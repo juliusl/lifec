@@ -16,8 +16,6 @@ pub trait RuntimeState<'a>
 
     /// select decides which listener should be processed next
     fn select(&self, listener: Listener<'a, Self::State>, current: &Event<'a>) -> bool 
-        where 
-        &'a <Self as RuntimeState<'a>>::State: Default
     {
         listener.event.get_phase_lifecycle() == current.get_phase_lifecycle()
             && listener.event.get_prefix_label() == current.get_prefix_label()
@@ -557,7 +555,6 @@ where
 pub struct Runtime<'a, T>
 where
     T: RuntimeState<'a, State = T> + Default + Clone,
-    &'a T: Default
 {
     listeners: Vec<Listener<'a, T>>,
     state: Option<T>,
@@ -567,7 +564,6 @@ where
 impl<'a, T> Runtime<'a, T>
 where
     T: RuntimeState<'a, State = T> + Default + Clone,
-    &'a T: Default
 {
     /// context gets the current event context of this runtime
     pub fn context(&self) -> Event<'a> {
@@ -621,7 +617,6 @@ where
     /// process handles the internal logic
     /// based on the context, the state implementation selects the next listener
     fn process(&mut self) -> Self {
-        println!("{}", &self.context());
         let mut state = self.state.clone();
 
         match &state {

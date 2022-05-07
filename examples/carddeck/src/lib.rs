@@ -809,6 +809,7 @@ impl<'a> RuntimeState<'a> for Dealer {
     type State = Dealer;
 
     fn process(&self, msg: &'a str) -> Result<Self, Self::Error> {
+        println!("Received: {}", msg);
         self.deal(msg)
     }
 

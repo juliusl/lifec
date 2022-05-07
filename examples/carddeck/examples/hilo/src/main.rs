@@ -21,8 +21,11 @@ fn main() {
         .dispatch("[.1-1]", "{ after_choose;; }");
 
     runtime.on("{ after_choose;; }").update(|s, _| {
+        println!("Current Dealer: {}", s);
         let s = s.prune();
+
         if s.hand(1).is_none() {
+            println!("Game Over\n");
             return (s.clone(), { "{ exit;; }" });
         }
 
@@ -39,13 +42,17 @@ fn main() {
             let cards = hands;
             let p1 = &cards[0];
             let p2 = &cards[1];
+            println!("{} > {}", p1, p2);
 
             if p1 > p2 {
+                println!("P1 Wins\n");
                 (s.clone(), "{ after_choose; player_1; }")
             } else {
+                println!("P2 Wins\n");
                 (s.clone(), "{ after_choose; player_2; }")
             }
         } else {
+            println!("Game Over\n");
             (s.clone(), "{ exit;; }")
         }
     })

@@ -1,0 +1,2331 @@
+Current Dealer: [s2s3s4][s5s6s7](hah2)
+ha > h2
+P1 Wins
+
+Current Dealer: [s2s3s4][s5s6s7](h2ha)
+h2 > ha
+P2 Wins
+
+Received: [+26][+26]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d9cqs10d7hah6s7d5c3sjhqsqc8s4d10s9sacjhjhkdqd3djc2c6][d6ckcah4h7h9c7h8dks2c4h5c9s6h3sks5c10d8das8h10d2h2s3](d4c5)
+d4 > c5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sah6d9d4c3hacqsqc8s10s7s4c5dqc2hjhqd7d3sjhkd5s9d10cjc6][h9d6c9h4d8s8daskc7s5h2c10h8h3d2ckh10h7dkcac4s3s6s2](djh5)
+dj > h5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d7s7d10d5h6dqs9c2hqsqhkd3s4c3cqc8cjsjd9c6sahjc5s10d4][d6skd2c4d8cadks5h10h5s3c10ckh3h8h4c9djh9s8h2h7s2dac7](has6)
+ha > s6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d10d9c3s4cjcqd7d4h6c2s7hqc6hjd5dqhksqhad3sjs9c5s10sas6][djc4h2h4d2h8h9s8d8h5s5s2dkc9d6s3caskh10c7dah7c10h3](c8ck)
+c8 > ck
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d5sqc6s4c5d4s7d9cjc3hjs6s10cqh6has9d10hqc2sad3d7dqsj][djs3h3dkh4dac10cks2h2h5d2s8h9c8d8c4h10skh8c9c7d6cas5](hkh7)
+hk > h7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sas6c6cqhqd10s7cjhks9d3h6d5hjdqc2d7s4d9sjd4h7c5s10hasq][dks3h3c8h9d6ckh8h10d2dah5c9djc10c4h2s2s8s5skh4d8ca](c3c7)
+c3 > c7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c5c2c6hqs7s4sjhks9d9had3cjsqdqs10sad4h7hjd5cqd10s6h6][h9c8cad8s8c4h10s5c10skc3c9c7das3h2ckh5d2h8d6h4djs2h3](d7dk)
+d7 > dk
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2c6s4sacjsjhqhjs9hahkd9sqcqh6dqs6d5h7s7d10c5d4d3][s2h10c8djc10c7h5h9d7h3d8s8s5s3ckd2dkc4h8d6skh2cac9dah4](s10c3)
+s10 > c3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d4sjd5cjsqs6sahjh6dqc2s4d9s9c6d10c5has7h7hqd3cq][dks2d8daskd2c9c8h2h10c7s3c4h3djs8s5d6s10c3h9h4ckh8cah5c10](hkd7)
+hk > d7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cjcqs4d9s6had5hkd10sqs7hqd7c6h6d4c2dqs9h7sjsahjc5][h5h8d8s8c4s3c7djh10h2skcackd6d2h3dac10c9h9s10h4c8s2dkc3](d3s5)
+d3 > s5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d5dqs7c5h6c6d9s9sqhad10hqcjcqd4s6d3hkh7s4d7hjs5c2sj][s8h2h4d6h5h3sks2ckh10c10dkc4dadjd8cac3s3h8c7c8c9s10h9](sad2)
+sa > d2
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s4hacjcqd4hjs9h7hqc5d10sqh6sjc2d9d3d5s6c6s7d7s5dq][d6c7cah5h10s8d8s3h9dadkc10d2skdjs10c9c3h4s2c8ckh2h3c4sa](hkh8)
+hk > h8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d3d7s9h6c5sjd9h8s6hjdqsqd4c6hkc2cjh7s7s4cqhqd10d5s5][c10ckc4sad2d8c3h10c7h2dkc8c9h5s2h4d6s8skh3djs3h9das10](haca)
+ha > ca
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjc2d3s4s7h7s6cqhqs9h8cjsqh6d9d10d4s5cahkhjd7c5c6d5ha][d8dah3dkc10c9c8s3c3h4c7sks2h5d2s10h10sac4djcks8h2d6](dqh9)
+dq > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cad9s4hah7hqh6d10s5d3cqc6d5c5s7c2sqsjd4hkhjd7s6h8cj][sad8c8djh10h2cks8das3s10h3h9skc7d6c9h5c3c10h4s2dkd2dq](s9c4)
+s9 > c4
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d5s5d4d3hasjh6d10hkc2hjs4sqs6cahqc5h7d7s7d9h8c6cj][dkckdjd2s8h4d8h3s10c8h9h2c9das3s9s2dqc10c7c3d6h5c4skh10](cqsa)
+cq > sa
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d7c6s4h8hjd3h6s7h7sjsqd10cac5had5cjhkcqs5c2hqs6d4d9][h9c3s9c7h5s3h3dqd8h4c9s2h2c10c4ckskd2d6s8dadjh10c8dk](sas10)
+sa > s10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s5sjcjcqhks7s10d3hqh8h7hjd10d7c2h6sqc5c6d9s4s6d4hasaca][c8h4djd8dqc10d2s3s8dkh2daskd6c4ckc3h5h3s9h9h10c7s2](d5c9)
+d5 > c9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2c6h8h7cad5s10hasjs7d10hksqd4d7hjcqsahqc5d3s4s5s6cjd9h6][s3djc4c7dadkdqckskh4c3c10s8s2d6h5d8h9d2h10h3h2c8](c9s9)
+c9 > s9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hacad9s10c9d7sad4sqs6hqh6c5s5cjs7sjd5s4h7hjd3c6c2s9h8d10cq][d6c7d2djdkc8dac10cks2h5d8h2h9s8h3c3sks3dqh4h10](hkc4)
+hk > c4
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cjd5c4s10sqc9c2c6hjhad9sjh8h7d10d7d3hkh6s9s7s4d4c5cas6hqsacq][c8s3h9dkh3d2skc7dadjh2h10d8d6ckdqc3h4s2h5s8](s5c10)
+s5 > c10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d9c4s6d4h6c9sqc2d5d10cac5cqcjhjc6had3sahqsjh7s4s7s9s10h8d7][h3h10h4d8dqh2c8s5h5dad6sks2s3dkd2djs8c10ckh9c3](hkc7)
+hk > c7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s7s9c5hkd7sjh6s4c9hjd5hqsahah8cqcjs10c2d4sqh7d10s6c7cad3c4c6][h2ckc8s3dkd8s2h4dadjh5skc10h9c3d6h10s8d2s5h3](d9dq)
+d9 > dq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjcacjd10cqc9s6c7c2h8sqd4d3d5d7h7h6hks7s4c6hasac4c5hjs9s10][h2djdqs5c8h9dah4skd6s8dkh3d8c3s3h5c10cks2d9h10](hqd2)
+hq > d2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s9d10sad2c6c4h6c5c7hkh8s6d7cjs7s4sjcqc2s10hqc9h7hjd4d5cad3ha][d8h4c8s3h3djs8d6d9h2c10dkskc3s2h5h9ckh10dadq](sqs5)
+sq > s5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hkc2s7h7cacqd10hjc6c5d7had4sjhqs5h8sqsas9s10c7d2cjc9d5h6c4s4s6][h9s8d9h4c3c8dqd6d8s3skdah5h10ckdjs2c10dkh3](d3h2)
+d3 > h2
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s6s7cac9d5d10cqd4sjsac7c2s10hkh7d7cjh8s5c6d2hjhas9hqc4h6sqc5][s2c3d3d6h9h3dks3djh5ckdqd8h2d9s8dah4c10h10c8](s4sk)
+s4 > sk
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h6h7hjd2cac4cjsad5c7c6sqs9h8s5s7c9d4c2hks10cqhahqd10sjc5d7][s2dkh10h2djc10c3cksks3s4d8d9h9dqh3dad3c8d6h4h5](s6s8)
+s6 > s8
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c6c2hah8cqc4s10cah7sas7hkd7h6cjd2c7d5sqs9hjs5c5c9d4sjhq][s4d8s8dqd9cks3h5s6dah10h2s2h3djh4d6skc3d3c8dkc10](d10h9)
+d10 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2c4h7hksjhqc7hac9casqs7s10d7h8c6d2h6hjd5s5c5s9cjcqd4][h4djs2h5h9c8ckd3d9d8s3d10h10dac10s4c3s6h2dqd6skdkh3](sas8)
+sa > s8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sqcac4hks9hasjh8d5c7s5sas10c9c5h6c6hqd2c2s8cjs7hjh7cqd7][dqckh10h4h5d6s6d10d3h2c8djs4dkh3c3dad8h9sks3d9s2](d4c10)
+d4 > c10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h6cacjhjs7h8had7sad4s10hks9c5c6s8h7c7c10c9hqsqd5c4s5sjd2c2][dqc8dah4d3h10d6h9c3ckh2h3h5s2s3djd8s4dks6skd9](cqd10)
+cq > d10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s7h6c10s5cjc2d4d5s9hqs10hksac5c6h8d2c7sjsqh7d7c4s8hjhaca][d10h9s4skdadks3c8h4s2h5d3h2djd6s6d8cqdqd9h3ckc3](c9h10)
+c9 > h10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d4d5hah6c5s5c4d7sjc2c7hqs10sqhkhjc10d2h7cas8s9sacjh8c6][d10d9djskh5dadqs2ckd6s4c3d3s6cqh9h10c9h3c8dkd8s3h4](s7h2)
+s7 > h2
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c7c2d5d4c4cac10hqh6h7sad7s8cjc6s9hksqhas5c5hjd2h8sj][h5c8dqh3sks2d9d10h9h10c3ckcqh2dkdac9s4d6djs7d3h4d8s6](s10s3)
+s10 > s3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c4s9sjsah6d2c10c2s5h8h7c5hjs8hahkd5d4s3cac6sqs10d7hqcj][h9d8s4s6h5c3d6daskd9d3h4cqs2h2dqdkc9djc8h10h3s7ck](c7d10)
+c7 > d10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c10d2d4sah7d7d5h6c2s8cac5hqhjcjsjs3s9s10s5c6hksqh8ha][s2dackd9d8skcqh3s6c7d6h4dqh10c8d3c3dkh5h9djs7c9h2s4](c4d10)
+c4 > d10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s10h8d7h6s5hqc10d5sjh7hacjd4s9d2hjc6cahksac2s3sqs8][c7c9h10c8d10h4c4d6h2h3cqd9s4s2dkh5ckdqh9dadjskc3s6d8s7](c5d3)
+c5 > d3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hqd7h8hkd2sac10cas3c2sqc6cjs5h7h6s9s10d4s8sjhahj][cqs2d8c7h4d3s7c8h2h5d10c3d9dkc4h9c5s4das6ckh10d6skdqdjc9](d5h3)
+d5 > h3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2s3hkc6c10sacas10sjd7s5cjhjh7h8had2hqsqs8h6d4][h9d9cqs7h4c4dkh10c5c9d6h3dad10dqh2c7skc3djs2h5d3c8d5d8s6s4](s9ck)
+s9 > ck
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [casjhkh7sacjs3h8sqd7c2d4h6s10d2hjs5c6s8c10ha][c5c9c3s9h2h5d5d9h4d3s7c4ckd10c8h3d6d8c7dah10dqh9cqs4dkdjsks2](hqs6)
+hq > s6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cjhjd2cac10s8s3sqh7c6h6s6d4s10d7hah8s5sasjhqc2][ckd5dkc8c7s2d10h5h4dqs4c3sks7c4h2d6s9d9d8cqh10h9c9h3djc5da](hkd3)
+hk > d3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h8cac6sad7s6s10s5sqs3hahqd4d3d2h6s8cjhjc10c2h7sj][h9c8s9d9d5dkdjs4c9s2h5c5dac3c7d10d8cqs7c4h3dqd6h10h4h2sk](hkck)
+hk > ck
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2h8c6has10d3s8s3d4d7casasjc10hksqhqs5h6ckh7d2cjs6][cqh5h4c4c5h3djh9h2s9c7d8dkd9d10h10d5s7dac9c8skc3s4s2d6](hjdq)
+hj > dq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjcackd4s3d3c2sahadqsqh8h6s8d7s10h7cjhkhjhqs6s5d2c6][c8c5d5s4h10s2d10h9d9dkc4h2c7d6dah3c9d8djs9cqs7skh5h4](c10c3)
+c10 > c3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2hjsqhkhadqsjs5s8cad2hqh7cjd7s10d4h6c10d3cks3sah8s6c6][c9d10c7djh3s4s9c4h5dacqd6skdks7h4c5d8h9d9c8h10s2d5](c3h2)
+c3 > h2
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s6c10had3cah6sasjcjd2s10c2h8c6hqdqs5s8sqhjd7d4h7s3hk][djdkc7d5dac9d8skh9s9s7s2c4h3d9d10cqd6h10s4c8h4c5c3h5](ckh2)
+ck > h2
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hqhac10cacjh8h7sjc6dqd2sqd4h6c2hjs8s6s10sas5s3d7hk][h4s4c4c5h3h10dah2s2d9c8d10c3c7c9d5s7h5ckdjs9skdkd6h9d8](d3cq)
+d3 > cq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s10h7d3c2h8cqh6hjcasjcjs8hqc6sqs6c10had2hksadqs3d7d4][dad5c7s2d6s7h2h9h4c8h10d8c9c3c4d9s9c5s4h3djh5d10dksk](s5ck)
+s5 > ck
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjc10s10d4s6h7s3s8hjh6hqd7sah8c6c2cqdqd2sqd3hkcjca][dks9d8s5s7dad10c8c7s4d5h9djc9c4s2ckd9h4c5h10c3h5skh3d6](hah2)
+ha > h2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cqd2cac2d7hkd4h2c10c6h8s8cjsjs10sad3sqhas3dqh6h7hqs6][ckc5s5c4d10s9s4h5c7d5h3h10d8das7djdkc3s2d6skc9h4h9c8](hjd9)
+hj > d9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [dqhjh7s8sqd2hac2s10s3hqd7h2h6cjh8sad3d4cad9hkcqc6c10sj][c5c9d8c8c3skckc7s4dkd5h10h9h4das7d10h5c4s2djs5d6s9](s6h3)
+s6 > h3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sqd9h2d4dqc2d3h8sasjc10d2hqd7s10has8h6s3cac6hkcqcjh7][d6djd10s4h10c8h5s2dah4ckd5s7s6s9c9c4c5h9skh3c7s5c3dk](hjd8)
+hj > d8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2s10d3cqs3hqhkcah8s8h2d8d9d2c6dqsad4cjhjsjhah7d7c10h6][c5s6skd5dah10s7s9s5s4h3h9djc9h5c8h4d10s2c4c3d6c7ck](sqdk)
+sq > dk
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d7s8h6d8d9s3c6had4dqcqsahqhkh8hjs10h7h2d2c10cjsjc2d3][ckdas7h4sks4h10c3c8d10sqs9djc9s5c5d6s6dkh9c7d5h3h5c4](cas2)
+ca > s2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h8sjh6s3d8d3hahqc10d2d7d9cqs10hkcah2c6s8h7dqd4cjc2sahj][s6s9h4d6s7dkdjd5s4dac5h5s5ckc9sqh3h10c4c7d10c8h9c3](s2sk)
+s2 > sk
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cahkc2sac10h8dqcqd9hqhjd4s10s3c6d8d2d7sjcjh7h6d3s8ha][skdkc8c4s4h5djs5h4h9sqdas9d10c3c5s6s2s7h3c9ckd5c7d6](h2h10)
+h2 > h10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h6hqsad2d4h7d7sjs10s8dqcqc6hacjh8c2hjs3d9cad3d8c10][s5c4h9c7c8dks7d6c3sqskh5s4cks6d5dadjd10s9c9c5h4s2h3h10](hkh2)
+hk > h2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d7cjc2hks10cqh6d9h8d2h2s3dqcasjhqd3d8s8c10d4c6hasahj][sqs5c7s6dac8c4h5h10s9s7d6c5ckh3d5s4h9c3dkdjh4s2c9sk](h7d10)
+h7 > d10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s3h6dqcah2c10hkd2cqhad3d4hjs8c6d10d7s10d9sacjhqd8c2h8h7][das9h9h5d5c4ckd6sqs5s7dkc5djc9c8h3h10s2s4c3sks6h4](sjc7)
+sj > c7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d10d4s8d7s3had9h6h8hkcqh2h7d2dqcac2d8s10d3hqcjsac6c10][s4h3d5cks6s9c9s7s2c4c8h4c7sjdkdasksqs5h5h10h9c3c5dj](hjd6)
+hj > d6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hkhqd2d10h6d3h2c6s10h7d8sacjd9d4s3d7c10cqc2h8has8d6hjdq][djh3sjc9s5d5h9s6s9c3ckc5h5s7s2c4sqc7s4dac8h10skdk](cah4)
+ca > h4
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hjd10d9c2h7s3h6hkcjc6h2h8d4dqd7hqd3d8d2d6c10hasas10cq][c7cksjc3s5skd5s4s6h9c8dkh10h3h4dac9djsqc5s7s9h5c4s2](s8ca)
+s8 > ca
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c6h2h6s10had3d6d4d10cjd9sas3hjh8dqh7d7d8hkhqc2d2cq][s6s7s4c7djs9c8sjdah10ckh5c4h9skc9h4d5s2sqc5cas5c3s8dk](c10h3)
+c10 > h3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d10h7h8had3cqsadqd9s10d8h2cjhkd4hjd7hqc2c6d6s3h6][h10h9c4c3djc5s2dks9s6c9sjcah4s5c8h3s8ckc7dasqh5c10s7skd5](d2s4)
+d2 > s4
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h7d2d4dqsacqd10s10s4d3h2d7c2d8h6c6hkcjh8hqd9has3d6][h4s9c4c5c10s6ckc3h10sqs5sjc9c7s7skh5dkc8h3djs8h9cas2da](hjd5)
+hj > d5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c6c2d3h8hksad5d7hahqh7dqcjcqd4hjd8d10h2d6d2h6s10s4s3][skdjs9c8c10c3ckdks8c5sjh4c7h3casqc9das6h10c4h9s7h5s5](d9s2)
+d9 > s2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s10cqd2hqs2c2h6d3d6h8sahacjh2hjd8dqc6hkd7d4d9d5s4s3h7][sjc8c5h4c3dkh9cadjs6c10cksks5s8h5sqdac7h3c9h10s7c4](d10s9)
+d10 > s9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d7c6dqhjcqs9hqc2d3d2s2s3cjd8hkd4d9had10h2h7sah8s4d5s10h6][c5c9s7h5sjcac3dks8sqskdjh10h4h3c10c8s5s6c7c4dack](d6h9)
+d6 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h2s4sad4s2d8d5d7had9hjdqh8hqd10d3h7d2s10s9h6cqcjs3c6hk][skckc3c8dac10cah10h5dkc7djh9sqs6sjs7s5h4c5c4h3d6s8](c2c9)
+c2 > c9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sad4h8d2hahkhjs3d5h2cqh7d8s2s10hqd9dqc6cjd10s4h6d3d7][cas5h9sjs6sqs7s8c8c5ckh4dadjc7c3dkc4h5skc9h3d6c2c10](s9h10)
+s9 > h10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s10d3hkcqhjs4d9h7d7h2d2dqd5cjh6s3c6sahqd10h8had8d4][s6djsks8sqh3c5d6dacah5c8h4s5c9c7s9dkc2h9h10s7c10c4sjc3](s2ck)
+s2 > ck
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hks3d10d7d3d9s10cjd2d8sacqh8d4s4c6hjhah6hqd5h2dq][s7s9h5dkdjh3c8h4c2sks6h9das2c4c5cks5c3s8cac10d6sjsqc9c7](h7h10)
+h7 > h10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hkh8cqh6h2hahqd9s3d10d2d3s4dqhjcjc6d7sad4d5s10][c2c7h10casqd6djs9c9h9c8cks8h3s5c5h5s7c3h4s2s6daskdksjh7c4](d8c10)
+d8 > c10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d3s3hah6s4cjd5d2d4c10d9h8d10cqhks10d8d7dqsahjh2hq][h4d6c5h7sjs9das7skc9c3c7h3s2c8c2h5cadkdjsqc4h10ckh9s5s6](c6s8)
+c6 > s8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s10d4d5sad8s3had2hqd10cqh6s8d9h2h8c6hkc10d3s4cjdqhj][skc8h9dkc7ckc2h7s7sjcac3djdah10s5h5h3h4sqc4s6s2d6c5s9](d7c9)
+d7 > c9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c9had7c10cjhjd3h8d5s10s4d2d9h6d10hkd4sac6h2s3cqdqd8s8][h3s9dkc5c4sqdah9d6h4h5h10c8sjskc3cks6cac2s2djc7s7s5](hqh7)
+hq > h7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cqh7c10sahqc6h2d5s8s3dqh8d9cjd7s10d4d3hjc9d10h6d2s4hkd8][h5d6h9c5c7s6s5h4c3sqcah10dasks2c2djc8h3dks9s7ckc4](hasj)
+ha > sj
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sacjsjc10d8cqd9s10c6d10hjhqh6h8d4d2d7dqs8d3hkh2s3c9has4d5][s7dkh5cas2d6c2h3s6s5c3c4c8h4sksqdjh9c7h10das9ck](h7c5)
+h7 > c5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d3sjdqhkc9cjhjd7s8h6h8d5d10c10c6d8h7d4s4c5h2has10d9s3cqsad2][c7c4h10s9c8h3h9s6s5dkc3ckd6sqskcah4h5s7c2dadj](hqs2)
+hq > s2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hjc6sjhkd3d4dqs4hqh7h2d9cjd10s10cqs2d5h8c10d2s3d7d8hac9s8sac5][c8c7h4ckh3dasqdkdjc3s7h10cas5c2sks9h9s6h5c4](h6d6)
+h6 > d6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjs10hqs8s3c10d3h8hkc9c5s2d6c6d8d10dqd9d4hjd2cqd5hah7cjd7h6sas4][s7s9h4s6c4ckdac8cadjdkc3sqs5h9skc2h10h3c7](h2h5)
+h2 > h5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d9s3cqh8sjc5hqd10s10s2d5d3c10d4hah7cjc9s4d8d2h6hjs8dqd7hkd6sa][s6sqdkc3c7h4cah10c4skc2h5djs5h2h3s7dah9c8ck](c6s9)
+c6 > s9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d2d5d8hkd10hjcqs9c9d3s2d4h6d6s3sac5h7had7s4h8s10s8cjc10sjd9hqdq][c3h9c2sqdjs5h10c4sks6h4dac8cac7ckh5dks7h3](c6h2)
+c6 > h2
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h6hjs4s3c5d10cjd6sjs10d7hqsadqh7d4hks8d2d8d9h8s9d3d5hac9s2c10][c7c3cas6h9c8c4h10djh3c2h4s7c6sksqdks5h2dah5](cqck)
+cq > ck
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s2d9hqsad3c5hahjd7hkd2h6d4d6s8dqs10c10s3h8s4s9cjsjd8d5c9d10][c7s6h3sksqc3h2h9cqh4c4c6dac2s7djs5dkcah5h10c8](h7ck)
+h7 > ck
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s8hks4sjc5sac9d2ckd6s3d7d5hqhjd3had8h8d9h7c10s2d10h6d4s10cjs9][h9sks5c8cqc6cas6h3h10c2h4s7h5h2c7c4dksqdjc3](dqda)
+dq > da
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hqs3c5d8had7h8sjh7c10d3d5s10d9d10ckcjc9d6s4d4h6s8s2d2s9sahj][dkh5s6sqh4h3dadjc2h2h10c6c3cah9c8c4s7cqc7skdq](hks5)
+hk > s5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s2hqh8hks3s8c10s9h6s5cjh7d3d4cksjc5d5d6d9d2had7hjc9s10s4d10sa][h5c8sqh3djc6h4s7c4dkc7c2h10cqdqdac3cah9skh2](d8s6)
+d8 > s6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjs3d5s5c5d7d2cks6hjhkd10s9hac10d3d4hqh8s10d9s4sah6c9d6s8s2d8cj][dkh9cqdac4h5h2c2sqs7djc3c7h3c6h4caskdqh10](h7c8)
+h7 > c8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s9cjc10hkhqc9d3d7h6s2s8s10sjhad8h7sas6s3d6s5d9h8c8d4ckc5s4d5d10d2][h9cah10s7c2cqdqsksqh2djc7c6dadkc4h3h4h5](hjc3)
+hj > c3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s4d2s8sahqd3h7had4d7hkc8s10s6s3h8c9d6d10sjhjd5c5c3ckc10s5s2d8h6s9d9][h3sqc2h5h2c6h9dkh4c4cqdqskcas7h10dadj](cjc7)
+cj > c7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d7hqd4s6c10h7d3d10s8h6h8hahjsad8cjc7ckc3c5d2s2s10c9d9d5d6s5hks4s9sjc8][h9sqh2dqdjcas7h10cqc4h4h5skc6dac2dk](s3h3)
+s3 > h3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cks4d10has6s2d3c10c3c5s10s9d9s8s5sjhkh6d6cjhjc8d7d4sah7c7d2hqh8d8d5][sks3cqs7h2h9h4h5dkc4sqdah10h3c2dqcac6](c9dj)
+c9 > dj
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c7d5d4had2cjhjd6h7s8s9s2hqsjh6d7ckh8s6s5d9c10sac5d3s10s4d10c8c3d8][c6daskdks7dqc4h5h10h9cqh4h2c9h3djsqc2s3](hkca)
+hk > ca
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s2d10d8hks5d9c5h7h6hah8cjd2hjc10d6s8cackd3d5c7sjs6d7s4s10hqs9c8d4sa][h5h10sqh3dqh9c2s3djcqc6c4dkh2c9s7h4sk](c3da)
+c3 > da
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d7h6sjhksad3cjh7d5d10c10d4ckc8s6hahjhqc7s2s5d6c5h8s4s9s10s8d2d8ca][dksqh5h10djs3dqs7c6h2skc2c9dacqh9h3c4c3](d9h4)
+d9 > h4
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h6s4cad5sahah8cjs8d6c10d3s5s2s6c7hkhjd8hqs9c5h7d4d7d10d2ckc8sj][c2h2sqh3cqc3d9s7dkh4dqdjh10c4h9skc9c6h5s3](s10da)
+s10 > da
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cad8s2sah6d4d10h8d2c10c8s6ckhks4d6d7d3hqc5d5s9h7s8has5cjhjc7][h10s10c3cqdadjh3d9h9dkskc6h2c4h4h5s3dqc2c9s7](sjsq)
+sj > sq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d7s4h8hac5c10ckh7h6d8c8hkd10cjsas8cad5d3hjd6s6s9d2d4c7s2s5][h2s7sjdqs3djh4c9d9c2h9c3h5s10c4dkh3cqh10c6sksq](hqda)
+hq > da
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s8hac10h8s2d6cjh6d8s6d10c7sahkhqc5d2cas5h7d3dac8s4s9hjckd4d7][c4h10c6h3sksqdkdjh5h9d9s3s10h2s7h4cqc9c2c3dq](d5sj)
+d5 > sj
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [ckd4s4c5s5had7d10dah7hkd6c7sasjd3h6h8cas2cjhqhjd5s6c8c10d8s8s9][djsqh9h10c3c6dqskdkd9cqc9h5s7h3h2c2h4s3c4](d2s10)
+d2 > s10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c5das5s10d4s9h6sjcjs2c10hac7d10d6s6h8d8hqs4s8sad2d3cah7hkc8hjd7d5][c6h3h4h5cqsqh2h10dqh9skc9d9s7djs3c2c3c4](ckdk)
+ck > dk
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hkc5cac8d5h7s8had8d3hqcjs2hjdad10sad2h6s6s5d7s4s9d4s10h8sjd6c7][c9c6s7d9c4skckc3cqdkh5djsqh3s3dqh10h9h4h2](c10c2)
+c10 > c2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hjs5d6cad2d4s6hahkc10sas10c7d8s4s8cjd7s9c2dah7hqh8h6c8c5s2d3d5sj][s7h5c9h3cqh2h9c6d9h4s3c3h10c4dkdjsksqck](d10dq)
+d10 > dq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d7hks6h7d8s5d5d6s10c5d4s8h6s9dacjd2s2s4c8c7hah8c10sjhqsacad3hj][h2skc3c6djc9dqh10s3d9c4h9h5ckh4dkd10s7cqsq](c2h3)
+c2 > h3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d4s4h8c8d2hjsjs2d8c10s5cjs6d3s8d6hkh6c7c5dad5h7has10d7sacahq][d10c2ckd9dkdjc9sqc4cqh3dqc3s3h5h2s7h4h9c6h10](s9sk)
+s9 > sk
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s6d8dac7hjh8cahkhac8s4h6s2c5s5sad5hqd3h7c10d7d4sjs8d6d2s10][c2sksqd9h3dkh5s9h4c3djh9dqs3h10s7h2c6cqd10ckc4](cjc9)
+cj > c9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s4s10hjcah6c10hqh8d2s6d7c9s8h7sjc8s5cjdahks2d8sac5d5d3d4c7ha][s7c4h2h5h9c3d9djdqd10h3c2cksks9cqs3c6sqdkh4](d6h10)
+d6 > h10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d5sah8s2d4s6sjc9d7cjd2c5c10d3hjhac7h6s8h7hqs4hkc8das5d8ca][s9h5c2h9d9s3djh10cqh3sqc3c4dqdkc6skd6s7ckh4h2](s10d10)
+s10 > d10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjhjc10s5s8s4hqhah8s6dac7s2sah7c8hkd4c5d7cjd8h6d2c9cad3][skh2h9djh10d6dqc2h5cqs7c6c4s9c3sqs3d10s10ckh4dkh3](d5d9)
+d5 > d9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s2c9d3c5d2hkh6hjd8cac8cjd4c7s6sas4s5hah8s8hqc10h7dasj][h2sqc4c3h9h3c2skdqdjh5d9d6d10h10s3s7h4dkc6cks10d5cq](d7s9)
+d7 > s9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sac8d2dacas5c9d3h6sjd8s2cjhkd4s8hqc7s6c10hac5hjs4s9h7d7][ckh5s7c6h9h10dksks10h4d5h2d9djh3dqc3c2sqcqd6c4s3](h8d10)
+h8 > d10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s2s6sas4c10d7h8d3hjh7has8sjs5cahkd10h6s9d4c7d2hqd8cjc8c5c9][sqh2h10dkc3c6h3h9h5d6djs10ckskc4cqs7d5d9s3h4c2](dadq)
+da > dq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cah8hahkd4das5c9s4c5d10dqhqh6s8c7c10d7sjcjc8sah7s9d3hjs2d2d8][djh3s3cqc3ckc4sqh10h5dkd5s10d6c2c6skh9h2h4d9](s6s7)
+s6 > s7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h8c5s9c10d2hqh6hjd8h7dqc8s4dahkd4s2c7hasacasjcjs8d7s5d10d3][h3h10s6d9ckh5sqc6d6s3d5c4c3h4skh2s10c2s7cqdjh9](c9dk)
+c9 > dk
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [had8c8h8d10d3hjs8hqhkc5d4dqdasad7s4d2s2c7c10sjcjs5cas9h6][c4cksqh9s6d6d5c3s10skc2h4dkh2c9cqc6h3s7djh5s3h10](h7d9)
+h7 > d9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjs9d10hqd2d9d4s4d7sas5c7d8d3s8dahjh8h7hacadqc5hkh6c8cjs2][h5dkh3c3djd5c6s7cqh10d6h2h9s3h4c4sqc2s10sks6ck](c10c9)
+c10 > c9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cas4c5s8d10sjc10s5h8d7sahjs2h7s9hkdac7hac9d4d9h6hqdqd8d2d3cj][d6c6h4skh2s3c4h9h5sqd5c2s10dkcqcks7h10s6c3dj](c8h3)
+c8 > h3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s9hjcjsjh7c5d4s2h6dad10cas8s5d7d3s4sac10c7hqh8hahkdqd2c9d9][h9sqc8h2ckc4d5s6d6s3cqc6s10h4h5s7h3c3dkdjc2sk](d8h10)
+d8 > h10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c7s2c9c10d9dacjdqs9s8hjd2had10h6cahqs4d3h7hksac5sjs5h8d4][c8h3c3c6skh10s10sqh4h5cks6s3h9s7c2c4djcqd6d8dkd5](d7h2)
+d7 > h2
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjhks2d4h7hqh8c5hadac9c10d10h6d2d3cjs5s4s8dqs9c7sacad9][sks7c4h4h5djs3h2s10cqsqc8c2d8h9h10ckc6c3h3s6dkd5d7](hjd6)
+hj > d6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d4c9s4d6hadad2s5d3d10c10s9cac7hkc5s2hqcjd9hjh8dqsah6h7sj][d5h4c6cqh10d7sksqckh5djc8s10h9s3c4h3h2s7dks6c2c3](s8d8)
+s8 > d8
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cahjhks9has5c10d2cjd10sjsah6dac7d3c9d4c5hqd9h7dqd6s2h8][dks10djskh2h10h5c8c3sqd5d7h3s7cks6c6d8h4cqc2h9s8s3](s4c4)
+s4 > c4
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h7dahad6d9c10s9hqcad4c5c7hjcjhkdqh8d3sac9d10h6sjd2s2][h5sqc4s6s3c8cks7d5dks10h2h4d8s8d7cqh10c3h3s4h9c6c2dj](s5sk)
+s5 > sk
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h6c5cjhks2sas9sjhjcah7h8d6d4d2d10d3dqhahqdac7c9d9][h9h4skh3d7d5c3h10s6h2c2sqc8h5d8s10cks7s8c4s4djdkc6s5s3](c10cq)
+c10 > cq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [dqs2d10d9h7c7hah6d3d2cah8s9d4hkcjc9sasjd6dahqc5][skc4d7s4s8ckc10djc6h2s3s7c2cqc8h4s10h9d5h5sqs5d8h10s6c3dk](hjh3)
+hj > h3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c9d10c5h6d6hjhad2d3dqhqsah8s9cac7d4sjhkcjdah3s2d9][s6cqs3s4djskh9ckh2c8d7c3s8sqh10c4h5d8c6s10dks5h4d5c2s7](h7c10)
+h7 > c10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d4s2d10h3hahqs9d9hjc7h8c9d6cjsjsac5h7c10d3dad2dqhkca][s10d7s5h10s7c4h9s6s8skcqdkd8d5c3sqc8h2c6ckdjh5h4s3s4](h6c2)
+h6 > c2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c9c7sacjs2sjd9hqs9d6d3cah7hkc5hjh8c10h3c2h6dadqd10had2][d5dksqskh9h5cks4c6d7s10s6c8s3h4c4s8d8cqs7h2h10c3dj](d4s5)
+d4 > s5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hjsac9dad2h3s5s2hahqd4c7h8h6d10cjc2hkdqd9h7cac10s9c5d6d3][h5c6h4d8c8sqs4h10skckc3h2s3s7djc4h9s10dkd7s6cqd5](sjs8)
+sj > s8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c10c7d9h7dqc2d3sahqh8hkcas5cjs9d4d2h6h3had6s8hjsjc5c9d10da][d7dkd5h9s7h4c4h2c8cqskh5d8sqdjh10s6s4s10s3ckc6](s2c3)
+s2 > c3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c9h7hjc5d3sad4cjdqs5d2d6c7s8hkc10sjc2d10dad9cahqs9h3h8h6][h5c6c4s6s4s2ckcqdkd7h2sqskc3s10d5s7h9c8d8s3h4dj](hah10)
+ha > h10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cjh10h3d10d2s8d9s9dqc5hqc10d4h7hksac9s5hjc2c7cah6d3dasjd6h8][dkckc6h5d7s7cqs4h2c4djd8h4c8c3s10s2s3sksqh9s6](had5)
+ha > d5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d10s9sad6h6c2dah10h7hkd3cac5d5h8c7d2s5c9c10hasjh3d4s8hqcjhjd9][s7h9s2h5s3d7ckc3sqskc8h4s4s6s10c4dkcqh2c6d8](dqdj)
+dq > dj
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjsahkd5dacjc10hahjd3d9h6s9s8c9djdqd6d4c2d2c7h7c5h3cah8d10s5h10][c3s10sqcks7h2skh9d8dks6c6d7s3s4cqh5s2h4c4](hqc8)
+hq > c8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h3s8h10hqdas9djc7c9sac2d4d6hjsjc10h8d5d3h6cjhkd2c8d10s5dqc5d9hah7][c3s2cqskc6s4h4h2sqh5c4s7dks3d7h9cks10s6](cad8)
+ca > d8
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [djcjc2s9h8d10d6c9d9h10d2hkc8sad4h7d5d3c7dqsjhac10c5hqh6das8hjh3][skdkc3c6s4d8h2s7s3c4cqs6h4cas10cksqh9h5s2](s5d7)
+s5 > d7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cjd2sac9d6h10dqc8d9had5c7hkd3sjs9h3c5c10h6h7h8hjdahqs8djc2d4][c4d8s5s10skcksqcqs3s2cas4s6h4h9d7dkc3s7c6h2](d10h5)
+d10 > h5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjhjdac9h7had2d4djc10h3h8s9c5c8cjd5h6c2d6c7hkd9sas8dqhqh10][s2cks5c3h2d8s6s4h4d10c6s3d7h9s10c4h5dks7sqcqsk](d3ca)
+d3 > ca
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [djdahqc10s9cjh7d6d4h3sahad9h6h10d5c2d3dqhjc7s8c9d2c8hkcac5sj][d7s7d10h4c3skh9c6dks6h5s2s3s4h2s5ckc4s10d8cq](h8sq)
+h8 > sq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c10djhad5h10sah7c7cjd9cad2s8sqdqs9d6c2dad3hjd4hkh8c5h6c8h3sjhq][cks4d7c3d8s6dkd10c6h4c4h9cqh2s3s2s7h5sks5](c9s10)
+c9 > s10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2h6c7hksah10c10c5s8d3d2s9sjs10h8d6hqd4h7cac9djcjsqh3hadqd9c8dahj][s5h5d7d8h4h9s7s3c4dks6skd10c3s4c6s2ckcq](d5h2)
+d5 > h2
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d6d9dqh6h3hjd4c10h7djc7hqcjd2sqhas9das8s10c2h8cac8h10hkc5sad3c9][s2cqdks4s3s7h5h4s6skd10c6d5c3c4d8s5ckh9d7](sjh2)
+sj > h2
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c9hadahjc5dqh7c8h8hkhqd2cjs8sqd4s10cah6djc2d6d3sac7s9h3h10d9][c3d10h9h5sjc6s2s5cqs7dks3sks6d5ckd8h2s4c4d7](c10h4)
+c10 > h4
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d6sqd4cahah7hjs9c2s10c9sad2c5h8h6d3h10s8c7dqdahkdjcjh3d9hq][s7h4s6s2d10h9s4s3s5skh5c6d8c4c10h2d7d5dkcqckc3](c8sj)
+c8 > sj
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h8h6hjcas10sjhkc9h10d3s8d4dahqsadqd9c8c7cjs9h7sqd2c5c2hadjh3][h5h9d5dkcks4s5h4s6s2d8d7skc4s7c3d10cqh2c6c10](d6s3)
+d6 > s3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s9hjc8c2h3hkd3sqhah6s10dasjs3dqc9hqd2h10sac7d6djd4cacjh8d9h7c5][sks6dkh5s4s5d5h4s2c4d10d8h2c10ckh9d7c3s7c6](s8cq)
+s8 > cq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2s10cjh10c5d2h8sad6hqdqh6s9d4sjhkh3c9c8hjdjc7d3sqh7d9cas3da][s5s2c4d10d5c3cqcks8d7sks7h2h9c6s4d8h5c10dks6](hah4)
+ha > h4
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h7h3d3h8d4hkhjd9hqdqhac8c9d6d2cjc2c5dasas10c7h6s9cadjh10sjh4s3][s5ckc6s6skc3d7d10d8s8s4h9c4d5h5h2c10dks2s7](sqcq)
+sq > cq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c9sjs3cac8d2c5d3sacjhqd4c7s10hkh8hadah4c2h10h7s9h3d6hjdqd9dj][dks7cqd10h5c4d7s5d8s8c6s4h9d5c10skcks2s6h2sq](h6c3)
+h6 > c3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cjc8h10s10h8hqs3h7dqc2c9sjd4d2sah3d9djh4hahjc5d3hkc7d6h6dacas9][h9sks8s4s7cks5c10dkd10sqc4cqd8h2h5s6d7s2c6](c3d5)
+c3 > d5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h10c7c8s9dqcjcahjh7d2sah6s10hac5d6d4djc9h8dac2hksjs3d9h4h3hq][d8cqskh5c3s4s6s7d7sqc4c10c6d10s8dkh2s5h9d5s2](d3ck)
+d3 > ck
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c9h10sjckd3hkd9h4c5c8sas10d2h3c7djh7cjhad4h6s9h8hjs3d6dahqdqc2][c4h9d8c10h2cqs2h5s4d7c3s6dkskd5s8sqs7c6d10](cas5)
+ca > s5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hadac9c5c7dqh3h7hqs10h8d9hjcas5d3cjs9ckd2h6c8djd4sjs3sah10c2h4hk][s6s7s8cqh5s4c3d5d7sqs2d10h9c4skh2d8c6c10](d6dk)
+d6 > dk
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s5c2h3h10s9d2djh4s3sjc9d4h6cjc7c5ckc8hacasas10hkhjd9dqh7hqh8d3][s4c4d7c10sqs8h5cqh9h2d8dkc3c6s2d5d10s7d6s6](dask)
+da > sk
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hkhackc2h7s10sad4c8s5hqs9dqdjd9hjskh10c9h3h8c7h4cjsjcas3dad2h6c5][s2d6d10h5d5dks6h2s8s4s7c10sqc4h9d8c3c6cq](d3d7)
+d3 > d7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h8c7c9cadqh10cjc5s9ckhkc2s3djhac8h3skhqhjh4d4dah6s10s5d2sasjd9][h2d6s8c4c6d5d3s2d7s4d8dkcqs7d10s6h5c3h9c10](h7sq)
+h7 > sq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c7c8c2cjh7sksasjh4s5cks10hkhqcah10hahjc9d2h6h8s9d9djd4dqsqh3s3c5][d10s6h9d3s2d8c6d6d5s7h2c4s8d7s4h5c3c10dk](dacq)
+da > cq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d2djc8h3cks10d4h6c9c5c7s3s9sah8dasqd9h10cqhjcac2h4cjhah7sjsks5hqdq][c6dkc10d6h9s8d10s4c4d5d8h5d7s2d3c3s7h2](hks6)
+hk > s6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h4h3haskh8s3h7d2hjdjc7hkd4h6cjcksacadas6sqcqsjc5hqs5c8c2s9h10c9s10dq][s4d8s2h9d5d10d7c4d6dkh2h5c6d3c10c3s8](d9s7)
+d9 > s7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d2s6s10djh10hqhkdqc8sac7sqs7dah8s5sjd9c5h4s9has3d4cqckc2c9skcjh7hjh3ca][h9d3c6d7d6h2c4s2d10d5s8s4c10h5c3d8](h6dk)
+h6 > dk
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s5d9d2h6hkcac5cqh10s3djs10had4c2hqc7h3skdqc8hjdah7sac9s9cjdkh8cks7h4s6sq][d5s8c6c10s2d10h5h2h9c3d3d6s4d8c4](sjd7)
+sj > d7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h6c5c2d9c7cjdkh8c9dqhas9h3s5dah4s3casks6d2sah7cksqhjs7s10djh10c8hkhqd4][h5c6s8c10s4sjd5h9c4d7d6h2c3d8d10d3](cqs2)
+cq > s2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s5djcacjh7h3skh4s2d2sqc2hjhadkc5hkcks9cqd4d9c8s3dqh6c7c9s6dah8sah10s7s10][d7h2d3d5c3s8s4d10sjh9h5c6d6c10c4](hqd8)
+hq > d8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h4dasqc5s9s6cqh3caskcjh8hjs10h7d8d2has3h6ckd4c8c7c2h10hkd9c9s5hqs2sas7djdq][h5h9d5d10d3sjc4d7s4c10c6h2d6c3](dks8)
+dk > s8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hqsah4c7s8cqsqdks3hks2d4c2cah6c9d8s5h8s9s6h3s10h10c8djckh7hjsks7c5d9cjhad2dq][c10c4d10c3h9h5d3d7d5h2d6s4sj](dac6)
+da > c6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s5dac7s2s3h4d2s9hjhqckcadqsasqh8c2c5skh3cjc9cqhks6s7djc6h7s8d8hadkd9h6d4s10h10][d10h9sjd7c3c4d6h5h2s4d5c10](c8d3)
+c8 > d3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s8c5h6h8hjcjc6h3d8dqd4sqs3das6hqsac2d2cqh10s7c9s2h7hac7s9s10dkd9cks5hkdjcah4][d10sjc10d5s4c3h2d7h9h5c4d6c8](skd3)
+sk > d3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h6c5hqs6s8d4c7h4cacqhkhas9c6sqdqdjcjdkd8h7hjc9s3h8h3c2s7s10cksas2dad9s5d2][skh5c8c10c3c4s4d3d6h9h2sjd7d10](h10d5)
+h10 > d5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c7s2hqdjdkckdah7d5cas3s5sahkh10d9cjc5s6d8c2h4s9h6cqd4c9hasqhjs7s10s8h8dqd2c6][d7d10sjh9c4c10s4h2d6skc3h5d3](h3c8)
+h3 > c8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s3ckcqc7d2s8h3s2s5s6sadjdah4d8s9d9hkcjd4dqh10s7c9hjsqcadkh8hac2c8h7h6c5hqc6s10][s4h5d3h2d7c4c10skc3sjd6d10](d5h9)
+d5 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d9d2s3sac6cahqh4s10d8cjcqckdqs7h10c8c9c2d4s2h6hkdks9s5s6h7s8hadjhjh3sqh8dac7][s4d7c10d3d10c4d6d5h2h9h5sjc3](c5sk)
+c5 > sk
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d9h4sacac6djc5cjc9ckh3s3s8d8h10hasqc2c8s7sks6s2hjh7das5s9h8dqdkhqh6s10cqc7d4d2][h9s4d5c4c3d7sjd10h2d6c10d3](hkh5)
+hk > h5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d2skdkd8s7h5dqh8d4s2hkdacjhjc5h6s5s8ckd9c8c9sqh4casac6cqh10djh3hahqc2s10c7s9s6s3][h9d7c10d6s4d10d5c3sjc4h2](h7d3)
+h7 > d3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h3d2h8ckhjd4s2h4skdjs10hkc5c7c2h7sqc9d9hqd8s9h5hah6s7sas3dkcas8dqc8cqs6dac6h10d3cj][c4s4d10c3sjc10h2d5h9d7](s5d6)
+s5 > d6
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d8s6d3hqd2sahjh3dah6cqsksqc5c8cad9s3s7djh4s9s10s2d4dkc6h5ckdqc7hkh8h10hac9s8h7cj][d7d5d6h2d10c4h9c10s4sjs5](c2c3)
+c2 > c3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c6d3cqdjh4hqdkh8d8c8hjh3s6d9h10cjhkc9sas8dqdad4h5s9c5d2s10sks2sqhas3cackh6h7s7][h9d5d7c4d10d6sjc10s4c2c3h2](c7s5)
+c7 > s5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h3d2dqsqhqhkcjdkcqh6sks9h5s10s7das5hackc5c9s8h8d8c7d3hjh4c6c8cad9d4h7s3sas2s6h10][h9s4c4h2d5c2sjd7c10d10c3](djd6)
+dj > d6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hjh5skd9s10cacqh8d3h6cjs3sadqsqdjh10s7hkc9h3d8c8s2s6d2c5ckdahqs5dkhah7s9c7h4d6d4c6][d7c2d10sjs4d5c10c4h2c3](s8h9)
+s8 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d2hkdjcadks9hjcqh4h7c6skc9cjs3s5d3c5hqs6h5d6dac7d8s2cksah6sqc8d9dqd4h8s10h3s7h10][d10h9s4h2c4sjd5d7s8c3c10](hac2)
+ha > c2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [skd9cksqc8das7cac6c2h7d8dqs3c5s2hqs5hjcqdjh10sah5c9c7s6d3cjhad4hkh6s9h4d2d6s10h8dk][c3s4h9d7d10c4sjc10d5s8](h3h2)
+h3 > h2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hjd9cjc7h3c8c5d4s10sas2dqhkd8c9h8h5dks6cadjd2h7h10s3cks9s5hqsqc6h6h2skd3c2h4d6dahacq][sjd7h9s8d10d5c4c10s4](s7c3)
+s7 > c3
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d9h8sahqh5djsqc2s10hkc5dqs2d6s5h4cad2s9skhas3dacqdkh3hjc7c6h7d3d8h10d4s6h6ckh2c9cj][s4d7c10s8c3d5h9d10s7c4](c8sj)
+c8 > sj
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [has3h4s5h3h2s6d9cac5h6dqc8skc2h10sqcjc6hjd8d6sac7s10c9d4dkdahkh7h5s2sjs9cqdjd3d2h8ck][s7s4d7d10d5c3c10h9s8](hqc4)
+hq > c4
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [had9c7c2sqd4d3sah8c9hqd8cadjc6s3h7h2skcjs10cks2h10c4c5d6cqd2c8h4h3h5s9sjdadkh6hjs6s5hk][c3c10s8h9d5d10s4d7](dqs7)
+dq > s7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d8h2s7das3c7dqsqh5d2s6cjs5skhad4c4s2d3djs10h4h7c9s9hjcac6ckd9c8h3hkdkh10sjd6hqc2cqsah6c5][d10c3s8c10d7h9d5](h8s4)
+h8 > s4
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d3c5hac4djd2s7d6s3dqs2dac6skh8c2hjc9h6d4hqc7s4c8s5h2ckh10s6dkhkcqsqsah3h7d8cjs9sjcad9s10h5][c10d7c3s8d10d5](h4h9)
+h4 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d8h5s3c4skh10d4c7d9h3c8sacadqs10h6had3s4hqs9ckhjsqs5c5hkd6dkc2s7djsjh8s2h7h2cjs6c9cqd2da][h4h9d10d5c10s8c3](c6d7)
+c6 > d7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h5s9h3s6h6sqs10c7cqcjsad2h7h8d8h10hkc2c5d3d9dah2s4s2s7c8hqdksjskc4c9s5cas3d4hjhadjckdq][c3s8d5c6d10c10h9h4](d6d7)
+d6 > d7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hkcah8s3has6c9s10h2dkd4djcqsas7s2d3d9d8cjh10skc8c7h7dqc5dasjckc4s5hqc2s9h5d2h6hjh3s4][d5c6c3d6d7d10s8h4c10](sqh9)
+sq > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c9cjd8s5h6c8h7s2c7c2sjd3h8h10dkcqc5sadqckh3das10djh5d4s3skhahjc4cad9hks4d2s7s9s6h2][s8h4sqc10c6h9d10c3d5d7](hqd6)
+hq > d6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s3s6s9hjs10hqckc5s5s2djh5dkd4d2cacqd6s7d8sah7skh6dad9h3hkc7c9s4d3c8cjh8h2hac4h10sjdq][sqd10c3c6c10s8h4d5h9](c2d7)
+c2 > d7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d2sjs10c9djc7h2cqd6h3sahac8dqc5s7s3s6cjd8d4hjs2d3ckc4hks9s5h8dkhqh5d9daskh6h10cas4][sqc3s8h4c6d5d7c2h9d10](h7c10)
+h7 > c10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cjhjh3h8h6s3c10dad8h5h7s7s9d2cqd3sas10c7c5hkd4s4h10dkdjs6hqc8c4had9cac9sjs5h2dqckd6s2][s8d5h4c2c3d10h9d7c6](sksq)
+sk > sq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cjs4s9h2hjh3ckd2d8d6h7sahkcac8sjd4h10dqs6dkdac5s7hqs3h6sks2c7s5d9c9c10sqd3c4djh8cqh5s10][d10c2d7s8d5c6c3h9](hah4)
+ha > h4
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h10hac4d3sks5hjcjc10dqsahkd8cac9sjd9s4s2s3c7d2s9s7h7hqh3sqs10c5h8c8h2h5djdackd6d4dkcqs6h4][s8c6c3d7h9c2d5](h6d10)
+h6 > d10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sks4d9dkd10d8das7djh4d3h3hkc4h8s9sqc8c9ckcjs10c7casad6cqh10hqd2s5c10h2s6d4c5s2dqh7s3h6hasjhj][d5c3h9d7c2s8](h5c6)
+h5 > c6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c7c5h6ckc4s4h10h2s5hqs7d9das9cah5dkcjc6cqs2h8d4d6s3sks6hahkd2c9h7hjc10d8s10dqdjd3h3sqsjsac8d10][d7h9d5c3s8](h4c2)
+h4 > c2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c7hqs5d4h8s9s2skh6d6cjh5h2d3c9djsac8c10d10d9c6dkd8s7h7s6ckh3hjcqs10c4h4dqs3sjc2c5das4hah10cahksq][d5s8h9c3](d2d7)
+d2 > d7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2h5cqd9dkc8cac10hah8cjdahqh4h3s10skhjc7s6h10djd3h7cks5sac6d6s2dqh2d8s7hkc5s3s4d4h6s9sjc4c9d10][d5s8c3h9d7](sqd2)
+sq > d2
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h3had6cah5d3s3c6d4d9h4s5c8c9h8cjhksjs7s9h2hjc4d10djcqskc2c7hqsas10dqdkdah10d8c10h6c5h7s6s2s4][d7sqs8c3d5h9](ckd2)
+ck > d2
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h6h7h5s2d6d4djsjc10dkd8s4hkd3h2sas9c2h4h3h8s5s10s7h10hqc4c6dqc5c7c9cjcqs6had10dahjcad9c8sk][d5d2cks8c3sqh9](s3d7)
+s3 > d7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c10c4dah2d9c8djs2hjh8dqs7s6d4h4h7c2caskd3c6s4h5c5dkd6s10cqs9hqs5h6h3sad10d8c7sjh10hkhac9][d7d2d5s3s8c3cksq](cjh9)
+cj > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [dah10c8c2c6s5c10skd10c7dqsahkc4h2c5h7c9d4s10s2h8d9hjcqhqh5h6sjs4h3h4s7dkd3cad6s6had8dj][ckh9d5c3d7sqs3d2s8](s9cj)
+s9 > cj
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h6h7c5c4c9s5cac10skd3sah3h4c2hkc7d4s10hjh5c6djdqd9d8das2dks4hahqh10h8h2s6sjs7d6c8cq][d2s8ckd5s9d7s3h9sqc3](d10cj)
+d10 > cj
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h10c4s7djh8c5h6sas5c2s6d6s10c10h4h3d9c8d4skh7d8c9had3sjhqc6dkh5dqd10cjdas4h2c7hkcacqs2][d2h9s3s8d7d5ckc3s9](hjsq)
+hj > sq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [djs6h6c6h4d3c5dqh10d9h3c4hjcad6sks7s5cjs4sasjhah5hqc9s2c8h7c7d8d10hksqs10dkc10d4h8dah2cq][d7c3h9d2cks8d5s3](c2s9)
+c2 > s9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s9s10cjs5dah4hkc7h8h10d6cqsad10s6skd3h3h6sjhjdjhqc2hasqs4s2d8c4c8d9c6d4h5c5dqs7dkh7h2c9c10][s8c3d2ckd5s3h9](cad7)
+ca > d7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s6h8cqdac7h5dqc10sqh6c8hqd4skdks9s7djs10hkd10d9c9d6c2h10h2c4s5cjd3sjh3hjd8h4h7hasas4s2c5][d2s8d5c3cackd7h9](c6s3)
+c6 > s3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c7d4cjsas5h8hksqdjhqhjc10s10h3h4dkd10h2d3s3das6h10h6h7c4cqc9skdqd8c2c8s4sjd9h5d6hac5s7c6s2][s8cad5h9c3ckd2](s9d7)
+s9 > d7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c6djhqh8d3c9d9h10dqs10sqhkc2hacqd4h7c4skh4s7hjdkh2sjs2c10h3cjh5d6c5dasah6c8s5d8s3c7s4s6][ckd5h9d2cas9d7s8](d10c3)
+d10 > c3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s10h8h7h3hqc2dks7h6c7cqh2h5c6s4dqsjh10s3d8c4sqd3das2sacjskh4hadjs6hkd9c5c9c10d4d6c8c3s5d10][s8ckd2cah9s9d5](hjd7)
+hj > d7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [skc9c3c8s10h7d7cjh3d4c5d3c2c4h10h4s6s4h8d10c7dkhks3sqd6hqd9h2h6s7dqcqs2djd8c10hjhadac6s5sjsa][h9s9s8d2d5ca](h5ck)
+h5 > ck
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c4dkhjd4h10hadjc10cqs6d10h7skd8h4s5h5dad6h3s2h2s4c6c7s10sqhkhqd7cjc2sac3ckd9c5d3s3c8h8h6sjdqc9][cas8h9s9d2](s7d5)
+s7 > d5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c3das5d8sjd4djd6c10h3c6c8c4h6d9c9dqdkhah2sqc7d3sacqs4hjsks6h8d10s2s10hkh5cks3h4h7hqc5d7cjh10][s9cad2s8s7h9](c2d5)
+c2 > d5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h10sadjs3d3ckcjh4d10c5s10d9hjd6s4c3c6h5h7dkc7sjh6c4dah8d8sqd7c9hqcqc8has5h3s2h2dqhkc10s6sk][d2s7cac2d5h9s9](d4s8)
+d4 > s8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c10cqd4c8sjc4h6s5c3s8h2sqs3c5h7sah4dad10d8hkdqh3h10d9h5d7dks4skc6djhqd6cjckh8d3s2s10s6c7c9ha][c2cad5s9s7h9](hjd2)
+hj > d2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c3cqdac9hac4h3sqd3s2sjs4c10h5djh8skd8s10d9s6d2c5sad4dks8dqd7h7d6hkhjc6s3hqcjh2h4c8h10h6ckd10s5][s7c2d5cah9](c7s9)
+c7 > s9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d9d8c3hac9cjs6h10c10h4sah6skdahkh5hqs4s9d7d2d10c5h3c7s10s2d6c4s3d3dkcqhjcksqc6djd4h8h2s5s8dqc8sj][s7c2d5ca](h7h9)
+h7 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d7c7s6c4s10hkdkc3sjd2skhjh10s4ckdac8h5h3djc6s9c10h8d3h2s8has5h4d4sqd10h6hqdqd9s3s2d6c9sacjc5d8][h7h9cas7c2](cqd5)
+cq > d5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d8d4c9h4s4s3h10sac3das8d9hksqd6dqc5c8h5d3c6c10cjskhjc7s9h6h2d7ckdjd2h3sjs6s10hah8s2c4s5hqd10][d5cacqh9c2s7](dkh7)
+dk > h7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s4d3sjh10skcjd8hqs2ckc6h4c7h8s9d4d7s6has5h6hkc3s8sadqc5djc4h3hjs3d6dasqc8h5d9d2c10h2s10d10][c2h7dkd5s7cah9](c9cq)
+c9 > cq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h2s8d6h4c3s2s9sqcjhqc5skc8hkcks3h8d4dqsjd10c7djs5c4d3s6c6h10s10d7h3hjh5d9s4had2sadah6c10][s7h9c9cad5cqh7dk](d8c2)
+d8 > c2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s3cjs9h8hqsah3c10s6c6d2dad7skhas10c3dqs5d3h5hkc4c5s2h10c8ckdjd4d10d6s8h4d8c2hjs4h2sjc7h6d9][h9c9dkd5h7s7ca](sqcq)
+sq > cq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s3s10c5d8h2d3c7cjh4s6d10d4s9d9s5c3c2c6djs4h8dac4skhkh5s8hah3sjhjdqc8h10s2d2sac10d6h6d7ck][h7c9cqdks7cad5h9](hqsq)
+hq > sq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hjs3c8s6h8d6had10h5s2dacjs8s9s10ckc7h10skc3h3d3c6h6c2sac4d4sqd9c5c10d2h2h4d7s5d8sjhqhkdqs4][d5h9cacqh7c9dk](djs7)
+dj > s7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hjc10dqs5d2s10c5hqd8d3s9c7cjs2h3s6d7c4h8d10daskdjh4h2s7c3h5had6d9c2c8sac6ckhks3sjs4h6d4h10sq][c9h9dkcad5h7](s8cq)
+s8 > cq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s7dad3skhjc10c8s9c5djh8c2s3sqh5hqs5d2sjdqs10c7ckd7h3d9s4h10hkc3sacjh2d8d4d10s2h4c4d6has6h6][s8cqc9d5h7cadk](c6h9)
+c6 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s7d10c5sac2c4h4d9d7d3dqhksjs2d8s3h6s4h8s5h3c8h2ckc7c3hah10sqdahjh5d4s9djsks10cjhqs6d2d6][cac9s8d5cqh7c6h9](c10dk)
+c10 > dk
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s10d9has4c8d4sjc5c2h2d3s7dqc3d10s9h4c7hkh6d8sqh3sah5cjckd7s6h8s5d2d6s3s2c4djhqskh10da][c6c9dkh7h9cas8c10d5](hjcq)
+hj > cq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d9h6cjs3skhks9c5h4cqc7ckc8d8djs7d7s5sjs6hjh5h2c4sqc2d4d3s4c3d6h8sas10h10dqhqd2h3s2d10da][h7c9c6h9dkd5cas8](hac10)
+ha > c10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d4ckd9s6h4s2d6sqh10c3skh5hah8d2cqs10hkh2sac8s7d8dadqc7c2cjhqhjd10s9s5s4c4c10h3s3d3c5djsjd7][cah7c6c9h9d5s8](h6dk)
+h6 > dk
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cqdasqh8skh2s10sasjs7cjh3h10c3dqd4c5hac7d10h4s2s5s9s4d7c8hqckhjh6c10d3h5djs6dkd2d6s3c2hkd8c4][h9s8c6h7cad5](d9c9)
+d9 > c9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sadks10dad8hadqcqhjs9s5s2c4d10h5sjd4c9s7d7hqsks4h8h2h10c3h6djc5d2d9hkh3c10c7cjc2d3ckc8sqh4d6s6][cah7d5s8h9](s3c6)
+s3 > c6
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [skc9cjs4h6c7hqsqh5h8d7c4sad2d10h10d6sjdqcqdjs9d8s10s7c8dkh2dahah3d9hjd3s2ckc5c2s5c10d4c3hkh4][cac6h9s8h7s3](s6d5)
+s6 > d5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [djd10s2sad3dkh2s5sqsks10d6s9h4h8d9h5cjd7hkc10h3s7h6hjc2h10dadqhac4c5s4c7d4c8d8c3hqc9ckcqsj][s3s8c6h9s6h7d5](d2ca)
+d2 > ca
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h5dah3s7h10cac8s2s5s10ckc10h4c5h6d8h8c3s9cjhad2d6skcqc2sjd10s4hkd3hqhjdkd9sadjdqd4c7c9c4d7sq][s3h7s8d5c6s6](h2h9)
+h2 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c10d2s2c5h8s9djdqc8h10d9c9s10sjd8d10h3d4h5h4cksadas4h6cqd3c7s7cac4c2dkhjhas5hqd6c3cjhksqsk][h2h7h9s8d5s3s6](d7c6)
+d7 > c6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [dkhah4djh10d4d9hjdqc5ckh3d10c9s2c8hqs4sjsqs9c4d7cjs5d6dahkc2c10h5s10d3cqd8cas7c7h6d2saskh8c3][h7s3s6h2d5s8](c6h9)
+c6 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c7dad4h10h3d10s9c3c10h6s7h5hjckd7c9sjc5dkh8d9d6d3d8h4hkcjs4sqs5skdjcqhac8s10c4cas2d2dqc2sa][s6s8h9d5h7s3c6](hqh2)
+hq > h2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d2hjsah4s9d8hadjc9cqs4sjh3h10dqdacjd6s7c7h8hkc4h5s5sks10c10d4d3d10d7c2c8dkc5cackh6s2hqh2c3sq][s3s6d5c6h9s8](d9h7)
+d9 > h7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d7hjskc4c3sjcks9sac10das2h8h10cqd8sqd6d3d10s4h5dqc2h3s7c5c7d2h6s10djdks5c8h2cjhac9h4hkd4ca][d9h7s8s6d5h9c6](hqs3)
+hq > s3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c8d10c4has7d6c9c5h3dad4c3sjc10h8dkdjc7d7h4h5dqhjh2cksac2d8cah6s5d2s3sqs9s2d3s4skhqs10hkcqcj][s6d9h9c6s8h7](h10d5)
+h10 > d5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d4cjd8h10h4s9djc4had7c2h3h8ckdqc3hqd5hjc8sjh2sas5d6d3s7h6c5c10hkcqc7skdadksqs2s10d2cas3s4h5c9][h9d9s6h7s8](d10c6)
+d10 > c6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c10sqd8h3h10had2s7s3cqdjd3d4sahqc2d6h8d7c3c4s9ckh6dks2dqs4s5cjc6sjh2hkcac5h5c7s10h4c8c9hjdad10sk][s8s6h9d9](d5h7)
+d5 > h7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d4cjdqs7h10ckc7c8s3h3s9d2h4skcqd7h5sqd10c3d8h6hadjhkh2sas5c4s4d3sjhqc6s10c10cahjs2c2c9c5dkdad6][d5h9d9h7s6](h8s8)
+h8 > s8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d3djd4d6cjhkc10c5h3s4h5s10h10s3s5c3h2c2cahjh6s7had10c7s9skcqdkd7s8c6c4d2cksas2dah8d8dqsqsjc8c9hq][d9d5s6h7](h4h9)
+h4 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h6cqdas9sqs5h2h5hqs8s3s7c6d6c8h10h8d8skd4ckc7cjh3s2s4c3djc4hkc2hjd2cadkc10d10sahasjdqc9d7d3s10][d9h4s6d5h9](c5h7)
+c5 > h7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cjh5dqhjh10d4c2dkdjd2c6sqs8h3d3c7s3h8d8c3s4d7c4s5dac8s7s9sjhksac9h6has10c10h2s2ckd10d6cacqhq][s6c5h7h9d9h4](skd5)
+sk > d5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [djc3c8c7h10cqs2d8s4s7cjc4d2h5s5s10h3sjd7d4das8dqhksahah2dkckh6c9cac10s3s9h8hjd6c6d3hqc2d10][skh4h7d5s6h9c5](sqd9)
+sq > d9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s9hac6djckhqd10h6c9d3d2c2cac3hjs3hkdkdqh5d6h2sjdah3h10s4c4s2cjs8s10d7c10d4c8h8cqs5s7c7sa][skd9d5h4h7h9c5s6](d8sq)
+d8 > sq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h5h8h6c9c8hjs8h2c10s3sjhksadkhas4d3s9djckdasqd10s2cqc4d7c6hqs10d6d8d2h3dqcjc7d4c2cah10s7c3][c5sks6d9h7d5h4](s5h9)
+s5 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h2c6c10s8h3c9c8c3sjs2s3cjs4sqd7d4c2h8hkhahqc4d3s10dqckdjcqcah5d8s9h6d6d10d2h10s7sahjc7da][h7c5skd5s5s6h4d9](dkh9)
+dk > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c8s8sqs2dqh6h2h3d3c6s10cqc4cad7s3h5djd2h8s7s4c7hkhjsjc10dahah10cjc2s9ckd8hqd4c9d6sad10][sks5c5h7h4d5s6dkd9](c3h9)
+c3 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c10h5c7d10sjs3cqs10h8h10hjc6d7dasqcah2c8h3hackhqs2s8sad3d4cjs4d6djs7c9s9c2d2c4d8dqh6][s5c3c5h4h9d5dks6h7d9](hksk)
+hk > sk
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d3h10s4s2d7cqc8c7sadac6d6d10cjsjs8dqs9h3s3cas7h6c10s10djhkc9ckd4c2h5h2d8h8c4hahjsqhqd2][d9c5s6h9h4c3dkd5h7](sks5)
+sk > s5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sqs8dqhqc6s3c2h2d2d7d8d4s4d3sac7h6had6s9h10dacahkckcqskd10cjc10c4s2hjh3djh5sjs7s10c9s5c8][c3d9h9c5dkh4h7s6](h8d5)
+h8 > d5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s7d2h6hkh2s9had3s5sahqs10cqc2h10d4s2c7djc10s3c4d7s8h3c6c9h5d10sjcadqd5cjd8skhjd6h8c8cks4da][dkc3d9h4c5h9h7](sqs6)
+sq > s6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [djh3sqc6s4h5cah10cjhjd6hac7s3d7sks9c8d5sac10c2c4s7dad10c9d3s2cks6h8hqd2h2h6d4s5d8hks8sjs10dq][d9c5h4dkc3h9](cqh7)
+cq > h7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjdqcjh3hks4d3s2skd5s7s8djd6d4h10s3h6s9c7d10s6d8h2hac8d2d7s5hjh5sac4dah8cac2s10c10c6sqhqc9][h7d9c3c5cqh4dk](ckh9)
+ck > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s3c6h3c9s2skdqd6sqd7hqsah10d2c10d8c8d10d4h2hadjhjc2h5s4d5d3c4das5cas10h6h8s6cjc7s7hksjs9][h4c3h7h9dkd9cqc5](s8ck)
+s8 > ck
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s6cas3d10d4s10sahad7skh10c7h5s5c4djc6sjc9d8d2d3h8hqs2h2c8sqs7hkhjc10cjc2d5dqs4s9dah3d6][cqh4h7c5d9cks8dkc3](h6h9)
+h6 > h9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [djhah5d4c2s10s2sjdqc6s7c8cad5h3d8c10hqskd3c4hkd10d6sas6s4h8d7c7sqh10d2s9s5c9cjs3h2hj][c3ckc5h7d9h9cqdkh4s8](dah6)
+da > h6
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hjsjsqd8c6c2s2c4d6sacjs3d10d4c8c9s9djc7d5h5dqs10d2s4cas5s6hqh3h2hkhaskd7h8s7d3c10][s8c3dad9h6ckh7h4dkc5h9](h10cq)
+h10 > cq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sqdjcqskhac6d4d2s5hqh8cjd3h2c10sac8s2c9d7dqs4c7s9h10sjhkcas7s3s10hjs6d5c4c2d10d8h5d6][h9h4c3h6s8c5dkd9h7ck](h3da)
+h3 > da
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s5hacqcas4c4d7h8sas9d10s2d4dqs3c6h5hjhkd3djd6sjd2h3s6h2c10dah10c7cjs10sqd5c9hqd8s7c2c8][h7c3h4ckd9h6s8dkh9](skc5)
+sk > c5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s2dqhac4hqs6c2c9c10h10sad2sjcqsqs7d3s4d6h8s3cjs10d10cadah5djh3c8d4h2s9c7d8s5hjc6d5d7][d9h4c3c5s8ckskdkh6h7](hkh9)
+hk > h9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cjc10dah8d8d7d10s7h2h5d5h9hksqhac2s6djd3c6d4d6s3cad2c9hjs10cqhqs9s5dqs2c4s4h3c8sjc7h10][c5h7ckc3sks8h6h4dk](sad9)
+sa > d9
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hkh10cad4djs2sqc9had8cjd5h8s9dahjsjcqc10hqc2c7h9s4d10s6s7c8d6s3h2h3dqs5c6c4s10d7d2d3][h7sad9h4dks8ckh6skc5](h5c3)
+h5 > c3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cqd7c3c6h10sjh5c10djs3c2hjs9has6d5c8c7s5cad8c9h9hkd2h8d4dqs7sqd3d10c4s2h2s4d6hqdah3cj][d9sackskh7h6s8c5h4](s10dk)
+s10 > dk
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c7sqd10d8c6s2c3s5d3d2s6h8d7sjc10c2h2h10s7d6dqdjh3hkd5s9s4d4cjhqdac9hac4hjcah9c8s3h5][sah7d9h6s8h4c5dkcksk](cqs10)
+cq > s10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c4hksqdjh2cacjh8c6s10hjd4s9s7h5d8h10d3sjc3h9s2d10s4d5c2dqc10s3h3s5s6hqd2d6hac9c8d7dac7][s8c5dkh6sackh4skd9](cqh7)
+cq > h7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hjc10dqh8h3c7s6d2s10d10sjd7d6cac9c6s5d3s2d4h2h10s4hkhac3hqdjs7c2s9c8cjh9s3sqd5c4dad8][h7dkc5h6sks8cqd9h4sa](h5ck)
+h5 > ck
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c3cah3d6s2d10hqs3s6c2hjd2h10h2hkcjs7sjd5h8d8ckh5s10s9s5c10c4sqd4d3d7djc8dqc9h9hac7das4][d9sah4sks8c5h7h6dk](c6cq)
+c6 > cq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h5hqs9sqc4cks4dahks6sjc8d6d5djdqd7h3d8d4cas10h9c7c9c10d2cjs7h8d10c2has5hjh2s2d3c3h10][h4dkc6skh6h7d9sas8cq](s3c5)
+s3 > c5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h8c9s10c3h2d10h5s5hadjsqc10hqs7d3ckh10dqc4d5h9h3dad7s6cahksjs2hjs9d8d2d4c8d6cjc2s4][h6dkh4c6sks3s8c5sad9cq](c7h7)
+c7 > h7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hjcac2h3d2d4c3dqhksjd8s2c8c9h9s6djhad7h2ckh5hqs10s4d10dac10h8c4sqs5d5d3h10s9d6s7][s3cqd9c7sas8h4dkc5h6skh7](cjc6)
+cj > c6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [das6h5d3d2ckd7hks7h2sjd4h10cad8c3s10s2h8s4c4s5hqc9dqsqcjh9djd6c2s9c10c8d5h3c6hahj][d9dkh7c7c5cqsks8sas3h4](d10h6)
+d10 > h6
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s2s10h2d6d5c3c9hasqckdjd8d3c8das7h8d2cad4s9hkh3h10s5s6dqc2h5hjc10s4d7c6cjsjhqc4][cqc7sas8dkskh7c5h6h4d10s3](h9d9)
+h9 > d9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h5c10d6h3cjd7c3d3c8s7hkhqd2d9sjd5s2s6hjsqc6d4s5d8cac4h2s9hadac9c2dqh9h10ckh8s10s4][dksas8h6s3c7d10cqc5h7sk](djh4)
+dj > h4
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cad4s5d9s6hks4h9cjhqs7h5c4hjs9dqc9h3s10ckdahac6h8s2d3d6c8c10h2d2d8h10c3c2sjd7sq][dks8skh6sadjcqh4s3d10c5h7](d5c7)
+d5 > c7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s9s4d6d3c6hqckh2c10d5h3dqsqc9h10d4hjcahks7s6das5c4c7c8sjs2c2d7h8s10d9c3h5had2h9d8][dkc5cqh7skd10djh6s3h4sa](cjs8)
+cj > s8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hah5d3hqc9cks8s5d5s2cah9c8c4hjhkh3s7das6h2dqc10c2c6c7h8s4d2d7d4sqs9d6cjh10c3d9d8sj][s3djsksac5h6cqdkh7h4](s10d10)
+s10 > d10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sjs7c7hjd9s4d7d3h10ckh3dqh2d6hac3d4d5cjs9s2d8c2c8c9hqh8cas8hkh5s5dac6c10sqs6d2c4][s10h4djs3h7sah6c5d10cqdk](h9sk)
+h9 > sk
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s8ckc8s7c6d5h10h9hqs2d3d7c9c7c3h3sqskhacahkdqcjs6dac2sjh2d4s9s5c10d9h5d6s4d2d8h8hj][c5h7d10djdksas3cqh6h4](c4s10)
+c4 > s10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d4c2dqs9h8c10d5c4hah2s8hjs2d3ckh10c6hqc7d7h9d8d9hkdas5h3d2s10cah5c8sjsqc3s4s6cjc9s7sk][sad10h4h7s3cqh6c5dk](d6dj)
+d6 > dj
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s4h5c9cjdas5d3s6hqd8d5h9d4h10s7c6c8ckd9s8sqdqs10hkc7d2c10h2s9h3c3c4s2d7hjhac2sksjh8][djcqd6sah7d10dkh6s3c5](cah4)
+ca > h4
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h5d8s7h9dah3s6s4hqs5s10d9h10c10s8c4h8c6dqd4skc7d5d2ckd7hkc8c9hjsjcjh2c2sqd3c3has2][s3c5h7cad10h6d6sadkh4cq](s9dj)
+s9 > dj
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [cjc4h9c2d2hjc7h8d5sqhqs5d8s6c9s4hkc8had3h2c6d4c10cksjh3c3d7d9s2h5h10dqs10sks7da][d6sah4s9dkcadjcqc5s3d10h6](s8h7)
+s8 > h7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s7c4h10c6s2c3ckh2cjd9d3s10skh3hjh8has4c2d4s6sjd7c7c8dahkhqc10d8s5dqd2h9c9sqh5][djcac5cqdks9s3h7h4s8sad6h6](d5d10)
+d5 > d10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d8c10s2h2d9skc2h8sjc9s4h10hjh5s7c7d4dqs10s5d2hqdahksqhac3h3ckc6c4d3cjs6c8d7][dkh6cqs8h4s9djsah7s3c5cad5d10](h9d6)
+h9 > d6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [sqs7dackd7haskh8h5c9c2s4hqcjh2d2s6d3h10c8d9sjc10d6h3c4hkc3c7d4h9s10d8dqc6s2s5][h7cacqh4s8dks9d10c5d5djs3sa](hjh6)
+hj > h6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h2d9s2s4d2c10c7hjc2s10dqs7c3sqhkhas5c4ckh9h5h8d3h6h10h3d7d4c8daskd8c6hqsjc9cjd6][s8dkc5cas9djh4h7d10cqs3sa](s6d5)
+s6 > d5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [dqsks5hkc6d6hjsjc4s7h3d2d4d7h2s4c9c3cjh10h9h8c7ckc10d9sqs2hqc8had3dah5s10h6d8][h7dkc5s8s6h4d5sas3cqcas9dj](c2d10)
+c2 > d10
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h2c10hkc4s5d2s2h5dasjc9c3hac8d8s7ckh9hqcjh6h10h3dqd3d7sqh8s10skhjc7c6d4d9d6][s8h4c2dks3s9d10c5cqd5djh7cas6](s4sa)
+s4 > sa
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hqd6c8c3c9h6h10sksjh3h8d9s5c6sqh2c7d4d2hkdad8cjs7c10d7hah9s2dqs10ckh5hjd3][s3d5c5cqs4s8d10s6s9sadkdjh7h4ca](c4c2)
+c4 > c2
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h8h10s7hah2h9s2c8d3dqd4sjc7sqh5hqc4s10skckd9d8d7d6c3c6hkhjc10c2dad2c9s5h6cj][d5d10h7sas3dkcas8c5h4cqs4s9s6](h3dj)
+h3 > dj
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [has7c8d4c7h8hjd7s10djd2h3d6sjs2c2h5hqsqdqcks5hkd8c3c9dah9h10h6cjd9d3c6skh2c4][sadks3d10d5s9c5h7h4s8cqcas4](c10s6)
+c10 > s6
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d8d2cjs7sjc4d3s6sqc9c3d4h5s5dqdackhqs10d6h6djc6c8c7c2s2hjskh10d7hac10h3hkh8h9h2][s9d5dkh4d10s4s8cah7c5sacq](d9s3)
+d9 > s3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h2d9sqd8c4c8c6d3sks2dac7h9c10s5s10hjs6hkc2dqh6d4c9hah10ckhqdjd6d7h8s3d2cjh5s7h3c3][h7h4s9c5dks8d10sacqd5ca](sjs4)
+sj > s4
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2h2h6skhahqsqd7d2s7c3sjs10cks3h9s5das6c8d9h10s2d6c9hkc7h3h5hjdqd3d8c10c6s4djc4h8cj][c5dkh7s9cqsacas8d10h4](d4d5)
+d4 > d5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hqdac9s6h8h5c8d9s2cjc3c7d8s7skc2h10sjc4s3sqd3djd6h2d2c6ckd7has4c10hkh9dqhjh3h6s10][d4sad5s8s9dkcqcac5h4d10](s5h7)
+s5 > h7
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h8c9s6s4c4d8h5ckdjdah6hjhqh10d2s3s7d9c8s10c2d3sqs2dqsjd6c6hahkcjh9h3skc7h2c10c3][s5h4cacqs9d4c5s8dkd5h7d10](d7sa)
+d7 > sa
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s6dqc8s4hkc2hjhqs7h6h2d6sksjcjd8h10h3s10das3h5d2c7sac4h9ckc6c3c10djs2h8d7sqhac9d3][d10h7c5s9d4cadkcqs8h4d5](d9s5)
+d9 > s5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [djd3d7hkc4s7s3sjc10h6d9s4d6h5s5dah10c3c6hqs6cjd8h9c9h3s10cksasqh8hjdqh2s2d2c7c8c2sk][h4dkd10c5d4cacqd5s8s9](hah7)
+ha > h7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d6h7h9h10hac2s2das6d8s5s10s3h6d2h2h8skd9s4sacjd7dqc4d3s7c7c3sqc9djh5hkhqc6sjhjckc10c8][c5d10s8s9d5cqcad4h4](h3dk)
+h3 > dk
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d6dac7h3c9h2hkd7h8h7h5c8h10s6s5has10dqd9dkd3djs2hjhqc4sasqs4s3d8c6h6cjc3c2ckskc10sjh9s7][s9d5d10cqd4cac5h4](d2s8)
+d2 > s8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s6d3c6h9c7d6c10sahkdjsjd8h5dahqdkhjc4s7cksqd9h7h10skc9s2d7h8s10s3c8h2cjhac2s5h3d2h6dqs4s8][s9d5d10cqh4cad4](c3c5)
+c3 > c5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hkdjsjs5s3c10h7d9cks6d2s8c9dahqd3s2h3sqhjh10s10d6dqc6h6d7d8h9saskdkc8h5s7c4c2s4h8h2cjc7][h4d4d5c5d10cqs9ca](hac3)
+ha > c3
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [skdasjh6dksqh7s3h5cjh3s10hasad9h2c7hjc9c4dqs6c8d8s4djhqc6d2s2d6h10d7s7c2hkh9s5c10ckd3s8c3][h4d5c5d10s9cqca](h8d4)
+h8 > d4
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c3djs4h2h6cjh8c9h7sahjd6ckdqc10d9h9hqs10s6d7d4c4s3c8d2sqhaskdkd8h5s7h10h3s8c7sjs5d3s2c2c6da][c5cacqh4d5s9](hkd10)
+hk > d10
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h8sqh3sadqd10c8h7h2s2d6h10s5s8cjc9d8hkhas3d4c6cks6c10c7c3hjh6h9hqs4d2c4s10h5c2djd7dad3s7sjdkd9][cqd5c5cah4](sks9)
+sk > s9
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h2d8skdkd10c7cjhqc3dqd9hjsqh7c10s4h6c9c8h3s7djs8dahasahks9h10s3s5h5d4c2s2c4h9s6c6h8d7d6sjd3s10d2][c5cqh4ca](ckd5)
+ck > d5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d9h6sks9h9djhkd7s3s10hqs5d6d2h2c7cjc3h8s7dqdah3s2c8c6c2dks6sqsjc9sad10s8d4d3c4hjd8c10hah5s4h10][cacqckc5d5](h7h4)
+h7 > h4
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d6d4skh4d3h5c8c6c2d7had9dqh8hqs9c4d8s6dkc9h3h9h7s2hks5c3s3sqd10cjh6s4sjs10djsac10hjdah2c7s7s8d2][ckcad5cq](h10c5)
+h10 > c5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c2s5s7d2c6skc3s8d10h8d7cjh7hjdkc9djh9d3h6sqh2c8h3c5s2hasjh4s3hqs4d6hks6sad8h10c7c10s9h5s10dad9c4dq][cqd5ck](d4ca)
+d4 > ca
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c8c5sjs8hkh5d3h9d9s6c9s9d10hqd8hah6s3c7h7d4h8h2h4s5c10das7skc4c3c6cahjcjsqs4dks10d2d7c2s2sad6dqh3dj][ckcq](h10d5)
+h10 > d5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d10c4s6dkd6d9h9sqd4sjs7s9d3s8s3sks2sahjhqhadac3h10h3h6c9d5djc8d7cjc10h4cah5s4d8s5h7h8d2hkc2c6c5h2dqs10][ck](c7cq)
+c7 > cq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s9s3s8c6dkdac5hkskh3hac9h6cjs4djcac2s2dqh7h4h2d5d9h10d4c10d3sjsahjhqc8h9d10d6d8sqs6h8h5d7d2s10c3s5c4][ckc7](s7cq)
+s7 > cq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h5cjd5c6sqc3c5c10h3d10d4h7hqdqcad2d8s6s3d7s10c2h10h9hjs2c9d6sadks5c8skh6s4c4d9hadah8d3s9hksjh4s8h2][ckcqc7](djs7)
+dj > s7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [h10sqs8h6s6d8s7d9c9s4dkh3s5h8d3s3djc3s9c10d6sah7had10skc4hqh4d2d4c2sjdadqhkcjh2s10h9c5cah5c6hjd5d7s2][cqc7](c8ck)
+c8 > ck
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hqc9h4h7s4s6c5d4d2c2h5h9d5h2cad8s2c6sjd3dkh3s3hjc10h10has10hksac4s9d7h6d6h8s5dqd9djc3d10das8sqsks7][c8c7ck](cjcq)
+cj > cq
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hkc5h2h4d3d6d7c3d10s2c4s9c6sjh8d5sks10s8s4h7h3has3d8h10c2dkd9h9s6c10dad2djh5sad4h6dqhqc9sqs7hjca][c8cqckc7](s5cj)
+s5 > cj
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hqs10c3c5h4dqh3hkd3c4h2c9s8s3s7s2hjs9d8d9s6s4d10djsjd6dasacad5c6h6d4sqh10d7h5h7c10c2h9h8dkd2sk][c8s5cqcjck](hac7)
+ha > c7
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d8d7s3c7sad10das9h5c9d4hqs4cadqhjd2c4hkd5h4h8sks2c5h3sjd6dkc10had3djh2sqs6h9s7c2h7s10c3c6h6d9s8][cqckc8s5](h10cj)
+h10 > cj
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [hqd5s6s10skh7c3hjc5d9dqs9h2d6s3h8c7cah5s4cjd2h4s2h3sad7dac9d8c4sjc2d4hah10hkc6d10s8h9d3sqc10s7dkdj][s5cqck](h6c8)
+h6 > c8
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d2skc7c10d6d4d8djh3hqh5d3cjh4s10d7c8c2c6h7c5s4h6c4sjhkh10d9c9sas3dkh8h9h2cad10s2s8c3hjdqs9sqdas7s6d5][cks5](hacq)
+ha > cq
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [d3hksqdqc10s7d9d5h5c7h4h7s3c6hqhjs10d4c2s6h2h6h9sjd2haskcadjsad7c3d8c5cqs2s8c8s9d6dah8d10c4c9dkcjh3h10][ck](s4s5)
+s4 > s5
+P2 Wins
+
+Received: [.1+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s9c10h3hjhqc6d5d2h9haskh2s3h6c2dkcjc4d9c8d10cqhks7c5h5s6sjc9s10h10h7h4dqd3sqd8sas2c3h8das8d4c7djcad7][cks4](d6s5)
+d6 > s5
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [c8c3c5h8sjd5s6d3hkc10cjd7d6das9d8cqs2c2h7d9s5s10hac4sqhjs3d4djskh3dqs7d2h6h4c7s8c6h10h2casahqdkc9d10h5][s4](h9ck)
+h9 > ck
+P1 Wins
+
+Received: [.0+2]
+Received: [.0-1]
+Received: [.1-1]
+Current Dealer: [s5d4dac6cjsjh9cqd10h4d5dks2hkd7h3c4d2hqd9s9sqc5s8s3skhah2c7h5cas7hjd8s10d3c10ckc9s6h6h7h10c2djh8sac3dqd6][](c8s4)
+Game Over
+
