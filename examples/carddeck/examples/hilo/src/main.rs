@@ -5,7 +5,8 @@ fn main() {
     let mut runtime = Runtime::<Dealer>::default();
     runtime
         .on("{ setup;; }")
-        .update(|s, _| (s.clone(), "{ deal;; }"));
+        .update(|s, _| (s.clone(), "{ deal;; }"))
+        .test("()", "{ deal;; }");
 
     runtime
         .on("{ deal;; }")
@@ -47,7 +48,9 @@ fn main() {
         } else {
             (s.clone(), "{ exit;; }")
         }
-    });
+    })
+    .test("[s2s3s4][s5s6s7](hah2)", "{ after_choose; player_1; }")
+    .test("[s2s3s4][s5s6s7](h2ha)", "{ after_choose; player_2; }");
 
     runtime
         .on("{ after_choose; player_1; }")
@@ -56,5 +59,5 @@ fn main() {
         .on("{ after_choose; player_2; }")
         .dispatch("[.1+2]", "{ action_choose; player_1; }");
 
-    runtime.start("{ setup;; }");
+     runtime.test().start("{ setup;; }");
 }

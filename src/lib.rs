@@ -1,5 +1,29 @@
 use logos::{Lexer, Logos};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
+
+pub trait RuntimeState<'a> 
+{
+    type Error;
+    type State: 'a + Default + RuntimeState<'a> + Clone + Sized;
+
+    /// load should take an initial message, and override any
+    /// existing state that exists
+    fn load(&self, init: &'a str) -> Self where Self: Sized;
+
+    /// process is a function that should take a string message
+    /// and return the next version of Self
+    fn process(&self, msg: &'a str) -> Result<Self::State, Self::Error>;
+
+    /// select decides which listener should be processed next
+    fn select(&self, listener: Listener<'a, Self::State>, current: &Event<'a>) -> bool 
+        where 
+        &'a <Self as RuntimeState<'a>>::State: Default
+    {
+        listener.event.get_phase_lifecycle() == current.get_phase_lifecycle()
+            && listener.event.get_prefix_label() == current.get_prefix_label()
+            && listener.event.get_payload() == current.get_payload()
+    }
+}
 
 #[derive(Default, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Event<'a> {
@@ -133,6 +157,12 @@ impl<'a> Event<'a> {
         } = self;
 
         (signal, data)
+    }
+}
+
+impl<'a> Display for Event<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{ {}_{}; {}_{}; {}_{} }}", self.phase, self.lifecycle, self.prefix, self.label, self.payload.1, self.payload.0)
     }
 }
 
@@ -391,14 +421,30 @@ fn test_lifecycle() {
     println!("{:?}", lexer.next());
 }
 
+
 #[derive(Clone)]
-enum Action<'a, T> {
+enum Action<'a, T>
+where 
+    T: Default
+{
     NoOp,
     Dispatch(&'a str),
     Thunk(fn(&T, Option<Event<'a>>) -> (T, &'a str)),
 }
 
-impl<'a, T> Debug for Action<'a, T> {
+impl<'a, T> Default for Action<'a, T> 
+where 
+    T: Default
+{
+    fn default() -> Self {
+        Self::NoOp
+    }
+}
+
+impl<'a, T> Debug for Action<'a, T> 
+where
+    T: Default
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NoOp => write!(f, "NoOp"),
@@ -408,78 +454,140 @@ impl<'a, T> Debug for Action<'a, T> {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Listener<'a, T> {
+#[derive(Debug, Clone, Default)]
+pub struct Listener<'a, T> 
+where
+    T: 'a + Default + RuntimeState<'a> + Clone
+{
     event: Event<'a>,
     action: Action<'a, T>,
     next: Option<Event<'a>>,
+    extensions: Extensions<'a, T>,
 }
 
-impl<'a, T> Default for Listener<'a, T> {
-    fn default() -> Self {
-        Self {
-            event: Default::default(),
-            action: Action::NoOp,
-            next: Default::default(),
+#[derive(Debug, Clone, Default)]
+pub struct Extensions<'a, T>
+where 
+    T: Default
+{
+    action: Action<'a, T>,
+    context: Option<Event<'a>>,
+    tests: Vec<(&'a str, &'a str)>,
+}
+
+impl<'a, T> Extensions<'a, T> 
+where 
+    T: Default + Clone + RuntimeState<'a>
+{
+    /// sets the current event context which will be used for extension methods
+    pub fn set_context(&mut self, context: Option<Event<'a>>) -> &mut Self {
+        self.context = context;
+        self
+    }
+
+    /// adds a test case to the extensions of the listener, 
+    /// only relevant for testing Thunk's at the moment
+    pub fn test(&mut self, init: &'a str, expected: &'a str) -> &mut Self {
+        self.tests.push((init, expected));
+        self
+    }
+
+    /// called by the runtime, this sets the action that was assigned
+    /// to the listener this extension is assigned to
+    fn init(&mut self, action: Action<'a, T>) -> &mut Self {
+        self.action = action;
+        self
+    }
+
+    /// called by the runtime to execute the tests 
+    /// if None is returned that means this extension skipped running anything
+    fn run_tests(&self) -> Option<bool> {
+        if let Action::Thunk(thunk) = self.action.clone() {
+            let mut pass = true;
+
+            self.tests.iter().for_each(|(init, expected)| {
+                // Load the desired state with init
+                let state = T::default().load(init);
+
+                // Call the thunk function, and get the next destination
+                // check if this matches our expectation
+                let (_, next) = thunk(&state, self.context.clone());
+                pass = next == *expected;
+                if !pass {
+                    eprintln!("expected: {}, got: {}", *expected, next);
+                }
+            });
+    
+            Some(pass)
+        } else {
+            None
         }
     }
 }
 
-impl<'a, T> Listener<'a, T> {
-    pub fn dispatch(&mut self, msg: &'static str, transition_expr: &'static str) {
+impl<'a, T> Listener<'a, T> 
+where
+    T: Default + Clone + RuntimeState<'a>,
+{
+    /// dispatch sends a message to state for processing
+    /// if successful transitions to the event described in the transition expression
+    pub fn dispatch(&mut self, msg: &'static str, transition_expr: &'static str) -> &mut Extensions<'a, T> {
         self.action = Action::Dispatch(msg);
 
-        let mut lexer = Lifecycle::lexer(transition_expr);
+        let lexer = Lifecycle::lexer(transition_expr);
+        let mut lexer = lexer;
         if let Some(Lifecycle::Event(e)) = lexer.next() {
             self.next = Some(e);
         }
+
+        &mut self.extensions
     }
 
-    pub fn update(&mut self, thunk: fn(&T, Option<Event<'a>>) -> (T, &'a str)) {
+    /// update takes a function and creates a listener that will be passed the current state
+    /// and event context for processing. The function must return the next state, and the next event expression
+    /// to transition to
+    pub fn update(&mut self, thunk: fn(&T, Option<Event<'a>>) -> (T, &'a str)) -> &mut Extensions<'a, T> {
         self.action = Action::Thunk(thunk);
+
+        &mut self.extensions
     }
 }
 
 #[derive(Debug, Default)]
-pub struct Runtime<'a, T> {
+pub struct Runtime<'a, T>
+where
+    T: RuntimeState<'a, State = T> + Default + Clone,
+    &'a T: Default
+{
     listeners: Vec<Listener<'a, T>>,
     state: Option<T>,
     current: Option<Event<'a>>,
 }
 
-pub trait RuntimeState<'a> {
-    type Error;
-    type State: Sized;
-
-    fn next(&self, msg: &'a str) -> Result<Self::State, Self::Error>;
-
-    fn select(&self, listener: &Listener<'a, Self::State>, current: &Event<'a>) -> bool {
-        listener.event.get_phase_lifecycle() == current.get_phase_lifecycle()
-            && listener.event.get_prefix_label() == current.get_prefix_label()
-            && listener.event.get_payload() == current.get_payload()
-    }
-}
-
 impl<'a, T> Runtime<'a, T>
 where
     T: RuntimeState<'a, State = T> + Default + Clone,
+    &'a T: Default
 {
-    pub fn current(&self) -> Event<'a> {
+    /// context gets the current event context of this runtime
+    pub fn context(&self) -> Event<'a> {
         self.current.clone().unwrap_or(Event::exit())
     }
 
+    /// init creates the default state to start the runtime with
     pub fn init() -> T {
         T::default()
     }
 
+    /// on parses an event expression, and adds a new listener for that event
+    /// this method returns an instance of the Listener for further configuration
     pub fn on(&mut self, event_expr: &'static str) -> &mut Listener<'a, T> {
         let mut lexer = Lifecycle::lexer(event_expr);
 
         if let Some(Lifecycle::Event(e)) = lexer.next() {
             let listener = Listener {
                 event: e,
-                action: Action::NoOp,
-                next: None,
+                ..Default::default()
             };
 
             self.listeners.push(listener);
@@ -489,6 +597,8 @@ where
         }
     }
 
+    /// start begins the runtime starting with the initial event expression
+    /// the runtime will continue to execute until it reaches the { exit;; } event
     pub fn start(&mut self, init_expr: &'a str) {
         let mut lexer = Lifecycle::lexer(init_expr);
 
@@ -501,15 +611,17 @@ where
         loop {
             processing = processing.process();
 
-            let current = &processing.current();
+            let current = &processing.context();
             if let (_, "exit") = current.get_phase_lifecycle() {
                 break;
             }
         }
     }
 
+    /// process handles the internal logic
+    /// based on the context, the state implementation selects the next listener
     fn process(&mut self) -> Self {
-        println!("{:?}", &self.current());
+        println!("{}", &self.context());
         let mut state = self.state.clone();
 
         match &state {
@@ -519,9 +631,9 @@ where
 
         let state = state.unwrap();
 
-        if let Some(l) = &self.listeners
+        if let Some(l) = self.listeners
             .iter()
-            .find(|l| state.select(l, &self.current()))
+            .find(|l| state.select(l.to_owned().clone(), &self.context()))
         {
             match l.action {
                 Action::Thunk(thunk) => {
@@ -544,7 +656,7 @@ where
                     }
                 }
                 Action::Dispatch(msg) => {
-                    if let Ok(n) = state.next(msg) {
+                    if let Ok(n) = state.process(msg) {
                         self.state = Some(n);
                         if let Some(next) = &l.next {
                             self.current = Some(next.clone());
@@ -559,6 +671,34 @@ where
             listeners: self.listeners.to_vec(),
             state: self.state.clone(),
             current: self.current.clone(),
+        }
+    }
+
+    /// (Extension) test runs tests defined in listener extensions, 
+    /// and panics if all tests do not pass. If all tests pass this function
+    /// will return the Runtime for execution
+    pub fn test(&'a mut self) -> &'a mut Self {
+        let test_pass = self.listeners.iter().cloned().all(|l| {
+            let mut extension = l.extensions;
+            let extension = &mut extension;
+            let extension = extension.init(l.action);
+            if let Some(result) = extension.run_tests() {
+                if !result {
+                    eprintln!("error with listener on({})", l.event);
+                } else {
+                    eprintln!("{} passed.", l.event);
+                }
+                result
+            } else {
+                eprintln!("{} skipped.", l.event);
+                true
+            }
+        });
+
+        if test_pass {
+            self 
+        } else {
+            panic!("did not pass all tests");
         }
     }
 }

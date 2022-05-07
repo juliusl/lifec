@@ -1,3 +1,4 @@
+use lifec::RuntimeState;
 use logos::{Lexer, Logos};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -803,12 +804,20 @@ impl Display for Dealer {
     }
 }
 
-impl<'a> lifec::RuntimeState<'a> for Dealer {
+impl<'a> RuntimeState<'a> for Dealer {
     type Error = InvalidDealerExpression;
     type State = Dealer;
 
-    fn next(&self, msg: &'a str) -> Result<Self, Self::Error> {
+    fn process(&self, msg: &'a str) -> Result<Self, Self::Error> {
         self.deal(msg)
+    }
+
+    fn load(&self, init: &'a str) -> Self where Self: Sized {
+        if let Ok(dealer) = Dealer::try_from(init) {
+            dealer
+        } else {
+            panic!("could not parse {}", init)
+        }
     }
 }
 
