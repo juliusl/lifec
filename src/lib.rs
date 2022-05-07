@@ -575,6 +575,11 @@ where
         T::default()
     }
 
+    /// current gets the current state
+    pub fn current(&self) -> &Option<T> {
+        &self.state
+    }
+
     /// on parses an event expression, and adds a new listener for that event
     /// this method returns an instance of the Listener for further configuration
     pub fn on(&mut self, event_expr: &'static str) -> &mut Listener<'a, T> {
@@ -595,28 +600,42 @@ where
 
     /// start begins the runtime starting with the initial event expression
     /// the runtime will continue to execute until it reaches the { exit;; } event
-    pub fn start(&mut self, init_expr: &'a str) {
-        let mut lexer = Lifecycle::lexer(init_expr);
-
-        if let Some(Lifecycle::Event(e)) = lexer.next() {
-            self.current = Some(e)
-        }
-
-        let mut processing = self.process();
+    pub fn start(self, init_expr: &'a str) {
+        let mut processing = self.parse_event(init_expr);
 
         loop {
             processing = processing.process();
 
-            let current = &processing.context();
-            if let (_, "exit") = current.get_phase_lifecycle() {
+            if !processing.can_continue() {
                 break;
             }
         }
     }
 
+    /// can_continue checks if the runtime can continue processing
+    pub fn can_continue(&self) -> bool {
+        let current = self.context();
+        if let (_, "exit") = current.get_phase_lifecycle() {
+           false
+        } else {
+            true
+        }
+    }
+
+    /// parse_event parses the event and sets it as the current context
+    pub fn parse_event(mut self, expr: &'a str) -> Self {
+        let mut lexer = Lifecycle::lexer(expr);
+
+        if let Some(Lifecycle::Event(e)) = lexer.next() {
+            self.current = Some(e)
+        }
+
+        self
+    }
+
     /// process handles the internal logic
     /// based on the context, the state implementation selects the next listener
-    fn process(&mut self) -> Self {
+    pub fn process(&mut self) -> Self {
         let mut state = self.state.clone();
 
         match &state {
