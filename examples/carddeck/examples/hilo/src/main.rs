@@ -10,32 +10,20 @@ fn main() {
 
     runtime
         .on("{ deal;; }")
-        .dispatch("[+26][+26]", "{ action_choose; player_1; }");
+        .dispatch("[+26][+26]", "{ draw;; }");
 
     runtime
-        .on("{ action_choose; player_1; }")
-        .dispatch("[.0-1]", "{ action_choose; player_2; }");
+        .on("{ draw;; }")
+        .dispatch("[.0-1][.1-1]", "{ after_draw;; }");
 
-    runtime
-        .on("{ action_choose; player_2; }")
-        .dispatch("[.1-1]", "{ after_choose;; }");
-
-    runtime.on("{ after_choose;; }").update(|s, _| {
+    runtime.on("{ after_draw;; }").update(|s, _| {
         println!("Current Dealer: {}", s);
-        let s = s.prune();
-
-        if s.hand(1).is_none() {
-            println!("Game Over\n");
-            return (s.clone(), { "{ exit;; }" });
-        }
 
         let deck = s.deck();
         let deck = deck.unwrap();
         let deck = &deck.take(2);
         if let Some((remaining,hands)) = deck {
             if remaining.cards().len() != 0 {
-                return (s.clone(), "{ error;; }");
-            } else if hands.len() != 2 {
                 return (s.clone(), "{ error;; }");
             }
 
@@ -61,10 +49,20 @@ fn main() {
 
     runtime
         .on("{ after_choose; player_1; }")
-        .dispatch("[.0+2]", "{ action_choose; player_1; }");
+        .dispatch("[.0+2]", "{ game_over;; }");
     runtime
         .on("{ after_choose; player_2; }")
-        .dispatch("[.1+2]", "{ action_choose; player_1; }");
+        .dispatch("[.1+2]", "{ game_over;; }");
+
+    runtime.on("{ game_over;; }")
+        .update(|s, _|{
+            if s.prune().hand(1).is_none() {
+                println!("Game Over\n");
+                (s.clone(), { "{ exit;; }" })
+            } else  {
+                (s.clone(), "{ draw;; }")
+            }
+        });
 
     runtime
         .test()

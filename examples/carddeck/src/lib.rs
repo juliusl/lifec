@@ -246,10 +246,8 @@ pub struct Hand(Vec<Card>);
 
 pub struct EmptyHandError {}
 
-impl TryFrom<&str> for Hand {
-    type Error = EmptyHandError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+impl From<&str> for Hand {
+    fn from(value: &str) -> Self {
         let mut cards: Vec<Card> = vec![];
         let mut lex = Card::lexer(value);
 
@@ -261,11 +259,7 @@ impl TryFrom<&str> for Hand {
             }
         }
 
-        if cards.len() == 0 {
-            Err(EmptyHandError {})
-        } else {
-            Ok(Hand(cards))
-        }
+        Hand(cards)
     }
 }
 
@@ -531,6 +525,8 @@ pub enum Deck {
     Deck(Hand),
     #[regex(r"\[(:?[SsCcDdHh](?:1|2|3|4|5|6|7|8|9|10|[Jj]|[Qq]|[Kk]|[Aa]))*\]"r, from_hand)]
     Hand(Hand),
+    #[token(r"\[\]")]
+    EmptyHand,
     // Logos requires one token variant to handle errors,
     // it can be named anything you wish.
     #[error]
@@ -582,7 +578,12 @@ impl Display for Deck {
                 std::fmt::Display::fmt(h, f)?;
                 write!(f, "]")?;
                 Ok(())
-            }
+            },
+            Deck::EmptyHand => {
+                write!(f, "[")?;
+                write!(f, "]")?;
+                Ok(())
+            },
             Deck::Error => Err(Error {}),
         }
     }
@@ -715,6 +716,10 @@ impl TryFrom<&str> for Dealer {
                 Some(Deck::Deck(h)) => {
                     _deck = Deck::Deck(h);
                     break;
+                },
+                Some(Deck::EmptyHand) => {
+                    hands.push(Hand(vec![]));
+                    continue;
                 }
                 None => {
                     _deck = Deck::Deck(Hand(vec![]));
@@ -752,7 +757,7 @@ impl TryFrom<&str> for Dealer {
                                 None
                             }
                         } else {
-                            eprintln!("invalid player_pos skipping");
+                            eprintln!("draw_to, invalid player_pos skipping, {}", player_pos);
                             continue;
                         }
                     }
@@ -770,7 +775,7 @@ impl TryFrom<&str> for Dealer {
                                 None
                             }
                         } else {
-                            eprintln!("invalid player_pos skipping");
+                            eprintln!("take_from, invalid player_pos skipping. {}", player_pos);
                             continue;
                         }
                     }
