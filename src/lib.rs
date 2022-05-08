@@ -1,22 +1,23 @@
-use logos::{Lexer, Logos};
+use logos::Logos;
+use parser::Lifecycle;
 use std::fmt::{Debug, Display};
 
-pub trait RuntimeState<'a> 
-{
+pub trait RuntimeState<'a> {
     type Error;
     type State: 'a + Default + RuntimeState<'a> + Clone + Sized;
 
     /// load should take an initial message, and override any
     /// existing state that exists
-    fn load<S: AsRef<str> + ?Sized>(&self, init: &'a S) -> Self where Self: Sized;
+    fn load<S: AsRef<str> + ?Sized>(&self, init: &'a S) -> Self
+    where
+        Self: Sized;
 
     /// process is a function that should take a string message
     /// and return the next version of Self
     fn process<S: AsRef<str> + ?Sized>(&self, msg: &'a S) -> Result<Self::State, Self::Error>;
 
     /// select decides which listener should be processed next
-    fn select(&self, listener: Listener<'a, Self::State>, current: &Event<'a>) -> bool 
-    {
+    fn select(&self, listener: Listener<'a, Self::State>, current: &Event<'a>) -> bool {
         listener.event.get_phase_lifecycle() == current.get_phase_lifecycle()
             && listener.event.get_prefix_label() == current.get_prefix_label()
             && listener.event.get_payload() == current.get_payload()
@@ -81,7 +82,7 @@ impl<'a> Event<'a> {
         }
     }
 
-    fn with<S: AsRef<str> +?Sized>(&self, property: &'a S, value: &'a S) -> Self {
+    fn with<S: AsRef<str> + ?Sized>(&self, property: &'a S, value: &'a S) -> Self {
         let Event {
             phase,
             lifecycle,
@@ -165,299 +166,24 @@ impl<'a> Event<'a> {
 
 impl<'a> Display for Event<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{ {}_{}; {}_{}; {}_{} }}", self.phase, self.lifecycle, self.prefix, self.label, self.payload.1, self.payload.0)
+        write!(
+            f,
+            "{{ {}_{}; {}_{}; {}_{} }}",
+            self.phase, self.lifecycle, self.prefix, self.label, self.payload.1, self.payload.0
+        )
     }
 }
 
-fn from_event_data_property_prefix<'a>(
-    lex: &mut Lexer<'a, EventData<'a>>,
-) -> Option<(&'a str, &'a str)> {
-    let slice = lex.slice();
-    if let Some(sep) = slice.chars().position(|c| c == '_') {
-        let prefix = &slice[..sep];
-        let label = &slice[sep + 1..slice.len() - 1];
-        Some((prefix, label))
-    } else {
-        None
-    }
-}
-
-fn from_event_data_property<'a>(lex: &mut Lexer<'a, EventData<'a>>) -> Option<&'a str> {
-    let slice = lex.slice();
-    let slice = &slice[..slice.len() - 1];
-
-    Some(slice)
-}
-
-fn from_event_data_signal<'a>(
-    lex: &mut Lexer<'a, EventData<'a>>,
-) -> Option<(&'a str, &'a str)> {
-    let mut slice = lex.slice();
-    let pos = slice.chars().position(|c| c == '_');
-    let mut signal = "";
-
-    if let Some(p) = pos {
-        signal = &slice[..p];
-        slice = &slice[p + 1..];
-    }
-
-    Some((signal, slice))
-}
-
-#[derive(Logos, Debug, Hash, Clone, PartialEq, PartialOrd)]
-enum EventData<'a> {
-    #[regex(r"(?:[a-zA-Z-]+);", from_event_data_property)]
-    Property(&'a str),
-    #[regex(r"(?:[a-zA-Z-]+)_(?:[a-zA-Z-0-9]+);", from_event_data_property_prefix)]
-    PropertyWithPrefix((&'a str, &'a str)),
-    #[regex(r"(?:[a-zA-Z-]*)_*(?:[+/=a-zA-Z0-9]+)", from_event_data_signal)]
-    Signal((&'a str, &'a str)),
-    // Logos requires one token variant to handle errors,
-    // it can be named anything you wish.
-    #[error]
-    // We can also use this variant to define whitespace,
-    // or any other matches we wish to skip.
-    #[regex(r"[ \t\n\f{}]+", logos::skip)]
-    Error,
-}
-
-#[test]
-fn test_event_data() {
-    let mut lexer =
-        EventData::lexer("{ init; player_1; abscawimim4fa430m} { yield_a344fa34f43 }");
-
-    assert_eq!(Some(EventData::Property("init")), lexer.next());
-    assert_eq!(
-        Some(EventData::PropertyWithPrefix(("player", "1"))),
-        lexer.next()
-    );
-    assert_eq!(
-        Some(EventData::Signal(("", "abscawimim4fa430m"))),
-        lexer.next()
-    );
-
-    match lexer.next() {
-        Some(EventData::Signal(("yield", payload))) => {
-            assert_eq!("a344fa34f43", payload);
-        }
-        _ => {
-            assert!(false, "expected to parse a signal")
-        }
-    }
-}
-
-fn from_lifecycle_event<'a>(lex: &mut Lexer<'a, Lifecycle<'a>>) -> Option<Event<'a>> {
-    let slice = lex.slice();
-    let slice = &slice[1..slice.len() - 1];
-    let mut event_data = EventData::lexer(slice);
-    let mut lifecycle_phase = "action";
-    let mut event_payload: &str;
-    let mut event_signal = "";
-    let lifecycle_event: &str;
-    let event_prefix: &str;
-    let event_label: &str;
-
-    match event_data.next() {
-        Some(EventData::Property(event)) => {
-            lifecycle_event = event;
-        }
-        Some(EventData::PropertyWithPrefix((phase, event))) => {
-            lifecycle_phase = phase;
-            lifecycle_event = event;
-        }
-        _ => return None,
-    };
-
-    if let Some(EventData::PropertyWithPrefix((prefix, label))) = event_data.next() {
-        event_payload = &slice[event_data.span().end + 1..];
-        event_prefix = prefix;
-        event_label = label;
-    } else {
-        event_payload = &slice[event_data.span().end + 1..];
-        event_prefix = "";
-        event_label = "";
-    }
-
-    match event_data.next() {
-        Some(EventData::Signal((signal, payload))) => {
-            event_signal = signal;
-            event_payload = payload;
-        }
-        _ => {}
-    }
-
-    Some(Event {
-        phase: lifecycle_phase,
-        lifecycle: lifecycle_event,
-        prefix: event_prefix,
-        label: event_label,
-        payload: Signal(event_signal, event_payload.trim()),
-    })
-}
-
-#[derive(Logos, Debug, PartialEq, PartialOrd, Clone, Hash)]
-pub enum Lifecycle<'a> {
-    #[regex(r"\{[+/=<>a-z;A-Z0-9 _-]+\}", from_lifecycle_event)]
-    Event(Event<'a>),
-    // Logos requires one token variant to handle errors,
-    // it can be named anything you wish.
-    #[error]
-    // We can also use this variant to define whitespace,
-    // or any other matches we wish to skip.
-    #[regex(r"[ \t\n\f\r]+", logos::skip)]
-    Error,
-}
-
-impl<'a> ToString for Lifecycle<'a> {
-    fn to_string(&self) -> String {
-        match self {
-            Lifecycle::Event(Event {
-                phase,
-                lifecycle,
-                prefix,
-                label,
-                payload: Signal("", data),
-            }) => format!(
-                "{{ {}_{}; {}_{}; {} }}",
-                phase, lifecycle, prefix, label, data
-            ),
-            Lifecycle::Event(Event {
-                phase,
-                lifecycle,
-                prefix,
-                label,
-                payload: Signal(signal, data),
-            }) => format!(
-                "{{ {}_{}; {}_{}; {}_{} }}",
-                phase, lifecycle, prefix, label, signal, data
-            ),
-            _ => String::default(),
-        }
-    }
-}
-
-#[test]
-fn test_lifecycle() {
-    let mut lexer = Lifecycle::lexer("{ before_update; test_life; yield_13nmiafn3i } { after_update; test_life2; ok_13nmiafn3i } { after_update; test_life2; 13nmiafn3i }");
-    assert_eq!(
-        Some(Lifecycle::Event(Event {
-            phase: "before",
-            lifecycle: "update",
-            prefix: "test",
-            label: "life",
-            payload: Signal("yield", "13nmiafn3i")
-        })),
-        lexer.next()
-    );
-
-    assert_eq!(
-        Some(Lifecycle::Event(Event {
-            phase: "after",
-            lifecycle: "update",
-            prefix: "test",
-            label: "life2",
-            payload: Signal("ok", "13nmiafn3i")
-        })),
-        lexer.next()
-    );
-
-    assert_eq!(
-        Some(Lifecycle::Event(Event {
-            phase: "after",
-            lifecycle: "update",
-            prefix: "test",
-            label: "life2",
-            payload: Signal("", "13nmiafn3i")
-        })),
-        lexer.next()
-    );
-
-    let test = Lifecycle::Event(Event {
-        phase: "after",
-        lifecycle: "update",
-        prefix: "test",
-        label: "life2",
-        payload: Signal("test", "13nmiafn3i"),
-    });
-
-    assert_eq!(
-        "{ after_update; test_life2; test_13nmiafn3i }",
-        test.to_string()
-    );
-
-    let test = Lifecycle::Event(Event {
-        phase: "after",
-        lifecycle: "update",
-        prefix: "test",
-        label: "life2",
-        payload: Signal("", "13nmiafn3i"),
-    });
-
-    assert_eq!("{ after_update; test_life2; 13nmiafn3i }", test.to_string());
-
-    let mut lexer = Lifecycle::lexer("{ setup;; } { action_setup; _;   }");
-
-    assert_eq!(
-        Some(Lifecycle::Event(Event {
-            phase: "action",
-            lifecycle: "setup",
-            prefix: "",
-            label: "",
-            payload: Signal("", "")
-        })),
-        lexer.next()
-    );
-
-    assert_eq!(
-        Some(Lifecycle::Event(Event {
-            phase: "action",
-            lifecycle: "setup",
-            prefix: "",
-            label: "",
-            payload: Signal("", "")
-        })),
-        lexer.next()
-    );
-    println!("{:?}", lexer.next());
-}
-
-
-#[derive(Clone)]
-enum Action<'a, T>
-where 
-    T: Default
-{
-    NoOp,
-    Dispatch(&'a str),
-    Thunk(fn(&T, Option<Event<'a>>) -> (T, &'a str)),
-}
-
-impl<'a, T> Default for Action<'a, T> 
-where 
-    T: Default
-{
-    fn default() -> Self {
-        Self::NoOp
-    }
-}
-
-impl<'a, T> Debug for Action<'a, T> 
-where
-    T: Default
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NoOp => write!(f, "NoOp"),
-            Self::Dispatch(arg0) => f.debug_tuple("Dispatch").field(arg0).finish(),
-            Self::Thunk(_) => write!(f, "thunk"),
-        }
+impl<'a> Into<String> for Event<'a> {
+    fn into(self) -> String {
+        format!("{}", self)
     }
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Listener<'a, T> 
+pub struct Listener<'a, T>
 where
-    T: 'a + Default + RuntimeState<'a> + Clone
+    T: 'a + Default + RuntimeState<'a> + Clone,
 {
     event: Event<'a>,
     action: Action<'a, T>,
@@ -466,30 +192,31 @@ where
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Extensions<'a>
-{
+pub struct Extensions<'a> {
     context: Option<Event<'a>>,
     tests: Vec<(&'a str, &'a str)>,
 }
 
-impl<'a> Extensions<'a> 
-{
+impl<'a> Extensions<'a> {
     /// sets the current event context which will be used for extension methods
     pub fn set_context(&mut self, context: Option<Event<'a>>) -> &mut Self {
         self.context = context;
         self
     }
 
-    /// adds a test case to the extensions of the listener, 
+    /// adds a test case to the extensions of the listener,
     /// only relevant for testing Thunk's at the moment
     pub fn test<S: AsRef<str> + ?Sized>(&mut self, init: &'a S, expected: &'a S) -> &mut Self {
         self.tests.push((init.as_ref(), expected.as_ref()));
         self
     }
 
-    /// called by the runtime to execute the tests 
+    /// called by the runtime to execute the tests
     /// if None is returned that means this extension skipped running anything
-    fn run_tests<T: Default + Clone + RuntimeState<'a>>(&'a self, action: Action<'a, T>) -> Option<bool> {
+    fn run_tests<T: Default + Clone + RuntimeState<'a>>(
+        &'a self,
+        action: Action<'a, T>,
+    ) -> Option<bool> {
         if let Action::Thunk(thunk) = action {
             let mut pass = true;
 
@@ -505,7 +232,7 @@ impl<'a> Extensions<'a>
                     eprintln!("expected: {}, got: {}", *expected, next);
                 }
             });
-    
+
             Some(pass)
         } else {
             None
@@ -513,13 +240,17 @@ impl<'a> Extensions<'a>
     }
 }
 
-impl<'a, T> Listener<'a, T> 
+impl<'a, T> Listener<'a, T>
 where
     T: Default + Clone + RuntimeState<'a>,
 {
     /// dispatch sends a message to state for processing
     /// if successful transitions to the event described in the transition expression
-    pub fn dispatch<S: AsRef<str> + ?Sized>(&mut self, msg: &'a S, transition_expr: &'a S) -> &mut Extensions<'a> {
+    pub fn dispatch<S: AsRef<str> + ?Sized>(
+        &mut self,
+        msg: &'a S,
+        transition_expr: &'a S,
+    ) -> &mut Extensions<'a> {
         self.action = Action::Dispatch(msg.as_ref());
 
         let lexer = Lifecycle::lexer(transition_expr.as_ref());
@@ -534,7 +265,10 @@ where
     /// update takes a function and creates a listener that will be passed the current state
     /// and event context for processing. The function must return the next state, and the next event expression
     /// to transition to
-    pub fn update(&mut self, thunk: fn(&T, Option<Event<'a>>) -> (T, &'a str)) -> &mut Extensions<'a> {
+    pub fn update(
+        &mut self,
+        thunk: fn(&T, Option<Event<'a>>) -> (T, &'a str),
+    ) -> &mut Extensions<'a> {
         self.action = Action::Thunk(thunk);
 
         &mut self.extensions
@@ -606,7 +340,7 @@ where
     pub fn can_continue(&self) -> bool {
         let current = self.context();
         if let (_, "exit") = current.get_phase_lifecycle() {
-           false
+            false
         } else {
             true
         }
@@ -635,7 +369,8 @@ where
 
         let state = state.unwrap();
 
-        if let Some(l) = self.listeners
+        if let Some(l) = self
+            .listeners
             .iter()
             .find(|l| state.select(l.to_owned().clone(), &self.context()))
         {
@@ -678,7 +413,7 @@ where
         }
     }
 
-    /// (Extension) test runs tests defined in listener extensions, 
+    /// (Extension) test runs tests defined in listener extensions,
     /// and panics if all tests do not pass. If all tests pass this function
     /// will return the Runtime for execution
     pub fn test(&'a self) -> Result<Self, RuntimeTestError> {
@@ -705,10 +440,300 @@ where
                 current: self.current.clone(),
             })
         } else {
-            Err(RuntimeTestError{})
+            Err(RuntimeTestError {})
         }
     }
 }
 
 #[derive(Debug)]
 pub struct RuntimeTestError;
+
+#[derive(Clone)]
+enum Action<'a, T>
+where
+    T: Default,
+{
+    NoOp,
+    Dispatch(&'a str),
+    Thunk(fn(&T, Option<Event<'a>>) -> (T, &'a str)),
+}
+
+impl<'a, T> Default for Action<'a, T>
+where
+    T: Default,
+{
+    fn default() -> Self {
+        Self::NoOp
+    }
+}
+
+impl<'a, T> Debug for Action<'a, T>
+where
+    T: Default,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoOp => write!(f, "NoOp"),
+            Self::Dispatch(arg0) => f.debug_tuple("Dispatch").field(arg0).finish(),
+            Self::Thunk(_) => write!(f, "thunk"),
+        }
+    }
+}
+
+mod parser {
+    use crate::{Event, Signal};
+    use logos::{Lexer, Logos};
+    use std::fmt::Debug;
+
+    #[derive(Logos, Debug, Hash, Clone, PartialEq, PartialOrd)]
+    pub enum EventData<'a> {
+        #[regex(r"(?:[a-zA-Z-]+);", from_event_data_property)]
+        Property(&'a str),
+        #[regex(r"(?:[a-zA-Z-]+)_(?:[a-zA-Z-0-9]+);", from_event_data_property_prefix)]
+        PropertyWithPrefix((&'a str, &'a str)),
+        #[regex(r"(?:[a-zA-Z-]*)_*(?:[+/=a-zA-Z0-9]+)", from_event_data_signal)]
+        Signal((&'a str, &'a str)),
+        // Logos requires one token variant to handle errors,
+        // it can be named anything you wish.
+        #[error]
+        // We can also use this variant to define whitespace,
+        // or any other matches we wish to skip.
+        #[regex(r"[ \t\n\f{}]+", logos::skip)]
+        Error,
+    }
+
+    #[test]
+    fn test_event_data() {
+        let mut lexer =
+            EventData::lexer("{ init; player_1; abscawimim4fa430m} { yield_a344fa34f43 }");
+
+        assert_eq!(Some(EventData::Property("init")), lexer.next());
+        assert_eq!(
+            Some(EventData::PropertyWithPrefix(("player", "1"))),
+            lexer.next()
+        );
+        assert_eq!(
+            Some(EventData::Signal(("", "abscawimim4fa430m"))),
+            lexer.next()
+        );
+
+        match lexer.next() {
+            Some(EventData::Signal(("yield", payload))) => {
+                assert_eq!("a344fa34f43", payload);
+            }
+            _ => {
+                assert!(false, "expected to parse a signal")
+            }
+        }
+    }
+
+    #[derive(Logos, Debug, PartialEq, PartialOrd, Clone, Hash)]
+    pub enum Lifecycle<'a> {
+        #[regex(r"\{[+/=<>a-z;A-Z0-9 _-]+\}", from_lifecycle_event)]
+        Event(Event<'a>),
+        // Logos requires one token variant to handle errors,
+        // it can be named anything you wish.
+        #[error]
+        // We can also use this variant to define whitespace,
+        // or any other matches we wish to skip.
+        #[regex(r"[ \t\n\f\r]+", logos::skip)]
+        Error,
+    }
+
+    impl<'a> ToString for Lifecycle<'a> {
+        fn to_string(&self) -> String {
+            match self {
+                Lifecycle::Event(Event {
+                    phase,
+                    lifecycle,
+                    prefix,
+                    label,
+                    payload: Signal("", data),
+                }) => format!(
+                    "{{ {}_{}; {}_{}; {} }}",
+                    phase, lifecycle, prefix, label, data
+                ),
+                Lifecycle::Event(Event {
+                    phase,
+                    lifecycle,
+                    prefix,
+                    label,
+                    payload: Signal(signal, data),
+                }) => format!(
+                    "{{ {}_{}; {}_{}; {}_{} }}",
+                    phase, lifecycle, prefix, label, signal, data
+                ),
+                _ => String::default(),
+            }
+        }
+    }
+
+    #[test]
+    fn test_lifecycle() {
+        let mut lexer = Lifecycle::lexer("{ before_update; test_life; yield_13nmiafn3i } { after_update; test_life2; ok_13nmiafn3i } { after_update; test_life2; 13nmiafn3i }");
+        assert_eq!(
+            Some(Lifecycle::Event(Event {
+                phase: "before",
+                lifecycle: "update",
+                prefix: "test",
+                label: "life",
+                payload: Signal("yield", "13nmiafn3i")
+            })),
+            lexer.next()
+        );
+
+        assert_eq!(
+            Some(Lifecycle::Event(Event {
+                phase: "after",
+                lifecycle: "update",
+                prefix: "test",
+                label: "life2",
+                payload: Signal("ok", "13nmiafn3i")
+            })),
+            lexer.next()
+        );
+
+        assert_eq!(
+            Some(Lifecycle::Event(Event {
+                phase: "after",
+                lifecycle: "update",
+                prefix: "test",
+                label: "life2",
+                payload: Signal("", "13nmiafn3i")
+            })),
+            lexer.next()
+        );
+
+        let test = Lifecycle::Event(Event {
+            phase: "after",
+            lifecycle: "update",
+            prefix: "test",
+            label: "life2",
+            payload: Signal("test", "13nmiafn3i"),
+        });
+
+        assert_eq!(
+            "{ after_update; test_life2; test_13nmiafn3i }",
+            test.to_string()
+        );
+
+        let test = Lifecycle::Event(Event {
+            phase: "after",
+            lifecycle: "update",
+            prefix: "test",
+            label: "life2",
+            payload: Signal("", "13nmiafn3i"),
+        });
+
+        assert_eq!("{ after_update; test_life2; 13nmiafn3i }", test.to_string());
+
+        let mut lexer = Lifecycle::lexer("{ setup;; } { action_setup; _;   }");
+
+        assert_eq!(
+            Some(Lifecycle::Event(Event {
+                phase: "action",
+                lifecycle: "setup",
+                prefix: "",
+                label: "",
+                payload: Signal("", "")
+            })),
+            lexer.next()
+        );
+
+        assert_eq!(
+            Some(Lifecycle::Event(Event {
+                phase: "action",
+                lifecycle: "setup",
+                prefix: "",
+                label: "",
+                payload: Signal("", "")
+            })),
+            lexer.next()
+        );
+        println!("{:?}", lexer.next());
+    }
+
+    fn from_event_data_property_prefix<'a>(
+        lex: &mut Lexer<'a, EventData<'a>>,
+    ) -> Option<(&'a str, &'a str)> {
+        let slice = lex.slice();
+        if let Some(sep) = slice.chars().position(|c| c == '_') {
+            let prefix = &slice[..sep];
+            let label = &slice[sep + 1..slice.len() - 1];
+            Some((prefix, label))
+        } else {
+            None
+        }
+    }
+
+    fn from_event_data_property<'a>(lex: &mut Lexer<'a, EventData<'a>>) -> Option<&'a str> {
+        let slice = lex.slice();
+        let slice = &slice[..slice.len() - 1];
+
+        Some(slice)
+    }
+
+    fn from_event_data_signal<'a>(
+        lex: &mut Lexer<'a, EventData<'a>>,
+    ) -> Option<(&'a str, &'a str)> {
+        let mut slice = lex.slice();
+        let pos = slice.chars().position(|c| c == '_');
+        let mut signal = "";
+
+        if let Some(p) = pos {
+            signal = &slice[..p];
+            slice = &slice[p + 1..];
+        }
+
+        Some((signal, slice))
+    }
+
+    fn from_lifecycle_event<'a>(lex: &mut Lexer<'a, Lifecycle<'a>>) -> Option<Event<'a>> {
+        let slice = lex.slice();
+        let slice = &slice[1..slice.len() - 1];
+        let mut event_data = EventData::lexer(slice);
+        let mut lifecycle_phase = "action";
+        let mut event_payload: &str;
+        let mut event_signal = "";
+        let lifecycle_event: &str;
+        let event_prefix: &str;
+        let event_label: &str;
+
+        match event_data.next() {
+            Some(EventData::Property(event)) => {
+                lifecycle_event = event;
+            }
+            Some(EventData::PropertyWithPrefix((phase, event))) => {
+                lifecycle_phase = phase;
+                lifecycle_event = event;
+            }
+            _ => return None,
+        };
+
+        if let Some(EventData::PropertyWithPrefix((prefix, label))) = event_data.next() {
+            event_payload = &slice[event_data.span().end + 1..];
+            event_prefix = prefix;
+            event_label = label;
+        } else {
+            event_payload = &slice[event_data.span().end + 1..];
+            event_prefix = "";
+            event_label = "";
+        }
+
+        match event_data.next() {
+            Some(EventData::Signal((signal, payload))) => {
+                event_signal = signal;
+                event_payload = payload;
+            }
+            _ => {}
+        }
+
+        Some(Event {
+            phase: lifecycle_phase,
+            lifecycle: lifecycle_event,
+            prefix: event_prefix,
+            label: event_label,
+            payload: Signal(event_signal, event_payload.trim()),
+        })
+    }
+}
