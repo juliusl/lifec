@@ -8,11 +8,11 @@ pub trait RuntimeState<'a>
 
     /// load should take an initial message, and override any
     /// existing state that exists
-    fn load(&self, init: &'a str) -> Self where Self: Sized;
+    fn load<S: AsRef<str> + ?Sized>(&self, init: &'a S) -> Self where Self: Sized;
 
     /// process is a function that should take a string message
     /// and return the next version of Self
-    fn process(&self, msg: &'a str) -> Result<Self::State, Self::Error>;
+    fn process<S: AsRef<str> + ?Sized>(&self, msg: &'a S) -> Result<Self::State, Self::Error>;
 
     /// select decides which listener should be processed next
     fn select(&self, listener: Listener<'a, Self::State>, current: &Event<'a>) -> bool 
@@ -32,6 +32,9 @@ pub struct Event<'a> {
     payload: Signal<'a>,
 }
 
+#[derive(Default, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Signal<'a>(pub &'a str, pub &'a str);
+
 impl<'a> Event<'a> {
     pub fn exit() -> Event<'a> {
         Event {
@@ -40,32 +43,32 @@ impl<'a> Event<'a> {
         }
     }
 
-    pub fn dispatch(&self, msg: &'a str) -> Self {
+    pub fn dispatch<S: AsRef<str> + ?Sized>(&self, msg: &'a S) -> Self {
         self.with_signal("yield").with_data(msg)
     }
 
-    pub fn with_phase(&self, phase: &'a str) -> Self {
-        self.with("phase", phase)
+    pub fn with_phase<S: AsRef<str> + ?Sized>(&self, phase: &'a S) -> Self {
+        self.with("phase", phase.as_ref())
     }
 
-    pub fn with_lifecycle(&self, lifecycle: &'a str) -> Self {
-        self.with("lifecycle", lifecycle)
+    pub fn with_lifecycle<S: AsRef<str> + ?Sized>(&self, lifecycle: &'a S) -> Self {
+        self.with("lifecycle", lifecycle.as_ref())
     }
 
-    pub fn with_prefix(&self, prefix: &'a str) -> Self {
-        self.with("prefix", prefix)
+    pub fn with_prefix<S: AsRef<str> + ?Sized>(&self, prefix: &'a S) -> Self {
+        self.with("prefix", prefix.as_ref())
     }
 
-    pub fn with_label(&self, label: &'a str) -> Self {
-        self.with("label", label)
+    pub fn with_label<S: AsRef<str> + ?Sized>(&self, label: &'a S) -> Self {
+        self.with("label", label.as_ref())
     }
 
-    pub fn with_signal(&self, signal: &'a str) -> Self {
-        self.with("signal", signal)
+    pub fn with_signal<S: AsRef<str> + ?Sized>(&self, signal: &'a S) -> Self {
+        self.with("signal", signal.as_ref())
     }
 
-    pub fn with_data(&self, data: &'a str) -> Self {
-        self.with("data", data)
+    pub fn with_data<S: AsRef<str> + ?Sized>(&self, data: &'a S) -> Self {
+        self.with("data", data.as_ref())
     }
 
     pub fn clear(&self) -> Self {
@@ -78,7 +81,7 @@ impl<'a> Event<'a> {
         }
     }
 
-    fn with(&self, property: &'static str, value: &'a str) -> Self {
+    fn with<S: AsRef<str> +?Sized>(&self, property: &'a S, value: &'a S) -> Self {
         let Event {
             phase,
             lifecycle,
@@ -87,7 +90,9 @@ impl<'a> Event<'a> {
             payload: Signal(signal, data),
         } = self.clone();
 
-        match property {
+        let value = value.as_ref();
+
+        match property.as_ref() {
             "phase" => Self {
                 phase: value,
                 lifecycle,
@@ -163,9 +168,6 @@ impl<'a> Display for Event<'a> {
         write!(f, "{{ {}_{}; {}_{}; {}_{} }}", self.phase, self.lifecycle, self.prefix, self.label, self.payload.1, self.payload.0)
     }
 }
-
-#[derive(Default, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Signal<'a>(pub &'a str, pub &'a str);
 
 fn from_event_data_property_prefix<'a>(
     lex: &mut Lexer<'a, EventData<'a>>,
@@ -460,22 +462,17 @@ where
     event: Event<'a>,
     action: Action<'a, T>,
     next: Option<Event<'a>>,
-    extensions: Extensions<'a, T>,
+    extensions: Extensions<'a>,
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Extensions<'a, T>
-where 
-    T: Default
+pub struct Extensions<'a>
 {
-    action: Action<'a, T>,
     context: Option<Event<'a>>,
     tests: Vec<(&'a str, &'a str)>,
 }
 
-impl<'a, T> Extensions<'a, T> 
-where 
-    T: Default + Clone + RuntimeState<'a>
+impl<'a> Extensions<'a> 
 {
     /// sets the current event context which will be used for extension methods
     pub fn set_context(&mut self, context: Option<Event<'a>>) -> &mut Self {
@@ -485,22 +482,15 @@ where
 
     /// adds a test case to the extensions of the listener, 
     /// only relevant for testing Thunk's at the moment
-    pub fn test(&mut self, init: &'a str, expected: &'a str) -> &mut Self {
-        self.tests.push((init, expected));
-        self
-    }
-
-    /// called by the runtime, this sets the action that was assigned
-    /// to the listener this extension is assigned to
-    fn init(&mut self, action: Action<'a, T>) -> &mut Self {
-        self.action = action;
+    pub fn test<S: AsRef<str> + ?Sized>(&mut self, init: &'a S, expected: &'a S) -> &mut Self {
+        self.tests.push((init.as_ref(), expected.as_ref()));
         self
     }
 
     /// called by the runtime to execute the tests 
     /// if None is returned that means this extension skipped running anything
-    fn run_tests(&self) -> Option<bool> {
-        if let Action::Thunk(thunk) = self.action.clone() {
+    fn run_tests<T: Default + Clone + RuntimeState<'a>>(&'a self, action: Action<'a, T>) -> Option<bool> {
+        if let Action::Thunk(thunk) = action {
             let mut pass = true;
 
             self.tests.iter().for_each(|(init, expected)| {
@@ -529,10 +519,10 @@ where
 {
     /// dispatch sends a message to state for processing
     /// if successful transitions to the event described in the transition expression
-    pub fn dispatch(&mut self, msg: &'static str, transition_expr: &'static str) -> &mut Extensions<'a, T> {
-        self.action = Action::Dispatch(msg);
+    pub fn dispatch<S: AsRef<str> + ?Sized>(&mut self, msg: &'a S, transition_expr: &'a S) -> &mut Extensions<'a> {
+        self.action = Action::Dispatch(msg.as_ref());
 
-        let lexer = Lifecycle::lexer(transition_expr);
+        let lexer = Lifecycle::lexer(transition_expr.as_ref());
         let mut lexer = lexer;
         if let Some(Lifecycle::Event(e)) = lexer.next() {
             self.next = Some(e);
@@ -544,7 +534,7 @@ where
     /// update takes a function and creates a listener that will be passed the current state
     /// and event context for processing. The function must return the next state, and the next event expression
     /// to transition to
-    pub fn update(&mut self, thunk: fn(&T, Option<Event<'a>>) -> (T, &'a str)) -> &mut Extensions<'a, T> {
+    pub fn update(&mut self, thunk: fn(&T, Option<Event<'a>>) -> (T, &'a str)) -> &mut Extensions<'a> {
         self.action = Action::Thunk(thunk);
 
         &mut self.extensions
@@ -570,20 +560,20 @@ where
         self.current.clone().unwrap_or(Event::exit())
     }
 
-    /// init creates the default state to start the runtime with
-    pub fn init() -> T {
-        T::default()
-    }
-
     /// current gets the current state
     pub fn current(&self) -> &Option<T> {
         &self.state
     }
 
+    /// init creates the default state to start the runtime with
+    pub fn init() -> T {
+        T::default()
+    }
+
     /// on parses an event expression, and adds a new listener for that event
     /// this method returns an instance of the Listener for further configuration
-    pub fn on(&mut self, event_expr: &'static str) -> &mut Listener<'a, T> {
-        let mut lexer = Lifecycle::lexer(event_expr);
+    pub fn on<S: AsRef<str> + ?Sized>(&mut self, event_expr: &'a S) -> &mut Listener<'a, T> {
+        let mut lexer = Lifecycle::lexer(event_expr.as_ref());
 
         if let Some(Lifecycle::Event(e)) = lexer.next() {
             let listener = Listener {
@@ -600,7 +590,7 @@ where
 
     /// start begins the runtime starting with the initial event expression
     /// the runtime will continue to execute until it reaches the { exit;; } event
-    pub fn start(self, init_expr: &'a str) {
+    pub fn start<S: AsRef<str> + ?Sized>(self, init_expr: &'a S) {
         let mut processing = self.parse_event(init_expr);
 
         loop {
@@ -623,8 +613,8 @@ where
     }
 
     /// parse_event parses the event and sets it as the current context
-    pub fn parse_event(mut self, expr: &'a str) -> Self {
-        let mut lexer = Lifecycle::lexer(expr);
+    pub fn parse_event<S: AsRef<str> + ?Sized>(mut self, expr: &'a S) -> Self {
+        let mut lexer = Lifecycle::lexer(expr.as_ref());
 
         if let Some(Lifecycle::Event(e)) = lexer.next() {
             self.current = Some(e)
@@ -691,18 +681,17 @@ where
     /// (Extension) test runs tests defined in listener extensions, 
     /// and panics if all tests do not pass. If all tests pass this function
     /// will return the Runtime for execution
-    pub fn test(&'a mut self) -> &'a mut Self {
-        let test_pass = self.listeners.iter().cloned().all(|l| {
-            let mut extension = l.extensions;
-            let extension = &mut extension;
-            let extension = extension.init(l.action);
-            if let Some(result) = extension.run_tests() {
+    pub fn test(&'a self) -> Result<Self, RuntimeTestError> {
+        let test_pass = self.listeners.iter().all(|l| {
+            let extension = &l.extensions;
+            if let Some(result) = extension.run_tests(l.action.clone()) {
                 if !result {
                     eprintln!("error with listener on({})", l.event);
+                    false
                 } else {
                     eprintln!("{} passed.", l.event);
+                    true
                 }
-                result
             } else {
                 eprintln!("{} skipped.", l.event);
                 true
@@ -710,9 +699,16 @@ where
         });
 
         if test_pass {
-            self 
+            Ok(Self {
+                state: self.state.clone(),
+                listeners: self.listeners.clone(),
+                current: self.current.clone(),
+            })
         } else {
-            panic!("did not pass all tests");
+            Err(RuntimeTestError{})
         }
     }
 }
+
+#[derive(Debug)]
+pub struct RuntimeTestError;

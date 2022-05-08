@@ -808,17 +808,17 @@ impl<'a> RuntimeState<'a> for Dealer {
     type Error = InvalidDealerExpression;
     type State = Dealer;
 
-    fn process(&self, msg: &'a str) -> Result<Self, Self::Error> {
-        println!("Received: {}", msg);
-        self.deal(msg)
-    }
-
-    fn load(&self, init: &'a str) -> Self where Self: Sized {
-        if let Ok(dealer) = Dealer::try_from(init) {
+    fn load<S: AsRef<str> + ?Sized>(&self, init: &'a S) -> Self where Self: Sized {
+        if let Ok(dealer) = Dealer::try_from(init.as_ref()) {
             dealer
         } else {
-            panic!("could not parse {}", init)
+            panic!("could not parse {}", init.as_ref())
         }
+    }
+
+    fn process<S: AsRef<str> + ?Sized>(&self, msg: &'a S) -> Result<Self::State, Self::Error> {
+        println!("Received: {}", msg.as_ref());
+        self.deal(msg.as_ref())
     }
 }
 

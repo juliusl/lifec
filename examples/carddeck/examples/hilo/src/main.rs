@@ -66,5 +66,8 @@ fn main() {
         .on("{ after_choose; player_2; }")
         .dispatch("[.1+2]", "{ action_choose; player_1; }");
 
-     runtime.test().start("{ setup;; }");
+    runtime
+        .test()
+        .expect("runtime did not pass all tests")
+        .start("{ setup;; }");
 }
