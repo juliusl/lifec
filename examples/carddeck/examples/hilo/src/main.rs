@@ -67,20 +67,19 @@ fn main() {
     });
 
     start_editor::<Runtime<Dealer>>(
-        "hilo", 
-        1920.0, 
-        1080.0, 
-        runtime.parse_event("{ setup;; }"), 
+        "hilo",
+        1920.0,
+        1080.0,
+        runtime.parse_event("{ setup;; }"),
         |ui, s| {
             use imgui::ChildWindow;
-            
-            let mut state = s.clone();
-            ChildWindow::new("hilo").size([-1.0, 0.00]).build(ui, || {
 
+            let mut state = s.clone();
+            ChildWindow::new("hilo").size([-1.0, -1.0]).build(ui, || {
                 if ui.button("Step") {
                     state = state.process();
                 }
-
+                ui.same_line();
                 if ui.button("Reset") {
                     state.reset();
                     state = state.parse_event("{ setup;; }");
@@ -114,13 +113,13 @@ fn main() {
                                 }
                             }
                         }
-
                     }
                 }
             });
 
             Some(state.to_owned())
-        });
+        },
+    );
 
     // runtime
     //     .test()
