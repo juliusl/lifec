@@ -496,7 +496,7 @@ mod parser {
         Property(&'a str),
         #[regex(r"(?:[a-zA-Z-]+)_(?:[a-zA-Z-0-9]+);", from_event_data_property_prefix)]
         PropertyWithPrefix((&'a str, &'a str)),
-        #[regex(r"(?:[a-zA-Z-]*)_*(?:[+/=a-zA-Z0-9]+)", from_event_data_signal)]
+        #[regex(r"(?:[+/=a-zA-Z0-9]+_*(?:[a-zA-Z-]*))", from_event_data_signal)]
         Signal((&'a str, &'a str)),
         // Logos requires one token variant to handle errors,
         // it can be named anything you wish.
@@ -510,7 +510,7 @@ mod parser {
     #[test]
     fn test_event_data() {
         let mut lexer =
-            EventData::lexer("{ init; player_1; abscawimim4fa430m} { yield_a344fa34f43 }");
+            EventData::lexer("{ init; player_1; abscawimim4fa430m} { a344fa34f43_yield }");
 
         assert_eq!(Some(EventData::Property("init")), lexer.next());
         assert_eq!(
@@ -575,7 +575,7 @@ mod parser {
 
     #[test]
     fn test_lifecycle() {
-        let mut lexer = Lifecycle::lexer("{ before_update; test_life; yield_13nmiafn3i } { after_update; test_life2; ok_13nmiafn3i } { after_update; test_life2; 13nmiafn3i }");
+        let mut lexer = Lifecycle::lexer("{ before_update; test_life; 13nmiafn3i_yield } { after_update; test_life2; 13nmiafn3i_ok } { after_update; test_life2; 13nmiafn3i }");
         assert_eq!(
             Some(Lifecycle::Event(Event {
                 phase: "before",
@@ -686,8 +686,8 @@ mod parser {
         let mut signal = "";
 
         if let Some(p) = pos {
-            signal = &slice[..p];
-            slice = &slice[p + 1..];
+            signal = &slice[p + 1..];
+            slice = &slice[..p];
         }
 
         Some((signal, slice))
