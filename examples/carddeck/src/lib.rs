@@ -861,6 +861,10 @@ impl Dealer {
         self.hands.get(pos)
     }
 
+    pub fn hands(&self) -> usize {
+        self.hands.len()
+    }
+
     pub fn deck(&self) -> Option<&Hand> {
         match &self.deck {
             Deck::Deck(h) => Some(h),
