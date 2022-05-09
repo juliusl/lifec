@@ -275,7 +275,7 @@ where
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Runtime<'a, T>
 where
     T: RuntimeState<'a, State = T> + Default + Clone,
@@ -304,6 +304,11 @@ where
         T::default()
     }
 
+    pub fn reset(&mut self) {
+        self.current = None;
+        self.state = None;
+    }
+
     /// on parses an event expression, and adds a new listener for that event
     /// this method returns an instance of the Listener for further configuration
     pub fn on<S: AsRef<str> + ?Sized>(&mut self, event_expr: &'a S) -> &mut Listener<'a, T> {
@@ -324,7 +329,7 @@ where
 
     /// start begins the runtime starting with the initial event expression
     /// the runtime will continue to execute until it reaches the { exit;; } event
-    pub fn start<S: AsRef<str> + ?Sized>(self, init_expr: &'a S) {
+    pub fn start<S: AsRef<str> + ?Sized>(&mut self, init_expr: &'a S) {
         let mut processing = self.parse_event(init_expr);
 
         loop {
@@ -347,14 +352,14 @@ where
     }
 
     /// parse_event parses the event and sets it as the current context
-    pub fn parse_event<S: AsRef<str> + ?Sized>(mut self, expr: &'a S) -> Self {
+    pub fn parse_event<S: AsRef<str> + ?Sized>(&mut self, expr: &'a S) -> Self {
         let mut lexer = Lifecycle::lexer(expr.as_ref());
 
         if let Some(Lifecycle::Event(e)) = lexer.next() {
             self.current = Some(e)
         }
 
-        self
+        self.clone()
     }
 
     /// process handles the internal logic
