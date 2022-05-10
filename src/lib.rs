@@ -2,6 +2,13 @@ use logos::Logos;
 use parser::Lifecycle;
 use std::fmt::{Debug, Display};
 
+#[cfg(feature = "editor")]
+pub mod editor;
+#[cfg(feature = "editor")]
+pub use self::editor::EditorEvent;
+#[cfg(feature = "editor")]
+pub use self::editor::EditorRuntime;
+
 pub trait RuntimeState {
     type Error;
     type State: Default + RuntimeState + Clone + Sized;
@@ -203,16 +210,14 @@ impl Extensions {
     /// adds a test case to the extensions of the listener,
     /// only relevant for testing Thunk's at the moment
     pub fn test<S: AsRef<str> + ?Sized>(&mut self, init: &S, expected: &S) -> &mut Self {
-        self.tests.push((init.as_ref().to_string(), expected.as_ref().to_string()));
+        self.tests
+            .push((init.as_ref().to_string(), expected.as_ref().to_string()));
         self
     }
 
     /// called by the runtime to execute the tests
     /// if None is returned that means this extension skipped running anything
-    fn run_tests<T: Default + Clone + RuntimeState>(
-        &self,
-        action: Action<T>,
-    ) -> Option<bool> {
+    fn run_tests<T: Default + Clone + RuntimeState>(&self, action: Action<T>) -> Option<bool> {
         if let Action::Thunk(thunk) = action {
             let mut pass = true;
 
@@ -261,10 +266,7 @@ where
     /// update takes a function and creates a listener that will be passed the current state
     /// and event context for processing. The function must return the next state, and the next event expression
     /// to transition to
-    pub fn update(
-        &mut self,
-        thunk: fn(&T, Option<Event>) -> (T, String),
-    ) -> &mut Extensions {
+    pub fn update(&mut self, thunk: fn(&T, Option<Event>) -> (T, String)) -> &mut Extensions {
         self.action = Action::Thunk(thunk);
 
         &mut self.extensions
@@ -541,7 +543,7 @@ mod parser {
         Error,
     }
 
-    impl ToString for Lifecycle{
+    impl ToString for Lifecycle {
         fn to_string(&self) -> String {
             match self {
                 Lifecycle::Event(Event {
@@ -644,9 +646,7 @@ mod parser {
         println!("{:?}", lexer.next());
     }
 
-    fn from_event_data_property_prefix(
-        lex: &mut Lexer<EventData>,
-    ) -> Option<(String, String)> {
+    fn from_event_data_property_prefix(lex: &mut Lexer<EventData>) -> Option<(String, String)> {
         let slice = lex.slice();
         if let Some(sep) = slice.chars().position(|c| c == '_') {
             let prefix = &slice[..sep];
@@ -664,9 +664,7 @@ mod parser {
         Some(slice.to_string())
     }
 
-    fn from_event_data_signal(
-        lex: &mut Lexer<EventData>,
-    ) -> Option<(String, String)> {
+    fn from_event_data_signal(lex: &mut Lexer<EventData>) -> Option<(String, String)> {
         let mut slice = lex.slice();
         let pos = slice.chars().position(|c| c == '_');
         let mut signal = "";

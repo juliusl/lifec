@@ -7,3 +7,11 @@ edition = "2021"
 
 [dependencies]
 logos = "0.12.0"
+
+# For Event Editor
+atlier = { path = "../atlier/", optional=true }
+imnodes = { path = "../atlier/imnodes-rs", optional=true }
+imgui = { version = "0.8.2", optional=true }
+
+[features]
+editor = ["atlier", "imnodes", "imgui"]

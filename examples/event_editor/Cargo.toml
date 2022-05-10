@@ -11,5 +11,5 @@ carddeck = { path = "../carddeck" }
 imgui = "0.8.2"
 imnodes = { path = "../../../atlier/imnodes-rs" }
 lazy_static = "1.4.0"
-lifec = { path = "../.." }
+lifec = { path = "../..", features = ["editor"] }
 thread-safe = "0.1.2"
