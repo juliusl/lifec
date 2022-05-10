@@ -809,11 +809,11 @@ impl Display for Dealer {
     }
 }
 
-impl<'a> RuntimeState<'a> for Dealer {
+impl RuntimeState for Dealer {
     type Error = InvalidDealerExpression;
     type State = Dealer;
 
-    fn load<S: AsRef<str> + ?Sized>(&self, init: &'a S) -> Self where Self: Sized {
+    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self where Self: Sized {
         if let Ok(dealer) = Dealer::try_from(init.as_ref()) {
             dealer
         } else {
@@ -821,7 +821,7 @@ impl<'a> RuntimeState<'a> for Dealer {
         }
     }
 
-    fn process<S: AsRef<str> + ?Sized>(&self, msg: &'a S) -> Result<Self::State, Self::Error> {
+    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self::State, Self::Error> {
         println!("Received: {}", msg.as_ref());
         self.deal(msg.as_ref())
     }

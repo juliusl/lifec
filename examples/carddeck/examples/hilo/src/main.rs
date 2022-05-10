@@ -1,4 +1,4 @@
-use atlier::system::start_editor;
+use atlier::system::{start_editor};
 use carddeck::Dealer;
 use lifec::Runtime;
 
@@ -6,7 +6,7 @@ fn main() {
     let mut runtime = Runtime::<Dealer>::default();
     runtime
         .on("{ setup;; }")
-        .update(|s, _| (s.clone(), "{ deal;; }"))
+        .update(|s, _| (s.clone(), "{ deal;; }".to_string()))
         .test("()", "{ deal;; }");
 
     runtime
@@ -27,7 +27,7 @@ fn main() {
             let deck = &deck.take(2);
             if let Some((remaining, hands)) = deck {
                 if remaining.cards().len() != 0 {
-                    return (s.clone(), "{ error;; }");
+                    return (s.clone(), "{ error;; }".to_string());
                 }
 
                 let cards = hands;
@@ -37,14 +37,14 @@ fn main() {
 
                 if p1 > p2 {
                     println!("P1 Wins\n");
-                    (s.clone(), "{ after_choose; player_1; }")
+                    (s.clone(), "{ after_choose; player_1; }".to_string())
                 } else {
                     println!("P2 Wins\n");
-                    (s.clone(), "{ after_choose; player_2; }")
+                    (s.clone(), "{ after_choose; player_2; }".to_string())
                 }
             } else {
                 println!("Game Over\n");
-                (s.clone(), "{ exit;; }")
+                (s.clone(), "{ exit;; }".to_string())
             }
         })
         .test("[s2s3s4][s5s6s7](hah2)", "{ after_choose; player_1; }")
@@ -60,9 +60,9 @@ fn main() {
     runtime.on("{ game_over;; }").update(|s, _| {
         if s.prune().hand(1).is_none() {
             println!("Game Over\n");
-            (s.clone(), { "{ exit;; }" })
+            (s.clone(), "{ exit;; }".to_string())
         } else {
-            (s.clone(), "{ draw;; }")
+            (s.clone(), "{ draw;; }".to_string())
         }
     });
 
@@ -71,11 +71,11 @@ fn main() {
         1920.0,
         1080.0,
         runtime.parse_event("{ setup;; }"),
-        |ui, s| {
-            use imgui::ChildWindow;
+        |ui, s, _| {
+            use imgui::Window;
 
             let mut state = s.clone();
-            ChildWindow::new("hilo").size([-1.0, -1.0]).build(ui, || {
+            Window::new("hilo").size([1280.0, 720.0], imgui::Condition::FirstUseEver).build(ui, || {
                 if ui.button("Step") {
                     state = state.process();
                 }
@@ -119,6 +119,7 @@ fn main() {
 
             Some(state.to_owned())
         },
+        true
     );
 
     // runtime
