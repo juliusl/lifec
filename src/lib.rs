@@ -2,11 +2,11 @@ use logos::Logos;
 use parser::Lifecycle;
 use std::fmt::{Debug, Display};
 
-#[cfg(feature = "editor")]
+#[cfg(any(feature = "editor"))]
 pub mod editor;
-#[cfg(feature = "editor")]
+#[cfg(any(feature = "editor"))]
 pub use self::editor::EditorEvent;
-#[cfg(feature = "editor")]
+#[cfg(any(feature = "editor"))]
 pub use self::editor::EditorRuntime;
 
 pub trait RuntimeState {
@@ -510,18 +510,19 @@ mod parser {
         let mut lexer =
             EventData::lexer("{ init; player_1; abscawimim4fa430m} { a344fa34f43_yield }");
 
-        assert_eq!(Some(EventData::Property("init")), lexer.next());
+        assert_eq!(Some(EventData::Property("init".to_string())), lexer.next());
         assert_eq!(
-            Some(EventData::PropertyWithPrefix(("player", "1"))),
+            Some(EventData::PropertyWithPrefix(("player".to_string(), "1".to_string()))),
             lexer.next()
         );
         assert_eq!(
-            Some(EventData::Signal(("", "abscawimim4fa430m"))),
+            Some(EventData::Signal(("".to_string(), "abscawimim4fa430m".to_string()))),
             lexer.next()
         );
 
         match lexer.next() {
-            Some(EventData::Signal(("yield", payload))) => {
+            Some(EventData::Signal((signal, payload))) => {
+                assert_eq!("yield", signal);
                 assert_eq!("a344fa34f43", payload);
             }
             _ => {
@@ -554,7 +555,7 @@ mod parser {
                     payload: Signal(signal, data),
                 }) => format!(
                     "{{ {}_{}; {}_{}; {}_{} }}",
-                    phase, lifecycle, prefix, label, signal, data
+                    phase, lifecycle, prefix, label, data, signal
                 ),
                 _ => String::default(),
             }
@@ -566,80 +567,80 @@ mod parser {
         let mut lexer = Lifecycle::lexer("{ before_update; test_life; 13nmiafn3i_yield } { after_update; test_life2; 13nmiafn3i_ok } { after_update; test_life2; 13nmiafn3i }");
         assert_eq!(
             Some(Lifecycle::Event(Event {
-                phase: "before",
-                lifecycle: "update",
-                prefix: "test",
-                label: "life",
-                payload: Signal("yield", "13nmiafn3i")
+                phase: "before".to_string(),
+                lifecycle: "update".to_string(),
+                prefix: "test".to_string(),
+                label: "life".to_string(),
+                payload: Signal("yield".to_string(), "13nmiafn3i".to_string())
             })),
             lexer.next()
         );
 
         assert_eq!(
             Some(Lifecycle::Event(Event {
-                phase: "after",
-                lifecycle: "update",
-                prefix: "test",
-                label: "life2",
-                payload: Signal("ok", "13nmiafn3i")
+                phase: "after".to_string(),
+                lifecycle: "update".to_string(),
+                prefix: "test".to_string(),
+                label: "life2".to_string(),
+                payload: Signal("ok".to_string(), "13nmiafn3i".to_string())
             })),
             lexer.next()
         );
 
         assert_eq!(
             Some(Lifecycle::Event(Event {
-                phase: "after",
-                lifecycle: "update",
-                prefix: "test",
-                label: "life2",
-                payload: Signal("", "13nmiafn3i")
+                phase: "after".to_string(),
+                lifecycle: "update".to_string(),
+                prefix: "test".to_string(),
+                label: "life2".to_string(),
+                payload: Signal("".to_string(), "13nmiafn3i".to_string())
             })),
             lexer.next()
         );
 
         let test = Lifecycle::Event(Event {
-            phase: "after",
-            lifecycle: "update",
-            prefix: "test",
-            label: "life2",
-            payload: Signal("test", "13nmiafn3i"),
+            phase: "after".to_string(),
+            lifecycle: "update".to_string(),
+            prefix: "test".to_string(),
+            label: "life2".to_string(),
+            payload: Signal("test".to_string(), "13nmiafn3i".to_string()),
         });
 
         assert_eq!(
-            "{ after_update; test_life2; test_13nmiafn3i }",
+            "{ after_update; test_life2; 13nmiafn3i_test }",
             test.to_string()
         );
 
         let test = Lifecycle::Event(Event {
-            phase: "after",
-            lifecycle: "update",
-            prefix: "test",
-            label: "life2",
-            payload: Signal("", "13nmiafn3i"),
+            phase: "after".to_string(),
+            lifecycle: "update".to_string(),
+            prefix: "test".to_string(),
+            label: "life2".to_string(),
+            payload: Signal("".to_string(), "13nmiafn3i".to_string()),
         });
 
-        assert_eq!("{ after_update; test_life2; 13nmiafn3i }", test.to_string());
+        assert_eq!("{ after_update; test_life2; 13nmiafn3i_ }", test.to_string());
 
         let mut lexer = Lifecycle::lexer("{ setup;; } { action_setup; _;   }");
 
         assert_eq!(
             Some(Lifecycle::Event(Event {
-                phase: "action",
-                lifecycle: "setup",
-                prefix: "",
-                label: "",
-                payload: Signal("", "")
+                phase: "action".to_string(),
+                lifecycle: "setup".to_string(),
+                prefix: "".to_string(),
+                label: "".to_string(),
+                payload: Signal("".to_string(), "".to_string())
             })),
             lexer.next()
         );
 
         assert_eq!(
             Some(Lifecycle::Event(Event {
-                phase: "action",
-                lifecycle: "setup",
-                prefix: "",
-                label: "",
-                payload: Signal("", "")
+                phase: "action".to_string(),
+                lifecycle: "setup".to_string(),
+                prefix: "".to_string(),
+                label: "".to_string(),
+                payload: Signal("".to_string(), "".to_string())
             })),
             lexer.next()
         );
