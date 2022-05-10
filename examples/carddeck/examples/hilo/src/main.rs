@@ -1,6 +1,6 @@
-use atlier::system::{start_editor};
+use atlier::system::{start_editor, App};
 use carddeck::Dealer;
-use lifec::Runtime;
+use lifec::{EditorRuntime, Runtime};
 
 fn main() {
     let mut runtime = Runtime::<Dealer>::default();
@@ -66,61 +66,71 @@ fn main() {
         }
     });
 
-    start_editor::<Runtime<Dealer>>(
+
+    start_editor(
         "hilo",
         1920.0,
         1080.0,
-        runtime.parse_event("{ setup;; }"),
-        |ui, s, _| {
-            use imgui::Window;
-
-            let mut state = s.clone();
-            Window::new("hilo").size([1280.0, 720.0], imgui::Condition::FirstUseEver).build(ui, || {
-                if ui.button("Step") {
-                    state = state.process();
-                }
-                ui.same_line();
-                if ui.button("Reset") {
-                    state.reset();
-                    state = state.parse_event("{ setup;; }");
-                }
-
-                if let Some(current_state) = state.current() {
-                    ui.label_text("event", state.context().to_string());
-                    ui.label_text("current_state", format!("{}", current_state));
-
-                    if let Some(hand_1) = current_state.hand(0) {
-                        ui.label_text("hand 1", format!("{}", hand_1))
-                    }
-
-                    if let Some(hand_2) = current_state.hand(1) {
-                        ui.label_text("hand 2", format!("{}", hand_2))
-                    }
-
-                    if let Some(deck) = current_state.deck() {
-                        if deck.cards().len() > 1 && current_state.hands() > 1 {
-                            ui.label_text("deck", format!("{}", deck));
-                            let cards = deck.cards();
-
-                            let player_1 = cards.get(0);
-                            let player_2 = cards.get(1);
-
-                            if let (Some(p1), Some(p2)) = (player_1, player_2) {
-                                if p1 > p2 {
-                                    ui.label_text("Winner", "player 1")
-                                } else {
-                                    ui.label_text("Winner", "player 2")
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-
-            Some(state.to_owned())
-        },
-        true
+        EditorRuntime::from(runtime),
+        |ui, state, imnodes| EditorRuntime::<Dealer>::show(ui, state, imnodes),
+        true,
     );
+
+    // start_editor::<Runtime<Dealer>>(
+    //     "hilo",
+    //     1920.0,
+    //     1080.0,
+    //     runtime.parse_event("{ setup;; }"),
+    //     |ui, s, _| {
+    //         use imgui::Window;
+
+    //         let mut state = s.clone();
+    //         Window::new("hilo").size([1280.0, 720.0], imgui::Condition::FirstUseEver).build(ui, || {
+    //             if ui.button("Step") {
+    //                 state = state.process();
+    //             }
+    //             ui.same_line();
+    //             if ui.button("Reset") {
+    //                 state.reset();
+    //                 state = state.parse_event("{ setup;; }");
+    //             }
+
+    //             if let Some(current_state) = state.current() {
+    //                 ui.label_text("event", state.context().to_string());
+    //                 ui.label_text("current_state", format!("{}", current_state));
+
+    //                 if let Some(hand_1) = current_state.hand(0) {
+    //                     ui.label_text("hand 1", format!("{}", hand_1))
+    //                 }
+
+    //                 if let Some(hand_2) = current_state.hand(1) {
+    //                     ui.label_text("hand 2", format!("{}", hand_2))
+    //                 }
+
+    //                 if let Some(deck) = current_state.deck() {
+    //                     if deck.cards().len() > 1 && current_state.hands() > 1 {
+    //                         ui.label_text("deck", format!("{}", deck));
+    //                         let cards = deck.cards();
+
+    //                         let player_1 = cards.get(0);
+    //                         let player_2 = cards.get(1);
+
+    //                         if let (Some(p1), Some(p2)) = (player_1, player_2) {
+    //                             if p1 > p2 {
+    //                                 ui.label_text("Winner", "player 1")
+    //                             } else {
+    //                                 ui.label_text("Winner", "player 2")
+    //                             }
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         });
+
+    //         Some(state.to_owned())
+    //     },
+    //     true
+    // );
 
     // runtime
     //     .test()

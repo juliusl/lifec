@@ -1,4 +1,4 @@
-use crate::{Runtime, RuntimeState};
+use crate::{Runtime, RuntimeState, Action};
 use imnodes::{ Link, NodeId, LinkId, AttributeFlag, IdentifierGenerator };
 use std::collections::HashSet;
 use atlier::prelude::*;
@@ -8,7 +8,7 @@ use std::collections::HashMap;
 #[derive(Default, Clone)]
 pub struct EditorRuntime<S>
 where
-    S: RuntimeState<State = S> + Default + Clone,
+    S: RuntimeState<State = S> + Default + Clone
 {
     count: usize,
     events: Vec<EditorEvent>,
@@ -23,6 +23,27 @@ pub struct EditorEvent {
     dispatch: String,
     transition: String,
 }
+
+impl<S> From<Runtime<S>> for EditorRuntime<S> 
+where
+    S: RuntimeState<State = S> + Default + Clone {
+        fn from(state: Runtime<S>) -> Self {
+            let events = state.listeners.iter().enumerate().filter_map(|(id, l)| {
+                if let (Action::Dispatch(msg), Some(transition)) = (&l.action, &l.next) {
+                    Some(EditorEvent {
+                        label: format!("Event {}", id),
+                        on: l.event.to_string(),
+                        dispatch: msg.to_string(),
+                        transition: transition.to_string(),
+                    })
+                } else {
+                    None
+                }
+            }).collect();
+
+            Self { state, events, ..Default::default() }
+        }
+    }
 
 impl<S> App for EditorRuntime<S>
 where
