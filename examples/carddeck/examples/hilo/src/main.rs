@@ -3,23 +3,9 @@ use carddeck::Dealer;
 use lifec::{EditorRuntime, Runtime};
 
 fn main() {
-    let mut runtime = Runtime::<Dealer>::default();
-    runtime
-        .on("{ setup;; }")
-        .update(|s, _| (s.clone(), "{ deal;; }".to_string()))
-        .test("()", "{ deal;; }");
-
-    runtime
-        .on("{ deal;; }")
-        .dispatch("[+26][+26]", "{ draw;; }");
-
-    runtime
-        .on("{ draw;; }")
-        .dispatch("[.0-1][.1-1]", "{ after_draw;; }");
-
-    runtime
-        .on("{ after_draw;; }")
-        .update(|s, _| {
+    let mut runtime = Runtime::<Dealer>::default()
+        .with_call("setup", |s, _| (s.clone(), "{ deal;; }".to_string()))
+        .with_call("after_draw", |s, _| {
             println!("Current Dealer: {}", s);
 
             let deck = s.deck();
@@ -47,6 +33,31 @@ fn main() {
                 (s.clone(), "{ exit;; }".to_string())
             }
         })
+        .with_call("game_over", |s, _| {
+            if s.prune().hand(1).is_none() {
+                println!("Game Over\n");
+                (s.clone(), "{ exit;; }".to_string())
+            } else {
+                (s.clone(), "{ draw;; }".to_string())
+            }
+        });
+    
+    runtime
+        .on("{ setup;; }")
+        .call("setup")
+        .test("()", "{ deal;; }");
+
+    runtime
+        .on("{ deal;; }")
+        .dispatch("[+26][+26]", "{ draw;; }");
+
+    runtime
+        .on("{ draw;; }")
+        .dispatch("[.0-1][.1-1]", "{ after_draw;; }");
+
+    runtime
+        .on("{ after_draw;; }")
+        .call("after_draw")
         .test("[s2s3s4][s5s6s7](hah2)", "{ after_choose; player_1; }")
         .test("[s2s3s4][s5s6s7](h2ha)", "{ after_choose; player_2; }");
 
@@ -57,24 +68,18 @@ fn main() {
         .on("{ after_choose; player_2; }")
         .dispatch("[.1+2]", "{ game_over;; }");
 
-    runtime.on("{ game_over;; }").update(|s, _| {
-        if s.prune().hand(1).is_none() {
-            println!("Game Over\n");
-            (s.clone(), "{ exit;; }".to_string())
-        } else {
-            (s.clone(), "{ draw;; }".to_string())
-        }
-    });
+    runtime
+        .on("{ game_over;; }")
+        .call("game_over");
 
-
-    start_editor(
-        "hilo",
-        1920.0,
-        1080.0,
-        EditorRuntime::from(runtime),
-        |ui, state, imnodes| EditorRuntime::<Dealer>::show(ui, state, imnodes),
-        true,
-    );
+    // start_editor(
+    //     "hilo",
+    //     1920.0,
+    //     1080.0,
+    //     EditorRuntime::from(runtime),
+    //     |ui, state, imnodes| EditorRuntime::<Dealer>::show(ui, state, imnodes),
+    //     true,
+    // );
 
     // start_editor::<Runtime<Dealer>>(
     //     "hilo",
@@ -132,8 +137,8 @@ fn main() {
     //     true
     // );
 
-    // runtime
-    //     .test()
-    //     .expect("runtime did not pass all tests")
-    //     .start("{ setup;; }");
+    runtime
+        .test()
+        .expect("runtime did not pass all tests")
+        .start("{ setup;; }");
 }

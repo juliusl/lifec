@@ -1,5 +1,6 @@
 use logos::Logos;
 use parser::Lifecycle;
+use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 
 #[cfg(any(feature = "editor"))]
@@ -271,14 +272,39 @@ where
 
         &mut self.extensions
     }
+
+    pub fn call<S: AsRef<str> + ?Sized>(
+        &mut self,
+        name: &S
+    ) -> &mut Extensions {
+        self.action = Action::Call(name.as_ref().to_string());
+
+        &mut self.extensions
+    }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Clone)]
+pub struct ThunkFunc<T: Default>(fn(&T, Option<Event>) -> (T, String));
+
+impl<T: Default> Default for ThunkFunc<T> {
+    fn default() -> Self {
+        ThunkFunc(|_, _| (T::default(), "{ exit;; }".to_string()))
+    }
+}
+
+impl<T: Default> Debug for ThunkFunc<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ThunkFunc").finish()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Runtime<T>
 where
     T: RuntimeState<State = T> + Default + Clone,
 {
     listeners: Vec<Listener<T>>,
+    calls: HashMap<String, ThunkFunc<T>>,
     state: Option<T>,
     current: Option<Event>,
 }
@@ -323,6 +349,12 @@ where
         } else {
             panic!()
         }
+    }
+
+    pub fn with_call<S: AsRef<str> + ?Sized>(&mut self, call_name: &S, thunk: fn(&T, Option<Event>) -> (T, String)) -> Self {
+        self.calls.insert(call_name.as_ref().to_string(), ThunkFunc(thunk));
+
+        self.clone()
     }
 
     /// start begins the runtime starting with the initial event expression
@@ -378,6 +410,27 @@ where
             .find(|l| state.select(l.to_owned().clone(), &self.context()))
         {
             match &l.action {
+                Action::Call(name) => {
+                    if let Some(ThunkFunc(thunk)) = self.calls.get(name) {
+                        let (next_s, next_e) = thunk(&state, self.current.clone());
+                        let mut lex = Lifecycle::lexer(&next_e);
+
+                        match lex.next() {
+                            Some(Lifecycle::Event(event)) => {
+                                self.current = Some(event);
+                                self.state = Some(next_s);
+                            }
+                            Some(Lifecycle::Error) => {
+                                eprintln!(
+                                    "Error parsing event expression: {:?}, {}",
+                                    lex.span(),
+                                    next_e
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                }
                 Action::Thunk(thunk) => {
                     let (next_s, next_e) = thunk(&state, self.current.clone());
                     let mut lex = Lifecycle::lexer(&next_e);
@@ -410,6 +463,7 @@ where
         }
 
         Self {
+            calls: self.calls.clone(),
             listeners: self.listeners.to_vec(),
             state: self.state.clone(),
             current: self.current.clone(),
@@ -422,7 +476,16 @@ where
     pub fn test(&self) -> Result<Self, RuntimeTestError> {
         let test_pass = self.listeners.iter().all(|l| {
             let extension = &l.extensions;
-            if let Some(result) = extension.run_tests(l.action.clone()) {
+
+            let mut action = l.action.clone();
+
+            if let Action::Call(name) = l.action.clone() {
+                action = {
+                    Action::Thunk(self.calls.get(&name).unwrap().0)
+                }
+            }
+
+            if let Some(result) = extension.run_tests(action) {
                 if !result {
                     eprintln!("error with listener on({})", l.event);
                     false
@@ -438,6 +501,7 @@ where
 
         if test_pass {
             Ok(Self {
+                calls: self.calls.clone(),
                 state: self.state.clone(),
                 listeners: self.listeners.clone(),
                 current: self.current.clone(),
@@ -457,6 +521,7 @@ where
     T: Default,
 {
     NoOp,
+    Call(String),
     Dispatch(String),
     Thunk(fn(&T, Option<Event>) -> (T, String)),
 }
@@ -479,6 +544,7 @@ where
             Self::NoOp => write!(f, "NoOp"),
             Self::Dispatch(arg0) => f.debug_tuple("Dispatch").field(arg0).finish(),
             Self::Thunk(_) => write!(f, "thunk"),
+            Self::Call(arg0) => f.debug_tuple("Call").field(arg0).finish(),
         }
     }
 }
@@ -512,11 +578,17 @@ mod parser {
 
         assert_eq!(Some(EventData::Property("init".to_string())), lexer.next());
         assert_eq!(
-            Some(EventData::PropertyWithPrefix(("player".to_string(), "1".to_string()))),
+            Some(EventData::PropertyWithPrefix((
+                "player".to_string(),
+                "1".to_string()
+            ))),
             lexer.next()
         );
         assert_eq!(
-            Some(EventData::Signal(("".to_string(), "abscawimim4fa430m".to_string()))),
+            Some(EventData::Signal((
+                "".to_string(),
+                "abscawimim4fa430m".to_string()
+            ))),
             lexer.next()
         );
 
@@ -619,7 +691,10 @@ mod parser {
             payload: Signal("".to_string(), "13nmiafn3i".to_string()),
         });
 
-        assert_eq!("{ after_update; test_life2; 13nmiafn3i_ }", test.to_string());
+        assert_eq!(
+            "{ after_update; test_life2; 13nmiafn3i_ }",
+            test.to_string()
+        );
 
         let mut lexer = Lifecycle::lexer("{ setup;; } { action_setup; _;   }");
 
