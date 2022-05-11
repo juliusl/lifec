@@ -8,4 +8,4 @@ edition = "2021"
 [dependencies]
 atlier = { path = "../../../atlier" }
 carddeck = { path = "../carddeck" }
-lifec = { path = "../..", features = ["editor"] }
+lifec = { path = "../.." }
