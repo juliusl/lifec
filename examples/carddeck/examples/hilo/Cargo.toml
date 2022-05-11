@@ -9,4 +9,4 @@ edition = "2021"
 atlier = { path = "../../../../../atlier" }
 carddeck = { path = "../.." }
 imgui = "0.8.2"
-lifec = { path = "../../../..", features = ["editor"] }
+lifec = { path = "../../../.." }

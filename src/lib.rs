@@ -3,11 +3,8 @@ use parser::Lifecycle;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 
-#[cfg(any(feature = "editor"))]
 pub mod editor;
-#[cfg(any(feature = "editor"))]
 pub use self::editor::EditorEvent;
-#[cfg(any(feature = "editor"))]
 pub use self::editor::EditorRuntime;
 
 pub trait RuntimeState {
