@@ -825,6 +825,16 @@ impl RuntimeState for Dealer {
         println!("Received: {}", msg.as_ref());
         self.deal(msg.as_ref())
     }
+
+    fn process_with_args<S: AsRef<str> + ?Sized>(state: lifec::WithArgs<Self>, msg: &S) -> Result<Self::State, Self::Error>
+    where
+            Self: Clone + Default + RuntimeState<State = Self>, {
+        let args = state.parse_flags();
+        
+        println!("Dealer received args: {:?}", args);
+
+        state.get_state().deal(msg.as_ref())
+    }
 }
 
 impl Default for Dealer {

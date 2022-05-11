@@ -72,6 +72,10 @@ impl<S> App for EditorRuntime<S>
 where
     S: RuntimeState<State = S> + Default + Clone + Display,
 {
+    fn title() -> &'static str {
+        "Event Editor"
+    }
+
     fn show(
         ui: &imgui::Ui,
         state: &Self,
@@ -132,6 +136,8 @@ where
                 if ui.button("re-arrange") {
                     let mut store = Store::<NodeId>::default();
                     let mut first: Option<NodeId> = None;
+
+                    // This first part arranges the events horizontally
                     for _ in 0..previous.len() {
                         for Link {
                             start_node,
@@ -139,31 +145,26 @@ where
                             ..
                         } in previous.clone().iter()
                         {
-                            let ImVec2 { x, y: _ } =
+                            let ImVec2 { x, y } =
                                 start_node.get_position(imnodes::CoordinateSystem::GridSpace);
                             let start_x = x + 400.0;
+                            let start_y = y + 75.0;
 
-                            let ImVec2 { x: _, y } =
-                                end_node.get_position(imnodes::CoordinateSystem::GridSpace);
-                            end_node.set_position(start_x, y, imnodes::CoordinateSystem::GridSpace);
-
+                            end_node.set_position(
+                                start_x,
+                                start_y,
+                                imnodes::CoordinateSystem::GridSpace,
+                            );
                             store = store
                                 .link_create_if_not_exists(start_node.clone(), end_node.clone());
 
                             if first.is_none() {
                                 first = Some(start_node.clone());
                             }
-
-                            // if let Some(f) = first {
-                            //     let first_i32: i32 = f.into();
-                            //     let start_node_i32: i32 = (*start_node).into();
-                            //     if first_i32 > start_node_i32 && start_node_i32 > 0 {
-                            //         first = Some(start_node.clone());
-                            //     }
-                            // }
                         }
                     }
 
+                    // This next part arranges the events that need space vertically, usually only places where events branch
                     if let Some(first) = first {
                         let (seen, _) =
                             store.new_walk::<_, Printer>(first, Some(&Printer::default()));
@@ -172,26 +173,28 @@ where
                             let node = store.get(s);
                             if let Some((id, refs)) = node.1 {
                                 if refs.len() >= 3 {
-                                    for (pos, end_node) in store
-                                        .clone()
-                                        .visit(*id)
-                                        .iter()
-                                        .skip(1)
-                                        .filter_map(|r| r.1)
-                                        .enumerate()
-                                    {
-                                        let ImVec2 { x: _, y } =
-                                            id.get_position(imnodes::CoordinateSystem::GridSpace);
+                                    for _ in 0..refs.len() - 1 {
+                                        for (pos, end_node) in store
+                                            .clone()
+                                            .visit(*id)
+                                            .iter()
+                                            .skip(1)
+                                            .filter_map(|r| r.1)
+                                            .enumerate()
+                                        {
+                                            let ImVec2 { x: _, y } = id
+                                                .get_position(imnodes::CoordinateSystem::GridSpace);
 
-                                        let start_y = y + (pos as f32) * 325.0;
+                                            let start_y = y + (pos as f32) * 325.0;
 
-                                        let ImVec2 { x, y: _ } = end_node
-                                            .get_position(imnodes::CoordinateSystem::GridSpace);
-                                        end_node.set_position(
-                                            x,
-                                            start_y,
-                                            imnodes::CoordinateSystem::GridSpace,
-                                        );
+                                            let ImVec2 { x, y: _ } = end_node
+                                                .get_position(imnodes::CoordinateSystem::GridSpace);
+                                            end_node.set_position(
+                                                x,
+                                                start_y,
+                                                imnodes::CoordinateSystem::GridSpace,
+                                            );
+                                        }
                                     }
                                 }
                             }
@@ -353,6 +356,10 @@ impl Visitor<EditorEvent> for Printer {
 }
 
 impl App for EditorEvent {
+    fn title() -> &'static str {
+        "Edit Event"
+    }
+
     fn show(ui: &imgui::Ui, state: &Self, _: Option<&mut imnodes::EditorContext>) -> Option<Self> {
         let mut next = state.clone();
         if imgui::CollapsingHeader::new(&state.label).begin(ui) {

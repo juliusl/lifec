@@ -21,6 +21,18 @@ pub trait RuntimeState {
     /// and return the next version of Self
     fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self::State, Self::Error>;
 
+    /// process is a function that should take a string message
+    /// and return the next version of Self
+    fn process_with_args<S: AsRef<str> + ?Sized>(
+        state: WithArgs<Self>,
+        msg: &S,
+    ) -> Result<Self::State, Self::Error>
+    where
+        Self: Clone + Default + RuntimeState<State = Self>,
+    {
+        Self::process(&state.get_state(), msg)
+    }
+
     /// select decides which listener should be processed next
     fn select(&self, listener: Listener<Self::State>, current: &Event) -> bool {
         listener.event.get_phase_lifecycle() == current.get_phase_lifecycle()
@@ -196,6 +208,7 @@ where
 pub struct Extensions {
     context: Option<Event>,
     tests: Vec<(String, String)>,
+    args: Vec<String>,
 }
 
 impl Extensions {
@@ -211,6 +224,16 @@ impl Extensions {
         self.tests
             .push((init.as_ref().to_string(), expected.as_ref().to_string()));
         self
+    }
+
+    pub fn args<'a>(&mut self, args: &[&'a str]) -> &mut Self {
+        self.args = args.iter().map(|a| a.to_string()).collect();
+
+        self
+    }
+
+    fn get_args(&self) -> Vec<String> {
+        self.args.to_vec()
     }
 
     /// called by the runtime to execute the tests
@@ -270,10 +293,7 @@ where
         &mut self.extensions
     }
 
-    pub fn call<S: AsRef<str> + ?Sized>(
-        &mut self,
-        name: &S
-    ) -> &mut Extensions {
+    pub fn call<S: AsRef<str> + ?Sized>(&mut self, name: &S) -> &mut Extensions {
         self.action = Action::Call(name.as_ref().to_string());
 
         &mut self.extensions
@@ -281,17 +301,29 @@ where
 }
 
 #[derive(Clone)]
-pub struct ThunkFunc<T: Default>(fn(&T, Option<Event>) -> (T, String));
+pub enum ThunkFunc<T: Default + RuntimeState<State = T> + Clone> {
+    Default(fn(&T, Option<Event>) -> (T, String)),
+    WithArgs(fn(&WithArgs<T>, Option<Event>) -> (T, String)),
+}
 
-impl<T: Default> Default for ThunkFunc<T> {
+impl<T: Default> Default for ThunkFunc<T>
+where
+    T: Default + RuntimeState<State = T> + Clone,
+{
     fn default() -> Self {
-        ThunkFunc(|_, _| (T::default(), "{ exit;; }".to_string()))
+        ThunkFunc::Default(|_, _| (T::default(), "{ exit;; }".to_string()))
     }
 }
 
-impl<T: Default> Debug for ThunkFunc<T> {
+impl<T> Debug for ThunkFunc<T>
+where
+    T: Default + RuntimeState<State = T> + Clone,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("ThunkFunc").finish()
+        match self {
+            ThunkFunc::Default(_) => f.debug_tuple("ThunkFunc::Default").finish(),
+            ThunkFunc::WithArgs(_) => f.debug_tuple("ThunkFunc::WithArgs").finish(),
+        }
     }
 }
 
@@ -304,6 +336,96 @@ where
     calls: HashMap<String, ThunkFunc<T>>,
     state: Option<T>,
     current: Option<Event>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct WithArgs<T>
+where
+    T: RuntimeState<State = T> + Default + Clone,
+{
+    state: T,
+    args: Vec<String>,
+}
+
+impl<T> WithArgs<T>
+where
+    T: RuntimeState<State = T> + Default + Clone,
+{
+    pub fn get_state(&self) -> T {
+        self.state.clone()
+    }
+
+    pub fn get_args(&self) -> &Vec<String> {
+        &self.args
+    }
+
+    pub fn parse_flags(&self) -> HashMap<String, String> {
+        use parser::Argument;
+        use parser::Flags;
+
+        let arguments = self.args.join(" ");
+        let mut arg_lexer = Argument::lexer(arguments.as_ref());
+        let mut map = HashMap::<String, String>::default();
+
+        loop {
+            match arg_lexer.next() {
+                Some(Argument::Argument((flag, value))) => match flag {
+                    Flags::ShortFlag(f) => {
+                        if let Some(old) = map.insert(f.clone(), value.clone()) {
+                            eprintln!(
+                                "Warning: replacing flag {}, with {} -- original: {}",
+                                f, value, old
+                            );
+                        }
+                    }
+                    Flags::LongFlag(flag) => {
+                        if let Some(old) = map.insert(flag.clone(), value.clone()) {
+                            eprintln!(
+                                "Warning: replacing flag {}, with {} -- original: {}",
+                                flag, value, old
+                            );
+                        }
+                    }
+                    _ => continue,
+                },
+                Some(Argument::Error) => continue,
+                None => break,
+            }
+        }
+
+        map
+    }
+}
+
+impl<T> RuntimeState for WithArgs<T>
+where
+    T: RuntimeState<State = T> + Default + Clone,
+{
+    type State = Self;
+
+    type Error = <T as RuntimeState>::Error;
+
+    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            state: self.state.load(init),
+            args: self.args.to_owned(),
+        }
+    }
+
+    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self::State, Self::Error> {
+        let next = self.state.process(msg);
+
+        match next {
+            Ok(next) => Ok(Self {
+                state: next,
+                args: self.args.to_owned(),
+            }),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 impl<T> Runtime<T>
@@ -348,8 +470,24 @@ where
         }
     }
 
-    pub fn with_call<S: AsRef<str> + ?Sized>(&mut self, call_name: &S, thunk: fn(&T, Option<Event>) -> (T, String)) -> Self {
-        self.calls.insert(call_name.as_ref().to_string(), ThunkFunc(thunk));
+    pub fn with_call<S: AsRef<str> + ?Sized>(
+        &mut self,
+        call_name: &S,
+        thunk: fn(&T, Option<Event>) -> (T, String),
+    ) -> Self {
+        self.calls
+            .insert(call_name.as_ref().to_string(), ThunkFunc::Default(thunk));
+
+        self.clone()
+    }
+
+    pub fn with_call_args<S: AsRef<str> + ?Sized>(
+        &mut self,
+        call_name: &S,
+        thunk: fn(&WithArgs<T>, Option<Event>) -> (T, String),
+    ) -> Self {
+        self.calls
+            .insert(call_name.as_ref().to_string(), ThunkFunc::WithArgs(thunk));
 
         self.clone()
     }
@@ -407,8 +545,8 @@ where
             .find(|l| state.select(l.to_owned().clone(), &self.context()))
         {
             match &l.action {
-                Action::Call(name) => {
-                    if let Some(ThunkFunc(thunk)) = self.calls.get(name) {
+                Action::Call(name) => match self.calls.get(name) {
+                    Some(ThunkFunc::Default(thunk)) => {
                         let (next_s, next_e) = thunk(&state, self.current.clone());
                         let mut lex = Lifecycle::lexer(&next_e);
 
@@ -427,7 +565,32 @@ where
                             _ => {}
                         }
                     }
-                }
+                    Some(ThunkFunc::WithArgs(thunk)) => {
+                        let with_args = WithArgs {
+                            state: state.clone(),
+                            args: l.extensions.get_args(),
+                        };
+
+                        let (next_s, next_e) = thunk(&with_args, self.current.clone());
+                        let mut lex = Lifecycle::lexer(&next_e);
+
+                        match lex.next() {
+                            Some(Lifecycle::Event(event)) => {
+                                self.current = Some(event);
+                                self.state = Some(next_s);
+                            }
+                            Some(Lifecycle::Error) => {
+                                eprintln!(
+                                    "Error parsing event expression: {:?}, {}",
+                                    lex.span(),
+                                    next_e
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => (),
+                },
                 Action::Thunk(thunk) => {
                     let (next_s, next_e) = thunk(&state, self.current.clone());
                     let mut lex = Lifecycle::lexer(&next_e);
@@ -448,7 +611,19 @@ where
                     }
                 }
                 Action::Dispatch(msg) => {
-                    if let Ok(n) = state.process(&msg) {
+                    let process = if l.extensions.args.len() > 0 {
+                        T::process_with_args(
+                            WithArgs {
+                                state,
+                                args: l.extensions.get_args(),
+                            },
+                            &msg,
+                        )
+                    } else {
+                        state.process(&msg)
+                    };
+
+                    if let Ok(n) = process {
                         self.state = Some(n);
                         if let Some(next) = &l.next {
                             self.current = Some(next.clone());
@@ -470,6 +645,7 @@ where
     /// (Extension) test runs tests defined in listener extensions,
     /// and panics if all tests do not pass. If all tests pass this function
     /// will return the Runtime for execution
+    /// TODO: Currently only tests .update(), and .call() Listeners, need to implement for .dispatch() as well
     pub fn test(&self) -> Result<Self, RuntimeTestError> {
         let test_pass = self.listeners.iter().all(|l| {
             let extension = &l.extensions;
@@ -478,7 +654,11 @@ where
 
             if let Action::Call(name) = l.action.clone() {
                 action = {
-                    Action::Thunk(self.calls.get(&name).unwrap().0)
+                    if let Some(ThunkFunc::Default(thunk)) = self.calls.get(&name) {
+                        Action::Thunk(*thunk)
+                    } else {
+                        Action::Thunk(|s, _| (s.clone(), "{ exit;; }".to_string()))
+                    }
                 }
             }
 
@@ -555,7 +735,7 @@ mod parser {
     pub enum EventData {
         #[regex(r"(?:[a-zA-Z-]+);", from_event_data_property)]
         Property(String),
-        #[regex(r"(?:[a-zA-Z-]+)_(?:[a-zA-Z-0-9]+);", from_event_data_property_prefix)]
+        #[regex(r"(?:[a-zA-Z-]+)*_(?:[a-zA-Z-0-9]+);", from_event_data_property_prefix)]
         PropertyWithPrefix((String, String)),
         #[regex(r"(?:[+/=a-zA-Z0-9]+_*(?:[a-zA-Z-]*))", from_event_data_signal)]
         Signal((String, String)),
@@ -566,6 +746,98 @@ mod parser {
         // or any other matches we wish to skip.
         #[regex(r"[ \t\n\f{}]+", logos::skip)]
         Error,
+    }
+
+    fn from_long_flag(lex: &mut Lexer<Flags>) -> Option<String> {
+        Some(lex.slice()[2..].to_string())
+    }
+
+    fn from_short_flag(lex: &mut Lexer<Flags>) -> Option<String> {
+        Some(lex.slice()[1..].to_string())
+    }
+
+    fn from_argument(lex: &mut Lexer<Argument>) -> Option<(Flags, String)> {
+        let mut flag_l = Flags::lexer(lex.slice());
+        if let Some(flag) = flag_l.next() {
+            let value = &lex.slice()[flag_l.slice().len() + 1..];
+            Some((flag, value.trim().to_string()))
+        } else {
+            None
+        }
+    }
+
+    #[derive(Logos, Debug, Hash, Clone, PartialEq, PartialOrd)]
+    pub enum Flags {
+        #[regex(r#"--[a-zA-Z0-9]+"#, from_long_flag)]
+        LongFlag(String),
+        #[regex(r"-[a-zA-Z0-9]", from_short_flag)]
+        ShortFlag(String),
+        // Logos requires one token variant to handle errors,
+        // it can be named anything you wish.
+        #[error]
+        // We can also use this variant to define whitespace,
+        // or any other matches we wish to skip.
+        #[regex(r"[ \t\n\f{}]+", logos::skip)]
+        Error,
+    }
+
+    #[derive(Logos, Debug, Hash, Clone, PartialEq, PartialOrd)]
+    pub enum Argument {
+        #[regex(
+            r#"[-]*[-]+[a-zA-Z0-9]+ *(:?[\w\d{} ;"':,|+(*&^%$#@!`)=\[\]\\/><']*)?"#,
+            from_argument
+        )]
+        Argument((Flags, String)),
+        // Logos requires one token variant to handle errors,
+        // it can be named anything you wish.
+        #[error]
+        // We can also use this variant to define whitespace,
+        // or any other matches we wish to skip.
+        #[regex(r"[ \t\n\f]+", logos::skip)]
+        Error,
+    }
+
+    #[test]
+    fn test_arguments() {
+        let mut lex = Argument::lexer(
+            r#"--test abc -t test --te et32t --json { test: "test"; "test"} --test { test: "abc", test2: "value"}"#,
+        );
+
+        assert_eq!(
+            Some(Argument::Argument((
+                Flags::LongFlag("test".to_string()),
+                "abc".to_string()
+            ))),
+            lex.next()
+        );
+        assert_eq!(
+            Some(Argument::Argument((
+                Flags::ShortFlag("t".to_string()),
+                "test".to_string()
+            ))),
+            lex.next()
+        );
+        assert_eq!(
+            Some(Argument::Argument((
+                Flags::LongFlag("te".to_string()),
+                "et32t".to_string()
+            ))),
+            lex.next()
+        );
+        assert_eq!(
+            Some(Argument::Argument((
+                Flags::LongFlag("json".to_string()),
+                r#"{ test: "test"; "test"}"#.to_string()
+            ))),
+            lex.next()
+        );
+        assert_eq!(
+            Some(Argument::Argument((
+                Flags::LongFlag("test".to_string()),
+                r#"{ test: "abc", test2: "value"}"#.to_string()
+            ))),
+            lex.next()
+        );
     }
 
     #[test]
