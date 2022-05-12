@@ -360,6 +360,32 @@ where
         &self.args
     }
 
+    pub fn parse_variables(&self) -> HashMap<String, String> {
+        use parser::Argument;
+
+        let arguments = self.args.join(" ");
+        let mut arg_lexer = Argument::lexer(arguments.as_ref());
+        let mut map = HashMap::<String, String>::default();
+
+        loop {
+            match arg_lexer.next() {
+                Some(Argument::Variable((name, value))) => {
+                    if let Some(old) = map.insert(name.clone(), value.clone()) {
+                        eprintln!(
+                            "Warning: replacing variable {}, with {} -- original: {}",
+                            name, value, old
+                        );
+                    }
+                },
+                Some(Argument::Flag(_)) => continue,
+                Some(Argument::Error) => continue,
+                None => break,
+            }
+        }
+
+        map
+    }
+
     pub fn parse_flags(&self) -> HashMap<String, String> {
         use parser::Argument;
         use parser::Flags;
@@ -370,7 +396,7 @@ where
 
         loop {
             match arg_lexer.next() {
-                Some(Argument::Argument((flag, value))) => match flag {
+                Some(Argument::Flag((flag, value))) => match flag {
                     Flags::ShortFlag(f) => {
                         if let Some(old) = map.insert(f.clone(), value.clone()) {
                             eprintln!(
@@ -389,6 +415,7 @@ where
                     }
                     _ => continue,
                 },
+                Some(Argument::Variable(_)) => continue,
                 Some(Argument::Error) => continue,
                 None => break,
             }
@@ -761,15 +788,30 @@ mod parser {
         let mut flag_l = Flags::lexer(lex.slice());
         if let Some(flag) = flag_l.next() {
             let value = &lex.slice()[flag_l.slice().len() + 1..];
+
             Some((flag, value.trim().to_string()))
         } else {
             None
         }
     }
 
+    fn from_variable(lex: &mut Lexer<Argument>) -> Option<(String, String)> {
+        let eq_pos = lex.slice().chars().position(|c| c=='=').expect("lexer shouldn't have tried to parse this if there wasn't an =");
+
+        let mut variable = &lex.slice()[..eq_pos];
+        if &lex.slice().chars().nth(0).expect("there should be a character at 0") == &'-' {
+            variable = &variable[1..];
+        }
+
+        let value = &lex.slice()[eq_pos+1..];
+
+
+        Some((variable.trim().to_string(), value.trim().to_string()))
+    }
+
     #[derive(Logos, Debug, Hash, Clone, PartialEq, PartialOrd)]
     pub enum Flags {
-        #[regex(r#"--[a-zA-Z0-9]+"#, from_long_flag)]
+        #[regex(r#"--[a-zA-Z0-9-]+"#, from_long_flag)]
         LongFlag(String),
         #[regex(r"-[a-zA-Z0-9]", from_short_flag)]
         ShortFlag(String),
@@ -785,10 +827,15 @@ mod parser {
     #[derive(Logos, Debug, Hash, Clone, PartialEq, PartialOrd)]
     pub enum Argument {
         #[regex(
-            r#"[-]*[-]+[a-zA-Z0-9]+ *(:?[\w\d{} ;"':,|+(*&^%$#@!`)=\[\]\\/><']*)?"#,
+            r#"[-]*[-]+[-a-zA-Z0-9]+ (:?[{][-\w\d ;"':,|+(*&^%$#@!`)=\[\]\\/><']*[}]|['][-\w\d ;":,|+(*&^%{}$#@!`)=\[\]\\/><]*[']|["][-\w\d ;:,|+(*&^%{}$#@!`)=\[\]\\/><']*["]|[-\w\d;"':,|+(*&^%$#@!`)=\[\]\\/><']*)?"#,
             from_argument
         )]
-        Argument((Flags, String)),
+        Flag((Flags, String)),
+        #[regex(
+            r#"[-]?[$][A-Z_]+=(:?[\w\d{} ;"':,|+(*&^%#@!`)=\[\]\\/><']*)?"#,
+            from_variable
+        )]
+        Variable((String, String)),
         // Logos requires one token variant to handle errors,
         // it can be named anything you wish.
         #[error]
@@ -801,41 +848,54 @@ mod parser {
     #[test]
     fn test_arguments() {
         let mut lex = Argument::lexer(
-            r#"--test abc -t test --te et32t --json { test: "test"; "test"} --test { test: "abc", test2: "value"}"#,
+            r#"$TEST='test1234' --test abc -t test --te et32t --json { test: "test"; "test"} --test { test: "abc", test2: "value"} -$TEST='test1234'"#,
         );
-
         assert_eq!(
-            Some(Argument::Argument((
+            Some(Argument::Variable((
+                "$TEST".to_string(),
+                r#"'test1234'"#.to_string()
+            ))),
+            lex.next()
+        );
+        assert_eq!(
+            Some(Argument::Flag((
                 Flags::LongFlag("test".to_string()),
                 "abc".to_string()
             ))),
             lex.next()
         );
         assert_eq!(
-            Some(Argument::Argument((
+            Some(Argument::Flag((
                 Flags::ShortFlag("t".to_string()),
                 "test".to_string()
             ))),
             lex.next()
         );
         assert_eq!(
-            Some(Argument::Argument((
+            Some(Argument::Flag((
                 Flags::LongFlag("te".to_string()),
                 "et32t".to_string()
             ))),
             lex.next()
         );
         assert_eq!(
-            Some(Argument::Argument((
+            Some(Argument::Flag((
                 Flags::LongFlag("json".to_string()),
                 r#"{ test: "test"; "test"}"#.to_string()
             ))),
             lex.next()
         );
         assert_eq!(
-            Some(Argument::Argument((
+            Some(Argument::Flag((
                 Flags::LongFlag("test".to_string()),
                 r#"{ test: "abc", test2: "value"}"#.to_string()
+            ))),
+            lex.next()
+        );
+        assert_eq!(
+            Some(Argument::Variable((
+                "$TEST".to_string(),
+                r#"'test1234'"#.to_string()
             ))),
             lex.next()
         );
