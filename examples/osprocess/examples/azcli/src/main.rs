@@ -1,4 +1,4 @@
-use lifec::{Event, Runtime};
+use lifec::{Event, Runtime, EditorRuntime, App};
 use osprocess::Process;
 
 fn main() {
@@ -13,7 +13,11 @@ fn main() {
             (s.get_state(), Event::exit().to_string())
         });
 
+    runtime.on("{ setup;; }")
+        .dispatch("echo", "{ make_vm;; }");
+
     runtime.on("{ make_vm;; }").call("az::vm::create").args(&[
+        "$RESOURCE_GROUP=dev-rg;",
         "--resource-group",
         "$RESOURCE_GROUP",
         "--name",
@@ -41,7 +45,5 @@ fn main() {
         "'dev_id=$DEV_ID orgv=342 source_driver=gcm'",
     ]);
 
-    runtime.parse_event("{ make_vm;; }");
-
-    runtime.process();
+    EditorRuntime::start_editor(Some(EditorRuntime::from(runtime)));
 }

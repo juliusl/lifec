@@ -1,4 +1,4 @@
-use crate::{Action, Runtime, RuntimeState};
+use crate::{Action, Runtime, RuntimeState, WithArgs};
 use imnodes::{AttributeFlag, IdentifierGenerator, Link, LinkId, NodeId};
 use imnodes::{AttributeId, ImVec2, InputPinId, OutputPinId};
 use knot::store::{Store, Visitor};
@@ -15,8 +15,9 @@ where
 {
     count: usize,
     events: Vec<EditorEvent>,
-    state: Runtime<S>,
+    runtime: Runtime<S>,
     links: HashSet<Link>,
+    initial_str: String,
 }
 
 #[derive(Clone, Default, PartialEq, Hash, Eq)]
@@ -61,11 +62,15 @@ where
             })
             .collect();
 
-        Self {
-            state,
+        let mut next = Self {
+            runtime: state,
             events,
             ..Default::default()
-        }
+        };
+
+        next.count = next.events.len();
+
+        next
     }
 }
 
@@ -85,7 +90,7 @@ where
         let mut next = state.clone();
 
         if let Some(window) = imgui::Window::new("runtime")
-            .size([2480.0, 1080.0], imgui::Condition::FirstUseEver)
+            .size([1280.0, 1080.0], imgui::Condition::FirstUseEver)
             .begin(ui)
         {
             let mut count = next.count.try_into().unwrap();
@@ -109,7 +114,7 @@ where
                 let runtime_state = &mut runtime_state;
                 for e in next.events.iter().cloned() {
                     let on = e.on;
-                    
+
                     match (e.dispatch.as_str(), e.call.as_str()) {
                         (dispatch, "") => {
                             let transition = e.transitions.join(" ");
@@ -117,25 +122,79 @@ where
                             runtime_state
                                 .on(&on)
                                 .dispatch(&dispatch, &transition.as_str());
-                        },
+                        }
                         ("", call) => {
-                            runtime_state
-                                .on(&on)
-                                .call(&call);
-                        },
-                        _ => {},
+                            runtime_state.on(&on).call(&call);
+                        }
+                        _ => {}
                     }
                 }
-                next.state = runtime_state.parse_event("{ setup;; }");
-            }
-            ui.same_line();
-            if ui.button("Process") {
-                next.state = next.state.process();
+                next.runtime = runtime_state.parse_event("{ setup;; }");
             }
 
-            if let Some(state) = next.state.current() {
+            ui.set_next_item_width(120.0);
+            ui.input_text("Initial Event", &mut next.initial_str)
+                .build();
+            ui.same_line();
+            if ui.button("Parse Event") {
+                next.runtime = next.runtime.parse_event("{ setup;; }");
+            }
+
+            if ui.button("Process") {
+                next.runtime = next.runtime.process();
+            }
+            if let (Some(state), context) = (next.runtime.current(), next.runtime.context()) {
                 ui.same_line();
-                ui.text(format!("{}", state));
+                ui.text(format!("Current Event: {} State: {}", context, state));
+
+                if let Some(l) = next.runtime.next_listener() {
+                    match l.action {
+                        Action::Call(call) => {
+                            ui.text(format!("Call: {}", call));
+
+                            if l.extensions.tests.len() > 0 {
+                                ui.text("Known Transitions:");
+                                l.extensions.tests.iter().map(|(_, t)| t).for_each(|t| {
+                                    ui.text(format!("- {}", t));
+                                });
+                            }
+                        }
+                        Action::Dispatch(dispatch) => {
+                            ui.text(format!("Dispatch: {}", dispatch));
+                            if let Some(next) = l.next {
+                                ui.text(format!("Next: {}", next));
+                            }
+                        }
+                        Action::Thunk(_) | Action::NoOp => {}
+                    }
+
+                    if l.extensions.args.len() > 0 {
+                        let args = WithArgs::<S> {
+                            state: state.clone(),
+                            args: l.extensions.args,
+                        };
+
+                        let flags = args.parse_flags();
+                        if flags.len() > 0 {
+                            ui.text(format!("Flags:"));
+                            for (key, value) in flags {
+                                if key.len() == 1 {
+                                    ui.text(format!("-{}: {}", key, value));
+                                } else {
+                                    ui.text(format!("--{}: {}", key, value));
+                                }
+                            }
+                        }
+
+                        let env = args.parse_variables(); 
+                        if env.len() > 0 {
+                            ui.text(format!("Env:"));
+                            for (key, value) in env {
+                                ui.text(format!("{}: {}", key, value));
+                            }
+                        }
+                    }
+                }
             }
 
             let mut next_events = next.events.clone();
@@ -323,7 +382,7 @@ where
                         }
                     }
                 }
-                
+
                 detach.pop();
                 next.links = previous.union(&next_links).cloned().collect();
             } else {

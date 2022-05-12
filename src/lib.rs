@@ -1,12 +1,12 @@
 use logos::Logos;
 use parser::Lifecycle;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Display};
 
 pub mod editor;
+pub use self::editor::App;
 pub use self::editor::EditorEvent;
 pub use self::editor::EditorRuntime;
-pub use self::editor::App;
 
 pub trait RuntimeState {
     type Error;
@@ -360,39 +360,41 @@ where
         &self.args
     }
 
-    pub fn parse_variables(&self) -> HashMap<String, String> {
+    pub fn parse_variables(&self) -> BTreeMap<String, String> {
         use parser::Argument;
 
-        let arguments = self.args.join(" ");
-        let mut arg_lexer = Argument::lexer(arguments.as_ref());
-        let mut map = HashMap::<String, String>::default();
-
-        loop {
-            match arg_lexer.next() {
-                Some(Argument::Variable((name, value))) => {
-                    if let Some(old) = map.insert(name.clone(), value.clone()) {
-                        eprintln!(
-                            "Warning: replacing variable {}, with {} -- original: {}",
-                            name, value, old
-                        );
-                    }
-                },
-                Some(Argument::Flag(_)) => continue,
-                Some(Argument::Error) => continue,
-                None => break,
+        let mut map = BTreeMap::<String, String>::default();
+        self.args.iter().filter_map(|a| Argument::lexer(a).next()).for_each(|p| {
+            if let Argument::Variable((var, val)) = p {
+                if let Some(old) = map.insert(var.clone(), val.clone()) {
+                    eprintln!(
+                        "Warning: replacing variable {}, with {} -- original: {}",
+                        var, val, old
+                    );
+                }
             }
-        }
+        });
 
         map
     }
 
-    pub fn parse_flags(&self) -> HashMap<String, String> {
+    pub fn parse_flags(&self) -> BTreeMap<String, String> {
         use parser::Argument;
         use parser::Flags;
 
-        let arguments = self.args.join(" ");
+        let args: Vec<String> = self.args.iter().map(|a| Argument::lexer(a)).filter_map(|mut p| {
+            if let Some(Argument::Variable(_)) = p.next() {
+                None
+            } else {
+                Some(p.source().to_string())
+            }
+        })
+        .collect();
+
+        let arguments = args.join(" ");
+
         let mut arg_lexer = Argument::lexer(arguments.as_ref());
-        let mut map = HashMap::<String, String>::default();
+        let mut map = BTreeMap::<String, String>::default();
 
         loop {
             match arg_lexer.next() {
@@ -555,23 +557,26 @@ where
         self.clone()
     }
 
-    /// process handles the internal logic
-    /// based on the context, the state implementation selects the next listener
-    pub fn process(&mut self) -> Self {
-        let mut state = self.state.clone();
-
-        match &state {
-            None => state = Some(Self::init()),
-            _ => {}
-        };
-
-        let state = state.unwrap();
-
-        if let Some(l) = self
+    /// gets the next listener that will be processed
+    pub fn next_listener(&self) -> Option<Listener<T>> {
+        let state = self.prepare_state();
+        if let Some(listener) = self
             .listeners
             .iter()
             .find(|l| state.select(l.to_owned().clone(), &self.context()))
         {
+            Some(listener.to_owned())
+        } else {
+            None
+        }
+    }
+
+    /// process handles the internal logic
+    /// based on the context, the state implementation selects the next listener
+    pub fn process(&mut self) -> Self {
+        let state = self.prepare_state();
+
+        if let Some(l) = self.next_listener() {
             match &l.action {
                 Action::Call(name) => match self.calls.get(name) {
                     Some(ThunkFunc::Default(thunk)) => {
@@ -668,6 +673,17 @@ where
             state: self.state.clone(),
             current: self.current.clone(),
         }
+    }
+
+    fn prepare_state(&self) -> T {
+        let mut state = self.state.clone();
+
+        match &state {
+            None => state = Some(Self::init()),
+            _ => {}
+        };
+
+        state.expect("state was just set")
     }
 
     /// (Extension) test runs tests defined in listener extensions,
@@ -796,15 +812,24 @@ mod parser {
     }
 
     fn from_variable(lex: &mut Lexer<Argument>) -> Option<(String, String)> {
-        let eq_pos = lex.slice().chars().position(|c| c=='=').expect("lexer shouldn't have tried to parse this if there wasn't an =");
+        let eq_pos = lex
+            .slice()
+            .chars()
+            .position(|c| c == '=')
+            .expect("lexer shouldn't have tried to parse this if there wasn't an =");
 
         let mut variable = &lex.slice()[..eq_pos];
-        if &lex.slice().chars().nth(0).expect("there should be a character at 0") == &'-' {
+        if &lex
+            .slice()
+            .chars()
+            .nth(0)
+            .expect("there should be a character at 0")
+            == &'-'
+        {
             variable = &variable[1..];
         }
 
-        let value = &lex.slice()[eq_pos+1..];
-
+        let value = &lex.slice()[eq_pos + 1..];
 
         Some((variable.trim().to_string(), value.trim().to_string()))
     }
@@ -832,7 +857,7 @@ mod parser {
         )]
         Flag((Flags, String)),
         #[regex(
-            r#"[-]?[$][A-Z_]+=(:?[\w\d{} ;"':,|+(*&^%#@!`)=\[\]\\/><']*)?"#,
+            r#"[-]?[$][A-Z_]+=(:?[-\w\d{} "':,|+(*&^%#@!`)=\[\]\\/><]*|['][-\w\d{} ":,|+(*&^%#@!`)=\[\]\\/><]*[']|["][-\w\d{} ':,|+(*&^%#@!`)=\[\]\\/><-]*["];)?"#,
             from_variable
         )]
         Variable((String, String)),
