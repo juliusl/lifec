@@ -6,6 +6,7 @@ use std::fmt::{Debug, Display};
 pub mod editor;
 pub use self::editor::EditorEvent;
 pub use self::editor::EditorRuntime;
+pub use self::editor::App;
 
 pub trait RuntimeState {
     type Error;

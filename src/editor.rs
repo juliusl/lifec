@@ -1,11 +1,12 @@
 use crate::{Action, Runtime, RuntimeState};
-use atlier::prelude::*;
 use imnodes::{AttributeFlag, IdentifierGenerator, Link, LinkId, NodeId};
 use imnodes::{AttributeId, ImVec2, InputPinId, OutputPinId};
 use knot::store::{Store, Visitor};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Display;
+
+pub use atlier::system::App;
 
 #[derive(Default, Clone)]
 pub struct EditorRuntime<S>
@@ -108,9 +109,22 @@ where
                 let runtime_state = &mut runtime_state;
                 for e in next.events.iter().cloned() {
                     let on = e.on;
-                    let dispatch = e.dispatch;
-                    let transition = e.transitions.join(" ");
-                    runtime_state.on(&on).dispatch(&dispatch, &transition);
+                    
+                    match (e.dispatch.as_str(), e.call.as_str()) {
+                        (dispatch, "") => {
+                            let transition = e.transitions.join(" ");
+
+                            runtime_state
+                                .on(&on)
+                                .dispatch(&dispatch, &transition.as_str());
+                        },
+                        ("", call) => {
+                            runtime_state
+                                .on(&on)
+                                .call(&call);
+                        },
+                        _ => {},
+                    }
                 }
                 next.state = runtime_state.parse_event("{ setup;; }");
             }
@@ -309,7 +323,7 @@ where
                         }
                     }
                 }
-
+                
                 detach.pop();
                 next.links = previous.union(&next_links).cloned().collect();
             } else {
