@@ -364,14 +364,18 @@ where
         use parser::Argument;
 
         let mut map = BTreeMap::<String, String>::default();
-        self.args.iter().filter_map(|a| Argument::lexer(a).next()).for_each(|p| {
-            if let Argument::Variable((var, val)) = p {
-                if let Some(old) = map.insert(var.clone(), val.clone()) {
-                    eprintln!(
-                        "Warning: replacing variable {}, with {} -- original: {}",
-                        var, val, old
-                    );
-                }
+        self.args.iter().map(|a| Argument::lexer(a)).filter_map(|mut p| {
+            if let Some(Argument::Variable(v)) = p.next() {
+                Some(v)
+            } else {
+                None
+            }
+        }).for_each(|(var, value)|{
+            if let Some(old) = map.insert(var.clone(), value.clone()) {
+                eprintln!(
+                    "Warning: replacing flag {}, with {} -- original: {}",
+                    var, value, old
+                );
             }
         });
 
@@ -400,7 +404,7 @@ where
             match arg_lexer.next() {
                 Some(Argument::Flag((flag, value))) => match flag {
                     Flags::ShortFlag(f) => {
-                        if let Some(old) = map.insert(f.clone(), value.clone()) {
+                        if let Some(old) = map.insert(format!("-{}", f), value.clone()) {
                             eprintln!(
                                 "Warning: replacing flag {}, with {} -- original: {}",
                                 f, value, old
@@ -408,7 +412,7 @@ where
                         }
                     }
                     Flags::LongFlag(flag) => {
-                        if let Some(old) = map.insert(flag.clone(), value.clone()) {
+                        if let Some(old) = map.insert(format!("--{}", flag), value.clone()) {
                             eprintln!(
                                 "Warning: replacing flag {}, with {} -- original: {}",
                                 flag, value, old

@@ -179,9 +179,9 @@ where
                             ui.text(format!("Flags:"));
                             for (key, value) in flags {
                                 if key.len() == 1 {
-                                    ui.text(format!("-{}: {}", key, value));
+                                    ui.text(format!("{}: {}", key, value));
                                 } else {
-                                    ui.text(format!("--{}: {}", key, value));
+                                    ui.text(format!("{}: {}", key, value));
                                 }
                             }
                         }
