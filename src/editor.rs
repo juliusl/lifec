@@ -1,8 +1,8 @@
-use crate::{Action, Runtime, RuntimeState, WithArgs};
+use crate::{Action, Runtime, RuntimeState, WithArgs, parse_flags, parse_variables, Listener};
 use imnodes::{AttributeFlag, IdentifierGenerator, Link, LinkId, NodeId};
 use imnodes::{AttributeId, ImVec2, InputPinId, OutputPinId};
 use knot::store::{Store, Visitor};
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::collections::HashSet;
 use std::fmt::Display;
 
@@ -27,6 +27,8 @@ pub struct EditorEvent {
     dispatch: String,
     call: String,
     transitions: Vec<String>,
+    flags: BTreeMap<String, String>,
+    variales: BTreeMap<String, String>,
 }
 
 impl<S> From<Runtime<S>> for EditorRuntime<S>
@@ -45,6 +47,8 @@ where
                     dispatch: msg.to_string(),
                     call: String::default(),
                     transitions: vec![transition.to_string()],
+                    flags: parse_flags(l.extensions.get_args()),
+                    variales: parse_variables(l.extensions.get_args()),
                 }),
                 (Action::Call(call), _) => Some(EditorEvent {
                     label: format!("Event {}", id),
@@ -57,6 +61,8 @@ where
                         .iter()
                         .map(|(_, t)| t.to_owned())
                         .collect(),
+                    flags: parse_flags(l.extensions.get_args()),
+                    variales: parse_variables(l.extensions.get_args()),
                 }),
                 _ => None,
             })
@@ -133,11 +139,10 @@ where
             }
 
             ui.set_next_item_width(120.0);
-            ui.input_text("Initial Event", &mut next.initial_str)
-                .build();
+            ui.input_text("Initial Event", &mut next.initial_str).build();
             ui.same_line();
             if ui.button("Parse Event") {
-                next.runtime = next.runtime.parse_event("{ setup;; }");
+                next.runtime = next.runtime.parse_event(&next.initial_str);
             }
 
             if ui.button("Process") {
@@ -169,12 +174,7 @@ where
                     }
 
                     if l.extensions.args.len() > 0 {
-                        let args = WithArgs::<S> {
-                            state: state.clone(),
-                            args: l.extensions.args,
-                        };
-
-                        let flags = args.parse_flags();
+                        let flags = parse_flags(l.extensions.get_args());
                         if flags.len() > 0 {
                             ui.text(format!("Flags:"));
                             for (key, value) in flags {
@@ -186,7 +186,7 @@ where
                             }
                         }
 
-                        let env = args.parse_variables(); 
+                        let env = parse_variables(l.extensions.get_args()); 
                         if env.len() > 0 {
                             ui.text(format!("Env:"));
                             for (key, value) in env {

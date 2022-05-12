@@ -360,75 +360,83 @@ where
         &self.args
     }
 
-    pub fn parse_variables(&self) -> BTreeMap<String, String> {
-        use parser::Argument;
-
-        let mut map = BTreeMap::<String, String>::default();
-        self.args.iter().map(|a| Argument::lexer(a)).filter_map(|mut p| {
-            if let Some(Argument::Variable(v)) = p.next() {
-                Some(v)
-            } else {
-                None
-            }
-        }).for_each(|(var, value)|{
-            if let Some(old) = map.insert(var.clone(), value.clone()) {
-                eprintln!(
-                    "Warning: replacing flag {}, with {} -- original: {}",
-                    var, value, old
-                );
-            }
-        });
-
-        map
-    }
-
     pub fn parse_flags(&self) -> BTreeMap<String, String> {
-        use parser::Argument;
-        use parser::Flags;
-
-        let args: Vec<String> = self.args.iter().map(|a| Argument::lexer(a)).filter_map(|mut p| {
-            if let Some(Argument::Variable(_)) = p.next() {
-                None
-            } else {
-                Some(p.source().to_string())
-            }
-        })
-        .collect();
-
-        let arguments = args.join(" ");
-
-        let mut arg_lexer = Argument::lexer(arguments.as_ref());
-        let mut map = BTreeMap::<String, String>::default();
-
-        loop {
-            match arg_lexer.next() {
-                Some(Argument::Flag((flag, value))) => match flag {
-                    Flags::ShortFlag(f) => {
-                        if let Some(old) = map.insert(format!("-{}", f), value.clone()) {
-                            eprintln!(
-                                "Warning: replacing flag {}, with {} -- original: {}",
-                                f, value, old
-                            );
-                        }
-                    }
-                    Flags::LongFlag(flag) => {
-                        if let Some(old) = map.insert(format!("--{}", flag), value.clone()) {
-                            eprintln!(
-                                "Warning: replacing flag {}, with {} -- original: {}",
-                                flag, value, old
-                            );
-                        }
-                    }
-                    _ => continue,
-                },
-                Some(Argument::Variable(_)) => continue,
-                Some(Argument::Error) => continue,
-                None => break,
-            }
-        }
-
-        map
+        parse_flags(self.args.clone())
     }
+
+    pub fn parse_variables(&self) -> BTreeMap<String, String> {
+        parse_variables(self.args.clone())
+    }
+}
+
+pub fn parse_variables(args: Vec<String>) -> BTreeMap<String, String> {
+    use parser::Argument;
+
+    let mut map = BTreeMap::<String, String>::default();
+    args.iter().map(|a| Argument::lexer(a)).filter_map(|mut p| {
+        if let Some(Argument::Variable(v)) = p.next() {
+            Some(v)
+        } else {
+            None
+        }
+    }).for_each(|(var, value)|{
+        if let Some(old) = map.insert(var.clone(), value.clone()) {
+            eprintln!(
+                "Warning: replacing flag {}, with {} -- original: {}",
+                var, value, old
+            );
+        }
+    });
+
+    map
+}
+
+pub fn parse_flags(args: Vec<String>) -> BTreeMap<String, String> {
+    use parser::Argument;
+    use parser::Flags;
+
+    let args: Vec<String> = args.iter().map(|a| Argument::lexer(a)).filter_map(|mut p| {
+        if let Some(Argument::Variable(_)) = p.next() {
+            None
+        } else {
+            Some(p.source().to_string())
+        }
+    })
+    .collect();
+
+    let arguments = args.join(" ");
+
+    let mut arg_lexer = Argument::lexer(arguments.as_ref());
+    let mut map = BTreeMap::<String, String>::default();
+
+    loop {
+        match arg_lexer.next() {
+            Some(Argument::Flag((flag, value))) => match flag {
+                Flags::ShortFlag(f) => {
+                    if let Some(old) = map.insert(format!("-{}", f), value.clone()) {
+                        eprintln!(
+                            "Warning: replacing flag {}, with {} -- original: {}",
+                            f, value, old
+                        );
+                    }
+                }
+                Flags::LongFlag(flag) => {
+                    if let Some(old) = map.insert(format!("--{}", flag), value.clone()) {
+                        eprintln!(
+                            "Warning: replacing flag {}, with {} -- original: {}",
+                            flag, value, old
+                        );
+                    }
+                }
+                _ => continue,
+            },
+            Some(Argument::Variable(_)) => continue,
+            Some(Argument::Error) => continue,
+            None => break,
+        }
+    }
+
+    map
 }
 
 impl<T> RuntimeState for WithArgs<T>
