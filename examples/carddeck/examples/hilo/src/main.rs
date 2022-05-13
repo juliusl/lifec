@@ -1,7 +1,7 @@
-use atlier::system::App;
+
 use carddeck::Dealer;
 use lifec::{Runtime, Event};
-use editor::RuntimeEditor;
+use editor::{App, RuntimeEditor};
 
 fn main() {
     let mut runtime = get_runtime();
