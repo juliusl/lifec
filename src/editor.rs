@@ -1,5 +1,5 @@
-use crate::{Action, Runtime, RuntimeState, WithArgs, parse_flags, parse_variables, Listener};
-use imgui::{Ui, MouseButton, PopupToken, PopupModal};
+use crate::{Action, Runtime, RuntimeState, parse_flags, parse_variables};
+use imgui::{Ui, MouseButton, PopupToken};
 use imnodes::{AttributeFlag, IdentifierGenerator, Link, LinkId, NodeId};
 use imnodes::{AttributeId, ImVec2, InputPinId, OutputPinId};
 use knot::store::{Store, Visitor};
@@ -317,7 +317,7 @@ where
 
                     let printer = &mut Printer::default();
                     store.new_walk_mut(next_events[0].clone(), Some(printer));
-                    previous.clear();
+                   
                     for s in &printer.state {
                         if let (Some((from, _, _, from_pin)), Some((to, to_pin, _, _))) =
                             (graph_index.get(&s.0), graph_index.get(&s.1))
@@ -391,7 +391,10 @@ where
                 }
 
                 detach.pop();
-                next.links = previous.union(&next_links).cloned().collect();
+                if next_links.len() > 0 || previous.len() != state.links.len() {
+                    next.links = previous.union(&next_links).cloned().collect();
+                }
+
             } else {
                 for (i, e) in next.events.iter().enumerate() {
                     if let Some(next_e) = EventEditor::show(ui, e, None) {
@@ -416,7 +419,7 @@ struct Printer {
 }
 
 impl Visitor<NodeId> for Printer {
-    fn visit(&self, from: &NodeId, to: &NodeId) -> bool {
+    fn visit(&self, _: &NodeId, _: &NodeId) -> bool {
         true
     }
 }
