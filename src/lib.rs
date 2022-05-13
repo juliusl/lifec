@@ -3,6 +3,12 @@ use parser::Lifecycle;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Display};
 
+#[cfg(feature = "runtime-editor")]
+pub mod runtime_editor {
+    pub use editor::RuntimeEditor;
+    pub use editor::App;
+}
+
 pub trait RuntimeState {
     type Error;
     type State: Default + RuntimeState + Clone + Sized;

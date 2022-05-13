@@ -7,3 +7,7 @@ edition = "2021"
 [dependencies]
 logos = "0.12.0"
 
+editor = { path = "src/editor", optional = true }
+
+[features]
+runtime-editor = ["editor"]
