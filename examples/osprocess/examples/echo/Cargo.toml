@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 atlier = { path = "../../../../../atlier" }
+editor = { path = "../../../../src/editor" }
 lifec = { path = "../../../.." }
 osprocess = { path = "../.." }

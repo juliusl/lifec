@@ -1,0 +1,13 @@
+[package]
+name = "editor"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lifec = { path = "../.." }
+atlier = { git = "https://github.com/juliusl/atlier.git"   }
+imnodes = { git = "https://github.com/benmkw/imnodes-rs.git" }
+knot = { git = "https://github.com/juliusl/knot.git"  }
+imgui = { version = "0.8.2" }

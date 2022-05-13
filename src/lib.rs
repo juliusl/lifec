@@ -3,11 +3,6 @@ use parser::Lifecycle;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Display};
 
-pub mod editor;
-pub use self::editor::App;
-pub use self::editor::EventEditor;
-pub use self::editor::RuntimeEditor;
-
 pub trait RuntimeState {
     type Error;
     type State: Default + RuntimeState + Clone + Sized;
@@ -199,17 +194,17 @@ pub struct Listener<T>
 where
     T: Default + RuntimeState + Clone,
 {
-    event: Event,
-    action: Action<T>,
-    next: Option<Event>,
-    extensions: Extensions,
+    pub event: Event,
+    pub action: Action<T>,
+    pub next: Option<Event>,
+    pub extensions: Extensions,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Extensions {
-    context: Option<Event>,
-    tests: Vec<(String, String)>,
-    args: Vec<String>,
+    pub context: Option<Event>,
+    pub tests: Vec<(String, String)>,
+    pub args: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -253,7 +248,7 @@ impl Extensions {
         self
     }
 
-    fn get_args(&self) -> Vec<String> {
+    pub fn get_args(&self) -> Vec<String> {
         self.args.to_vec()
     }
 
@@ -503,6 +498,10 @@ where
         }).cloned().collect();
     }
 
+    pub fn get_listeners(&self) -> Vec<Listener<T>> {
+        self.listeners.clone()
+    }
+
     /// on parses an event expression, and adds a new listener for that event
     /// this method returns an instance of the Listener for further configuration
     pub fn on<S: AsRef<str> + ?Sized>(&mut self, event_expr: &S) -> &mut Listener<T> {
@@ -731,7 +730,7 @@ where
 pub struct RuntimeTestError;
 
 #[derive(Clone)]
-enum Action<T>
+pub enum Action<T>
 where
     T: Default,
 {

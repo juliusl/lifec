@@ -1,7 +1,7 @@
 use atlier::system::default_start_editor_1080p;
 use atlier::system::App;
 use carddeck::Dealer;
-use lifec::editor::RuntimeEditor;
+use editor::RuntimeEditor;
 
 fn main() {
     default_start_editor_1080p::<RuntimeEditor<Dealer>>(

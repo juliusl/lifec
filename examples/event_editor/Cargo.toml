@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 atlier = { path = "../../../atlier" }
 carddeck = { path = "../carddeck" }
+editor = { path = "../../src/editor" }
 lifec = { path = "../.." }
