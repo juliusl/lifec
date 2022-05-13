@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
 use atlier::system::App;
-use lifec::{RuntimeState, Runtime, Action, parse_flags, parse_variables};
+use crate::{RuntimeState, Runtime, Action, parse_flags, parse_variables};
 
-use crate::event_editor::EventEditor;
-use crate::event_graph_editor::EventGraphEditor;
+use super::event_editor::EventEditor;
+use super::event_graph_editor::EventGraphEditor;
 
 #[derive(Default, Clone)]
 pub struct RuntimeEditor<S>

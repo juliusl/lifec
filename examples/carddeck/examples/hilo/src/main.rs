@@ -1,7 +1,7 @@
 
 use carddeck::Dealer;
 use lifec::{Runtime, Event};
-use editor::{App, RuntimeEditor};
+use lifec::editor::{App, RuntimeEditor};
 
 fn main() {
     let mut runtime = get_runtime();

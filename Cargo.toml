@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 logos = "0.12.0"
 
-editor = { path = "src/editor", optional = true }
-
-[features]
-runtime-editor = ["editor"]
+atlier = { git = "https://github.com/juliusl/atlier.git"   }
+imnodes = { git = "https://github.com/benmkw/imnodes-rs.git" }
+knot = { git = "https://github.com/juliusl/knot.git"  }
+imgui = { version = "0.8.2" }

@@ -4,7 +4,7 @@ use atlier::system::App;
 use imnodes::{Link, LinkId, NodeId, InputPinId, AttributeId, OutputPinId, AttributeFlag, IdentifierGenerator, ImVec2};
 use knot::store::{Store, Visitor};
 
-use crate::event_editor::EventEditor;
+use super::event_editor::EventEditor;
 
 #[derive(Default, Clone)]
 pub struct EventGraphEditor {

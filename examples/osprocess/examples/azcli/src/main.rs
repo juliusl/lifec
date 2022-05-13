@@ -1,5 +1,5 @@
 use lifec::{Event, Runtime};
-use editor::{App, RuntimeEditor};
+use lifec::editor::{App, RuntimeEditor};
 use osprocess::Process;
 
 fn main() {
