@@ -125,8 +125,10 @@ where
             }
             ui.same_line();
             if ui.button("Compile") {
-                let mut runtime_state = Runtime::<S>::default();
+                let mut runtime_state = next.runtime.clone();
                 let runtime_state = &mut runtime_state;
+                runtime_state.reset_listeners(true);
+
                 for e in next.events.iter().cloned() {
                     let on = e.on;
 

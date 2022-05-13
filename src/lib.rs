@@ -212,6 +212,26 @@ pub struct Extensions {
     args: Vec<String>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct Runtime<T>
+where
+    T: RuntimeState<State = T> + Default + Clone,
+{
+    listeners: Vec<Listener<T>>,
+    calls: HashMap<String, ThunkFunc<T>>,
+    state: Option<T>,
+    current: Option<Event>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct WithArgs<T>
+where
+    T: RuntimeState<State = T> + Default + Clone,
+{
+    state: T,
+    args: Vec<String>,
+}
+
 impl Extensions {
     /// sets the current event context which will be used for extension methods
     pub fn set_context(&mut self, context: Option<Event>) -> &mut Self {
@@ -326,26 +346,6 @@ where
             ThunkFunc::WithArgs(_) => f.debug_tuple("ThunkFunc::WithArgs").finish(),
         }
     }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct Runtime<T>
-where
-    T: RuntimeState<State = T> + Default + Clone,
-{
-    listeners: Vec<Listener<T>>,
-    calls: HashMap<String, ThunkFunc<T>>,
-    state: Option<T>,
-    current: Option<Event>,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct WithArgs<T>
-where
-    T: RuntimeState<State = T> + Default + Clone,
-{
-    state: T,
-    args: Vec<String>,
 }
 
 impl<T> WithArgs<T>
@@ -492,6 +492,15 @@ where
     pub fn reset(&mut self) {
         self.current = None;
         self.state = None;
+    }
+
+    pub fn reset_listeners(&mut self, keep_update_listeners: bool) {
+        self.listeners = self.listeners.iter().filter(|l| {
+            match l.action {
+                Action::Thunk(_) => keep_update_listeners,
+                _ => false
+            }
+        }).cloned().collect();
     }
 
     /// on parses an event expression, and adds a new listener for that event
