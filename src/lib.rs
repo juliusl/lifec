@@ -5,8 +5,8 @@ use std::fmt::{Debug, Display};
 
 pub mod editor;
 pub use self::editor::App;
-pub use self::editor::EditorEvent;
-pub use self::editor::EditorRuntime;
+pub use self::editor::EventEditor;
+pub use self::editor::RuntimeEditor;
 
 pub trait RuntimeState {
     type Error;
@@ -593,22 +593,7 @@ where
                 Action::Call(name) => match self.calls.get(name) {
                     Some(ThunkFunc::Default(thunk)) => {
                         let (next_s, next_e) = thunk(&state, self.current.clone());
-                        let mut lex = Lifecycle::lexer(&next_e);
-
-                        match lex.next() {
-                            Some(Lifecycle::Event(event)) => {
-                                self.current = Some(event);
-                                self.state = Some(next_s);
-                            }
-                            Some(Lifecycle::Error) => {
-                                eprintln!(
-                                    "Error parsing event expression: {:?}, {}",
-                                    lex.span(),
-                                    next_e
-                                );
-                            }
-                            _ => {}
-                        }
+                        self.update(next_s, next_e);
                     }
                     Some(ThunkFunc::WithArgs(thunk)) => {
                         let with_args = WithArgs {
@@ -617,43 +602,13 @@ where
                         };
 
                         let (next_s, next_e) = thunk(&with_args, self.current.clone());
-                        let mut lex = Lifecycle::lexer(&next_e);
-
-                        match lex.next() {
-                            Some(Lifecycle::Event(event)) => {
-                                self.current = Some(event);
-                                self.state = Some(next_s);
-                            }
-                            Some(Lifecycle::Error) => {
-                                eprintln!(
-                                    "Error parsing event expression: {:?}, {}",
-                                    lex.span(),
-                                    next_e
-                                );
-                            }
-                            _ => {}
-                        }
+                        self.update(next_s, next_e);
                     }
                     _ => (),
                 },
                 Action::Thunk(thunk) => {
                     let (next_s, next_e) = thunk(&state, self.current.clone());
-                    let mut lex = Lifecycle::lexer(&next_e);
-
-                    match lex.next() {
-                        Some(Lifecycle::Event(event)) => {
-                            self.current = Some(event);
-                            self.state = Some(next_s);
-                        }
-                        Some(Lifecycle::Error) => {
-                            eprintln!(
-                                "Error parsing event expression: {:?}, {}",
-                                lex.span(),
-                                next_e
-                            );
-                        }
-                        _ => {}
-                    }
+                    self.update(next_s, next_e);
                 }
                 Action::Dispatch(msg) => {
                     let process = if l.extensions.args.len() > 0 {
@@ -687,17 +642,6 @@ where
         }
     }
 
-    fn prepare_state(&self) -> T {
-        let mut state = self.state.clone();
-
-        match &state {
-            None => state = Some(Self::init()),
-            _ => {}
-        };
-
-        state.expect("state was just set")
-    }
-
     /// (Extension) test runs tests defined in listener extensions,
     /// and panics if all tests do not pass. If all tests pass this function
     /// will return the Runtime for execution
@@ -708,7 +652,7 @@ where
 
             let mut action = l.action.clone();
 
-            if let Action::Call(name) = l.action.clone() {
+            if let Action::Call(name) = action {
                 action = {
                     if let Some(ThunkFunc::Default(thunk)) = self.calls.get(&name) {
                         Action::Thunk(*thunk)
@@ -741,6 +685,35 @@ where
             })
         } else {
             Err(RuntimeTestError {})
+        }
+    }
+
+    fn prepare_state(&self) -> T {
+        let mut state = self.state.clone();
+
+        match &state {
+            None => state = Some(Self::init()),
+            _ => {}
+        };
+
+        state.expect("state was just set")
+    }
+
+    fn update(&mut self, next_state: T, next_event: String) {
+        let mut lex = Lifecycle::lexer(&next_event);
+        match lex.next() {
+            Some(Lifecycle::Event(event)) => {
+                self.current = Some(event);
+                self.state = Some(next_state);
+            }
+            Some(Lifecycle::Error) => {
+                eprintln!(
+                    "Error parsing event expression: {:?}, {}",
+                    lex.span(),
+                    next_event
+                );
+            }
+            _ => {}
         }
     }
 }

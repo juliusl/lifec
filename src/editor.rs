@@ -1,4 +1,5 @@
 use crate::{Action, Runtime, RuntimeState, WithArgs, parse_flags, parse_variables, Listener};
+use imgui::{Ui, MouseButton, PopupToken, PopupModal};
 use imnodes::{AttributeFlag, IdentifierGenerator, Link, LinkId, NodeId};
 use imnodes::{AttributeId, ImVec2, InputPinId, OutputPinId};
 use knot::store::{Store, Visitor};
@@ -9,19 +10,19 @@ use std::fmt::Display;
 pub use atlier::system::App;
 
 #[derive(Default, Clone)]
-pub struct EditorRuntime<S>
+pub struct RuntimeEditor<S>
 where
     S: RuntimeState<State = S> + Default + Clone,
 {
     count: usize,
-    events: Vec<EditorEvent>,
+    events: Vec<EventEditor>,
     runtime: Runtime<S>,
     links: HashSet<Link>,
     initial_str: String,
 }
 
 #[derive(Clone, Default, PartialEq, Hash, Eq)]
-pub struct EditorEvent {
+pub struct EventEditor {
     label: String,
     on: String,
     dispatch: String,
@@ -31,7 +32,7 @@ pub struct EditorEvent {
     variales: BTreeMap<String, String>,
 }
 
-impl<S> From<Runtime<S>> for EditorRuntime<S>
+impl<S> From<Runtime<S>> for RuntimeEditor<S>
 where
     S: RuntimeState<State = S> + Default + Clone,
 {
@@ -41,7 +42,7 @@ where
             .iter()
             .enumerate()
             .filter_map(|(id, l)| match (&l.action, &l.next) {
-                (Action::Dispatch(msg), Some(transition)) => Some(EditorEvent {
+                (Action::Dispatch(msg), Some(transition)) => Some(EventEditor {
                     label: format!("Event {}", id),
                     on: l.event.to_string(),
                     dispatch: msg.to_string(),
@@ -50,7 +51,7 @@ where
                     flags: parse_flags(l.extensions.get_args()),
                     variales: parse_variables(l.extensions.get_args()),
                 }),
-                (Action::Call(call), _) => Some(EditorEvent {
+                (Action::Call(call), _) => Some(EventEditor {
                     label: format!("Event {}", id),
                     on: l.event.to_string(),
                     call: call.to_string(),
@@ -80,7 +81,15 @@ where
     }
 }
 
-impl<S> App for EditorRuntime<S>
+pub fn begin_context_menu<'a>(popup_id: impl AsRef<str>, ui: &'a Ui<'a>) -> Option<PopupToken<'a>> {
+    if ui.is_item_hovered() && ui.is_mouse_released(MouseButton::Right) {
+        ui.open_popup(&popup_id);
+    }
+
+    ui.begin_popup(popup_id)
+}
+
+impl<S> App for RuntimeEditor<S>
 where
     S: RuntimeState<State = S> + Default + Clone + Display,
 {
@@ -108,7 +117,7 @@ where
                 for i in 0..count {
                     let i: usize = i.try_into().unwrap();
                     let label = format!("Event {}", i);
-                    next.events.push(EditorEvent {
+                    next.events.push(EventEditor {
                         label,
                         ..Default::default()
                     });
@@ -200,10 +209,9 @@ where
             let mut next_events = next.events.clone();
 
             if let Some(editor_context) = imnodes {
-                let mut node_index = HashMap::<NodeId, EditorEvent>::new();
+                let mut node_index = HashMap::<NodeId, EventEditor>::new();
                 let mut link_index = HashMap::<LinkId, Link>::new();
                 let detach = editor_context.push(AttributeFlag::EnableLinkDetachWithDragClick);
-                let idgen = &mut editor_context.new_identifier_generator();
                 let mut previous = state.links.clone();
 
                 if ui.button("re-arrange") {
@@ -277,9 +285,9 @@ where
 
                 if ui.button("graph state") {
                     let idgen = &mut editor_context.new_identifier_generator();
-                    let mut store = Store::<EditorEvent>::default();
+                    let mut store = Store::<EventEditor>::default();
                     let mut graph_index = HashMap::<
-                        EditorEvent,
+                        EventEditor,
                         (NodeId, InputPinId, AttributeId, OutputPinId),
                     >::new();
                     let next_events = next.events.clone();
@@ -322,17 +330,16 @@ where
                                 craeated_from_snap: false,
                             });
                         }
-
-                        println!("{} -> {}", &s.0.on, &s.1.on);
                     }
                 }
 
+                let idgen = &mut editor_context.new_identifier_generator();
                 let outer = imnodes::editor(editor_context, |mut scope| {
                     let mut i = 0;
                     for e in next.events {
                         let node_id = idgen.next_node();
                         scope.add_node(node_id, |node| {
-                            if let Some(next_e) = EditorEvent::show_node(ui, &e, node, idgen) {
+                            if let Some(next_e) = EventEditor::show_node(ui, &e, node, idgen) {
                                 node_index.insert(node_id, next_e.clone());
                                 next_events[i] = next_e;
                             }
@@ -387,7 +394,7 @@ where
                 next.links = previous.union(&next_links).cloned().collect();
             } else {
                 for (i, e) in next.events.iter().enumerate() {
-                    if let Some(next_e) = EditorEvent::show(ui, e, None) {
+                    if let Some(next_e) = EventEditor::show(ui, e, None) {
                         if next_e != *e {
                             next_events[i] = next_e.clone()
                         }
@@ -405,7 +412,7 @@ where
 
 #[derive(Default)]
 struct Printer {
-    state: HashSet<(EditorEvent, EditorEvent)>,
+    state: HashSet<(EventEditor, EventEditor)>,
 }
 
 impl Visitor<NodeId> for Printer {
@@ -414,13 +421,13 @@ impl Visitor<NodeId> for Printer {
     }
 }
 
-impl Visitor<EditorEvent> for Printer {
-    fn visit(&self, from: &EditorEvent, to: &EditorEvent) -> bool {
+impl Visitor<EventEditor> for Printer {
+    fn visit(&self, from: &EventEditor, to: &EventEditor) -> bool {
         println!("{} -> {}", from.on, to.on);
         true
     }
 
-    fn visit_mut(&mut self, from: &EditorEvent, to: &EditorEvent) -> bool {
+    fn visit_mut(&mut self, from: &EventEditor, to: &EventEditor) -> bool {
         if from.transitions.iter().find(|t| **t == to.on).is_some() {
             self.state.insert((from.clone(), to.clone()));
         }
@@ -428,7 +435,7 @@ impl Visitor<EditorEvent> for Printer {
     }
 }
 
-impl App for EditorEvent {
+impl App for EventEditor {
     fn title() -> &'static str {
         "Edit Event"
     }
@@ -482,7 +489,7 @@ impl App for EditorEvent {
                 ui.text(t);
             }
         });
-
+        
         Some(next)
     }
 }

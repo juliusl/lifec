@@ -1,4 +1,4 @@
-use lifec::{Event, Runtime, EditorRuntime, App};
+use lifec::{Event, Runtime, RuntimeEditor, App};
 use osprocess::Process;
 
 fn main() {
@@ -45,5 +45,5 @@ fn main() {
         "'dev_id=$DEV_ID orgv=342 source_driver=gcm'",
     ]);
 
-    EditorRuntime::start_editor(Some(EditorRuntime::from(runtime)));
+    RuntimeEditor::start_editor(Some(RuntimeEditor::from(runtime)));
 }

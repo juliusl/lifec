@@ -1,4 +1,4 @@
-use lifec::{App, EditorRuntime, Runtime};
+use lifec::{App, RuntimeEditor, Runtime};
 use osprocess::Process;
 
 fn main() {
@@ -18,5 +18,5 @@ fn main() {
 
     runtime.on("{ after_echo;; }").call("print_results");
 
-    EditorRuntime::start_editor(Some(EditorRuntime::from(runtime.parse_event("{ setup;; }"))));
+    RuntimeEditor::start_editor(Some(RuntimeEditor::from(runtime.parse_event("{ setup;; }"))));
 }
