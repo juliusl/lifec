@@ -2,10 +2,11 @@ use logos::Logos;
 use parser::Lifecycle;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Display};
+use std::any::Any;
 
 pub mod editor;
 
-pub trait RuntimeState {
+pub trait RuntimeState: Any + Sized + Sync + Send + Display + Default + Clone {
     type Error;
     type State: Default + RuntimeState + Clone + Sized;
 
@@ -194,7 +195,7 @@ impl Into<String> for Event {
 #[derive(Debug, Clone, Default)]
 pub struct Listener<T>
 where
-    T: Default + RuntimeState + Clone,
+    T: RuntimeState,
 {
     pub event: Event,
     pub action: Action<T>,
@@ -212,7 +213,7 @@ pub struct Extensions {
 #[derive(Debug, Clone, Default)]
 pub struct Runtime<T>
 where
-    T: RuntimeState<State = T> + Default + Clone,
+    T: RuntimeState,
 {
     listeners: Vec<Listener<T>>,
     calls: HashMap<String, ThunkFunc<T>>,
@@ -223,7 +224,7 @@ where
 #[derive(Debug, Clone, Default)]
 pub struct WithArgs<T>
 where
-    T: RuntimeState<State = T> + Default + Clone,
+    T: RuntimeState,
 {
     state: T,
     args: Vec<String>,
@@ -282,7 +283,7 @@ impl Extensions {
 
 impl<T> Listener<T>
 where
-    T: Default + Clone + RuntimeState,
+    T: RuntimeState<State = T>,
 {
     /// dispatch sends a message to state for processing
     /// if successful transitions to the event described in the transition expression
@@ -319,14 +320,17 @@ where
 }
 
 #[derive(Clone)]
-pub enum ThunkFunc<T: Default + RuntimeState<State = T> + Clone> {
+pub enum ThunkFunc<T> 
+where
+    T: RuntimeState,
+{
     Default(fn(&T, Option<Event>) -> (T, String)),
     WithArgs(fn(&WithArgs<T>, Option<Event>) -> (T, String)),
 }
 
 impl<T: Default> Default for ThunkFunc<T>
 where
-    T: Default + RuntimeState<State = T> + Clone,
+    T: RuntimeState,
 {
     fn default() -> Self {
         ThunkFunc::Default(|_, _| (T::default(), "{ exit;; }".to_string()))
@@ -335,7 +339,7 @@ where
 
 impl<T> Debug for ThunkFunc<T>
 where
-    T: Default + RuntimeState<State = T> + Clone,
+    T: RuntimeState,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -347,7 +351,7 @@ where
 
 impl<T> WithArgs<T>
 where
-    T: RuntimeState<State = T> + Default + Clone,
+    T: RuntimeState,
 {
     pub fn get_state(&self) -> T {
         self.state.clone()
@@ -436,9 +440,15 @@ pub fn parse_flags(args: Vec<String>) -> BTreeMap<String, String> {
     map
 }
 
+impl<T: RuntimeState> Display for WithArgs<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "with_args")
+    }
+}
+
 impl<T> RuntimeState for WithArgs<T>
 where
-    T: RuntimeState<State = T> + Default + Clone,
+    T: RuntimeState<State = T>,
 {
     type State = Self;
 
@@ -469,7 +479,7 @@ where
 
 impl<T> Runtime<T>
 where
-    T: RuntimeState<State = T> + Default + Clone,
+    T: RuntimeState<State = T>,
 {
     /// context gets the current event context of this runtime
     pub fn context(&self) -> Event {
@@ -734,7 +744,7 @@ pub struct RuntimeTestError;
 #[derive(Clone)]
 pub enum Action<T>
 where
-    T: Default,
+    T: RuntimeState,
 {
     NoOp,
     Call(String),
@@ -744,7 +754,7 @@ where
 
 impl<T> Default for Action<T>
 where
-    T: Default,
+    T: RuntimeState,
 {
     fn default() -> Self {
         Self::NoOp
@@ -753,7 +763,7 @@ where
 
 impl<T> Debug for Action<T>
 where
-    T: Default,
+    T: RuntimeState,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

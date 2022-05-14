@@ -7,7 +7,9 @@ edition = "2021"
 [dependencies]
 logos = "0.12.0"
 
-atlier = { git = "https://github.com/juliusl/atlier.git"   }
+# Add's support for built-in editors
+atlier = { path = "../atlier" } #{ git = "https://github.com/juliusl/atlier.git"   }
 imnodes = { git = "https://github.com/benmkw/imnodes-rs.git" }
 knot = { git = "https://github.com/juliusl/knot.git"  }
 imgui = { version = "0.8.2" }
+specs = "0.17.0"
