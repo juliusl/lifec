@@ -11,9 +11,9 @@ pub struct RuntimeEditor<S>
 where
     S: RuntimeState,
 {
-    count: usize,
-    initial_str: String,
-    runtime: Runtime<S>,
+    // count: usize,
+    // initial_str: String,
+    _runtime: Runtime<S>,
     imnodes: Option<imnodes::Context>,
     // events: Vec<EventEditor>,
 }
