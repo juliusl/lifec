@@ -1,12 +1,9 @@
 use std::collections::HashMap;
 use specs::{Component, DenseVecStorage, Entities, Join, ReadStorage, System};
 
-#[derive(Clone)]
+#[derive(Clone, Component)]
+#[storage(DenseVecStorage)]
 pub struct NodeEditorId(u32);
-
-impl Component for NodeEditorId {
-    type Storage = DenseVecStorage<Self>;
-}
 
 pub struct NodeEditor {
     pub imnodes: imnodes::Context,

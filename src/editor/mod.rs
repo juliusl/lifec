@@ -8,42 +8,37 @@ mod runtime_editor;
 mod section;
 
 use std::any::Any;
+use specs::{prelude::*, Component};
 
 pub use atlier::system::{start_editor};
 pub use atlier::system::App;
 pub use runtime_editor::RuntimeEditor;
 pub use section::Section;
 
-use imgui::CollapsingHeader;
-use specs::{Component, Builder, DenseVecStorage};
-
-#[derive(Clone)]
+/// Edit is a function wrapper over a display function that is stored as a specs Component
+#[derive(Clone, Component)]
+#[storage(DenseVecStorage)]
 pub struct Edit<S: Any + Send + Sync + Clone>(pub fn(&mut S, &imgui::Ui));
 
-impl<S: Any + Send + Sync + Clone> Component for Edit<S> {
-    type Storage = DenseVecStorage<Self>;
+// #[derive(Clone, Component)]
+// #[storage(DenseVecStorage)]
+// pub struct Show<S: Any + Send + Sync + Clone>(pub fn(&S, &imgui::Ui));
+
+/// Event component is the the most basic data unit of the runtime
+#[derive(Clone, Component)]
+#[storage(DenseVecStorage)]
+pub struct EventComponent {
+    pub on: String,
+    pub dispatch: String,
+    pub call: String,
+    pub transitions: Vec<String>,
 }
 
-impl<S: Any + Send + Sync + Clone> App for Section<S> {
-    fn title() -> &'static str {
-        "Section"
-    }
-
-    fn show_editor(&mut self, ui: &imgui::Ui) {
-        if CollapsingHeader::new(&self.title).build(ui) {
-            let (Edit(editor), s) = (&mut self.editor, &mut self.state);
-            editor(s, ui);
-        }
-    }
-}
-
-
-pub fn start_runtime_editor<S>()
+/// Opens the runtime editor with a single section defined by S
+pub fn start_simple_runtime_editor<S>()
 where
     S: crate::RuntimeState + Component + App,
 {
-    use specs::WorldExt;
-
     start_editor(
         "Runtime Editor",
         1280.0,
@@ -52,17 +47,9 @@ where
         |_, world, _| {
             world.register::<Section<S>>();
 
-            let section = Section::<S> { 
-                title: "Test Section".to_string(), 
-                editor: Edit(|s, ui|{
-                    S::show_editor(s, ui);
-                }), 
-                state: S::default()
-            };
-
             world
                 .create_entity()
-                .maybe_with(Some(section))
+                .maybe_with(Some(Section::<S>::from(S::default())))
                 .build();
         })
 }

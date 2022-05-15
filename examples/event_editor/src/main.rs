@@ -1,10 +1,11 @@
 use std::fmt::Display;
 
+use imgui::Window;
 use lifec::{
-    editor::{start_editor, RuntimeEditor, Section, App},
+    editor::{start_editor, App, RuntimeEditor, Section},
     RuntimeState,
 };
-use specs::{Builder, WorldExt, System, WriteStorage, Join, Entities};
+use specs::{Builder, Entities, Join, System, WorldExt, WriteStorage};
 use specs::{Component, DenseVecStorage};
 
 fn main() {
@@ -12,40 +13,45 @@ fn main() {
         "Test Editor",
         1280.0,
         720.0,
-         RuntimeEditor::<Test>::default(),
+        RuntimeEditor::<Test>::default(),
         |_, world, dispatcher| {
             world.register::<Section<Test>>();
 
             world
                 .create_entity()
-                .maybe_with(Some(Section::from(Test { id: 0, val: 10, clock: 0 })))
+                .maybe_with(Some(Section::from(Test {
+                    id: 0,
+                    val: 10,
+                    clock: 0,
+                    open_test_window: false,
+                })))
                 .build();
 
             world
                 .create_entity()
-                .maybe_with(Some(Section::from(Test { id: 1, val: 11 , clock: 0})))
+                .maybe_with(Some(Section::from(Test {
+                        id: 1,
+                        val: 11,
+                        clock: 0,
+                        open_test_window: false,
+                    }).enable_app_systems()))
                 .build();
 
-            world
-                .create_entity()
-                .maybe_with(Some(Section::from(Test { id: 2, val: 12, clock: 0 })))
-                .build();
-            
-            dispatcher.add(Incrementer{}, "random-system", &[]);
+            dispatcher.add(Clock {}, "clock", &[]);
         },
     )
 }
 
-struct Incrementer;
+struct Clock;
 
-impl <'a> System<'a> for Incrementer {
+impl<'a> System<'a> for Clock {
     type SystemData = (Entities<'a>, WriteStorage<'a, Section<Test>>);
 
     fn run(&mut self, mut data: Self::SystemData) {
         for e in data.0.join() {
-           if let Some(section) = data.1.get_mut(e) {
-               section.state.clock += 1;
-           }
+            if let Some(section) = data.1.get_mut(e) {
+                section.state.clock += 1;
+            }
         }
     }
 }
@@ -53,8 +59,9 @@ impl <'a> System<'a> for Incrementer {
 #[derive(Default, Clone)]
 struct Test {
     val: i32,
-    clock: i32,
     id: u32,
+    clock: u64,
+    open_test_window: bool,
 }
 
 pub struct TestRuntimeError {}
@@ -67,7 +74,15 @@ impl App for Test {
     fn show_editor(&mut self, ui: &imgui::Ui) {
         ui.input_int(format!("test_val: {}", self.id), &mut self.val)
             .build();
-        ui.label_text(format!("count: {}", self.id), format!("{}", self.clock));
+        if ui.checkbox(format!("test opening nested window {}", self.id), &mut self.open_test_window) {}
+
+        if self.open_test_window {
+            Window::new(format!("test window {}", self.id))
+                .size([1280.0, 720.0], imgui::Condition::Appearing)
+                .build(ui, || {
+                    ui.text(format!("{}", self.clock));
+                });
+        }
     }
 }
 
@@ -89,6 +104,12 @@ impl RuntimeState for Test {
 
     fn process<S: AsRef<str> + ?Sized>(&self, _: &S) -> Result<Self, Self::Error> {
         Ok(self.clone())
+    }
+
+    fn merge_with(&self, other: &Self) -> Self {
+        let mut next = self.clone();
+        next.clock = other.clock;
+        next
     }
 }
 

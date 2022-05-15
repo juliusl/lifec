@@ -1,23 +1,11 @@
 use atlier::system::App;
 use imgui::Window;
-use specs::{Component, DenseVecStorage, Entities, Join, ReadStorage, System};
+use specs::{Component, Entities, Join, ReadStorage, System};
 use std::collections::BTreeMap;
 
 use crate::{Runtime, RuntimeState};
 
 use super::section::Section;
-
-#[derive(Clone)]
-pub struct EventComponent {
-    pub on: String,
-    pub dispatch: String,
-    pub call: String,
-    pub transitions: Vec<String>,
-}
-
-impl Component for EventComponent {
-    type Storage = DenseVecStorage<Self>;
-}
 
 pub struct RuntimeEditor<S>
 where
@@ -33,9 +21,24 @@ where
 {
     type SystemData = (Entities<'a>, ReadStorage<'a, Section<S>>);
 
-    fn run(&mut self, (entities, sections): Self::SystemData) {
-        for (e, s) in (&entities, &sections).join() {
-            self.sections.insert(e.id(), s.clone());
+    fn run(&mut self, (entities, read_sections): Self::SystemData) {
+        for (e, s) in (&entities, &read_sections).join() {
+            match self.sections.get(&e.id()) {
+                None => {
+                    self.sections.insert(e.id(), s.clone());
+                }
+                Some(Section {  enable_app_systems, state, .. }) => {
+                    if *enable_app_systems {
+                        let state = state.merge_with(&s.state);
+                        self.sections.insert(e.id(), {
+                            let mut s = s.clone();
+                            s.state = state;
+                            s
+                        });
+                    }
+                },
+                _ => {},
+            } 
         }
     }
 }

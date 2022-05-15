@@ -31,6 +31,12 @@ pub trait RuntimeState: Any + Sized + Sync + Send + Display + Default + Clone {
         Self::process(&state.get_state(), msg)
     }
 
+    /// merge_with specifies how to merge another instance of Self that has been modified externally
+    /// this allows for only specific fields in state to be updated asynchronously
+    fn merge_with(&self, _: &Self) -> Self {
+        todo!("Implement this to serialize external changes to state")
+    }
+
     /// select decides which listener should be processed next
     fn select(&self, listener: Listener<Self>, current: &Event) -> bool {
         listener.event.get_phase_lifecycle() == current.get_phase_lifecycle()
