@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 carddeck = { path = "../carddeck" }
 lifec = { path = "../.." }
+specs = "0.17.0"
