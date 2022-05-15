@@ -4,7 +4,7 @@ use atlier::system::App;
 use imgui::CollapsingHeader;
 use specs::{Component, HashMapStorage};
 
-use super::Edit;
+use super::{Edit};
 
 /// Section is a component of the runtime editor
 /// it displays a collapsable section header, and renders it's editor in it's body
@@ -20,6 +20,10 @@ pub struct Section<S: Any + Send + Sync + Clone> {
 }
 
 impl<S: Any + Send + Sync + Clone> Section<S> {
+    pub fn new(title: impl AsRef<str>, show: fn(&mut S, &imgui::Ui), initial_state: S) -> Section<S> {
+        Section { title: title.as_ref().to_string(), editor: Edit(show), state: initial_state, enable_app_systems: false }
+    }
+
     pub fn enable_app_systems(&self) -> Self {
         let mut next = self.clone();
         next.enable_app_systems = true; 
@@ -30,7 +34,7 @@ impl<S: Any + Send + Sync + Clone> Section<S> {
 impl<S: Any + Send + Sync + Clone + App + Display> From<S> for Section<S> {
     fn from(initial: S) -> Self {
         Section {
-            title: format!("{}: {}", S::title().to_string(), initial),
+            title: format!("{}: {}", S::name().to_string(), initial),
             editor: Edit(S::show_editor),
             state: initial,
             enable_app_systems: false,
@@ -39,7 +43,7 @@ impl<S: Any + Send + Sync + Clone + App + Display> From<S> for Section<S> {
 }
 
 impl<S: Any + Send + Sync + Clone> App for Section<S> {
-    fn title() -> &'static str {
+    fn name() -> &'static str {
         "Section"
     }
 

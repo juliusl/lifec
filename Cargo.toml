@@ -13,3 +13,4 @@ imnodes = { git = "https://github.com/benmkw/imnodes-rs.git" }
 knot = { git = "https://github.com/juliusl/knot.git"  }
 imgui = { version = "0.8.2" }
 specs = "0.17.0"
+rand = "0.8.5"

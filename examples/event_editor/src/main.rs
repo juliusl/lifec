@@ -2,44 +2,42 @@ use std::fmt::Display;
 
 use imgui::Window;
 use lifec::{
-    editor::{start_editor, App, RuntimeEditor, Section},
+    editor::{unique_title, App, Section, open_editor},
     RuntimeState,
 };
-use specs::{Builder, Entities, Join, System, WorldExt, WriteStorage};
+use specs::{Entities, Join, System, WriteStorage};
 use specs::{Component, DenseVecStorage};
 
 fn main() {
-    start_editor(
-        "Test Editor",
-        1280.0,
-        720.0,
-        RuntimeEditor::<Test>::default(),
-        |_, world, dispatcher| {
-            world.register::<Section<Test>>();
+    open_editor(vec![
+        Section::from(Test {
+            id: 0,
+            val: 10,
+            clock: 0,
+            open_test_window: false,
+        }),
+        Section::new(
+            unique_title("With Additional Tooling"),
+            |s, ui| {
+                Test::show_editor(s, ui);
 
-            world
-                .create_entity()
-                .maybe_with(Some(Section::from(Test {
-                    id: 0,
-                    val: 10,
-                    clock: 0,
-                    open_test_window: false,
-                })))
-                .build();
-
-            world
-                .create_entity()
-                .maybe_with(Some(Section::from(Test {
-                        id: 1,
-                        val: 11,
-                        clock: 0,
-                        open_test_window: false,
-                    }).enable_app_systems()))
-                .build();
-
-            dispatcher.add(Clock {}, "clock", &[]);
-        },
-    )
+                ui.text(format!("clock: {}", s.clock));
+                if ui.button("hello") {
+                    println!("world");
+                }
+            },
+            Test {
+                id: 1,
+                val: 11,
+                clock: 0,
+                open_test_window: false,
+            },
+        )
+        .enable_app_systems(),
+    ],
+    |d| {
+        d.add(Clock{}, "clock", &[]);
+    });
 }
 
 struct Clock;
@@ -56,7 +54,8 @@ impl<'a> System<'a> for Clock {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Component)]
+#[storage(DenseVecStorage)]
 struct Test {
     val: i32,
     id: u32,
@@ -67,14 +66,17 @@ struct Test {
 pub struct TestRuntimeError {}
 
 impl App for Test {
-    fn title() -> &'static str {
+    fn name() -> &'static str {
         "Test"
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
         ui.input_int(format!("test_val: {}", self.id), &mut self.val)
             .build();
-        if ui.checkbox(format!("test opening nested window {}", self.id), &mut self.open_test_window) {}
+        if ui.checkbox(
+            format!("test opening nested window {}", self.id),
+            &mut self.open_test_window,
+        ) {}
 
         if self.open_test_window {
             Window::new(format!("test window {}", self.id))
@@ -88,7 +90,7 @@ impl App for Test {
 
 impl Display for Test {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Test 1: {}", self.val)
+        write!(f, "{}", self.id)
     }
 }
 
@@ -111,8 +113,4 @@ impl RuntimeState for Test {
         next.clock = other.clock;
         next
     }
-}
-
-impl Component for Test {
-    type Storage = DenseVecStorage<Self>;
 }

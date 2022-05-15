@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use crate::{Runtime, RuntimeState};
 
-use super::section::Section;
+use super::{section::Section, unique_title};
 
 pub struct RuntimeEditor<S>
 where
@@ -59,16 +59,16 @@ impl<S> App for RuntimeEditor<S>
 where
     S: RuntimeState + Component,
 {
-    fn title() -> &'static str {
+    fn name() -> &'static str {
         "Runtime Editor"
     }
 
     fn window_size() -> &'static [f32; 2] {
-        &[1280.0, 720.0]
+        &[640.0, 720.0]
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
-        Window::new(Self::title())
+        Window::new(Self::name())
             .size(*Self::window_size(), imgui::Condition::Appearing)
             .build(ui, || {
                 for (_, section) in self.sections.iter_mut() {
