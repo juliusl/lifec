@@ -811,7 +811,6 @@ impl Display for Dealer {
 
 impl RuntimeState for Dealer {
     type Error = InvalidDealerExpression;
-    type State = Dealer;
 
     fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self where Self: Sized {
         if let Ok(dealer) = Dealer::try_from(init.as_ref()) {
@@ -821,14 +820,14 @@ impl RuntimeState for Dealer {
         }
     }
 
-    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self::State, Self::Error> {
+    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error> {
         println!("Received: {}", msg.as_ref());
         self.deal(msg.as_ref())
     }
 
-    fn process_with_args<S: AsRef<str> + ?Sized>(state: lifec::WithArgs<Self>, msg: &S) -> Result<Self::State, Self::Error>
+    fn process_with_args<S: AsRef<str> + ?Sized>(state: lifec::WithArgs<Self>, msg: &S) -> Result<Self, Self::Error>
     where
-            Self: Clone + Default + RuntimeState<State = Self>, {
+            Self: Clone + Default + RuntimeState {
         let args = state.parse_flags();
         
         println!("Dealer received args: {:?}", args);

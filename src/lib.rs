@@ -8,7 +8,6 @@ pub mod editor;
 
 pub trait RuntimeState: Any + Sized + Sync + Send + Display + Default + Clone {
     type Error;
-    type State: Default + RuntimeState + Clone + Sized;
 
     /// load should take an initial message, and override any
     /// existing state that exists
@@ -18,22 +17,22 @@ pub trait RuntimeState: Any + Sized + Sync + Send + Display + Default + Clone {
 
     /// process is a function that should take a string message
     /// and return the next version of Self
-    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self::State, Self::Error>;
+    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error>;
 
     /// process is a function that should take a string message
     /// and return the next version of Self
     fn process_with_args<S: AsRef<str> + ?Sized>(
         state: WithArgs<Self>,
         msg: &S,
-    ) -> Result<Self::State, Self::Error>
+    ) -> Result<Self, Self::Error>
     where
-        Self: Clone + Default + RuntimeState<State = Self>,
+        Self: Clone + Default + RuntimeState,
     {
         Self::process(&state.get_state(), msg)
     }
 
     /// select decides which listener should be processed next
-    fn select(&self, listener: Listener<Self::State>, current: &Event) -> bool {
+    fn select(&self, listener: Listener<Self>, current: &Event) -> bool {
         listener.event.get_phase_lifecycle() == current.get_phase_lifecycle()
             && listener.event.get_prefix_label() == current.get_prefix_label()
             && listener.event.get_payload() == current.get_payload()
@@ -283,7 +282,7 @@ impl Extensions {
 
 impl<T> Listener<T>
 where
-    T: RuntimeState<State = T>,
+    T: RuntimeState,
 {
     /// dispatch sends a message to state for processing
     /// if successful transitions to the event described in the transition expression
@@ -448,10 +447,8 @@ impl<T: RuntimeState> Display for WithArgs<T> {
 
 impl<T> RuntimeState for WithArgs<T>
 where
-    T: RuntimeState<State = T>,
+    T: RuntimeState,
 {
-    type State = Self;
-
     type Error = <T as RuntimeState>::Error;
 
     fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self
@@ -464,7 +461,7 @@ where
         }
     }
 
-    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self::State, Self::Error> {
+    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error> {
         let next = self.state.process(msg);
 
         match next {
@@ -479,7 +476,7 @@ where
 
 impl<T> Runtime<T>
 where
-    T: RuntimeState<State = T>,
+    T: RuntimeState,
 {
     /// context gets the current event context of this runtime
     pub fn context(&self) -> Event {
