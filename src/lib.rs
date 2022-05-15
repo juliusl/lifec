@@ -560,7 +560,7 @@ where
         let mut processing = self.parse_event(init_expr);
 
         loop {
-            processing = processing.process();
+            processing = processing.process_state();
 
             if !processing.can_continue() {
                 break;
@@ -605,7 +605,7 @@ where
 
     /// process handles the internal logic
     /// based on the context, the state implementation selects the next listener
-    pub fn process(&mut self) -> Self {
+    pub fn process_state(&mut self) -> Self {
         let state = self.prepare_state();
 
         if let Some(l) = self.next_listener() {
