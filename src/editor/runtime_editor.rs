@@ -11,7 +11,7 @@ pub struct RuntimeEditor<S>
 where
     S: RuntimeState,
 {
-    runtime: Runtime<S>,
+    pub runtime: Runtime<S>,
     sections: BTreeMap<u32, Section<S>>,
 }
 
@@ -42,8 +42,7 @@ where
                             s
                         });
                     }
-                },
-                _ => {},
+                }
             } 
         }
     }
