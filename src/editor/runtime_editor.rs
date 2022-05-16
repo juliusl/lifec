@@ -1,23 +1,56 @@
 use atlier::system::App;
-use imgui::Window;
-use specs::{Component, Entities, Join, ReadStorage, System};
+use imgui::{Window, CollapsingHeader};
+use specs::{Component, Entities, Join, ReadStorage, System, WriteStorage};
 use std::collections::BTreeMap;
 
-use crate::{Runtime, RuntimeState};
+use crate::{Runtime, RuntimeState, Action};
 
-use super::section::Section;
+use super::{section::Section, EventComponent};
 
 pub struct RuntimeEditor<S>
 where
     S: RuntimeState,
 {
     pub runtime: Runtime<S>,
+    events: Vec<EventComponent>,
     sections: BTreeMap<u32, Section<S>>,
 }
 
 impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
     fn from(runtime: Runtime<S>) -> Self {
-        Self { runtime, sections: BTreeMap::new() }
+        let events = runtime
+            .get_listeners()
+            .iter()
+            .enumerate()
+            .filter_map(|(id, l)| match (&l.action, &l.next) {
+                (Action::Dispatch(msg), Some(transition)) => Some(EventComponent {
+                    label: format!("Event {}", id),
+                    on: l.event.to_string(),
+                    dispatch: msg.to_string(),
+                    call: String::default(),
+                    transitions: vec![transition.to_string()],
+                    // flags: parse_flags(l.extensions.get_args()),
+                    // variales: parse_variables(l.extensions.get_args()),
+                }),
+                (Action::Call(call), _) => Some(EventComponent {
+                    label: format!("Event {}", id),
+                    on: l.event.to_string(),
+                    call: call.to_string(),
+                    dispatch: String::default(),
+                    transitions: l
+                        .extensions
+                        .tests
+                        .iter()
+                        .map(|(_, t)| t.to_owned())
+                        .collect(),
+                //     flags: parse_flags(l.extensions.get_args()),
+                //     variales: parse_variables(l.extensions.get_args()),
+                }),
+                _ => None,
+            })
+            .collect();
+
+        Self { runtime, events, sections: BTreeMap::new() }
     }
 }
 
@@ -55,6 +88,7 @@ where
     fn default() -> Self {
         Self {
             runtime: Default::default(),
+            events: Default::default(),
             sections: Default::default(),
         }
     }
@@ -78,6 +112,13 @@ where
             .build(ui, || {
                 for (_, section) in self.sections.iter_mut() {
                     section.show_editor(ui);
+                }
+
+                if CollapsingHeader::new(format!("Events")).begin(ui) {
+                    ui.indent();
+                    for e in self.events.iter_mut() {
+                        EventComponent::show_editor( e, ui);
+                    }
                 }
             });
     }

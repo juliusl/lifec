@@ -7,6 +7,7 @@ mod node_editor;
 mod runtime_editor;
 mod section;
 
+use imgui::CollapsingHeader;
 use rand::Rng;
 use specs::{prelude::*, Component};
 use std::any::Any;
@@ -31,10 +32,32 @@ pub struct Edit<S: Any + Send + Sync + Clone>(pub fn(&mut S, &imgui::Ui));
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
 pub struct EventComponent {
+    pub label: String,
     pub on: String,
     pub dispatch: String,
     pub call: String,
     pub transitions: Vec<String>,
+    // pub flags: BTreeMap<String, String>,
+    // pub variales: BTreeMap<String, String>,
+}
+
+impl App for EventComponent {
+    fn name() -> &'static str {
+       "Event Component"
+    }
+
+    fn show_editor(&mut self, ui: &imgui::Ui) {
+        if CollapsingHeader::new(format!("{}", self.label)).leaf(true).begin(ui) {
+            ui.input_text(format!("on ({})", self.label), &mut self.on).build();
+            if !&self.dispatch.is_empty() {
+                ui.input_text(format!("dispatch ({})", self.label), &mut self.dispatch).build();
+            }
+
+            if !&self.call.is_empty() {
+                ui.input_text(format!("call ({})", self.label), &mut self.call).build();
+            }
+        }
+    }
 }
 
 /// Opens the runtime editor with a single section defined by S
