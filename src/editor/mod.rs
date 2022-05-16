@@ -47,7 +47,7 @@ impl App for EventComponent {
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
-        if CollapsingHeader::new(format!("{}", self.label)).leaf(true).begin(ui) {
+        if CollapsingHeader::new(format!("{}", self.label)).begin(ui) {
             ui.input_text(format!("on ({})", self.label), &mut self.on).build();
             if !&self.dispatch.is_empty() {
                 ui.input_text(format!("dispatch ({})", self.label), &mut self.dispatch).build();
@@ -56,6 +56,7 @@ impl App for EventComponent {
             if !&self.call.is_empty() {
                 ui.input_text(format!("call ({})", self.label), &mut self.call).build();
             }
+            ui.new_line();
         }
     }
 }

@@ -104,19 +104,22 @@ where
     }
 
     fn window_size() -> &'static [f32; 2] {
-        &[640.0, 720.0]
+        &[1500.0, 720.0]
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
         Window::new(Self::name())
             .size(*Self::window_size(), imgui::Condition::Appearing)
             .build(ui, || {
+                ui.text("Extensions");
+                ui.new_line();
                 for (_, section) in self.sections.iter_mut() {
                     section.show_editor(ui);
                 }
 
                 ui.new_line();
                 ui.text("Runtime Tools");
+                ui.new_line();
                 if CollapsingHeader::new(format!("Current Runtime Information")).begin(ui) {
                     ui.indent();
 
@@ -128,7 +131,7 @@ where
 
                     let context = self.runtime.context(); 
                     ui.label_text(format!("Current Context"), format!("{}", context));
-                    
+
                     ui.unindent();
                 }
                 
