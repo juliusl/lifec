@@ -89,7 +89,7 @@ where
         width.into(),
         height.into(),
         RuntimeEditor::<S>::from(initial_runtime),
-        move |e, w, d| extension(e, w, d),
+        extension,
     )
 }
 
