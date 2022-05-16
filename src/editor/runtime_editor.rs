@@ -1,5 +1,6 @@
 use atlier::system::App;
 use imgui::{Window, CollapsingHeader};
+use imnodes::ColorStyle;
 use specs::{Component, Entities, Join, ReadStorage, System, WriteStorage};
 use std::collections::BTreeMap;
 
@@ -114,11 +115,29 @@ where
                     section.show_editor(ui);
                 }
 
+                ui.new_line();
+                ui.text("Runtime Tools");
+                if CollapsingHeader::new(format!("Current Runtime Information")).begin(ui) {
+                    ui.indent();
+
+                    if let Some(state) = self.runtime.current() {
+                        ui.text(format!("Current State: "));
+                        ui.text_wrapped(format!("{}", state));
+                        ui.new_line();
+                    }
+
+                    let context = self.runtime.context(); 
+                    ui.label_text(format!("Current Context"), format!("{}", context));
+                    
+                    ui.unindent();
+                }
+                
                 if CollapsingHeader::new(format!("Events")).begin(ui) {
                     ui.indent();
                     for e in self.events.iter_mut() {
                         EventComponent::show_editor( e, ui);
                     }
+                    ui.unindent();
                 }
             });
     }
