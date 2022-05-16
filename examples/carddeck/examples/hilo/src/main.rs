@@ -29,14 +29,18 @@ fn main() {
         .on("{ after_choose; player_2; }")
         .dispatch("[.1+2]", "{ game_over;; }");
 
-    runtime.on("{ game_over;; }").call("game_over");
+    runtime
+        .on("{ game_over;; }")
+        .call("game_over");
 
-    runtime.on("{ test_test;; }").call("test_args").args(&[
-        "--test",
-        "value123",
-        "--object",
-        "{test: abc, test123: 12345}",
-    ]);
+    runtime
+        .on("{ test_test;; }")
+        .call("test_args").args(&[
+            "--test",
+            "value123",
+            "--object",
+            "{test: abc, test123: 12345}",
+        ]);
 
     let runtime = runtime.parse_event("{ test_test;; }").process_state();
 

@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use crate::{Runtime, RuntimeState};
 
-use super::{section::Section, unique_title};
+use super::section::Section;
 
 pub struct RuntimeEditor<S>
 where

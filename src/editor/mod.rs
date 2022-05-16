@@ -82,10 +82,12 @@ where
     S: crate::RuntimeState + Component + App,
     F: 'static + Fn(&mut RuntimeEditor<S>, &mut World, &mut DispatcherBuilder),
 {
+    let &[width, height] = S::window_size();
+
     start_editor(
         "Runtime Editor",
-        1280.0,
-        720.0,
+        width.into(),
+        height.into(),
         RuntimeEditor::<S>::from(initial_runtime),
         move |e, w, d| extension(e, w, d),
     )

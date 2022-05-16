@@ -713,55 +713,6 @@ impl Dealer {
     }
 }
 
-impl App for Dealer {
-    fn name() -> &'static str {
-        "Dealer"
-    }
-
-    fn show_editor(&mut self, ui: &Ui) {
-        ui.text(format!("State: {}", self.to_string()));
-        ui.label_text("number of hands", format!("{}", self.hands()));
-
-        for i in 0..self.hands() {
-            if let Some(hand) = self.hand(i) {
-                ui.label_text(format!("Hand: {}", i), format!("{}", hand));
-            }
-        }
-
-        if let Some(deck) = self.deck() {
-            ui.label_text("Deck", format!("{}", deck));
-        }
-
-        ui.input_text(format!("Expression"), &mut self.expression).build();
-        if ui.button(format!("Deal")) {
-            match self.deal(&self.expression) {
-                Ok(next) => *self = next,
-                Err(e) => eprintln!("Error Dealing: {:?}", e),
-            }
-        }
-        ui.same_line();
-        ui.text("Parses the above expression and updates state");
-
-        if ui.button("Reshuffle") {
-            *self = Dealer::default();
-        }
-        ui.same_line();
-        ui.text("Reshuffles the deck");
-
-        if ui.button("Clear Deck") {
-            *self = self.clear_deck();
-        }
-        ui.same_line();
-        ui.text("Clears the deck");
-
-        if ui.button("Prune") {
-            *self = self.prune()
-        }
-        ui.same_line();
-        ui.text("Removes empty hands");
-    }
-}
-
 #[derive(Debug)]
 pub struct InvalidDealerExpression {}
 
@@ -875,33 +826,6 @@ impl Display for Dealer {
     }
 }
 
-impl RuntimeState for Dealer {
-    type Error = InvalidDealerExpression;
-
-    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self where Self: Sized {
-        if let Ok(dealer) = Dealer::try_from(init.as_ref()) {
-            dealer
-        } else {
-            panic!("could not parse {}", init.as_ref())
-        }
-    }
-
-    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error> {
-        println!("Received: {}", msg.as_ref());
-        self.deal(msg.as_ref())
-    }
-
-    fn process_with_args<S: AsRef<str> + ?Sized>(state: lifec::WithArgs<Self>, msg: &S) -> Result<Self, Self::Error>
-    where
-            Self: Clone + Default + RuntimeState {
-        let args = state.parse_flags();
-        
-        println!("Dealer received args: {:?}", args);
-
-        state.get_state().deal(msg.as_ref())
-    }
-}
-
 impl Default for Dealer {
     fn default() -> Self {
         let dealer = Dealer::try_from("(.STD)").ok();
@@ -926,6 +850,82 @@ impl From<&Hand> for Dealer {
                 expression: String::default()
             }
         }
+    }
+}
+
+impl App for Dealer {
+    fn name() -> &'static str {
+        "Dealer"
+    }
+
+    fn show_editor(&mut self, ui: &Ui) {
+        ui.text(format!("State: {}", self.to_string()));
+        ui.label_text("number of hands", format!("{}", self.hands()));
+
+        for i in 0..self.hands() {
+            if let Some(hand) = self.hand(i) {
+                ui.label_text(format!("Hand: {}", i), format!("{}", hand));
+            }
+        }
+
+        if let Some(deck) = self.deck() {
+            ui.label_text("Deck", format!("{}", deck));
+        }
+
+        ui.input_text(format!("Expression"), &mut self.expression).build();
+        if ui.button(format!("Deal")) {
+            match self.deal(&self.expression) {
+                Ok(next) => *self = next,
+                Err(e) => eprintln!("Error Dealing: {:?}", e),
+            }
+        }
+        ui.same_line();
+        ui.text("Parses the above expression and updates state");
+
+        if ui.button("Reshuffle") {
+            *self = Dealer::default();
+        }
+        ui.same_line();
+        ui.text("Reshuffles the deck");
+
+        if ui.button("Clear Deck") {
+            *self = self.clear_deck();
+        }
+        ui.same_line();
+        ui.text("Clears the deck");
+
+        if ui.button("Prune") {
+            *self = self.prune()
+        }
+        ui.same_line();
+        ui.text("Removes empty hands");
+    }
+}
+
+impl RuntimeState for Dealer {
+    type Error = InvalidDealerExpression;
+
+    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self where Self: Sized {
+        if let Ok(dealer) = Dealer::try_from(init.as_ref()) {
+            dealer
+        } else {
+            panic!("could not parse {}", init.as_ref())
+        }
+    }
+
+    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error> {
+        println!("Received: {}", msg.as_ref());
+        self.deal(msg.as_ref())
+    }
+
+    fn process_with_args<S: AsRef<str> + ?Sized>(state: lifec::WithArgs<Self>, msg: &S) -> Result<Self, Self::Error>
+    where
+            Self: Clone + Default + RuntimeState {
+        let args = state.parse_flags();
+        
+        println!("Dealer received args: {:?}", args);
+
+        state.get_state().deal(msg.as_ref())
     }
 }
 
