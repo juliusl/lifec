@@ -859,8 +859,8 @@ impl App for Dealer {
     }
 
     fn show_editor(&mut self, ui: &Ui) {
-        ui.text(format!("State: {}", self.to_string()));
-        ui.label_text("number of hands", format!("{}", self.hands()));
+        ui.indent();
+        ui.label_text("Number of hands", format!("{}", self.hands()));
 
         for i in 0..self.hands() {
             if let Some(hand) = self.hand(i) {
@@ -899,6 +899,7 @@ impl App for Dealer {
         }
         ui.same_line();
         ui.text("Removes empty hands");
+        ui.unindent();
     }
 }
 
