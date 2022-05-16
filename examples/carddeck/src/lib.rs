@@ -855,7 +855,7 @@ impl From<&Hand> for Dealer {
 
 impl App for Dealer {
     fn name() -> &'static str {
-        "Dealer"
+        "Card Dealer"
     }
 
     fn show_editor(&mut self, ui: &Ui) {

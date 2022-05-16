@@ -42,7 +42,7 @@ pub fn open_simple_editor<S>()
 where
     S: crate::RuntimeState + Component + App,
 {
-    start_runtime_editor::<S, _>(Runtime::<S>::default(), |_, w, _| {
+    start_runtime_editor::<S, _>(format!("Simple Runtime Editor for {}", <S as App>::name()).as_str(), Runtime::<S>::default(), |_, w, _| {
         w.register::<Section<S>>();
 
         w
@@ -57,15 +57,15 @@ where
     RtS: crate::RuntimeState + Component + App,
     SysInitF: 'static + Fn(&mut DispatcherBuilder)
 {
-    open_editor_with(Runtime::<RtS>::default(), sections, with_systems)
+    open_editor_with(format!("Runtime Editor for {}", <RtS as App>::name()), Runtime::<RtS>::default(), sections, with_systems)
 }
 
-pub fn open_editor_with<RtS, SysInitF>(initial_runtime: Runtime<RtS>, sections: Vec<Section::<RtS>>, with_systems: SysInitF)
+pub fn open_editor_with<RtS, SysInitF>(title: String, initial_runtime: Runtime<RtS>, sections: Vec<Section::<RtS>>, with_systems: SysInitF)
 where
     RtS: crate::RuntimeState + Component + App,
     SysInitF: 'static + Fn(&mut DispatcherBuilder)
 {
-    start_runtime_editor::<RtS, _>(initial_runtime, move |_, w, d| {
+    start_runtime_editor::<RtS, _>(title.as_str(), initial_runtime, move |_, w, d| {
         w.register::<Section<RtS>>();
         sections.iter().for_each(|s| {
             w.create_entity()
@@ -77,7 +77,7 @@ where
     });
 }
 
-fn start_runtime_editor<S, F>(initial_runtime: Runtime<S>, extension: F)
+fn start_runtime_editor<S, F>(title: &str, initial_runtime: Runtime<S>, extension: F)
 where
     S: crate::RuntimeState + Component + App,
     F: 'static + Fn(&mut RuntimeEditor<S>, &mut World, &mut DispatcherBuilder),
@@ -85,7 +85,7 @@ where
     let &[width, height] = S::window_size();
 
     start_editor(
-        "Runtime Editor",
+        title,
         width.into(),
         height.into(),
         RuntimeEditor::<S>::from(initial_runtime),
