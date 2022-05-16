@@ -15,6 +15,12 @@ where
     sections: BTreeMap<u32, Section<S>>,
 }
 
+impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
+    fn from(runtime: Runtime<S>) -> Self {
+        Self { runtime, sections: BTreeMap::new() }
+    }
+}
+
 impl<'a, S> System<'a> for RuntimeEditor<S>
 where
     S: RuntimeState + Component,
