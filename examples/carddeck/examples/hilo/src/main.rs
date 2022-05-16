@@ -44,7 +44,7 @@ fn main() {
 
     let runtime = runtime.parse_event("{ test_test;; }").process_state();
 
-    lifec::editor::open_editor_with(format!("Dealer Editor"), runtime, vec![Dealer::dealer_section()], |_| {})
+    lifec::editor::open_editor_with(format!("Dealer Editor"), runtime, vec![Dealer::dealer_section()], |_| {}, |_| {})
 }
 
 fn get_runtime() -> Runtime<Dealer> {

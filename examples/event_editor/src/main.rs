@@ -2,10 +2,10 @@ use std::fmt::Display;
 
 use imgui::Window;
 use lifec::{
-    editor::{unique_title, App, Section, open_editor},
+    editor::{unique_title, App, Section, open_editor, Attribute, Value},
     RuntimeState,
 };
-use specs::{Entities, Join, System, WriteStorage};
+use specs::{Entities, Join, System, WriteStorage, WorldExt};
 use specs::{Component, DenseVecStorage};
 
 fn main() {
@@ -32,9 +32,14 @@ fn main() {
                 clock: 0,
                 open_test_window: false,
             },
+            vec![]
         )
+        .update(|s| s.text_attr("test", "hello"))
         .enable_app_systems(),
     ],
+    |w| {
+        w.register::<Attribute>();
+    },
     |d| {
         d.add(Clock{}, "clock", &[]);
     });

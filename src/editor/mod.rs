@@ -14,6 +14,8 @@ use std::any::Any;
 use atlier::system::start_editor;
 
 pub use atlier::system::App;
+pub use atlier::system::Value;
+pub use atlier::system::Attribute;
 pub use runtime_editor::RuntimeEditor;
 pub use section::Section;
 
@@ -76,17 +78,19 @@ where
     });
 }
 
-pub fn open_editor<RtS, SysInitF>(sections: Vec<Section::<RtS>>, with_systems: SysInitF)
+pub fn open_editor<RtS, WorldInitF, SysInitF>(sections: Vec<Section::<RtS>>, with_world: WorldInitF, with_systems: SysInitF)
 where
     RtS: crate::RuntimeState + Component + App,
+    WorldInitF: 'static + Fn(&mut World),
     SysInitF: 'static + Fn(&mut DispatcherBuilder)
 {
-    open_editor_with(format!("Runtime Editor for {}", <RtS as App>::name()), Runtime::<RtS>::default(), sections, with_systems)
+    open_editor_with(format!("Runtime Editor for {}", <RtS as App>::name()), Runtime::<RtS>::default(), sections, with_world, with_systems)
 }
 
-pub fn open_editor_with<RtS, SysInitF>(title: String, initial_runtime: Runtime<RtS>, sections: Vec<Section::<RtS>>, with_systems: SysInitF)
+pub fn open_editor_with<RtS, WorldInitF, SysInitF>(title: String, initial_runtime: Runtime<RtS>, sections: Vec<Section::<RtS>>, with_world: WorldInitF, with_systems: SysInitF)
 where
     RtS: crate::RuntimeState + Component + App,
+    WorldInitF: 'static + Fn(&mut World),
     SysInitF: 'static + Fn(&mut DispatcherBuilder)
 {
     start_runtime_editor::<RtS, _>(title.as_str(), initial_runtime, move |_, w, d| {
@@ -96,7 +100,7 @@ where
                 .maybe_with(Some(s.clone()))
                 .build();
         });
-
+        with_world(w);
         with_systems(d);
     });
 }

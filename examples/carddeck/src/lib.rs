@@ -708,7 +708,8 @@ impl Dealer {
         Section::<Dealer>::new(
             "Dealer", 
             Dealer::show_editor, 
-            Dealer::default()
+            Dealer::default(),
+            vec![],
         )
     }
 }
