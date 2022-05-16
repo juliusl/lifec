@@ -1,7 +1,6 @@
-use atlier::system::App;
+use atlier::system::{App, Attribute};
 use imgui::{Window, CollapsingHeader};
-use imnodes::ColorStyle;
-use specs::{Component, Entities, Join, ReadStorage, System, WriteStorage};
+use specs::{Component, Entities, Join, ReadStorage, System, WriteStorage, storage::DenseVecStorage};
 use std::collections::BTreeMap;
 
 use crate::{Runtime, RuntimeState, Action};
@@ -55,24 +54,57 @@ impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
     }
 }
 
+#[derive(Component, Clone)]
+#[storage(DenseVecStorage)]
+pub struct SectionAttributes(Vec<Attribute>);
+
+impl SectionAttributes {
+    pub fn get_attr(&self, name: impl AsRef<str>) -> Option<&Attribute> {
+        let SectionAttributes(attributes) = self;
+
+        attributes.iter().find(|a| a.name() == name.as_ref())
+    }
+}
+
 impl<'a, S> System<'a> for RuntimeEditor<S>
 where
     S: RuntimeState + Component,
 {
-    type SystemData = (Entities<'a>, ReadStorage<'a, Section<S>>);
+    type SystemData = (Entities<'a>, ReadStorage<'a, Section<S>>, WriteStorage<'a, SectionAttributes>);
 
-    fn run(&mut self, (entities, read_sections): Self::SystemData) {
+    fn run(&mut self, (entities, read_sections, mut write_attributes): Self::SystemData) {
         for (e, s) in (&entities, &read_sections).join() {
             match self.sections.get(&e.id()) {
                 None => {
-                    self.sections.insert(e.id(), s.clone());
+                    let mut clone = s.clone();
+                    clone.set_parent_entity(e.id());
+
+                    // Save a copy of the section attributes.
+                    // TODO currently any changes to section attributes via systems wouldn't affect the gui state
+                    match write_attributes.insert(e, SectionAttributes(clone.attributes.iter().cloned().collect())) {
+                        Ok(_) => {
+                            self.sections.insert(e.id(), clone);
+                        },
+                        Err(e) => {
+                            eprintln!("Error adding Section Attributes to Storage, {}", e); 
+                        }
+                    }
                 }
-                Some(Section {  enable_app_systems, state, .. }) => {
+                Some(Section {  enable_app_systems, state, attributes, .. }) => {
+                    // Update the world's copy of attributes from editor's copy
+                    match write_attributes.insert(e, SectionAttributes(attributes.iter().cloned().collect())) {
+                        Ok(_) => {},
+                        Err(err) => { eprintln!("Error updating section attributes {}", err); },
+                    }
+
                     if *enable_app_systems {
                         let state = state.merge_with(&s.state);
+                        let attributes = attributes.clone();
                         self.sections.insert(e.id(), {
                             let mut s = s.clone();
                             s.state = state;
+                            s.attributes = attributes;
+                            s.set_parent_entity(e.id());
                             s
                         });
                     }
@@ -136,6 +168,9 @@ where
                 }
                 
                 if CollapsingHeader::new(format!("Events")).begin(ui) {
+                    if ui.button("Add New Dispatch Event") {
+                    }
+
                     ui.indent();
                     for e in self.events.iter_mut() {
                         EventComponent::show_editor( e, ui);

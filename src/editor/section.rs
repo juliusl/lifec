@@ -9,8 +9,9 @@ use super::{Edit, Attribute, Value, App};
 #[derive(Clone, Component)]
 #[storage(HashMapStorage)]
 pub struct Section<S: Any + Send + Sync + Clone> {
+    id: u32,
     pub title: String,
-    pub editor: Edit<S>,
+    pub editor: Edit<Section<S>>,
     pub state: S,
     pub attributes: Vec<Attribute>,
     /// enable to allow external systems to make changes to state, 
@@ -19,8 +20,8 @@ pub struct Section<S: Any + Send + Sync + Clone> {
 }
 
 impl<S: Any + Send + Sync + Clone> Section<S> {
-    pub fn new(title: impl AsRef<str>, show: fn(&mut S, &imgui::Ui), initial_state: S, attributes: Vec<Attribute>) -> Section<S> {
-        Section { title: title.as_ref().to_string(), editor: Edit(show), state: initial_state, enable_app_systems: false, attributes }
+    pub fn new(title: impl AsRef<str>, show: fn(&mut Section<S>, &imgui::Ui), initial_state: S, attributes: Vec<Attribute>) -> Section<S> {
+        Section { id: 0, title: title.as_ref().to_string(), editor: Edit(show), state: initial_state, enable_app_systems: false, attributes }
     }
 
     pub fn enable_app_systems(&self) -> Self {
@@ -33,15 +34,15 @@ impl<S: Any + Send + Sync + Clone> Section<S> {
         self.attributes.push(attr);
     }
 
-    pub fn text_attr(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) {
+    pub fn add_text_attr(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) {
         self.add_attribute(Attribute::new(0, name.as_ref().to_string(), Value::TextBuffer(init_value.as_ref().to_string())));
     }
 
-    pub fn int_attr(&mut self, name: impl AsRef<str>, init_value: i32) {
+    pub fn add_int_attr(&mut self, name: impl AsRef<str>, init_value: i32) {
         self.add_attribute(Attribute::new(0, name.as_ref().to_string(), Value::Int(init_value)));
     }
 
-    pub fn float_attr(&mut self, name: impl AsRef<str>, init_value: f32) {
+    pub fn add_float_attr(&mut self, name: impl AsRef<str>, init_value: f32) {
         self.add_attribute(Attribute::new(0, name.as_ref().to_string(), Value::Float(init_value)));
     }
 
@@ -52,13 +53,23 @@ impl<S: Any + Send + Sync + Clone> Section<S> {
 
         next.to_owned()
     }
+
+    pub fn set_parent_entity(&mut self, id: u32) {
+        self.id = id;
+        for a in self.attributes.iter_mut() {
+            a.set_id(id);
+        }
+    }
 }
 
 impl<S: Any + Send + Sync + Clone + App + Display> From<S> for Section<S> {
     fn from(initial: S) -> Self {
         Section {
+            id: 0,
             title: format!("{}: {}", S::name().to_string(), initial),
-            editor: Edit(S::show_editor),
+            editor: Edit(|section, ui| {
+                S::show_editor(&mut section.state, ui);
+            }),
             state: initial,
             enable_app_systems: false,
             attributes: vec![],
@@ -73,14 +84,19 @@ impl<S: Any + Send + Sync + Clone> App for Section<S> {
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
         if CollapsingHeader::new(&self.title).build(ui) {
-            let (Edit(editor), s) = (&mut self.editor, &mut self.state);
-            editor(s, ui);
+            ui.indent();
+            let Edit(editor) = &mut self.editor;
+            editor(self, ui);
 
-            ui.new_line();
-            ui.text("Attributes:"); 
-            for a in self.attributes.iter_mut() {
-                Attribute::show_editor(a, ui);
+            if !self.attributes.is_empty() {
+                ui.new_line();
+                if CollapsingHeader::new(format!("Attributes_{:#4x}", self.id)).build(ui) {
+                    for a in self.attributes.iter_mut() {
+                        Attribute::show_editor(a, ui);
+                    }
+                }
             }
+            ui.unindent();
         }
     }
 }

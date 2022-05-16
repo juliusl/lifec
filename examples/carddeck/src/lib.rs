@@ -707,7 +707,9 @@ impl Dealer {
     pub fn dealer_section() -> Section::<Dealer> {
         Section::<Dealer>::new(
             "Dealer", 
-            Dealer::show_editor, 
+            |section, ui| { 
+                Dealer::show_editor(&mut section.state, ui);
+            }, 
             Dealer::default(),
             vec![],
         )

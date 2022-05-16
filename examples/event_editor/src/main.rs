@@ -2,10 +2,10 @@ use std::fmt::Display;
 
 use imgui::Window;
 use lifec::{
-    editor::{unique_title, App, Section, open_editor, Attribute, Value},
+    editor::{unique_title, App, Section, open_editor, Attribute, SectionAttributes},
     RuntimeState,
 };
-use specs::{Entities, Join, System, WriteStorage, WorldExt};
+use specs::{Entities, Join, System, WriteStorage, WorldExt, ReadStorage};
 use specs::{Component, DenseVecStorage};
 
 fn main() {
@@ -15,13 +15,13 @@ fn main() {
             val: 10,
             clock: 0,
             open_test_window: false,
-        }),
+        }).update(|s| s.add_int_attr("test", 10)),
         Section::new(
             unique_title("With Additional Tooling"),
             |s, ui| {
-                Test::show_editor(s, ui);
+                Test::show_editor(&mut s.state, ui);
 
-                ui.text(format!("clock: {}", s.clock));
+                ui.text(format!("clock: {}", s.state.clock));
                 if ui.button("hello") {
                     println!("world");
                 }
@@ -34,7 +34,7 @@ fn main() {
             },
             vec![]
         )
-        .update(|s| s.text_attr("test", "hello"))
+        .update(|s| s.add_text_attr("test", "hello"))
         .enable_app_systems(),
     ],
     |w| {
@@ -48,12 +48,18 @@ fn main() {
 struct Clock;
 
 impl<'a> System<'a> for Clock {
-    type SystemData = (Entities<'a>, WriteStorage<'a, Section<Test>>);
+    type SystemData = (Entities<'a>, WriteStorage<'a, Section<Test>>, ReadStorage<'a, SectionAttributes>);
 
     fn run(&mut self, mut data: Self::SystemData) {
         for e in data.0.join() {
             if let Some(section) = data.1.get_mut(e) {
                 section.state.clock += 1;
+            }
+
+            if let Some(attributes) = data.2.get(e) {
+                if let Some(attribute) = attributes.get_attr("test") {
+                    println!("From Clock System, reading attribute: {:?}", attribute);
+                }
             }
         }
     }

@@ -17,6 +17,7 @@ pub use atlier::system::App;
 pub use atlier::system::Value;
 pub use atlier::system::Attribute;
 pub use runtime_editor::RuntimeEditor;
+pub use runtime_editor::SectionAttributes;
 pub use section::Section;
 
 use crate::Runtime;
@@ -25,10 +26,6 @@ use crate::Runtime;
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
 pub struct Edit<S: Any + Send + Sync + Clone>(pub fn(&mut S, &imgui::Ui));
-
-// #[derive(Clone, Component)]
-// #[storage(DenseVecStorage)]
-// pub struct Show<S: Any + Send + Sync + Clone>(pub fn(&S, &imgui::Ui));
 
 /// Event component is the the most basic data unit of the runtime
 #[derive(Clone, Component)]
