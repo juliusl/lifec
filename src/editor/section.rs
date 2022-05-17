@@ -16,17 +16,57 @@ pub struct Section<S: Any + Send + Sync + Clone> {
     pub attributes: Vec<Attribute>,
     /// enable to allow external systems to make changes to state, 
     /// in order for systems to commit these changes, RuntimeState::merge_with must be implemented (this is set todo!() by default)
-    pub enable_app_systems: bool, 
+    pub enable_app_systems: bool,
+    /// enable inherent attribute editor for section
+    pub enable_edit_attributes: bool,
 }
 
 impl<S: Any + Send + Sync + Clone> Section<S> {
     pub fn new(title: impl AsRef<str>, show: fn(&mut Section<S>, &imgui::Ui), initial_state: S) -> Section<S> {
-        Section { id: 0, title: title.as_ref().to_string(), editor: Edit(show), state: initial_state, enable_app_systems: false, attributes: vec![] }
+        Section { id: 0, title: title.as_ref().to_string(), editor: Edit(show), state: initial_state, enable_app_systems: false, enable_edit_attributes: false, attributes: vec![] }
+    }
+
+    pub fn get_attr(&self, with_name: impl AsRef<str>) -> Option<&Attribute> {
+        self.attributes.iter().find(|a| a.name() == with_name.as_ref() )
+    }
+
+    pub fn get_attr_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Attribute> {
+        self.attributes.iter_mut().find(|a| a.name() == with_name.as_ref() )
+    }
+
+    pub fn show_attr_debug(&mut self, label: impl AsRef<str>, attr_name: impl AsRef<str>, ui: &imgui::Ui) {
+        if let Some(value) = self.get_attr(attr_name) {
+            ui.label_text(label.as_ref(),  format!("{:?}", value));
+        }
+    }
+
+    pub fn edit_attr(&mut self, label: impl AsRef<str>, attr_name: impl AsRef<str>, ui: &imgui::Ui) {
+        match self.get_attr_mut(attr_name).and_then(|a| Some(a.get_value_mut())) {
+            Some(Value::TextBuffer(val)) => {
+                ui.input_text(label.as_ref(),  val).build();
+            },
+            Some(Value::Int(val)) => {
+                ui.input_int(label.as_ref(), val).build();
+            },
+            Some(Value::Float(val)) => {
+                ui.input_float(label.as_ref(), val).build();
+            },
+            Some(Value::Bool(val)) => {
+                ui.checkbox(label.as_ref(), val);
+            }
+            _ => todo!(),
+        }
     }
 
     pub fn enable_app_systems(&self) -> Self {
         let mut next = self.clone();
         next.enable_app_systems = true; 
+        next
+    }
+
+    pub fn enable_edit_attributes(&self) -> Self {
+        let mut next = self.clone();
+        next.enable_edit_attributes = true; 
         next
     }
 
@@ -51,6 +91,10 @@ impl<S: Any + Send + Sync + Clone> Section<S> {
         self.update(move |next| next.add_float_attr(name, init_value))
     }
 
+    pub fn with_bool(&mut self, name: impl AsRef<str>, init_value: bool) -> Self {
+        self.update(move |next| next.add_bool_attr(name, init_value))
+    }
+    
     pub fn with_parent_entity(&mut self, id: u32) -> Self {
         self.update(move |next| next.set_parent_entity(id))
     }
@@ -69,6 +113,10 @@ impl<S: Any + Send + Sync + Clone> Section<S> {
 
     pub fn add_float_attr(&mut self, name: impl AsRef<str>, init_value: f32) {
         self.add_attribute(Attribute::new(0, name.as_ref().to_string(), Value::Float(init_value)));
+    }
+
+    pub fn add_bool_attr(&mut self, name: impl AsRef<str>, init_value: bool) {
+        self.add_attribute(Attribute::new(0, name.as_ref().to_string(), Value::Bool(init_value)));
     }
 
     pub fn update(&mut self, func: impl FnOnce(&mut Self)) -> Self {
@@ -97,6 +145,7 @@ impl<S: Any + Send + Sync + Clone + App + Display> From<S> for Section<S> {
             }),
             state: initial,
             enable_app_systems: false,
+            enable_edit_attributes: false,
             attributes: vec![],
         }
     }
@@ -113,7 +162,7 @@ impl<S: Any + Send + Sync + Clone> App for Section<S> {
             let Edit(editor) = &mut self.editor;
             editor(self, ui);
 
-            if !self.attributes.is_empty() {
+            if self.enable_edit_attributes {
                 ui.new_line();
                 if CollapsingHeader::new(format!("Attributes {:#4x}", self.id)).build(ui) {
                     for a in self.attributes.iter_mut() {

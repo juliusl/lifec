@@ -25,6 +25,11 @@ fn main() {
                 if ui.button("hello") {
                     println!("world");
                 }
+
+                s.show_attr_debug("display debug for test", "test", ui);
+                s.show_attr_debug("display debug for test-bool", "test-bool", ui);
+                s.edit_attr("edit test attribute", "test", ui);
+                s.edit_attr("test checkbox", "test-bool", ui);
             },
             Test {
                 id: 1,
@@ -34,6 +39,7 @@ fn main() {
             },
         )
         .with_text("test", "hello")
+        .with_bool("test-bool", false)
         .enable_app_systems(),
     ],
     |w| {
