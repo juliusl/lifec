@@ -32,7 +32,6 @@ fn main() {
                 clock: 0,
                 open_test_window: false,
             },
-            vec![]
         )
         .with_text("test", "hello")
         .enable_app_systems(),

@@ -711,7 +711,6 @@ impl Dealer {
                 Dealer::show_editor(&mut section.state, ui);
             }, 
             Dealer::default(),
-            vec![],
         )
     }
 }

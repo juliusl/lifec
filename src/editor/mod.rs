@@ -43,7 +43,7 @@ pub struct EventComponent {
 impl<S: Default + Any + Send + Sync + Clone> Into<Section<S>> for &mut EventComponent {
     fn into(self) -> Section<S> {
         Section::<S>::new(self.label.to_string(), 
-        |_, _| {}, S::default(), vec![])
+        |_, _| {}, S::default())
         .with_text("label", self.label.clone())
         .with_text("on", self.on.clone())
         .with_text("dispatch", self.dispatch.clone())

@@ -20,8 +20,8 @@ pub struct Section<S: Any + Send + Sync + Clone> {
 }
 
 impl<S: Any + Send + Sync + Clone> Section<S> {
-    pub fn new(title: impl AsRef<str>, show: fn(&mut Section<S>, &imgui::Ui), initial_state: S, attributes: Vec<Attribute>) -> Section<S> {
-        Section { id: 0, title: title.as_ref().to_string(), editor: Edit(show), state: initial_state, enable_app_systems: false, attributes }
+    pub fn new(title: impl AsRef<str>, show: fn(&mut Section<S>, &imgui::Ui), initial_state: S) -> Section<S> {
+        Section { id: 0, title: title.as_ref().to_string(), editor: Edit(show), state: initial_state, enable_app_systems: false, attributes: vec![] }
     }
 
     pub fn enable_app_systems(&self) -> Self {
