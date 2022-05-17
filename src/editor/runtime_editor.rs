@@ -1,10 +1,10 @@
 use imgui::{Window, CollapsingHeader};
 use specs::{Component, Entities, Join, ReadStorage, System, WriteStorage, storage::DenseVecStorage};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap};
 
 use crate::{Runtime, RuntimeState, Action};
 
-use super::{section::Section, EventComponent, Value, App, Attribute};
+use super::{section::Section, EventComponent, Value, App, Attribute, unique_title};
 
 pub struct RuntimeEditor<S>
 where
@@ -97,7 +97,7 @@ where
                         }
                     }
                 }
-                Some(Section {  enable_app_systems, state, attributes, .. }) => {
+                Some(Section {  enable_app_systems, state, attributes, enable_edit_attributes, .. }) => {
                     // Update the world's copy of attributes from editor's copy
                     match write_attributes.insert(e, SectionAttributes(attributes.iter().cloned().collect())) {
                         Ok(_) => {},
@@ -107,10 +107,13 @@ where
                     if *enable_app_systems {
                         let state = state.merge_with(&s.state);
                         let attributes = attributes.clone();
+                        let enable_edit_attributes = *enable_edit_attributes;
                         self.sections.insert(e.id(), {
                             let mut s = s.clone().with_parent_entity(e.id());
                             s.state = state;
                             s.attributes = attributes;
+                            s.enable_edit_attributes = enable_edit_attributes;
+                            s.enable_app_systems = true;
                             s
                         });
                     }
@@ -149,14 +152,13 @@ where
         Window::new(Self::name())
             .size(*Self::window_size(), imgui::Condition::Appearing)
             .build(ui, || {
-                ui.text("Extensions");
                 ui.new_line();
                 for (_, section) in self.sections.iter_mut() {
                     section.show_editor(ui);
                 }
 
                 ui.new_line();
-                ui.text("Runtime Tools");
+                ui.text("Runtime/Editor Tools");
                 ui.new_line();
                 if CollapsingHeader::new(format!("Current Runtime Information")).begin(ui) {
                     ui.indent();
@@ -173,13 +175,33 @@ where
                     ui.unindent();
                 }
                 
-                if CollapsingHeader::new(format!("Events")).begin(ui) {
-                    if ui.button("Add New Dispatch Event") {
-                    }
-
+                if CollapsingHeader::new(format!("Edit Current Runtime Events")).begin(ui) {
                     ui.indent();
                     for e in self.events.iter_mut() {                        
                         EventComponent::show_editor(e, ui);
+                    }
+                    ui.unindent();
+                }
+
+                if CollapsingHeader::new(format!("Debug Editor Sections")).begin(ui) {
+                    ui.indent();
+                    for (_, section) in self.sections.iter_mut() {                        
+                        ui.checkbox(format!("enable attribute editor for {}", section.title), &mut section.enable_edit_attributes);
+
+                       
+                        if ui.button(format!("Add new text attribute to {}", section.title)) {
+                            section.add_text_attr(unique_title("New"), ""); 
+                        }
+                        if ui.button(format!("Add new int attribute to {}", section.title)) {
+                            section.add_int_attr(unique_title("New"), 0); 
+                        }
+                        if ui.button(format!("Add new float attribute to {}", section.title)) {
+                            section.add_float_attr(unique_title("New"), 0.0); 
+                        } 
+                        if ui.button(format!("Add new bool attribute to {}", section.title)) {
+                            section.add_bool_attr(unique_title("New"), false); 
+                        }
+                        ui.new_line();
                     }
                     ui.unindent();
                 }

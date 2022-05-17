@@ -62,6 +62,7 @@ impl<S: Any + Send + Sync + Clone> Section<S> {
             Some(Value::Bool(val)) => {
                 ui.checkbox(label.as_ref(), val);
             }
+            None => {}
             _ => todo!(),
         }
     }
