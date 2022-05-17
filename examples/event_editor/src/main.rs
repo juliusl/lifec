@@ -34,7 +34,7 @@ fn main() {
             },
             vec![]
         )
-        .update(|s| s.add_text_attr("test", "hello"))
+        .with_text("test", "hello")
         .enable_app_systems(),
     ],
     |w| {

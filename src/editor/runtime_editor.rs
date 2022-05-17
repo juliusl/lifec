@@ -76,8 +76,7 @@ where
         for (e, s) in (&entities, &read_sections).join() {
             match self.sections.get(&e.id()) {
                 None => {
-                    let mut clone = s.clone();
-                    clone.set_parent_entity(e.id());
+                    let clone = s.clone().with_parent_entity(e.id());
 
                     // Save a copy of the section attributes.
                     // TODO currently any changes to section attributes via systems wouldn't affect the gui state
@@ -101,10 +100,9 @@ where
                         let state = state.merge_with(&s.state);
                         let attributes = attributes.clone();
                         self.sections.insert(e.id(), {
-                            let mut s = s.clone();
+                            let mut s = s.clone().with_parent_entity(e.id());
                             s.state = state;
                             s.attributes = attributes;
-                            s.set_parent_entity(e.id());
                             s
                         });
                     }

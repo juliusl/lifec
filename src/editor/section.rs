@@ -30,6 +30,27 @@ impl<S: Any + Send + Sync + Clone> Section<S> {
         next
     }
 
+    pub fn with_attribute(&mut self, attr: Attribute) -> Self {
+        let attr = attr;
+        self.update(move |next| next.add_attribute(attr))
+    }
+
+    pub fn with_text(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) -> Self {
+        self.update(move |next| next.add_text_attr(name, init_value))
+    }
+
+    pub fn with_int(&mut self, name: impl AsRef<str>, init_value: i32) -> Self {
+        self.update(move |next| next.add_int_attr(name, init_value))
+    }
+
+    pub fn with_float(&mut self, name: impl AsRef<str>, init_value: f32) -> Self {
+        self.update(move |next| next.add_float_attr(name, init_value))
+    }
+
+    pub fn with_parent_entity(&mut self, id: u32) -> Self {
+        self.update(move |next| next.set_parent_entity(id))
+    }
+
     pub fn add_attribute(&mut self, attr: Attribute) {
         self.attributes.push(attr);
     }
@@ -46,7 +67,7 @@ impl<S: Any + Send + Sync + Clone> Section<S> {
         self.add_attribute(Attribute::new(0, name.as_ref().to_string(), Value::Float(init_value)));
     }
 
-    pub fn update(&mut self, func: impl Fn(&mut Self)) -> Self {
+    pub fn update(&mut self, func: impl FnOnce(&mut Self)) -> Self {
         let next = self; 
 
         (func)(next);
@@ -90,7 +111,7 @@ impl<S: Any + Send + Sync + Clone> App for Section<S> {
 
             if !self.attributes.is_empty() {
                 ui.new_line();
-                if CollapsingHeader::new(format!("Attributes_{:#4x}", self.id)).build(ui) {
+                if CollapsingHeader::new(format!("Attributes {:#4x}", self.id)).build(ui) {
                     for a in self.attributes.iter_mut() {
                         Attribute::show_editor(a, ui);
                     }
