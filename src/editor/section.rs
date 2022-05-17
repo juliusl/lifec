@@ -40,6 +40,14 @@ impl<S: Any + Send + Sync + Clone> Section<S> {
         }
     }
 
+    pub fn is_attr_checkbox(&self, with_name: impl AsRef<str>) -> Option<bool> {
+        if let Some(Value::Bool(value)) = self.get_attr(with_name).and_then(|a| Some(a.value())) {
+           Some(*value)
+        } else {
+            None
+        }
+    }
+
     pub fn edit_attr(&mut self, label: impl AsRef<str>, attr_name: impl AsRef<str>, ui: &imgui::Ui) {
         match self.get_attr_mut(attr_name).and_then(|a| Some(a.get_value_mut())) {
             Some(Value::TextBuffer(val)) => {

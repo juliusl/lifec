@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use imgui::Window;
 use lifec::{
-    editor::{unique_title, App, Section, open_editor, Attribute, SectionAttributes},
+    editor::{unique_title, App, Section, open_editor, Attribute, SectionAttributes, Value},
     RuntimeState,
 };
 use specs::{Entities, Join, System, WriteStorage, WorldExt, ReadStorage};
@@ -30,6 +30,10 @@ fn main() {
                 s.show_attr_debug("display debug for test-bool", "test-bool", ui);
                 s.edit_attr("edit test attribute", "test", ui);
                 s.edit_attr("test checkbox", "test-bool", ui);
+
+                if let Some(true) = s.is_attr_checkbox("test-bool") {
+                    Window::new("testing attr control").build(ui, || ui.text("hi"));
+                }
             },
             Test {
                 id: 1,
