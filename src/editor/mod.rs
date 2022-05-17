@@ -10,7 +10,6 @@ mod section;
 use imgui::CollapsingHeader;
 use rand::Rng;
 use specs::{prelude::*, Component};
-use std::any::Any;
 use atlier::system::start_editor;
 
 pub use atlier::system::App;
@@ -18,14 +17,17 @@ pub use atlier::system::Value;
 pub use atlier::system::Attribute;
 pub use runtime_editor::RuntimeEditor;
 pub use runtime_editor::SectionAttributes;
+pub use node_editor::NodeEditor;
 pub use section::Section;
+pub use section::SectionExtension;
 
 use crate::Runtime;
+use crate::RuntimeState;
 
 /// Edit is a function wrapper over a display function that is stored as a specs Component
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
-pub struct Edit<S: Any + Send + Sync + Clone>(pub fn(&mut S, &imgui::Ui));
+pub struct Edit<S: RuntimeState>(pub fn(&mut S, &imgui::Ui));
 
 /// Event component is the the most basic data unit of the runtime
 #[derive(Clone, Component)]
@@ -40,7 +42,7 @@ pub struct EventComponent {
     // pub variales: BTreeMap<String, String>,
 }
 
-impl<S: Default + Any + Send + Sync + Clone> Into<Section<S>> for &mut EventComponent {
+impl<S: RuntimeState> Into<Section<S>> for &mut EventComponent {
     fn into(self) -> Section<S> {
         Section::<S>::new(self.label.to_string(), 
         |_, _| {}, S::default())

@@ -1,14 +1,23 @@
-use std::{any::Any, fmt::Display};
+use std::fmt::Display;
 
 use imgui::CollapsingHeader;
 use specs::{Component, HashMapStorage};
+use crate::RuntimeState;
+
 use super::{Edit, Attribute, Value, App};
+
+/// This trait allows others to author extensions using Section<S> as the main runtime-state 
+/// for the extension
+pub trait SectionExtension<S: RuntimeState> {
+    /// To consume this method must be called in the edit fn for the section
+    fn extend_section(section: &mut Section<S>, ui: &imgui::Ui);
+}
 
 /// Section is a component of the runtime editor
 /// it displays a collapsable section header, and renders it's editor in it's body
 #[derive(Clone, Component)]
 #[storage(HashMapStorage)]
-pub struct Section<S: Any + Send + Sync + Clone> {
+pub struct Section<S: RuntimeState> {
     id: u32,
     pub title: String,
     pub editor: Edit<Section<S>>,
@@ -21,9 +30,13 @@ pub struct Section<S: Any + Send + Sync + Clone> {
     pub enable_edit_attributes: bool,
 }
 
-impl<S: Any + Send + Sync + Clone> Section<S> {
+impl<S: RuntimeState> Section<S> {
     pub fn new(title: impl AsRef<str>, show: fn(&mut Section<S>, &imgui::Ui), initial_state: S) -> Section<S> {
         Section { id: 0, title: title.as_ref().to_string(), editor: Edit(show), state: initial_state, enable_app_systems: false, enable_edit_attributes: false, attributes: vec![] }
+    }
+
+    pub fn get_parent_entity(&self) -> u32 {
+        self.id
     }
 
     pub fn get_attr(&self, with_name: impl AsRef<str>) -> Option<&Attribute> {
@@ -144,7 +157,7 @@ impl<S: Any + Send + Sync + Clone> Section<S> {
     }
 }
 
-impl<S: Any + Send + Sync + Clone + App + Display> From<S> for Section<S> {
+impl<S: RuntimeState + App> From<S> for Section<S> {
     fn from(initial: S) -> Self {
         Section {
             id: 0,
@@ -160,7 +173,7 @@ impl<S: Any + Send + Sync + Clone + App + Display> From<S> for Section<S> {
     }
 }
 
-impl<S: Any + Send + Sync + Clone> App for Section<S> {
+impl<S: RuntimeState> App for Section<S> {
     fn name() -> &'static str {
         "Section"
     }
@@ -181,5 +194,31 @@ impl<S: Any + Send + Sync + Clone> App for Section<S> {
             }
             ui.unindent();
         }
+    }
+}
+
+impl<S> Default for Section<S> where S: RuntimeState {
+    fn default() -> Self {
+        Self { id: Default::default(), title: Default::default(), editor: Edit(|_,_|{}), state: Default::default(), attributes: Default::default(), enable_app_systems: Default::default(), enable_edit_attributes: Default::default() }
+    }
+}
+
+impl<S> Display for Section<S> where S: RuntimeState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Section")
+    }
+}
+
+impl<S> RuntimeState for Section<S> where S: RuntimeState {
+    type Error = ();
+
+    fn load<Str: AsRef<str> + ?Sized>(&self, _: &Str) -> Self
+    where
+        Self: Sized {
+        todo!()
+    }
+
+    fn process<Str: AsRef<str> + ?Sized>(&self, _: &Str) -> Result<Self, Self::Error> {
+        todo!()
     }
 }

@@ -6,7 +6,7 @@ use std::any::Any;
 
 pub mod editor;
 
-pub trait RuntimeState: Any + Sized + Sync + Send + Display + Default + Clone {
+pub trait RuntimeState: Any + Sized + Sync + Clone + Default + Send + Display {
     type Error;
 
     /// load should take an initial message, and override any

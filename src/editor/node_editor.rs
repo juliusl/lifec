@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap};
 use specs::{Component, DenseVecStorage, Entities, Join, ReadStorage, System};
 
 #[derive(Clone, Component)]
@@ -22,8 +22,6 @@ impl<'a> System<'a> for NodeEditor {
         }
     }
 }
-
-
 
 // impl<S> RuntimeEditor<S>
 // where

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use imgui::{Window, Condition};
 use lifec::{
-    editor::{open_editor, unique_title, App, Attribute, Section, SectionAttributes},
+    editor::*,
     RuntimeState,
 };
 use specs::{Component, DenseVecStorage};
@@ -39,6 +39,8 @@ fn main() {
                     if let Some(true) = s.is_attr_checkbox("test-bool") {
                         Window::new("testing attr control").size([800.0, 600.0], Condition::Appearing).build(ui, || ui.text("hi"));
                     }
+
+                    TestExtension::extend_section(s, ui);
                 },
                 Test {
                     id: 1,
@@ -59,6 +61,14 @@ fn main() {
             d.add(Clock {}, "clock", &[]);
         },
     );
+}
+
+struct TestExtension;
+
+impl SectionExtension<Test> for TestExtension {
+    fn extend_section(section: &mut Section<Test>, ui: &imgui::Ui) {
+        ui.text(format!("from test extension for {}, parent_entity: {}", section, section.get_parent_entity()));
+    }
 }
 
 struct Clock;
