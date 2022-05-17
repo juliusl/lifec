@@ -1,11 +1,10 @@
-use atlier::system::{App, Attribute};
 use imgui::{Window, CollapsingHeader};
 use specs::{Component, Entities, Join, ReadStorage, System, WriteStorage, storage::DenseVecStorage};
 use std::collections::BTreeMap;
 
 use crate::{Runtime, RuntimeState, Action};
 
-use super::{section::Section, EventComponent};
+use super::{section::Section, EventComponent, Value, App, Attribute};
 
 pub struct RuntimeEditor<S>
 where
@@ -64,6 +63,14 @@ impl SectionAttributes {
         let SectionAttributes(attributes) = self;
 
         attributes.iter().find(|a| a.name() == name.as_ref())
+    }
+
+    pub fn is_attr_checkbox(&self, name: impl AsRef<str>) -> Option<bool> {
+        if let Some(Value::Bool(val)) = self.get_attr(name).and_then(|a| Some(a.value())) {
+            Some(*val)
+        } else {
+            None
+        }
     }
 }
 

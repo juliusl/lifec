@@ -1,73 +1,82 @@
 use std::fmt::Display;
 
-use imgui::Window;
+use imgui::{Window, Condition};
 use lifec::{
-    editor::{unique_title, App, Section, open_editor, Attribute, SectionAttributes, Value},
+    editor::{open_editor, unique_title, App, Attribute, Section, SectionAttributes},
     RuntimeState,
 };
-use specs::{Entities, Join, System, WriteStorage, WorldExt, ReadStorage};
 use specs::{Component, DenseVecStorage};
+use specs::{Entities, Join, ReadStorage, System, WorldExt, WriteStorage};
 
 fn main() {
-    open_editor(vec![
-        Section::from(Test {
-            id: 0,
-            val: 10,
-            clock: 0,
-            open_test_window: false,
-        }).update(|s| s.add_int_attr("test", 10)),
-        Section::new(
-            unique_title("With Additional Tooling"),
-            |s, ui| {
-                Test::show_editor(&mut s.state, ui);
-
-                ui.text(format!("clock: {}", s.state.clock));
-                if ui.button("hello") {
-                    println!("world");
-                }
-
-                s.show_attr_debug("display debug for test", "test", ui);
-                s.show_attr_debug("display debug for test-bool", "test-bool", ui);
-                s.edit_attr("edit test attribute", "test", ui);
-                s.edit_attr("test checkbox", "test-bool", ui);
-
-                if let Some(true) = s.is_attr_checkbox("test-bool") {
-                    Window::new("testing attr control").build(ui, || ui.text("hi"));
-                }
-            },
-            Test {
-                id: 1,
-                val: 11,
+    open_editor(
+        vec![
+            Section::from(Test {
+                id: 0,
+                val: 10,
                 clock: 0,
                 open_test_window: false,
-            },
-        )
-        .with_text("test", "hello")
-        .with_bool("test-bool", false)
-        .enable_app_systems(),
-    ],
-    |w| {
-        w.register::<Attribute>();
-    },
-    |d| {
-        d.add(Clock{}, "clock", &[]);
-    });
+            })
+            .with_title("Default Tooling")
+            .with_int("test", 10),
+            Section::new(
+                unique_title("With Additional Tooling"),
+                |s, ui| {
+                    Test::show_editor(&mut s.state, ui);
+                    ui.new_line();
+                    ui.text(format!("clock: {}", s.state.clock));
+                    if ui.button("hello") {
+                        println!("world");
+                    }
+
+                    s.show_attr_debug("display debug for test", "test", ui);
+                    s.show_attr_debug("display debug for test-bool", "test-bool", ui);
+                    s.show_attr_debug("display debug for enable clock", "enable clock", ui);
+                    s.edit_attr("edit test attribute", "test", ui);
+                    s.edit_attr("open a new window and test this attribute", "test-bool", ui);
+                    s.edit_attr("enable clock for this section", "enable clock", ui);
+
+                    if let Some(true) = s.is_attr_checkbox("test-bool") {
+                        Window::new("testing attr control").size([800.0, 600.0], Condition::Appearing).build(ui, || ui.text("hi"));
+                    }
+                },
+                Test {
+                    id: 1,
+                    val: 11,
+                    clock: 0,
+                    open_test_window: false,
+                },
+            )
+            .with_text("test", "hello")
+            .with_bool("test-bool", false)
+            .with_bool("enable clock", false)
+            .enable_app_systems(),
+        ],
+        |w| {
+            w.register::<Attribute>();
+        },
+        |d| {
+            d.add(Clock {}, "clock", &[]);
+        },
+    );
 }
 
 struct Clock;
 
 impl<'a> System<'a> for Clock {
-    type SystemData = (Entities<'a>, WriteStorage<'a, Section<Test>>, ReadStorage<'a, SectionAttributes>);
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, Section<Test>>,
+        ReadStorage<'a, SectionAttributes>,
+    );
 
     fn run(&mut self, mut data: Self::SystemData) {
         for e in data.0.join() {
-            if let Some(section) = data.1.get_mut(e) {
-                section.state.clock += 1;
-            }
-
             if let Some(attributes) = data.2.get(e) {
-                if let Some(attribute) = attributes.get_attr("test") {
-                    println!("From Clock System, reading attribute: {:?}", attribute);
+                if let Some(true) = attributes.is_attr_checkbox("enable clock") {
+                    if let Some(section) = data.1.get_mut(e) {
+                        section.state.clock += 1;
+                    }
                 }
             }
         }
