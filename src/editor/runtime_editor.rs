@@ -50,7 +50,8 @@ impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
             })
             .collect();
 
-        Self { runtime, events, sections: BTreeMap::new() }
+       let next =  Self { runtime, events, sections: BTreeMap::new() };
+       next
     }
 }
 
@@ -170,8 +171,8 @@ where
                     }
 
                     ui.indent();
-                    for e in self.events.iter_mut() {
-                        EventComponent::show_editor( e, ui);
+                    for e in self.events.iter_mut() {                        
+                        EventComponent::show_editor(e, ui);
                     }
                     ui.unindent();
                 }

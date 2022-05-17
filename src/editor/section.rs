@@ -30,6 +30,10 @@ impl<S: Any + Send + Sync + Clone> Section<S> {
         next
     }
 
+    pub fn with_title(&mut self, title: impl AsRef<str>) -> Self {
+        self.update(move |next| next.title = title.as_ref().to_string())
+    }
+
     pub fn with_attribute(&mut self, attr: Attribute) -> Self {
         let attr = attr;
         self.update(move |next| next.add_attribute(attr))
