@@ -24,7 +24,7 @@ fn main() {
                 |s, ui| {
                     Test::show_editor(&mut s.state, ui);
                     ui.new_line();
-                    ui.text(format!("clock: {}", s.state.clock));
+                    Clock::extend_section(s, ui);
                     if ui.button("hello") {
                         println!("world");
                     }
@@ -72,6 +72,14 @@ impl SectionExtension<Test> for TestExtension {
 }
 
 struct Clock;
+
+impl SectionExtension<Test> for Clock {
+    fn extend_section(section: &mut Section<Test>, ui: &imgui::Ui) {
+        if let Some(true) = section.is_attr_checkbox("enable clock") {
+            ui.text(format!("clock: {}", section.state.clock));
+        }
+    }
+}
 
 impl<'a> System<'a> for Clock {
     type SystemData = (
