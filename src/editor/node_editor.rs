@@ -100,8 +100,7 @@ impl App for NodeEditor {
                 editor(&mut context, |mut editor_scope| {
                     nodes
                         .iter_mut()
-                        .map(|f| (f.clone(), f.attribute.edit()))
-                        .for_each(|(node_component, mut edit_attribute)| {
+                        .for_each(|node_component| {
                             let NodeComponent {
                                 title,
                                 label,
@@ -109,26 +108,26 @@ impl App for NodeEditor {
                                 input_id,
                                 output_id,
                                 attribute_id,
-                                ..
+                                attribute,
                             } = node_component;
 
                             ui.set_next_item_width(200.0);
-                            editor_scope.add_node(node_id, |mut node_scope| {
+                            editor_scope.add_node(*node_id, |mut node_scope| {
                                 ui.set_next_item_width(200.0);
                                 node_scope.add_titlebar(|| {
                                     ui.text(title);
                                 });
-                                node_scope.attribute(attribute_id, || {
+                                node_scope.attribute(*attribute_id, || {
                                     ui.set_next_item_width(200.0);
-                                    edit_attribute.edit_attr(label, ui);
+                                    attribute.edit(ui);
                                 });
 
-                                node_scope.add_input(input_id, imnodes::PinShape::Circle, || {
+                                node_scope.add_input(*input_id, imnodes::PinShape::Circle, || {
                                     ui.set_next_item_width(200.0);
                                     ui.text("in");
                                 });
 
-                                node_scope.add_output(output_id, imnodes::PinShape::Circle, || {
+                                node_scope.add_output(*output_id, imnodes::PinShape::Circle, || {
                                     ui.set_next_item_width(200.0);
                                     ui.text("out");
                                 });

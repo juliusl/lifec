@@ -232,7 +232,8 @@ impl<S: RuntimeState> App for Section<S> {
                 ui.new_line();
                 if CollapsingHeader::new(format!("Attributes {:#4x}", self.id)).build(ui) {
                     for a in self.attributes.iter_mut() {
-                        Attribute::show_editor(a, ui);
+                        a.edit(ui);
+                        ui.new_line();
                     }
                 }
             }
