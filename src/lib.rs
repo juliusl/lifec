@@ -2,12 +2,12 @@ use logos::Logos;
 use parser::Lifecycle;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Display};
+use std::any::Any;
 
 pub mod editor;
 
-pub trait RuntimeState {
+pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
     type Error;
-    type State: Default + RuntimeState + Clone + Sized;
 
     /// load should take an initial message, and override any
     /// existing state that exists
@@ -17,22 +17,28 @@ pub trait RuntimeState {
 
     /// process is a function that should take a string message
     /// and return the next version of Self
-    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self::State, Self::Error>;
+    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error>;
 
     /// process is a function that should take a string message
     /// and return the next version of Self
     fn process_with_args<S: AsRef<str> + ?Sized>(
         state: WithArgs<Self>,
         msg: &S,
-    ) -> Result<Self::State, Self::Error>
+    ) -> Result<Self, Self::Error>
     where
-        Self: Clone + Default + RuntimeState<State = Self>,
+        Self: Clone + Default + RuntimeState,
     {
         Self::process(&state.get_state(), msg)
     }
 
+    /// merge_with specifies how to merge another instance of Self that has been modified externally
+    /// this allows for only specific fields in state to be updated asynchronously
+    fn merge_with(&self, _: &Self) -> Self {
+        todo!("Implement this to serialize external changes to state")
+    }
+
     /// select decides which listener should be processed next
-    fn select(&self, listener: Listener<Self::State>, current: &Event) -> bool {
+    fn select(&self, listener: Listener<Self>, current: &Event) -> bool {
         listener.event.get_phase_lifecycle() == current.get_phase_lifecycle()
             && listener.event.get_prefix_label() == current.get_prefix_label()
             && listener.event.get_payload() == current.get_payload()
@@ -194,7 +200,7 @@ impl Into<String> for Event {
 #[derive(Debug, Clone, Default)]
 pub struct Listener<T>
 where
-    T: Default + RuntimeState + Clone,
+    T: RuntimeState,
 {
     pub event: Event,
     pub action: Action<T>,
@@ -212,7 +218,7 @@ pub struct Extensions {
 #[derive(Debug, Clone, Default)]
 pub struct Runtime<T>
 where
-    T: RuntimeState<State = T> + Default + Clone,
+    T: RuntimeState,
 {
     listeners: Vec<Listener<T>>,
     calls: HashMap<String, ThunkFunc<T>>,
@@ -223,7 +229,7 @@ where
 #[derive(Debug, Clone, Default)]
 pub struct WithArgs<T>
 where
-    T: RuntimeState<State = T> + Default + Clone,
+    T: RuntimeState,
 {
     state: T,
     args: Vec<String>,
@@ -282,7 +288,7 @@ impl Extensions {
 
 impl<T> Listener<T>
 where
-    T: Default + Clone + RuntimeState,
+    T: RuntimeState,
 {
     /// dispatch sends a message to state for processing
     /// if successful transitions to the event described in the transition expression
@@ -319,14 +325,17 @@ where
 }
 
 #[derive(Clone)]
-pub enum ThunkFunc<T: Default + RuntimeState<State = T> + Clone> {
+pub enum ThunkFunc<T> 
+where
+    T: RuntimeState,
+{
     Default(fn(&T, Option<Event>) -> (T, String)),
     WithArgs(fn(&WithArgs<T>, Option<Event>) -> (T, String)),
 }
 
 impl<T: Default> Default for ThunkFunc<T>
 where
-    T: Default + RuntimeState<State = T> + Clone,
+    T: RuntimeState,
 {
     fn default() -> Self {
         ThunkFunc::Default(|_, _| (T::default(), "{ exit;; }".to_string()))
@@ -335,7 +344,7 @@ where
 
 impl<T> Debug for ThunkFunc<T>
 where
-    T: Default + RuntimeState<State = T> + Clone,
+    T: RuntimeState,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -347,7 +356,7 @@ where
 
 impl<T> WithArgs<T>
 where
-    T: RuntimeState<State = T> + Default + Clone,
+    T: RuntimeState,
 {
     pub fn get_state(&self) -> T {
         self.state.clone()
@@ -436,12 +445,16 @@ pub fn parse_flags(args: Vec<String>) -> BTreeMap<String, String> {
     map
 }
 
+impl<T: RuntimeState> Display for WithArgs<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "with_args")
+    }
+}
+
 impl<T> RuntimeState for WithArgs<T>
 where
-    T: RuntimeState<State = T> + Default + Clone,
+    T: RuntimeState,
 {
-    type State = Self;
-
     type Error = <T as RuntimeState>::Error;
 
     fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self
@@ -454,7 +467,7 @@ where
         }
     }
 
-    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self::State, Self::Error> {
+    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error> {
         let next = self.state.process(msg);
 
         match next {
@@ -469,7 +482,7 @@ where
 
 impl<T> Runtime<T>
 where
-    T: RuntimeState<State = T> + Default + Clone,
+    T: RuntimeState,
 {
     /// context gets the current event context of this runtime
     pub fn context(&self) -> Event {
@@ -550,7 +563,7 @@ where
         let mut processing = self.parse_event(init_expr);
 
         loop {
-            processing = processing.process();
+            processing = processing.process_state();
 
             if !processing.can_continue() {
                 break;
@@ -595,7 +608,7 @@ where
 
     /// process handles the internal logic
     /// based on the context, the state implementation selects the next listener
-    pub fn process(&mut self) -> Self {
+    pub fn process_state(&mut self) -> Self {
         let state = self.prepare_state();
 
         if let Some(l) = self.next_listener() {
@@ -734,7 +747,7 @@ pub struct RuntimeTestError;
 #[derive(Clone)]
 pub enum Action<T>
 where
-    T: Default,
+    T: RuntimeState,
 {
     NoOp,
     Call(String),
@@ -744,7 +757,7 @@ where
 
 impl<T> Default for Action<T>
 where
-    T: Default,
+    T: RuntimeState,
 {
     fn default() -> Self {
         Self::NoOp
@@ -753,7 +766,7 @@ where
 
 impl<T> Debug for Action<T>
 where
-    T: Default,
+    T: RuntimeState,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

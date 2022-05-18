@@ -1,7 +1,11 @@
+use imgui::Ui;
 use lifec::RuntimeState;
+use lifec::editor::{App, Section};
 use logos::{Lexer, Logos};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use specs::Component;
+use specs::storage::HashMapStorage;
 use std::collections::BTreeSet;
 use std::fmt::{Debug, Display, Error};
 
@@ -691,12 +695,27 @@ fn test_draw() {
     assert_eq!(Some(Draw::Draw(6)), draw.next());
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Component)]
+#[storage(HashMapStorage)]
 pub struct Dealer {
     deck: Deck,
     hands: Vec<Hand>,
+    expression: String,
 }
 
+impl Dealer {
+    pub fn dealer_section() -> Section::<Dealer> {
+        Section::<Dealer>::new(
+            "Dealer", 
+            |section, ui| { 
+                Dealer::show_editor(&mut section.state, ui);
+            }, 
+            Dealer::default(),
+        )
+    }
+}
+
+#[derive(Debug)]
 pub struct InvalidDealerExpression {}
 
 impl TryFrom<&str> for Dealer {
@@ -790,7 +809,7 @@ impl TryFrom<&str> for Dealer {
             }
 
             let deck = Deck::Deck(deck);
-            Ok(Self { deck, hands })
+            Ok(Self { deck, hands, expression: format!("")})
         } else {
             Err(InvalidDealerExpression {})
         }
@@ -809,34 +828,6 @@ impl Display for Dealer {
     }
 }
 
-impl RuntimeState for Dealer {
-    type Error = InvalidDealerExpression;
-    type State = Dealer;
-
-    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self where Self: Sized {
-        if let Ok(dealer) = Dealer::try_from(init.as_ref()) {
-            dealer
-        } else {
-            panic!("could not parse {}", init.as_ref())
-        }
-    }
-
-    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self::State, Self::Error> {
-        println!("Received: {}", msg.as_ref());
-        self.deal(msg.as_ref())
-    }
-
-    fn process_with_args<S: AsRef<str> + ?Sized>(state: lifec::WithArgs<Self>, msg: &S) -> Result<Self::State, Self::Error>
-    where
-            Self: Clone + Default + RuntimeState<State = Self>, {
-        let args = state.parse_flags();
-        
-        println!("Dealer received args: {:?}", args);
-
-        state.get_state().deal(msg.as_ref())
-    }
-}
-
 impl Default for Dealer {
     fn default() -> Self {
         let dealer = Dealer::try_from("(.STD)").ok();
@@ -849,6 +840,7 @@ impl From<&Hand> for Dealer {
         let h = Self {
             deck: Deck::Deck(hand.clone()),
             hands: vec![],
+            expression: String::default(),
         };
 
         if let Ok(s) = h.deal("[+1]".repeat(hand.0.len()).as_str()) {
@@ -857,8 +849,86 @@ impl From<&Hand> for Dealer {
             Self {
                 deck: Deck::Deck(Hand(vec![])),
                 hands: vec![],
+                expression: String::default()
             }
         }
+    }
+}
+
+impl App for Dealer {
+    fn name() -> &'static str {
+        "Card Dealer"
+    }
+
+    fn show_editor(&mut self, ui: &Ui) {
+        ui.indent();
+        ui.label_text("Number of hands", format!("{}", self.hands()));
+
+        for i in 0..self.hands() {
+            if let Some(hand) = self.hand(i) {
+                ui.label_text(format!("Hand: {}", i), format!("{}", hand));
+            }
+        }
+
+        if let Some(deck) = self.deck() {
+            ui.label_text("Deck", format!("{}", deck));
+        }
+
+        ui.input_text(format!("Expression"), &mut self.expression).build();
+        if ui.button(format!("Deal")) {
+            match self.deal(&self.expression) {
+                Ok(next) => *self = next,
+                Err(e) => eprintln!("Error Dealing: {:?}", e),
+            }
+        }
+        ui.same_line();
+        ui.text("Parses the above expression and updates state");
+
+        if ui.button("Reshuffle") {
+            *self = Dealer::default();
+        }
+        ui.same_line();
+        ui.text("Reshuffles the deck");
+
+        if ui.button("Clear Deck") {
+            *self = self.clear_deck();
+        }
+        ui.same_line();
+        ui.text("Clears the deck");
+
+        if ui.button("Prune") {
+            *self = self.prune()
+        }
+        ui.same_line();
+        ui.text("Removes empty hands");
+        ui.unindent();
+    }
+}
+
+impl RuntimeState for Dealer {
+    type Error = InvalidDealerExpression;
+
+    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self where Self: Sized {
+        if let Ok(dealer) = Dealer::try_from(init.as_ref()) {
+            dealer
+        } else {
+            panic!("could not parse {}", init.as_ref())
+        }
+    }
+
+    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error> {
+        println!("Received: {}", msg.as_ref());
+        self.deal(msg.as_ref())
+    }
+
+    fn process_with_args<S: AsRef<str> + ?Sized>(state: lifec::WithArgs<Self>, msg: &S) -> Result<Self, Self::Error>
+    where
+            Self: Clone + Default + RuntimeState {
+        let args = state.parse_flags();
+        
+        println!("Dealer received args: {:?}", args);
+
+        state.get_state().deal(msg.as_ref())
     }
 }
 
@@ -893,6 +963,7 @@ impl Dealer {
         Self {
             hands,
             deck: self.deck.clone(),
+            expression: self.expression.clone(),
         }
     }
 
@@ -900,6 +971,7 @@ impl Dealer {
         Self {
             hands: self.hands.iter().cloned().collect(),
             deck: Deck::Deck(Hand(vec![])),
+            expression: String::default(),
         }
     }
 }

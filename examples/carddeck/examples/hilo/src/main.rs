@@ -1,7 +1,5 @@
-
 use carddeck::Dealer;
-use lifec::{Runtime, Event};
-use lifec::editor::{App, RuntimeEditor};
+use lifec::{Event, Runtime};
 
 fn main() {
     let mut runtime = get_runtime();
@@ -34,14 +32,25 @@ fn main() {
     runtime
         .on("{ game_over;; }")
         .call("game_over");
-    
-    runtime.on("{ test_test;; }")
-        .call("test_args")
-        .args(&["--test", "value123", "--object", "{test: abc, test123: 12345}"]);
 
-    let runtime = runtime.parse_event("{ test_test;; }").process();
+    runtime
+        .on("{ test_test;; }")
+        .call("test_args").args(&[
+            "--test",
+            "value123",
+            "--object",
+            "'{test: abc, test123: 12345}'",
+        ]);
 
-    RuntimeEditor::start_editor(Some(RuntimeEditor::from(runtime)));
+    let runtime = runtime.parse_event("{ test_test;; }").process_state();
+
+    lifec::editor::open_editor_with(
+        format!("Dealer Editor"), 
+        runtime, 
+        vec![Dealer::dealer_section()],
+        |_| {}, 
+        |_| {}
+    )
 }
 
 fn get_runtime() -> Runtime<Dealer> {

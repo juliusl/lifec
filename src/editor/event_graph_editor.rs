@@ -1,7 +1,10 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 use atlier::system::App;
-use imnodes::{Link, LinkId, NodeId, InputPinId, AttributeId, OutputPinId, AttributeFlag, IdentifierGenerator, ImVec2};
+use imnodes::{
+    AttributeFlag, AttributeId, EditorContext, IdentifierGenerator, ImVec2, InputPinId, Link,
+    LinkId, NodeId, OutputPinId,
+};
 use knot::store::{Store, Visitor};
 
 use super::event_editor::EventEditor;
@@ -10,101 +13,93 @@ use super::event_editor::EventEditor;
 pub struct EventGraphEditor {
     pub events: Vec<EventEditor>,
     pub links: HashSet<Link>,
-    pub link_index: HashMap::<LinkId, Link>,
+    pub link_index: HashMap<LinkId, Link>,
     pub node_index: HashMap<NodeId, EventEditor>,
     pub graph_index: HashMap<EventEditor, (NodeId, InputPinId, AttributeId, OutputPinId)>,
 }
 
 impl App for EventGraphEditor {
     fn title() -> &'static str {
-        "Graph Editor"
+        "Event Graph Editor"
     }
 
-    fn show(
-        ui: &imgui::Ui,
-        state: &Self,
-        imnode_editor: Option<&mut imnodes::EditorContext>,
-    ) -> Option<Self> {
-        if let Some(editor_context) = imnode_editor {
-            let mut next = state.clone();
+    // fn show_node_editor(ui: &imgui::Ui, state: &Self, editor_context: &mut EditorContext) -> Option<Self> {
+    //     let mut next = state.clone();
 
-            if ui.button("Re-Arrange") {
-                next.rearrange();
-            }
+    //     if ui.button("Re-Arrange") {
+    //         next.rearrange();
+    //     }
 
-            let detach = editor_context.push(AttributeFlag::EnableLinkDetachWithDragClick);
-            let idgen = &mut editor_context.new_identifier_generator();
-            let mut next_events = next.events.clone();
+    //     let detach = editor_context.push(AttributeFlag::EnableLinkDetachWithDragClick);
+    //     let idgen = &mut editor_context.new_identifier_generator();
+    //     let mut next_events = next.events.clone();
 
-            let outer = imnodes::editor(editor_context, |mut scope| {
-                scope.add_mini_map(imnodes::MiniMapLocation::TopRight);
+    //     let outer = imnodes::editor(editor_context, |mut scope| {
+    //         scope.add_mini_map(imnodes::MiniMapLocation::TopRight);
 
-                let mut i = 0;
-                for e in &next.events {
-                    let node_id = idgen.next_node();
-                    scope.add_node(node_id, |node| {
-                        if let Some(next_e) = EventEditor::show_node(ui, &e, node, idgen) {
-                            next.node_index.insert(node_id, next_e.clone());
-                            next_events[i] = next_e;
-                        }
-                    });
-                    i += 1;
-                }
+    //         let mut i = 0;
+    //         for e in &next.events {
+    //             let node_id = idgen.next_node();
+    //             scope.add_node(node_id, |node| {
+    //                 if let Some(next_e) = EventEditor::edit_node(ui, &e, node, idgen) {
+    //                     next.node_index.insert(node_id, next_e.clone());
+    //                     next_events[i] = next_e;
+    //                 }
+    //             });
+    //             i += 1;
+    //         }
 
-                for link in &next.links {
-                    let link_id = idgen.next_link();
-                    scope.add_link(link_id, link.end_pin, link.start_pin);
-                    next.link_index.insert(link_id, link.clone());
-                }
-            });
+    //         for link in &next.links {
+    //             let link_id = idgen.next_link();
+    //             scope.add_link(link_id, link.end_pin, link.start_pin);
+    //             next.link_index.insert(link_id, link.clone());
+    //         }
+    //     });
 
-            let mut next_links = HashSet::new();
-            if let Some(link) = outer.links_created() {
-                next_links.insert(link);
+    //     let mut next_links = HashSet::new();
+    //     if let Some(link) = outer.links_created() {
+    //         next_links.insert(link);
 
-                if let (Some(start), Some(end)) = (
-                    next.node_index.get(&link.start_node),
-                    next.node_index.get(&link.end_node),
-                ) {
-                    if let Some(start_pos) = next_events.iter().position(|e| *e == *start) {
-                        let mut updated_start = start.clone();
-                        updated_start.transitions.push(end.on.to_owned());
-                        next_events[start_pos] = updated_start;
-                    }
-                }
-            }
+    //         if let (Some(start), Some(end)) = (
+    //             next.node_index.get(&link.start_node),
+    //             next.node_index.get(&link.end_node),
+    //         ) {
+    //             if let Some(start_pos) = next_events.iter().position(|e| *e == *start) {
+    //                 let mut updated_start = start.clone();
+    //                 updated_start.transitions.push(end.on.to_owned());
+    //                 next_events[start_pos] = updated_start;
+    //             }
+    //         }
+    //     }
 
-            if let Some(destroyed) = outer.get_dropped_link() {
-                if let Some(link) = next.link_index.get(&destroyed) {
-                    next.links.remove(link);
+    //     if let Some(destroyed) = outer.get_dropped_link() {
+    //         if let Some(link) = next.link_index.get(&destroyed) {
+    //             next.links.remove(link);
 
-                    let start_node_id = link.start_node;
-                    if let Some(start) = next.node_index.get(&start_node_id) {
-                        if let Some(start_pos) = next_events.iter().position(|e| *e == *start) {
-                            let mut updated_start = next_events[start_pos].clone();
-                            updated_start.transitions = updated_start
-                                .transitions
-                                .iter()
-                                .filter(|s| **s != start.on)
-                                .map(|s| s.to_owned())
-                                .collect();
-                            next_events[start_pos] = updated_start;
-                        }
-                    }
-                }
-            }
+    //             let start_node_id = link.start_node;
+    //             if let Some(start) = next.node_index.get(&start_node_id) {
+    //                 if let Some(start_pos) = next_events.iter().position(|e| *e == *start) {
+    //                     let mut updated_start = next_events[start_pos].clone();
+    //                     updated_start.transitions = updated_start
+    //                         .transitions
+    //                         .iter()
+    //                         .filter(|s| **s != start.on)
+    //                         .map(|s| s.to_owned())
+    //                         .collect();
+    //                     next_events[start_pos] = updated_start;
+    //                 }
+    //             }
+    //         }
+    //     }
 
-            detach.pop();
-            if next_links.len() > 0 || next.links.len() != state.links.len() {
-                next.links = next.links.union(&next_links).cloned().collect();
-                Some(next)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
+    //     detach.pop();
+    //     if next_links.len() > 0 || next.links.len() != state.links.len() {
+    //         next.links = next.links.union(&next_links).cloned().collect();
+    //         Some(next)
+    //     } else {
+    //         None
+    //     }
+    // }
 }
 
 impl EventGraphEditor {
@@ -128,10 +123,11 @@ impl EventGraphEditor {
             store = store.node(e.clone());
 
             if !&e.transitions.is_empty() {
-                for to in
-                    self.events.clone().iter().filter(|o| {
-                        e.transitions.iter().find(|p| **p == o.on).is_some()
-                    })
+                for to in self
+                    .events
+                    .clone()
+                    .iter()
+                    .filter(|o| e.transitions.iter().find(|p| **p == o.on).is_some())
                 {
                     store = store.link_create_if_not_exists(e.clone(), to.to_owned());
                 }
@@ -170,7 +166,8 @@ impl EventGraphEditor {
 
         // This next part arranges the events that need space vertically, usually only places where events branch
         if let Some(first) = first {
-            let (seen, _) = store.new_walk::<_, EventGraphEditor>(first, Some(&EventGraphEditor::default()));
+            let (seen, _) =
+                store.new_walk::<_, EventGraphEditor>(first, Some(&EventGraphEditor::default()));
 
             for s in seen {
                 let node = store.get(s);

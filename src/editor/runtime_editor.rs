@@ -1,44 +1,37 @@
-use std::fmt::Display;
+use imgui::{Window, CollapsingHeader};
+use specs::{Component, Entities, Join, ReadStorage, System, WriteStorage, storage::DenseVecStorage};
+use std::{collections::BTreeMap};
 
-use atlier::system::App;
-use crate::{RuntimeState, Runtime, Action, parse_flags, parse_variables};
+use crate::{Runtime, RuntimeState, Action};
 
-use super::event_editor::EventEditor;
-use super::event_graph_editor::EventGraphEditor;
+use super::{section::Section, EventComponent, Value, App, Attribute, unique_title};
 
-#[derive(Default, Clone)]
 pub struct RuntimeEditor<S>
 where
-    S: RuntimeState<State = S> + Default + Clone,
+    S: RuntimeState,
 {
-    count: usize,
-    initial_str: String,
-    events: Vec<EventEditor>,
-    runtime: Runtime<S>,
-    show_graph_editor: bool,
-    graph_editor: Option<EventGraphEditor>,
+    pub runtime: Runtime<S>,
+    events: Vec<EventComponent>,
+    sections: BTreeMap<u32, Section<S>>,
 }
 
-impl<S> From<Runtime<S>> for RuntimeEditor<S>
-where
-    S: RuntimeState<State = S> + Default + Clone,
-{
-    fn from(state: Runtime<S>) -> Self {
-        let events = state
+impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
+    fn from(runtime: Runtime<S>) -> Self {
+        let events = runtime
             .get_listeners()
             .iter()
             .enumerate()
             .filter_map(|(id, l)| match (&l.action, &l.next) {
-                (Action::Dispatch(msg), Some(transition)) => Some(EventEditor {
+                (Action::Dispatch(msg), Some(transition)) => Some(EventComponent {
                     label: format!("Event {}", id),
                     on: l.event.to_string(),
                     dispatch: msg.to_string(),
                     call: String::default(),
                     transitions: vec![transition.to_string()],
-                    flags: parse_flags(l.extensions.get_args()),
-                    variales: parse_variables(l.extensions.get_args()),
+                    // flags: parse_flags(l.extensions.get_args()),
+                    // variales: parse_variables(l.extensions.get_args()),
                 }),
-                (Action::Call(call), _) => Some(EventEditor {
+                (Action::Call(call), _) => Some(EventComponent {
                     label: format!("Event {}", id),
                     on: l.event.to_string(),
                     call: call.to_string(),
@@ -49,189 +42,176 @@ where
                         .iter()
                         .map(|(_, t)| t.to_owned())
                         .collect(),
-                    flags: parse_flags(l.extensions.get_args()),
-                    variales: parse_variables(l.extensions.get_args()),
+                //     flags: parse_flags(l.extensions.get_args()),
+                //     variales: parse_variables(l.extensions.get_args()),
                 }),
                 _ => None,
             })
             .collect();
 
-        let mut next = Self {
-            runtime: state,
-            events,
-            ..Default::default()
-        };
+       let next =  Self { runtime, events, sections: BTreeMap::new() };
+       next
+    }
+}
 
-        next.count = next.events.len();
+#[derive(Component, Clone)]
+#[storage(DenseVecStorage)]
+pub struct SectionAttributes(Vec<Attribute>);
 
-        next
+impl SectionAttributes {
+    pub fn get_attrs(&self) -> Vec<&Attribute> {
+        self.0.iter().collect()
+    }
+
+    pub fn clone_attrs(&self) -> Vec<Attribute> {
+        self.0.iter().cloned().collect()
+    }
+
+    pub fn get_attr(&self, name: impl AsRef<str>) -> Option<&Attribute> {
+        let SectionAttributes(attributes) = self;
+
+        attributes.iter().find(|a| a.name() == name.as_ref())
+    }
+
+    pub fn is_attr_checkbox(&self, name: impl AsRef<str>) -> Option<bool> {
+        if let Some(Value::Bool(val)) = self.get_attr(name).and_then(|a| Some(a.value())) {
+            Some(*val)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a, S> System<'a> for RuntimeEditor<S>
+where
+    S: RuntimeState + Component,
+{
+    type SystemData = (Entities<'a>, ReadStorage<'a, Section<S>>, WriteStorage<'a, SectionAttributes>);
+
+    fn run(&mut self, (entities, read_sections, mut write_attributes): Self::SystemData) {
+        for (e, s) in (&entities, &read_sections).join() {
+            match self.sections.get(&e.id()) {
+                None => {
+                    let clone = s.clone().with_parent_entity(e.id());
+
+                    // Save a copy of the section attributes.
+                    // TODO currently any changes to section attributes via systems wouldn't affect the gui state
+                    match write_attributes.insert(e, SectionAttributes(clone.attributes.iter().cloned().collect())) {
+                        Ok(_) => {
+                            self.sections.insert(e.id(), clone);
+                        },
+                        Err(e) => {
+                            eprintln!("Error adding Section Attributes to Storage, {}", e); 
+                        }
+                    }
+                }
+                Some(Section {  enable_app_systems, state, attributes, enable_edit_attributes, .. }) => {
+                    // Update the world's copy of attributes from editor's copy
+                    match write_attributes.insert(e, SectionAttributes(attributes.iter().cloned().collect())) {
+                        Ok(_) => {},
+                        Err(err) => { eprintln!("Error updating section attributes {}", err); },
+                    }
+
+                    if *enable_app_systems {
+                        let state = state.merge_with(&s.state);
+                        let attributes = attributes.clone();
+                        let enable_edit_attributes = *enable_edit_attributes;
+                        self.sections.insert(e.id(), {
+                            let mut s = s.clone().with_parent_entity(e.id());
+                            s.state = state;
+                            s.attributes = attributes;
+                            s.enable_edit_attributes = enable_edit_attributes;
+                            s.enable_app_systems = true;
+                            s
+                        });
+                    }
+                }
+            } 
+        }
+    }
+}
+
+impl<S> Default for RuntimeEditor<S>
+where
+    S: RuntimeState + Component,
+{
+    fn default() -> Self {
+        Self {
+            runtime: Default::default(),
+            events: Default::default(),
+            sections: Default::default(),
+        }
     }
 }
 
 impl<S> App for RuntimeEditor<S>
 where
-    S: RuntimeState<State = S> + Default + Clone + Display,
+    S: RuntimeState + Component,
 {
-    fn title() -> &'static str {
-        "Event Editor"
+    fn name() -> &'static str {
+        "Runtime Editor"
     }
 
-    fn show(
-        ui: &imgui::Ui,
-        state: &Self,
-        imnodes: Option<&mut imnodes::EditorContext>,
-    ) -> Option<Self> {
-        let mut next = state.clone();
+    fn window_size() -> &'static [f32; 2] {
+        &[1500.0, 720.0]
+    }
 
-        if let Some(window) = imgui::Window::new("Runtime Editor")
-            .size([1280.0, 1080.0], imgui::Condition::FirstUseEver)
-            .begin(ui)
-        {
-            let mut count = next.count.try_into().unwrap();
-            imgui::InputInt::new(ui, "number of events", &mut count).build();
-            next.count = count.try_into().unwrap();
-
-            if ui.button("Create") {
-                next.events.clear();
-                for i in 0..count {
-                    let i: usize = i.try_into().unwrap();
-                    let label = format!("Event {}", i);
-                    next.events.push(EventEditor {
-                        label,
-                        ..Default::default()
-                    });
+    fn show_editor(&mut self, ui: &imgui::Ui) {
+        Window::new(Self::name())
+            .size(*Self::window_size(), imgui::Condition::Appearing)
+            .build(ui, || {
+                ui.new_line();
+                for (_, section) in self.sections.iter_mut() {
+                    section.show_editor(ui);
                 }
-            }
-            ui.same_line();
-            if ui.button("Compile") {
-                let mut runtime_state = next.runtime.clone();
-                let runtime_state = &mut runtime_state;
-                runtime_state.reset_listeners(true);
 
-                for e in next.events.iter().cloned() {
-                    let on = e.on;
+                ui.new_line();
+                ui.text("Runtime/Editor Tools");
+                ui.new_line();
+                if CollapsingHeader::new(format!("Current Runtime Information")).begin(ui) {
+                    ui.indent();
 
-                    match (e.dispatch.as_str(), e.call.as_str()) {
-                        (dispatch, "") => {
-                            let transition = e.transitions.join(" ");
-
-                            runtime_state
-                                .on(&on)
-                                .dispatch(&dispatch, &transition.as_str());
-                        }
-                        ("", call) => {
-                            runtime_state.on(&on).call(&call);
-                        }
-                        _ => {}
-                    }
-                }
-                next.runtime = runtime_state.parse_event("{ setup;; }");
-            }
-
-            ui.set_next_item_width(120.0);
-            ui.input_text("Initial Event", &mut next.initial_str)
-                .build();
-            ui.same_line();
-            if ui.button("Parse Event") {
-                next.runtime = next.runtime.parse_event(&next.initial_str);
-            }
-
-            if ui.button("Process") {
-                next.runtime = next.runtime.process();
-            }
-            
-            // Display Current State of Runtime
-            if let (Some(state), context) = (next.runtime.current(), next.runtime.context()) {
-                ui.same_line();
-                ui.text(format!("Current Event: {} State: {}", context, state));
-
-                if let Some(l) = next.runtime.next_listener() {
-                    match l.action {
-                        Action::Call(call) => {
-                            ui.text(format!("Call: {}", call));
-
-                            if l.extensions.tests.len() > 0 {
-                                ui.text("Known Transitions:");
-                                l.extensions.tests.iter().map(|(_, t)| t).for_each(|t| {
-                                    ui.text(format!("- {}", t));
-                                });
-                            }
-                        }
-                        Action::Dispatch(dispatch) => {
-                            ui.text(format!("Dispatch: {}", dispatch));
-                            if let Some(next) = l.next {
-                                ui.text(format!("Next: {}", next));
-                            }
-                        }
-                        Action::Thunk(_) | Action::NoOp => {}
+                    if let Some(state) = self.runtime.current() {
+                        ui.text(format!("Current State: "));
+                        ui.text_wrapped(format!("{}", state));
+                        ui.new_line();
                     }
 
-                    if l.extensions.args.len() > 0 {
-                        let flags = parse_flags(l.extensions.get_args());
-                        if flags.len() > 0 {
-                            ui.text(format!("Flags:"));
-                            for (key, value) in flags {
-                                if key.len() == 1 {
-                                    ui.text(format!("{}: {}", key, value));
-                                } else {
-                                    ui.text(format!("{}: {}", key, value));
-                                }
-                            }
-                        }
+                    let context = self.runtime.context(); 
+                    ui.label_text(format!("Current Context"), format!("{}", context));
 
-                        let env = parse_variables(l.extensions.get_args());
-                        if env.len() > 0 {
-                            ui.text(format!("Env:"));
-                            for (key, value) in env {
-                                ui.text(format!("{}: {}", key, value));
-                            }
-                        }
+                    ui.unindent();
+                }
+                
+                if CollapsingHeader::new(format!("Edit Current Runtime Events")).begin(ui) {
+                    ui.indent();
+                    for e in self.events.iter_mut() {                        
+                        EventComponent::show_editor(e, ui);
                     }
-                }
-            }
-
-            if let Some(editor_context) = imnodes {
-                if ui.checkbox("Open Graph Editor", &mut next.show_graph_editor) {
-                    let mut graph_editor =EventGraphEditor {
-                        events: next.events.clone(),
-                        ..Default::default()
-                    };
-
-                    let mut idgen = editor_context.new_identifier_generator();
-                    graph_editor.graph_contents(&mut idgen);
-                    
-                    next.graph_editor = Some(graph_editor);
+                    ui.unindent();
                 }
 
-                if next.show_graph_editor {
-                    if let Some(ref graph_editor) = next.graph_editor {
-                        let mut next_graph_editor = graph_editor.clone();
-                        imgui::Window::new("Graph Editor").size([1280.0, 720.0], imgui::Condition::Appearing).build(ui, || {
-                            if let Some(updated_graph_editor) = EventGraphEditor::show(ui, &next_graph_editor, Some(editor_context)) {
-                                next_graph_editor = updated_graph_editor;
-                                next.events = next_graph_editor.clone().events;
-                            }
-                        });
+                if CollapsingHeader::new(format!("Debug Editor Sections")).begin(ui) {
+                    ui.indent();
+                    for (_, section) in self.sections.iter_mut() {                        
+                        ui.checkbox(format!("enable attribute editor for {}", section.title), &mut section.enable_edit_attributes);
 
-                        next.events = next_graph_editor.clone().events;
-                        next.graph_editor = Some(next_graph_editor);
-                    }
-                }
-            } else {
-                let mut next_events = next.events.clone();
-                for (i, e) in next.events.iter().enumerate() {
-                    if let Some(next_e) = EventEditor::show(ui, e, None) {
-                        if next_e != *e {
-                            next_events[i] = next_e.clone()
+                        if ui.button(format!("Add new text attribute to {}", section.title)) {
+                            section.add_text_attr(unique_title("New"), ""); 
                         }
+                        if ui.button(format!("Add new int attribute to {}", section.title)) {
+                            section.add_int_attr(unique_title("New"), 0); 
+                        }
+                        if ui.button(format!("Add new float attribute to {}", section.title)) {
+                            section.add_float_attr(unique_title("New"), 0.0); 
+                        } 
+                        if ui.button(format!("Add new bool attribute to {}", section.title)) {
+                            section.add_bool_attr(unique_title("New"), false); 
+                        }
+                        ui.new_line();
                     }
+                    ui.unindent();
                 }
-                next.events = next_events;
-            }
-
-            window.end()
-        }
-
-        Some(next)
+            });
     }
 }
