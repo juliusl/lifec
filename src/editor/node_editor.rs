@@ -1,7 +1,7 @@
-use atlier::system::{App, Attribute, EditAttribute, Extension};
+use atlier::system::{App, Attribute, Extension};
 use imnodes::{editor, AttributeId, InputPinId, NodeId, OutputPinId};
 use specs::{
-    Component, DefaultVecStorage, DenseVecStorage, Entities, Join, ReadStorage, RunNow, System,
+    Component, DenseVecStorage, Entities, Join, ReadStorage, RunNow, System,
 };
 use std::collections::HashMap;
 

@@ -31,10 +31,12 @@ fn main() {
                     s.show_attr_debug("display debug for test", "test", ui);
                     s.show_attr_debug("display debug for test-bool", "test-bool", ui);
                     s.show_attr_debug("display debug for enable clock", "enable clock", ui);
+                    s.show_attr_debug("display debug for node::test int", "node::test int", ui);
                     s.edit_attr("edit test attribute", "test", ui);
                     s.edit_attr("open a new window and test this attribute", "test-bool", ui);
                     s.edit_attr("enable clock for this section", "enable clock", ui);
                     s.edit_attr("enable node editor for this section", "enable node editor", ui);
+                    s.edit_attr("edit a float that's from the node editor", "node::test float", ui);
 
                     if let Some(true) = s.is_attr_checkbox("test-bool") {
                         Window::new("testing attr control")

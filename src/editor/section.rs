@@ -155,7 +155,7 @@ impl<S: RuntimeState> Section<S> {
 
     pub fn add_text_attr(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) {
         self.add_attribute(Attribute::new(
-            0,
+            self.id,
             name.as_ref().to_string(),
             Value::TextBuffer(init_value.as_ref().to_string()),
         ));
@@ -163,7 +163,7 @@ impl<S: RuntimeState> Section<S> {
 
     pub fn add_int_attr(&mut self, name: impl AsRef<str>, init_value: i32) {
         self.add_attribute(Attribute::new(
-            0,
+            self.id,
             name.as_ref().to_string(),
             Value::Int(init_value),
         ));
@@ -171,7 +171,7 @@ impl<S: RuntimeState> Section<S> {
 
     pub fn add_float_attr(&mut self, name: impl AsRef<str>, init_value: f32) {
         self.add_attribute(Attribute::new(
-            0,
+            self.id,
             name.as_ref().to_string(),
             Value::Float(init_value),
         ));
@@ -179,7 +179,7 @@ impl<S: RuntimeState> Section<S> {
 
     pub fn add_bool_attr(&mut self, name: impl AsRef<str>, init_value: bool) {
         self.add_attribute(Attribute::new(
-            0,
+            self.id,
             name.as_ref().to_string(),
             Value::Bool(init_value),
         ));

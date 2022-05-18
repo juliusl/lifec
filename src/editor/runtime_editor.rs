@@ -196,7 +196,6 @@ where
                     for (_, section) in self.sections.iter_mut() {                        
                         ui.checkbox(format!("enable attribute editor for {}", section.title), &mut section.enable_edit_attributes);
 
-                       
                         if ui.button(format!("Add new text attribute to {}", section.title)) {
                             section.add_text_attr(unique_title("New"), ""); 
                         }
