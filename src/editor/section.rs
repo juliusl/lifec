@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::RuntimeState;
 use imgui::CollapsingHeader;
-use specs::{Component, HashMapStorage, World};
+use specs::{Component, HashMapStorage};
 use super::{App, Attribute, Edit, Value};
 
 /// This trait allows others to author extensions using Section<S> as the main runtime-state
@@ -10,10 +10,6 @@ use super::{App, Attribute, Edit, Value};
 pub trait SectionExtension<S: RuntimeState> {
     /// To consume this method must be called in the edit fn for the section
     fn extend_section(section: &mut Section<S>, ui: &imgui::Ui);
-}
-
-pub trait EditorExtension {
-    fn extend_editor(&mut self, world: &World, ui: &imgui::Ui);
 }
 
 /// Section is a component of the runtime editor

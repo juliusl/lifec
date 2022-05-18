@@ -11,13 +11,13 @@ use specs::{prelude::*, Component};
 pub use atlier::system::App;
 pub use atlier::system::Attribute;
 pub use atlier::system::Value;
+pub use atlier::system::Extension;
 pub use specs::RunNow;
 pub use node_editor::NodeEditor;
 pub use runtime_editor::RuntimeEditor;
 pub use runtime_editor::SectionAttributes;
 pub use section::Section;
 pub use section::SectionExtension;
-pub use section::EditorExtension;
 
 use crate::Runtime;
 use crate::RuntimeState;

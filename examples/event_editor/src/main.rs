@@ -53,7 +53,7 @@ fn main() {
             )
             .with_text("test", "hello")
             .with_bool("test-bool", false)
-            .with_bool("enable clock", false)
+            .with_bool("node::enable clock", false)
             .with_bool("enable node editor", false)
             .with_int("node::test int", 0)
             .with_float("node::test float", 0.0)
@@ -67,7 +67,7 @@ fn main() {
         },
         move |world, ui| {
             let node_editor = &mut node_editor;
-            node_editor.extend_editor(world, ui);
+            node_editor.extend_app_world(world, ui);
         },
     );
 }
