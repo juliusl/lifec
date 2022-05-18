@@ -1,14 +1,13 @@
 use std::fmt::Display;
 
-use imgui::{Window, Condition};
-use lifec::{
-    editor::*,
-    RuntimeState,
-};
+use imgui::{Condition, Window};
+use lifec::{editor::*, RuntimeState};
 use specs::{Component, DenseVecStorage};
 use specs::{Entities, Join, ReadStorage, System, WorldExt, WriteStorage};
 
 fn main() {
+    let mut node_editor = NodeEditor::new();
+
     open_editor(
         vec![
             Section::from(Test {
@@ -35,9 +34,12 @@ fn main() {
                     s.edit_attr("edit test attribute", "test", ui);
                     s.edit_attr("open a new window and test this attribute", "test-bool", ui);
                     s.edit_attr("enable clock for this section", "enable clock", ui);
+                    s.edit_attr("enable node editor for this section", "enable node editor", ui);
 
                     if let Some(true) = s.is_attr_checkbox("test-bool") {
-                        Window::new("testing attr control").size([800.0, 600.0], Condition::Appearing).build(ui, || ui.text("hi"));
+                        Window::new("testing attr control")
+                            .size([800.0, 600.0], Condition::Appearing)
+                            .build(ui, || ui.text("hi"));
                     }
 
                     TestExtension::extend_section(s, ui);
@@ -52,6 +54,9 @@ fn main() {
             .with_text("test", "hello")
             .with_bool("test-bool", false)
             .with_bool("enable clock", false)
+            .with_bool("enable node editor", false)
+            .with_int("node::test int", 0)
+            .with_float("node::test float", 0.0)
             .enable_app_systems(),
         ],
         |w| {
@@ -60,6 +65,10 @@ fn main() {
         |d| {
             d.add(Clock {}, "clock", &[]);
         },
+        move |world, ui| {
+            let node_editor = &mut node_editor;
+            node_editor.extend_editor(world, ui);
+        },
     );
 }
 
@@ -67,7 +76,11 @@ struct TestExtension;
 
 impl SectionExtension<Test> for TestExtension {
     fn extend_section(section: &mut Section<Test>, ui: &imgui::Ui) {
-        ui.text(format!("from test extension for {}, parent_entity: {}", section, section.get_parent_entity()));
+        ui.text(format!(
+            "from test extension for {}, parent_entity: {}",
+            section,
+            section.get_parent_entity()
+        ));
     }
 }
 

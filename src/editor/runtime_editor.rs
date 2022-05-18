@@ -59,6 +59,14 @@ impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
 pub struct SectionAttributes(Vec<Attribute>);
 
 impl SectionAttributes {
+    pub fn get_attrs(&self) -> Vec<&Attribute> {
+        self.0.iter().collect()
+    }
+
+    pub fn clone_attrs(&self) -> Vec<Attribute> {
+        self.0.iter().cloned().collect()
+    }
+
     pub fn get_attr(&self, name: impl AsRef<str>) -> Option<&Attribute> {
         let SectionAttributes(attributes) = self;
 

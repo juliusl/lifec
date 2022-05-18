@@ -1,5 +1,9 @@
-use std::{collections::HashMap};
-use specs::{Component, DenseVecStorage, Entities, Join, ReadStorage, System};
+use atlier::system::{App, Attribute};
+use imnodes::{editor, AttributeId, InputPinId, NodeId, OutputPinId};
+use specs::{Component, DenseVecStorage, Entities, Join, ReadStorage, RunNow, System};
+use std::collections::HashMap;
+
+use super::{section::EditorExtension, SectionAttributes};
 
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
@@ -8,16 +12,123 @@ pub struct NodeEditorId(u32);
 pub struct NodeEditor {
     pub imnodes: imnodes::Context,
     pub imnode_editors: HashMap<u32, imnodes::EditorContext>,
+    pub nodes: HashMap<u32, Vec<NodeComponent>>,
+}
+
+pub struct NodeComponent {
+    title: String,
+    label: String,
+    node_id: NodeId,
+    input_id: InputPinId,
+    output_id: OutputPinId,
+    attribute_id: AttributeId,
+    attribute: Attribute,
+}
+
+impl NodeEditor {
+    pub fn new() -> NodeEditor {
+        NodeEditor {
+            imnodes: imnodes::Context::new(),
+            imnode_editors: HashMap::new(),
+            nodes: HashMap::new(),
+        }
+    }
+}
+
+impl EditorExtension for NodeEditor {
+    fn extend_editor(&mut self, world: &specs::World, ui: &imgui::Ui) {
+        self.run_now(world);
+        self.show_editor(ui);
+    }
 }
 
 impl<'a> System<'a> for NodeEditor {
-    type SystemData = (Entities<'a>, ReadStorage<'a, NodeEditorId>);
+    type SystemData = (Entities<'a>, ReadStorage<'a, SectionAttributes>);
 
-    fn run(&mut self, (entities, node_editor): Self::SystemData) {
-        for (_, NodeEditorId(parent_id)) in (&entities, &node_editor).join() {
-            if let None = self.imnode_editors.get(&parent_id) {
-                self.imnode_editors
-                    .insert(*parent_id, self.imnodes.create_editor());
+    fn run(&mut self, (entities, attributes): Self::SystemData) {
+        for e in entities.join() {
+            if let Some(attributes) = attributes.get(e) {
+                match attributes.is_attr_checkbox("enable node editor") {
+                    Some(true) => {
+                        if let None = self.imnode_editors.get(&e.id()) {
+                            let editor_context = self.imnodes.create_editor();
+                            let mut idgen = editor_context.new_identifier_generator();
+
+                            let mut nodes = vec![];
+
+                            for attr in attributes
+                                .clone_attrs()
+                                .iter_mut()
+                                .filter(|a| a.name().starts_with("node::"))
+                            {
+                                nodes.push(NodeComponent {
+                                    title: attr.name().to_string(),
+                                    label: attr.name()[6..].to_string(),
+                                    node_id: idgen.next_node(),
+                                    input_id: idgen.next_input_pin(),
+                                    output_id: idgen.next_output_pin(),
+                                    attribute_id: idgen.next_attribute(),
+                                    attribute: attr.clone(),
+                                });
+                            }
+
+                            self.nodes.insert(e.id(), nodes);
+                            self.imnode_editors.insert(e.id(), editor_context);
+                        }
+                    }
+                    Some(false) => {
+                        self.imnode_editors.remove(&e.id());
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+}
+
+impl App for NodeEditor {
+    fn name() -> &'static str {
+        "Node Editor"
+    }
+
+    fn show_editor(&mut self, ui: &imgui::Ui) {
+        for (id, mut context) in self.imnode_editors.iter_mut() {
+            if let Some(nodes) = self.nodes.get_mut(id) {
+                editor(&mut context, |mut editor_scope| {
+                    nodes.iter_mut().for_each(|node_component| {
+                        let NodeComponent {
+                            title,
+                            label,
+                            node_id,
+                            input_id,
+                            output_id,
+                            attribute_id,
+                            attribute,
+                        } = node_component;
+
+                        ui.set_next_item_width(200.0);
+                        editor_scope.add_node(*node_id, |mut node_scope| {
+                            ui.set_next_item_width(200.0);
+                            node_scope.add_titlebar(|| {
+                                ui.text(title);
+                            });
+                            node_scope.attribute(*attribute_id, || {
+                                ui.set_next_item_width(200.0);
+                                attribute.edit_attr(label, ui);
+                            });
+
+                            node_scope.add_input(*input_id, imnodes::PinShape::Circle, || {
+                                ui.set_next_item_width(200.0);
+                                ui.text("in");
+                            });
+
+                            node_scope.add_output(*output_id, imnodes::PinShape::Circle, || {
+                                ui.set_next_item_width(200.0);
+                                ui.text("out");
+                            });
+                        });
+                    })
+                });
             }
         }
     }

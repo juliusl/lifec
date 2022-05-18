@@ -1,25 +1,23 @@
-// pub use atlier::system::App;
-
-// mod event_editor;
-// mod event_graph_editor;
 mod event_node_editor;
 mod node_editor;
 mod runtime_editor;
 mod section;
 
+use atlier::system::start_editor;
 use imgui::CollapsingHeader;
 use rand::Rng;
 use specs::{prelude::*, Component};
-use atlier::system::start_editor;
 
 pub use atlier::system::App;
-pub use atlier::system::Value;
 pub use atlier::system::Attribute;
+pub use atlier::system::Value;
+pub use specs::RunNow;
+pub use node_editor::NodeEditor;
 pub use runtime_editor::RuntimeEditor;
 pub use runtime_editor::SectionAttributes;
-pub use node_editor::NodeEditor;
 pub use section::Section;
 pub use section::SectionExtension;
+pub use section::EditorExtension;
 
 use crate::Runtime;
 use crate::RuntimeState;
@@ -44,29 +42,31 @@ pub struct EventComponent {
 
 impl<S: RuntimeState> Into<Section<S>> for &mut EventComponent {
     fn into(self) -> Section<S> {
-        Section::<S>::new(self.label.to_string(), 
-        |_, _| {}, S::default())
-        .with_text("label", self.label.clone())
-        .with_text("on", self.on.clone())
-        .with_text("dispatch", self.dispatch.clone())
-        .with_text("call", self.call.clone())
+        Section::<S>::new(self.label.to_string(), |_, _| {}, S::default())
+            .with_text("label", self.label.clone())
+            .with_text("on", self.on.clone())
+            .with_text("dispatch", self.dispatch.clone())
+            .with_text("call", self.call.clone())
     }
 }
 
 impl App for EventComponent {
     fn name() -> &'static str {
-       "Event Component"
+        "Event Component"
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
         if CollapsingHeader::new(format!("{}", self.label)).begin(ui) {
-            ui.input_text(format!("on ({})", self.label), &mut self.on).build();
+            ui.input_text(format!("on ({})", self.label), &mut self.on)
+                .build();
             if !&self.dispatch.is_empty() {
-                ui.input_text(format!("dispatch ({})", self.label), &mut self.dispatch).build();
+                ui.input_text(format!("dispatch ({})", self.label), &mut self.dispatch)
+                    .build();
             }
 
             if !&self.call.is_empty() {
-                ui.input_text(format!("call ({})", self.label), &mut self.call).build();
+                ui.input_text(format!("call ({})", self.label), &mut self.call)
+                    .build();
             }
             ui.new_line();
         }
@@ -78,47 +78,78 @@ pub fn open_simple_editor<S>()
 where
     S: crate::RuntimeState + Component + App,
 {
-    start_runtime_editor::<S, _>(format!("Simple Runtime Editor for {}", <S as App>::name()).as_str(), Runtime::<S>::default(), |_, w, _| {
-        w.register::<Section<S>>();
+    start_runtime_editor::<S, _, _>(
+        format!("Simple Runtime Editor for {}", <S as App>::name()).as_str(),
+        Runtime::<S>::default(),
+        |_, w, _| {
+            w.register::<Section<S>>();
 
-        w
-            .create_entity()
-            .maybe_with(Some(Section::<S>::from(S::default())))
-            .build();
-    });
-}
-
-pub fn open_editor<RtS, WorldInitF, SysInitF>(sections: Vec<Section::<RtS>>, with_world: WorldInitF, with_systems: SysInitF)
-where
-    RtS: crate::RuntimeState + Component + App,
-    WorldInitF: 'static + Fn(&mut World),
-    SysInitF: 'static + Fn(&mut DispatcherBuilder)
-{
-    open_editor_with(format!("Runtime Editor for {}", <RtS as App>::name()), Runtime::<RtS>::default(), sections, with_world, with_systems)
-}
-
-pub fn open_editor_with<RtS, WorldInitF, SysInitF>(title: String, initial_runtime: Runtime<RtS>, sections: Vec<Section::<RtS>>, with_world: WorldInitF, with_systems: SysInitF)
-where
-    RtS: crate::RuntimeState + Component + App,
-    WorldInitF: 'static + Fn(&mut World),
-    SysInitF: 'static + Fn(&mut DispatcherBuilder)
-{
-    start_runtime_editor::<RtS, _>(title.as_str(), initial_runtime, move |_, w, d| {
-        w.register::<Section<RtS>>();
-        sections.iter().for_each(|s| {
             w.create_entity()
-                .maybe_with(Some(s.clone()))
+                .maybe_with(Some(Section::<S>::from(S::default())))
                 .build();
-        });
-        with_world(w);
-        with_systems(d);
-    });
+        },
+        |_, _| {},
+    );
 }
 
-fn start_runtime_editor<S, F>(title: &str, initial_runtime: Runtime<S>, extension: F)
-where
+pub fn open_editor<RtS, WorldInitF, SysInitF, Ext>(
+    sections: Vec<Section<RtS>>,
+    with_world: WorldInitF,
+    with_systems: SysInitF,
+    with_ext_app: Ext,
+) where
+    RtS: crate::RuntimeState + Component + App,
+    WorldInitF: 'static + Fn(&mut World),
+    SysInitF: 'static + Fn(&mut DispatcherBuilder),
+    Ext: 'static + FnMut(&World, &imgui::Ui),
+{
+    open_editor_with(
+        format!("Runtime Editor for {}", <RtS as App>::name()),
+        Runtime::<RtS>::default(),
+        sections,
+        with_world,
+        with_systems,
+        with_ext_app,
+    )
+}
+
+pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
+    title: String,
+    initial_runtime: Runtime<RtS>,
+    sections: Vec<Section<RtS>>,
+    with_world: WorldInitF,
+    with_systems: SysInitF,
+    with_ext_app: Ext,
+) where
+    RtS: crate::RuntimeState + Component + App,
+    WorldInitF: 'static + Fn(&mut World),
+    SysInitF: 'static + Fn(&mut DispatcherBuilder),
+    Ext: 'static + FnMut(&World, &imgui::Ui),
+{
+    start_runtime_editor::<RtS, _, _>(
+        title.as_str(),
+        initial_runtime,
+        move |_, w, d| {
+            w.register::<Section<RtS>>();
+            sections.iter().for_each(|s| {
+                w.create_entity().maybe_with(Some(s.clone())).build();
+            });
+            with_world(w);
+            with_systems(d);
+        },
+        with_ext_app,
+    );
+}
+
+fn start_runtime_editor<S, F, Ext>(
+    title: &str,
+    initial_runtime: Runtime<S>,
+    extension: F,
+    ext_app: Ext,
+) where
     S: crate::RuntimeState + Component + App,
     F: 'static + Fn(&mut RuntimeEditor<S>, &mut World, &mut DispatcherBuilder),
+    Ext: 'static + FnMut(&World, &imgui::Ui),
 {
     let &[width, height] = S::window_size();
 
@@ -128,6 +159,7 @@ where
         height.into(),
         RuntimeEditor::<S>::from(initial_runtime),
         extension,
+        ext_app,
     )
 }
 
