@@ -2,7 +2,7 @@ use std::{fmt::Display, path::Path, fs};
 
 use super::{App, Attribute, ShowEditor, Value};
 use crate::RuntimeState;
-use imgui::*;
+use imgui::CollapsingHeader;
 use serde::{Deserialize, Serialize};
 use specs::{Component, HashMapStorage};
 
@@ -27,8 +27,11 @@ pub struct Section<S>
 where
     S: RuntimeState,
 {
+    /// id is the id of the parent entity of the section
     id: u32,
+    /// title of this section, will be the header
     pub title: String,
+    /// attributes are properties that this section owns and are editable
     pub attributes: Vec<Attribute>,
     /// enable to allow external systems to make changes to state,
     /// in order for systems to commit these changes, RuntimeState::merge_with must be implemented (this is set todo!() by default)
@@ -62,6 +65,14 @@ impl<S: RuntimeState> Section<S> {
     /// The parent entity of this component
     pub fn get_parent_entity(&self) -> u32 {
         self.id
+    }
+
+    pub fn get_attr_value(&self, with_name: impl AsRef<str>) -> Option<&Value> {
+        self.get_attr(with_name).and_then(|a| Some(a.value()))
+    }
+
+    pub fn get_attr_value_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Value> {
+        self.get_attr_mut(with_name).and_then(|a| Some(a.get_value_mut()))
     }
 
     pub fn get_attr(&self, with_name: impl AsRef<str>) -> Option<&Attribute> {
@@ -102,9 +113,7 @@ impl<S: RuntimeState> Section<S> {
         attr_name: impl AsRef<str>,
         ui: &imgui::Ui,
     ) {
-        match self
-            .get_attr_mut(attr_name)
-            .and_then(|a| Some(a.get_value_mut()))
+        match self.get_attr_value_mut(attr_name)
         {
             Some(Value::TextBuffer(val)) => {
                 ui.input_text(label.as_ref(), val).build();

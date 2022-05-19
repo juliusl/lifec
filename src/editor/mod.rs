@@ -74,10 +74,10 @@ impl<S: RuntimeState> From<&mut Section<S>> for EventComponent {
             Some(Value::TextBuffer(on)), 
             Some(Value::TextBuffer(dispatch)), 
             Some(Value::TextBuffer(call))) = (
-            s.get_attr("label").and_then(|a|Some(a.value())), 
-            s.get_attr("on").and_then(|a|Some(a.value())),
-            s.get_attr("dispatch").and_then(|a|Some(a.value())),
-            s.get_attr("call").and_then(|a|Some(a.value())),  
+            s.get_attr_value("label"), 
+            s.get_attr_value("on"),
+            s.get_attr_value("dispatch"),
+            s.get_attr_value("call"),  
         ){
             let label = label.to_string();
             let on = on.to_string();
