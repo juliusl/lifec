@@ -1,5 +1,6 @@
 use imgui::{Condition, Window};
 use lifec::{editor::*, RuntimeState};
+use ron::ser::PrettyConfig;
 use specs::{Component, DenseVecStorage, RunNow};
 use specs::{Entities, Join, ReadStorage, System, WorldExt, WriteStorage};
 use std::fmt::Display;
@@ -120,6 +121,14 @@ impl<'a> System<'a> for TestSerializeAttributes {
             if let Some(section) = section.get(entity) {
                 if let Some(str) = serde_json::to_string(section).ok() {
                     println!("{}", str);
+                }
+
+                if let Some(str) = ron::ser::to_string_pretty(section, PrettyConfig::new()).ok() {
+                    println!("{}", str);
+                }
+
+                if let Some(vec) = rmp_serde::encode::to_vec(section).ok() {
+                    println!("{:?}", vec);
                 }
             }
         }
