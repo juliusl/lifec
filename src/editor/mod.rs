@@ -1,4 +1,3 @@
-mod event_node_editor;
 mod node_editor;
 mod node_editor_graph;
 mod runtime_editor;

@@ -9,8 +9,13 @@ pub mod editor;
 pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
     type Error;
 
-    /// load should take an initial message, and override any
-    /// existing state that exists
+    /// Save should serialize this state into a String
+    fn save(&self) -> String {
+        String::default()
+    }
+
+    /// load should take the serialized form of this state
+    /// and create a new instance of Self 
     fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self
     where
         Self: Sized;
