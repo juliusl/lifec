@@ -4,7 +4,6 @@ mod runtime_editor;
 mod section;
 
 use atlier::system::start_editor;
-use imgui::CollapsingHeader;
 use rand::Rng;
 use specs::{prelude::*, Component};
 
@@ -24,14 +23,16 @@ use crate::RuntimeState;
 /// ShowEditor is a wrapper over a show function stored as a specs Component
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
-pub struct ShowEditor<S>(pub fn(&mut S, &imgui::Ui)) where S: RuntimeState;
+pub struct ShowEditor<S>(pub fn(&mut S, &imgui::Ui))
+where
+    S: RuntimeState;
 
 impl<S> Default for ShowEditor<S>
 where
     S: RuntimeState,
 {
     fn default() -> Self {
-        Self(|_, _|{})
+        Self(|_, _| {})
     }
 }
 
@@ -50,34 +51,19 @@ pub struct EventComponent {
 
 impl<S: RuntimeState> Into<Section<S>> for &mut EventComponent {
     fn into(self) -> Section<S> {
-        Section::<S>::new(self.label.to_string(), |_, _| {}, S::default())
-            .with_text("label", self.label.clone())
-            .with_text("on", self.on.clone())
-            .with_text("dispatch", self.dispatch.clone())
-            .with_text("call", self.call.clone())
-    }
-}
-
-impl App for EventComponent {
-    fn name() -> &'static str {
-        "Event Component"
-    }
-
-    fn show_editor(&mut self, ui: &imgui::Ui) {
-        if CollapsingHeader::new(format!("{}", self.label)).begin(ui) {
-            ui.input_text(format!("on ({})", self.label), &mut self.on)
-                .build();
-            if !&self.dispatch.is_empty() {
-                ui.input_text(format!("dispatch ({})", self.label), &mut self.dispatch)
-                    .build();
-            }
-
-            if !&self.call.is_empty() {
-                ui.input_text(format!("call ({})", self.label), &mut self.call)
-                    .build();
-            }
-            ui.new_line();
-        }
+        Section::<S>::new(
+            self.label.to_string(),
+            |s, ui| {
+                s.edit_attr("edit the 'on' property", "on", ui);
+                s.edit_attr("edit the 'dispatch' property", "dispatch", ui);
+                s.edit_attr("edit the 'call' property", "call", ui);
+            },
+            S::default(),
+        )
+        .with_text("label", self.label.clone())
+        .with_text("on", self.on.clone())
+        .with_text("dispatch", self.dispatch.clone())
+        .with_text("call", self.call.clone())
     }
 }
 

@@ -212,7 +212,9 @@ where
                 if CollapsingHeader::new(format!("Edit Current Runtime Events")).begin(ui) {
                     ui.indent();
                     for e in self.events.iter_mut() {
-                        EventComponent::show_editor(e, ui);
+                        let mut section: Section::<S> = e.into();
+                        let section = &mut section;
+                        section.show_editor(ui);
                     }
                     ui.unindent();
                 }

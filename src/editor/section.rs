@@ -161,10 +161,11 @@ impl<S: RuntimeState> Section<S> {
         next
     }
 
+    /// try to load a file into an attribute
     pub fn with_file(&mut self, file_name: impl AsRef<Path> + AsRef<str> + Display) -> Self {
         match  fs::read_to_string(&file_name){
             Ok(contents) => {
-                self.update(move |next| next.add_binary_attr(file_name, contents.as_bytes().to_vec()))
+                self.update(move |next| next.add_binary_attr(format!("file::{}", file_name), contents.as_bytes().to_vec()))
             },
             Err(err) => { 
                 eprintln!("Could not load file '{}', for with_file on section '{}', entity {}. Error: {}", &file_name, self.title, self.id, err);

@@ -49,7 +49,8 @@ fn main() {
         runtime, 
         vec![Dealer::dealer_section()],
         |_| {}, 
-        |_| {}
+        |_| {},
+        |_, _| {}
     )
 }
 
