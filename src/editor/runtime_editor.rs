@@ -215,6 +215,8 @@ where
                         let mut section: Section::<S> = e.into();
                         let section = &mut section;
                         section.show_editor(ui);
+
+                        *e = EventComponent::from(section);
                     }
                     ui.unindent();
                 }

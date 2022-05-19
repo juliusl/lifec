@@ -67,6 +67,41 @@ impl<S: RuntimeState> Into<Section<S>> for &mut EventComponent {
     }
 }
 
+impl<S: RuntimeState> From<&mut Section<S>> for EventComponent {
+    fn from(s: &mut Section<S>) -> Self {
+        if let (
+            Some(Value::TextBuffer(label)), 
+            Some(Value::TextBuffer(on)), 
+            Some(Value::TextBuffer(dispatch)), 
+            Some(Value::TextBuffer(call))) = (
+            s.get_attr("label").and_then(|a|Some(a.value())), 
+            s.get_attr("on").and_then(|a|Some(a.value())),
+            s.get_attr("dispatch").and_then(|a|Some(a.value())),
+            s.get_attr("call").and_then(|a|Some(a.value())),  
+        ){
+            let label = label.to_string();
+            let on = on.to_string();
+            let dispatch = dispatch.to_string();
+            let call = call.to_string();
+            Self {
+                label,
+                on,
+                dispatch,
+                call,
+                transitions: Vec::default()
+            }
+        } else {
+            Self {
+                label: String::default(),
+                on: String::default(),
+                dispatch: String::default(),
+                call: String::default(),
+                transitions: Vec::default(),
+            }
+        }
+    }
+}
+
 /// Opens the runtime editor with a single section defined by S
 pub fn open_simple_editor<S>()
 where
