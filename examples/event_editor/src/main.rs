@@ -33,6 +33,7 @@ fn main() {
                     s.show_debug("enable clock", ui);
                     s.show_debug("node::test int", ui);
                     s.show_debug("node::test float range", ui);
+                    s.show_debug("binary", ui);
                     s.edit_attr("edit test attribute", "test", ui);
                     s.edit_attr("open a new window and test this attribute", "test-bool", ui);
                     s.edit_attr("enable clock for this section", "enable clock", ui);
@@ -86,6 +87,9 @@ fn main() {
             .with_float("node::test float", 0.0)
             .with_float_pair("node::test float pair", &[0.0, 1.0])
             .with_float_range("node::test float range", &[1.0, 2.0, 3.0])
+            .with_attribute(Attribute::new(0, "binary".to_string(), Value::BinaryVector(vec![1, 2, 3])))
+            .with_file("test.txt")
+            .with_file("doesnt_exist.txt")
             .enable_app_systems(),
         ],
         |w| {
