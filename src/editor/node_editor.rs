@@ -1,26 +1,20 @@
 use atlier::system::{App, Attribute, Extension};
-use imnodes::{editor, AttributeId, InputPinId, NodeId, OutputPinId};
-use specs::{
-    Component, DenseVecStorage, Entities, Join, ReadStorage, RunNow, System,
-};
-use std::collections::HashMap;
+use imnodes::{editor, AttributeFlag, AttributeId, InputPinId, Link, LinkId, NodeId, OutputPinId};
+use specs::{Entities, Join, ReadStorage, RunNow, System};
+use std::collections::{HashMap, HashSet};
 
-use super::SectionAttributes;
-
-#[derive(Clone, Component)]
-#[storage(DenseVecStorage)]
-pub struct NodeEditorId(u32);
+use super::{node_editor_graph::NodeEditorGraph, SectionAttributes};
 
 pub struct NodeEditor {
     pub imnodes: imnodes::Context,
-    pub imnode_editors: HashMap<u32, imnodes::EditorContext>,
+    pub imnode_editors: HashMap<u32, (imnodes::EditorContext, imnodes::IdentifierGenerator)>,
     pub nodes: HashMap<u32, Vec<NodeComponent>>,
+    pub links: HashMap<u32, (HashSet<Link>, HashMap<LinkId, Link>)>,
 }
 
 #[derive(Clone)]
 pub struct NodeComponent {
     title: String,
-    label: String,
     node_id: NodeId,
     input_id: InputPinId,
     output_id: OutputPinId,
@@ -34,6 +28,7 @@ impl NodeEditor {
             imnodes: imnodes::Context::new(),
             imnode_editors: HashMap::new(),
             nodes: HashMap::new(),
+            links: HashMap::new(),
         }
     }
 }
@@ -48,12 +43,18 @@ impl Extension for NodeEditor {
 impl<'a> System<'a> for NodeEditor {
     type SystemData = (Entities<'a>, ReadStorage<'a, SectionAttributes>);
 
+    /// This system initializes a node editor when it detects
+    /// the attribute "enable node editor" has been set to true
+    /// It will read all the attributes in the collection with the prefix node::
+    /// and initialize the node_editor state
+    /// When the attribute is set to false, this system will remove those resources from this
+    /// system
     fn run(&mut self, (entities, attributes): Self::SystemData) {
-        for e in entities.join() {
+        entities.join().for_each(|e| {
             if let Some(attributes) = attributes.get(e) {
                 match attributes.is_attr_checkbox("enable node editor") {
-                    Some(true) => {
-                        if let None = self.imnode_editors.get(&e.id()) {
+                    Some(true) => match self.imnode_editors.get(&e.id()) {
+                        None => {
                             let editor_context = self.imnodes.create_editor();
                             let mut idgen = editor_context.new_identifier_generator();
 
@@ -65,8 +66,7 @@ impl<'a> System<'a> for NodeEditor {
                                 .filter(|a| a.name().starts_with("node::"))
                             {
                                 nodes.push(NodeComponent {
-                                    title: attr.name().to_string(),
-                                    label: attr.name()[6..].to_string(),
+                                    title: attr.name()[6..].to_string(),
                                     node_id: idgen.next_node(),
                                     input_id: idgen.next_input_pin(),
                                     output_id: idgen.next_output_pin(),
@@ -76,16 +76,20 @@ impl<'a> System<'a> for NodeEditor {
                             }
 
                             self.nodes.insert(e.id(), nodes);
-                            self.imnode_editors.insert(e.id(), editor_context);
+                            self.imnode_editors.insert(e.id(), (editor_context, idgen));
+                            self.links.insert(e.id(), (HashSet::new(), HashMap::new()));
                         }
-                    }
+                        _ => (),
+                    },
                     Some(false) => {
+                        self.nodes.remove(&e.id());
                         self.imnode_editors.remove(&e.id());
+                        self.links.remove(&e.id());
                     }
                     _ => (),
                 }
             }
-        }
+        })
     }
 }
 
@@ -95,45 +99,91 @@ impl App for NodeEditor {
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
-        for (id, mut context) in self.imnode_editors.iter_mut() {
+        use imgui::Condition;
+        use imgui::Window;
+
+        for (id, (context, idgen)) in self.imnode_editors.iter_mut() {
             if let Some(nodes) = self.nodes.get_mut(id) {
-                editor(&mut context, |mut editor_scope| {
-                    nodes
-                        .iter_mut()
-                        .for_each(|node_component| {
-                            let NodeComponent {
-                                title,
-                                label,
-                                node_id,
-                                input_id,
-                                output_id,
-                                attribute_id,
-                                attribute,
-                            } = node_component;
+                Window::new(format!("Node editor {}", id))
+                    .size([1920.0, 1080.0], Condition::Appearing)
+                    .build(ui, || {
+                        if ui.button("Rearrange") {
+                            if let Some((links, _)) = self.links.get_mut(id) {
+                                NodeEditorGraph::rearrange(links);
+                            }
+                        }
 
-                            ui.set_next_item_width(200.0);
-                            editor_scope.add_node(*node_id, |mut node_scope| {
-                                ui.set_next_item_width(200.0);
-                                node_scope.add_titlebar(|| {
-                                    ui.text(title);
-                                });
-                                node_scope.attribute(*attribute_id, || {
-                                    ui.set_next_item_width(200.0);
-                                    attribute.edit(ui);
-                                });
+                        let detatch = context.push(AttributeFlag::EnableLinkDetachWithDragClick);
 
-                                node_scope.add_input(*input_id, imnodes::PinShape::Circle, || {
-                                    ui.set_next_item_width(200.0);
-                                    ui.text("in");
-                                });
+                        let outer_scope = editor(context, |mut editor_scope| {
+                            editor_scope.add_mini_map(imnodes::MiniMapLocation::BottomRight);
+                            nodes.iter_mut().for_each(|node_component| {
+                                let NodeComponent {
+                                    title,
+                                    node_id,
+                                    input_id,
+                                    output_id,
+                                    attribute_id,
+                                    attribute,
+                                } = node_component;
 
-                                node_scope.add_output(*output_id, imnodes::PinShape::Circle, || {
-                                    ui.set_next_item_width(200.0);
-                                    ui.text("out");
+                                ui.set_next_item_width(130.0);
+                                editor_scope.add_node(*node_id, |mut node_scope| {
+                                    ui.set_next_item_width(130.0);
+                                    node_scope.add_titlebar(|| {
+                                        ui.text(title);
+                                    });
+                                    node_scope.attribute(*attribute_id, || {
+                                        ui.set_next_item_width(130.0);
+                                        attribute.edit(ui);
+                                    });
+
+                                    node_scope.add_input(
+                                        *input_id,
+                                        imnodes::PinShape::Circle,
+                                        || {
+                                            ui.set_next_item_width(130.0);
+                                            ui.text("in");
+                                        },
+                                    );
+
+                                    node_scope.add_output(
+                                        *output_id,
+                                        imnodes::PinShape::Circle,
+                                        || {
+                                            ui.set_next_item_width(130.0);
+                                            ui.text("out");
+                                        },
+                                    );
                                 });
                             });
-                        })
-                });
+
+                            if let Some((_, link_index)) = self.links.get(id) {
+                                link_index.iter().for_each(|(link_id, link)| {
+                                    editor_scope.add_link(*link_id, link.end_pin, link.start_pin);
+                                });
+                            }
+                        });
+
+                        if let Some(link) = outer_scope.links_created() {
+                            if let Some((links, link_index)) = self.links.get_mut(id) {
+                                if links.insert(link) {
+                                    link_index.insert(idgen.next_link(), link);
+                                }
+                            }
+                        }
+
+                        if let Some(dropped) = outer_scope.get_dropped_link() {
+                            if let Some((links, link_index)) = self.links.get_mut(id) {
+                                if let Some(dropped_link) = link_index.get(&dropped) {
+                                    links.remove(dropped_link);
+                                    link_index.remove(&dropped);
+                                }
+                            }
+                        }
+
+                        detatch.pop();
+                    });
             }
         }
     }
