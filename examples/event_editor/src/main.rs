@@ -1,9 +1,8 @@
-use std::fmt::Display;
-
 use imgui::{Condition, Window};
 use lifec::{editor::*, RuntimeState};
-use specs::{Component, DenseVecStorage};
+use specs::{Component, DenseVecStorage, RunNow};
 use specs::{Entities, Join, ReadStorage, System, WorldExt, WriteStorage};
+use std::fmt::Display;
 
 fn main() {
     let mut node_editor = NodeEditor::new();
@@ -23,20 +22,43 @@ fn main() {
                 |s, ui| {
                     Test::show_editor(&mut s.state, ui);
                     ui.new_line();
-                    Clock::extend_section(s, ui);
+                    Clock::show_extension(s, ui);
                     if ui.button("hello") {
                         println!("world");
                     }
 
-                    s.show_attr_debug("display debug for test", "test", ui);
-                    s.show_attr_debug("display debug for test-bool", "test-bool", ui);
-                    s.show_attr_debug("display debug for enable clock", "enable clock", ui);
-                    s.show_attr_debug("display debug for node::test int", "node::test int", ui);
+                    s.show_debug("test", ui);
+                    s.show_debug("test-bool", ui);
+                    s.show_debug("enable clock", ui);
+                    s.show_debug("node::test int", ui);
+                    s.show_debug("node::test float range", ui);
                     s.edit_attr("edit test attribute", "test", ui);
                     s.edit_attr("open a new window and test this attribute", "test-bool", ui);
                     s.edit_attr("enable clock for this section", "enable clock", ui);
-                    s.edit_attr("enable node editor for this section", "enable node editor", ui);
-                    s.edit_attr("edit a float that's from the node editor", "node::test float", ui);
+                    s.edit_attr(
+                        "enable node editor for this section",
+                        "enable node editor",
+                        ui,
+                    );
+                    s.edit_attr(
+                        "edit a float that's from the node editor",
+                        "node::test float",
+                        ui,
+                    );
+                    s.edit_attr(
+                        "edit a slider float",
+                        "node::test float range",
+                        ui
+                    );
+                    s.edit_attr(
+                        "edit a float pair",
+                        "node::test float pair",
+                        ui
+                    );
+
+                    s.edit_attr_custom("node::test int pair", |attr| { 
+                        ui.text(format!("testing edit attr custom {:?}", attr));
+                    });
 
                     if let Some(true) = s.is_attr_checkbox("test-bool") {
                         Window::new("testing attr control")
@@ -44,7 +66,7 @@ fn main() {
                             .build(ui, || ui.text("hi"));
                     }
 
-                    TestExtension::extend_section(s, ui);
+                    TestExtension::show_extension(s, ui);
                 },
                 Test {
                     id: 1,
@@ -57,12 +79,17 @@ fn main() {
             .with_bool("test-bool", false)
             .with_bool("node::enable clock", false)
             .with_bool("enable node editor", false)
+            .with_bool("allow node editor to change state on close", false)
             .with_int("node::test int", 0)
+            .with_int_pair("node::test int pair", &[0, 1])
             .with_float("node::test float", 0.0)
+            .with_float_pair("node::test float pair", &[0.0, 1.0])
+            .with_float_range("node::test float range", &[1.0, 2.0, 3.0])
             .enable_app_systems(),
         ],
         |w| {
             w.register::<Attribute>();
+            NodeEditor::configure_app_world(w);
         },
         |d| {
             d.add(Clock {}, "clock", &[]);
@@ -70,14 +97,39 @@ fn main() {
         move |world, ui| {
             let node_editor = &mut node_editor;
             node_editor.extend_app_world(world, ui);
+
+            // example of extending the world with a custom window and save button
+            Window::new("save the world")
+                .size([800.0, 600.0], Condition::Appearing)
+                .build(ui, || {
+                    if ui.button("save") {
+                        TestSerializeAttributes {}.run_now(world);
+                    }
+                });
         },
     );
+}
+
+struct TestSerializeAttributes;
+
+impl<'a> System<'a> for TestSerializeAttributes {
+    type SystemData = (Entities<'a>, ReadStorage<'a, SectionAttributes>);
+
+    fn run(&mut self, (entities, section): Self::SystemData) {
+        for entity in entities.join() {
+            if let Some(section) = section.get(entity) {
+                if let Some(str) = serde_json::to_string(section).ok() {
+                    println!("{}", str);
+                }
+            }
+        }
+    }
 }
 
 struct TestExtension;
 
 impl SectionExtension<Test> for TestExtension {
-    fn extend_section(section: &mut Section<Test>, ui: &imgui::Ui) {
+    fn show_extension(section: &mut Section<Test>, ui: &imgui::Ui) {
         ui.text(format!(
             "from test extension for {}, parent_entity: {}",
             section,
@@ -89,7 +141,7 @@ impl SectionExtension<Test> for TestExtension {
 struct Clock;
 
 impl SectionExtension<Test> for Clock {
-    fn extend_section(section: &mut Section<Test>, ui: &imgui::Ui) {
+    fn show_extension(section: &mut Section<Test>, ui: &imgui::Ui) {
         if let Some(true) = section.is_attr_checkbox("enable clock") {
             ui.text(format!("clock: {}", section.state.clock));
         }

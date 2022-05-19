@@ -1,10 +1,12 @@
-use imgui::{Window, CollapsingHeader};
-use specs::{Component, Entities, Join, ReadStorage, System, WriteStorage, storage::DenseVecStorage};
-use std::{collections::BTreeMap};
+use imgui::{CollapsingHeader, Window};
+use serde::{Deserialize, Serialize};
+use specs::{
+    storage::DenseVecStorage, Component, Entities, Join, ReadStorage, System, WriteStorage,
+};
+use std::collections::BTreeMap;
 
-use crate::{Runtime, RuntimeState, Action};
-
-use super::{section::Section, EventComponent, Value, App, Attribute, unique_title};
+use super::{section::Section, unique_title, App, Attribute, EventComponent, Value};
+use crate::{Action, Runtime, RuntimeState};
 
 pub struct RuntimeEditor<S>
 where
@@ -42,19 +44,23 @@ impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
                         .iter()
                         .map(|(_, t)| t.to_owned())
                         .collect(),
-                //     flags: parse_flags(l.extensions.get_args()),
-                //     variales: parse_variables(l.extensions.get_args()),
+                    //     flags: parse_flags(l.extensions.get_args()),
+                    //     variales: parse_variables(l.extensions.get_args()),
                 }),
                 _ => None,
             })
             .collect();
 
-       let next =  Self { runtime, events, sections: BTreeMap::new() };
-       next
+        let next = Self {
+            runtime,
+            events,
+            sections: BTreeMap::new(),
+        };
+        next
     }
 }
 
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Serialize, Deserialize)]
 #[storage(DenseVecStorage)]
 pub struct SectionAttributes(Vec<Attribute>);
 
@@ -80,36 +86,56 @@ impl SectionAttributes {
             None
         }
     }
+
+    pub fn get_attrs_mut(&mut self) -> &mut Vec<Attribute> {
+        &mut self.0
+    }
 }
 
 impl<'a, S> System<'a> for RuntimeEditor<S>
 where
     S: RuntimeState + Component,
 {
-    type SystemData = (Entities<'a>, ReadStorage<'a, Section<S>>, WriteStorage<'a, SectionAttributes>);
+    type SystemData = (
+        Entities<'a>,
+        ReadStorage<'a, Section<S>>,
+        WriteStorage<'a, SectionAttributes>,
+    );
 
+    /// The runtime editor maintains a vector of sections that it displays
+    /// This system coordinates updates to those sections, as well as initialization
     fn run(&mut self, (entities, read_sections, mut write_attributes): Self::SystemData) {
         for (e, s) in (&entities, &read_sections).join() {
             match self.sections.get(&e.id()) {
                 None => {
                     let clone = s.clone().with_parent_entity(e.id());
-
-                    // Save a copy of the section attributes.
-                    // TODO currently any changes to section attributes via systems wouldn't affect the gui state
-                    match write_attributes.insert(e, SectionAttributes(clone.attributes.iter().cloned().collect())) {
+                    match write_attributes.insert(
+                        e,
+                        SectionAttributes(clone.attributes.iter().cloned().collect()),
+                    ) {
                         Ok(_) => {
                             self.sections.insert(e.id(), clone);
-                        },
+                        }
                         Err(e) => {
-                            eprintln!("Error adding Section Attributes to Storage, {}", e); 
+                            eprintln!("Error adding Section Attributes to Storage, {}", e);
                         }
                     }
                 }
-                Some(Section {  enable_app_systems, state, attributes, enable_edit_attributes, .. }) => {
+                Some(Section {
+                    enable_app_systems,
+                    state,
+                    attributes,
+                    enable_edit_attributes,
+                    ..
+                }) => {
                     // Update the world's copy of attributes from editor's copy
-                    match write_attributes.insert(e, SectionAttributes(attributes.iter().cloned().collect())) {
-                        Ok(_) => {},
-                        Err(err) => { eprintln!("Error updating section attributes {}", err); },
+                    match write_attributes
+                        .insert(e, SectionAttributes(attributes.iter().cloned().collect()))
+                    {
+                        Ok(_) => {}
+                        Err(err) => {
+                            eprintln!("Error updating section attributes {}", err);
+                        }
                     }
 
                     if *enable_app_systems {
@@ -126,7 +152,7 @@ where
                         });
                     }
                 }
-            } 
+            }
         }
     }
 }
@@ -177,15 +203,15 @@ where
                         ui.new_line();
                     }
 
-                    let context = self.runtime.context(); 
+                    let context = self.runtime.context();
                     ui.label_text(format!("Current Context"), format!("{}", context));
 
                     ui.unindent();
                 }
-                
+
                 if CollapsingHeader::new(format!("Edit Current Runtime Events")).begin(ui) {
                     ui.indent();
-                    for e in self.events.iter_mut() {                        
+                    for e in self.events.iter_mut() {
                         EventComponent::show_editor(e, ui);
                     }
                     ui.unindent();
@@ -193,20 +219,23 @@ where
 
                 if CollapsingHeader::new(format!("Debug Editor Sections")).begin(ui) {
                     ui.indent();
-                    for (_, section) in self.sections.iter_mut() {                        
-                        ui.checkbox(format!("enable attribute editor for {}", section.title), &mut section.enable_edit_attributes);
+                    for (_, section) in self.sections.iter_mut() {
+                        ui.checkbox(
+                            format!("enable attribute editor for {}", section.title),
+                            &mut section.enable_edit_attributes,
+                        );
 
                         if ui.button(format!("Add new text attribute to {}", section.title)) {
-                            section.add_text_attr(unique_title("New"), ""); 
+                            section.add_text_attr(unique_title("New"), "");
                         }
                         if ui.button(format!("Add new int attribute to {}", section.title)) {
-                            section.add_int_attr(unique_title("New"), 0); 
+                            section.add_int_attr(unique_title("New"), 0);
                         }
                         if ui.button(format!("Add new float attribute to {}", section.title)) {
-                            section.add_float_attr(unique_title("New"), 0.0); 
-                        } 
+                            section.add_float_attr(unique_title("New"), 0.0);
+                        }
                         if ui.button(format!("Add new bool attribute to {}", section.title)) {
-                            section.add_bool_attr(unique_title("New"), false); 
+                            section.add_bool_attr(unique_title("New"), false);
                         }
                         ui.new_line();
                     }

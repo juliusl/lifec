@@ -11,8 +11,8 @@ use specs::{prelude::*, Component};
 
 pub use atlier::system::App;
 pub use atlier::system::Attribute;
-pub use atlier::system::Value;
 pub use atlier::system::Extension;
+pub use atlier::system::Value;
 pub use node_editor::NodeEditor;
 pub use runtime_editor::RuntimeEditor;
 pub use runtime_editor::SectionAttributes;
@@ -22,10 +22,19 @@ pub use section::SectionExtension;
 use crate::Runtime;
 use crate::RuntimeState;
 
-/// Edit is a function wrapper over a display function that is stored as a specs Component
+/// ShowEditor is a wrapper over a show function stored as a specs Component
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
-pub struct Edit<S: RuntimeState>(pub fn(&mut S, &imgui::Ui));
+pub struct ShowEditor<S>(pub fn(&mut S, &imgui::Ui)) where S: RuntimeState;
+
+impl<S> Default for ShowEditor<S>
+where
+    S: RuntimeState,
+{
+    fn default() -> Self {
+        Self(|_, _|{})
+    }
+}
 
 /// Event component is the the most basic data unit of the runtime
 #[derive(Clone, Component)]
@@ -163,8 +172,8 @@ fn start_runtime_editor<S, F, Ext>(
     )
 }
 
-pub fn unique_title(title: &str) -> String {
+pub fn unique_title(title: impl AsRef<str>) -> String {
     let mut rng = rand::thread_rng();
 
-    format!("{}_{:#04x}", title, rng.gen::<u16>())
+    format!("{}_{:#04x}", title.as_ref(), rng.gen::<u16>())
 }
