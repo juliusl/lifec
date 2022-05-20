@@ -54,8 +54,8 @@ impl<S: RuntimeState> Into<Section<S>> for &mut EventComponent {
         Section::<S>::new(
             self.label.to_string(),
             |s, ui| {
-                s.edit_attr("edit the 'on' property", "on", ui);
-                s.edit_attr("edit the 'dispatch' property", "dispatch", ui);
+                s.edit_attr("edit the 'on' property",  "on", ui);
+                s.edit_attr("edit the 'dispatch' property",  "dispatch", ui);
                 s.edit_attr("edit the 'call' property", "call", ui);
             },
             S::default(),
@@ -143,7 +143,7 @@ pub fn open_editor<RtS, WorldInitF, SysInitF, Ext>(
 }
 
 pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
-    title: String,
+    title: impl AsRef<str>,
     initial_runtime: Runtime<RtS>,
     sections: Vec<Section<RtS>>,
     with_world: WorldInitF,
@@ -156,7 +156,7 @@ pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
     Ext: 'static + FnMut(&World, &imgui::Ui),
 {
     start_runtime_editor::<RtS, _, _>(
-        title.as_str(),
+        title.as_ref(),
         initial_runtime,
         move |_, w, d| {
             w.register::<Section<RtS>>();

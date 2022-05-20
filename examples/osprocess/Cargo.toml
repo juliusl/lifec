@@ -7,4 +7,6 @@ edition = "2021"
 
 [dependencies]
 atlier = { path = "../../../atlier" }
+imgui = "0.8.2"
 lifec = { path = "../.." }
+specs = "0.17.0"

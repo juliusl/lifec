@@ -188,13 +188,18 @@ where
             .build(ui, || {
                 ui.new_line();
                 for (_, section) in self.sections.iter_mut() {
+                    if let Some(current) = self.runtime.current() {
+                        section.state = current.clone();
+                    }
                     section.show_editor(ui);
+                    self.runtime.state = Some(section.state.clone());
                 }
 
                 ui.new_line();
                 ui.text("Runtime/Editor Tools");
                 ui.new_line();
-                if CollapsingHeader::new(format!("Current Runtime Information")).begin(ui) {
+                
+                if CollapsingHeader::new(format!("Current Runtime")).begin(ui) {
                     ui.indent();
 
                     if let Some(state) = self.runtime.current() {
@@ -206,17 +211,31 @@ where
                     let context = self.runtime.context();
                     ui.label_text(format!("Current Context"), format!("{}", context));
 
+                    if CollapsingHeader::new(format!("Debug Runtime")).default_open(true).begin(ui) {
+                        ui.indent();
+
+                        if ui.button("Step") {
+                            self.runtime = self.runtime.step();
+                        }
+
+                        if ui.button("Setup") {
+                            self.runtime.parse_event("{ setup;; }");
+                        }
+    
+                        ui.unindent();
+                    }
                     ui.unindent();
                 }
 
                 if CollapsingHeader::new(format!("Edit Current Runtime Events")).begin(ui) {
                     ui.indent();
-                    for e in self.events.iter_mut() {
+                    for (i, e) in self.events.iter_mut().enumerate() {
                         let mut section: Section::<S> = e.into();
                         let section = &mut section;
+                        let mut section = section.with_parent_entity(i as u32);
                         section.show_editor(ui);
 
-                        *e = EventComponent::from(section);
+                        *e = EventComponent::from(&mut section);
                     }
                     ui.unindent();
                 }

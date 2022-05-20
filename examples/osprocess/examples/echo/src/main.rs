@@ -1,5 +1,5 @@
-use lifec::{Runtime};
-use lifec::editor::{App, RuntimeEditor};
+use lifec::editor::{open_editor, open_editor_with, App, RuntimeEditor, Section};
+use lifec::Runtime;
 use osprocess::Process;
 
 fn main() {
@@ -9,6 +9,7 @@ fn main() {
         if let Some(output) = output {
             println!("{}", output);
         }
+
         (s.clone(), "{ exit;; }".to_string())
     });
 
@@ -19,5 +20,15 @@ fn main() {
 
     runtime.on("{ after_echo;; }").call("print_results");
 
-    RuntimeEditor::start_editor(Some(RuntimeEditor::from(runtime.parse_event("{ setup;; }"))));
+    open_editor_with(
+        "OS Process",
+        runtime.parse_event("{ setup;; }"),
+        vec![
+            Section::new(<Process as App>::name(), Process::edit, Process::default())
+                .with_text("command", "")
+        ],
+        |_| {},
+        |_| {},
+        |_, _| {},
+    );
 }

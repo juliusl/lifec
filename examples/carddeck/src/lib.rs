@@ -705,13 +705,7 @@ pub struct Dealer {
 
 impl Dealer {
     pub fn dealer_section() -> Section::<Dealer> {
-        Section::<Dealer>::new(
-            "Dealer", 
-            |section, ui| { 
-                Dealer::show_editor(&mut section.state, ui);
-            }, 
-            Dealer::default(),
-        )
+        Dealer::default().into()
     }
 }
 
@@ -888,7 +882,7 @@ impl App for Dealer {
             *self = Dealer::default();
         }
         ui.same_line();
-        ui.text("Reshuffles the deck");
+        ui.text("Reshuffles the deck and all hands");
 
         if ui.button("Clear Deck") {
             *self = self.clear_deck();

@@ -1,8 +1,8 @@
 use std::{fmt::Display, path::Path, fs};
 
-use super::{App, Attribute, ShowEditor, Value};
+use super::{App, Attribute, ShowEditor, Value, unique_title};
 use crate::RuntimeState;
-use imgui::CollapsingHeader;
+use imgui::{CollapsingHeader, TreeNodeFlags};
 use serde::{Deserialize, Serialize};
 use specs::{Component, HashMapStorage};
 
@@ -104,28 +104,37 @@ impl<S: RuntimeState> Section<S> {
         }
     }
 
+    pub fn edit_state_with_attr<Str: AsRef<str>>(&mut self, attr_name: Str, update: impl Fn(&Attribute, &S) -> Option<S>) {
+        if let Some(attr) = self.get_attr(attr_name) {
+            if let Some(next) = update(attr, &self.state) {
+                self.state = next;
+            }
+        }
+    }
+
     /// This method allows you to edit an attribute from this section
     /// You can use a label that is different from the actual attribute name
     /// This allows attribute re-use
     pub fn edit_attr(
         &mut self,
-        label: impl AsRef<str>,
+        label: impl AsRef<str> + Display,
         attr_name: impl AsRef<str>,
         ui: &imgui::Ui,
     ) {
+        let label = format!("{} {}", label, self.id);
         match self.get_attr_value_mut(attr_name)
         {
             Some(Value::TextBuffer(val)) => {
-                ui.input_text(label.as_ref(), val).build();
+                ui.input_text(label, val).build();
             }
             Some(Value::Int(val)) => {
-                ui.input_int(label.as_ref(), val).build();
+                ui.input_int(label, val).build();
             }
             Some(Value::Float(val)) => {
-                ui.input_float(label.as_ref(), val).build();
+                ui.input_float(label, val).build();
             }
             Some(Value::Bool(val)) => {
-                ui.checkbox(label.as_ref(), val);
+                ui.checkbox(label, val);
             }
             Some(Value::FloatPair(f1, f2)) => {
                 let clone = &mut [*f1, *f2];
@@ -140,10 +149,10 @@ impl<S: RuntimeState> Section<S> {
                 *i2 = clone[1];
             }
             Some(Value::IntRange(i, i_min, i_max)) => {
-                imgui::Slider::new(label.as_ref(), *i_min, *i_max).build(ui, i);
+                imgui::Slider::new(label, *i_min, *i_max).build(ui, i);
             }
             Some(Value::FloatRange(f, f_min, f_max)) => {
-                imgui::Slider::new(label.as_ref(), *f_min, *f_max).build(ui, f);
+                imgui::Slider::new(label, *f_min, *f_max).build(ui, f);
             }
             None => {}
             _ => todo!(),
@@ -324,7 +333,7 @@ impl<S: RuntimeState + App> From<S> for Section<S> {
     fn from(initial: S) -> Self {
         Section {
             id: 0,
-            title: format!("{}: {}", S::name().to_string(), initial),
+            title: unique_title(S::name().to_string()),
             show_editor: ShowEditor(|section, ui| {
                 S::show_editor(&mut section.state, ui);
             }),
@@ -349,7 +358,7 @@ impl<S: RuntimeState> App for Section<S> {
 
             if self.enable_edit_attributes {
                 ui.new_line();
-                if CollapsingHeader::new(format!("Attributes {:#4x}", self.id)).build(ui) {
+                if CollapsingHeader::new(format!("Attributes {:#4x}", self.id)).flags(TreeNodeFlags::SPAN_AVAIL_WIDTH).build(ui) {
                     for a in self.attributes.iter_mut() {
                         a.edit(ui);
                         ui.new_line();
