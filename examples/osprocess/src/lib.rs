@@ -19,8 +19,15 @@ pub struct Process {
     pub flags: BTreeMap<String, String>,
 }
 
+impl SectionExtension<Process> for Process
+{
+    fn show_extension(section: &mut Section<Process>, ui: &imgui::Ui) {
+        Process::edit(section, ui);
+    }
+}
+
 impl Process {
-    pub fn edit(section: &mut Section<Process>, ui: &Ui) {
+    fn edit(section: &mut Section<Process>, ui: &Ui) {
         // Show the default view for this editor
         Process::show_editor(&mut section.state, ui);
 
