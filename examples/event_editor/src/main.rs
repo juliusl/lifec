@@ -7,6 +7,7 @@ use std::fmt::Display;
 
 fn main() {
     let mut node_editor = NodeEditor::new();
+    let mut attribute_editor = AttributeEditor::new();
 
     open_editor(
         vec![
@@ -88,6 +89,7 @@ fn main() {
             .with_float_pair("node::test float pair", &[0.0, 1.0])
             .with_float_range("node::test float range", &[1.0, 2.0, 3.0])
             .with_attribute(Attribute::new(0, "binary".to_string(), Value::BinaryVector(vec![1, 2, 3])))
+            .with_attribute(Attribute::new(0, "ref::test".to_string(), Value::TextBuffer("hello".to_string()).to_ref()))
             .with_file("test.txt")
             .with_file("doesnt_exist.txt")
             .enable_app_systems(),
@@ -102,6 +104,9 @@ fn main() {
         move |world, ui| {
             let node_editor = &mut node_editor;
             node_editor.extend_app_world(world, ui);
+
+            let attribute_editor = &mut attribute_editor;
+            attribute_editor.extend_app_world(world, ui);
 
             // example of extending the world with a custom window and save button
             Window::new("save the world")

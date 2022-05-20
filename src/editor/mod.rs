@@ -1,3 +1,5 @@
+mod attribute_editor;
+mod file_editor;
 mod node_editor;
 mod node_editor_graph;
 mod runtime_editor;
@@ -11,6 +13,8 @@ pub use atlier::system::App;
 pub use atlier::system::Attribute;
 pub use atlier::system::Extension;
 pub use atlier::system::Value;
+pub use attribute_editor::AttributeEditor;
+pub use file_editor::FileEditor;
 pub use node_editor::NodeEditor;
 pub use runtime_editor::RuntimeEditor;
 pub use runtime_editor::SectionAttributes;

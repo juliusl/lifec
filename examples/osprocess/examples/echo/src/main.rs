@@ -1,5 +1,4 @@
-use lifec::editor::{open_editor_with, App, Section, SectionExtension};
-use lifec::Runtime;
+use lifec::{editor::*, editor::FileEditor, Runtime};
 use osprocess::Process;
 
 fn main() {
@@ -20,6 +19,7 @@ fn main() {
 
     runtime.on("{ after_echo;; }").call("print_results");
 
+    let mut file_editor = FileEditor::default();
     open_editor_with(
         "OS Process",
         runtime.parse_event("{ setup;; }"),
@@ -29,9 +29,13 @@ fn main() {
             Process::default(),
         )
         .with_text("command", "")
-        .with_text("arg::--help", "")],
+        .with_symbol("file::name::echo.json")
+        ],
         |_| {},
         |_| {},
-        |_, _| {},
+        move |w, ui| {
+            let file_editor = &mut file_editor;
+            file_editor.extend_app_world(w, ui);
+        },
     );
 }

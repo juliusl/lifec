@@ -1,3 +1,4 @@
+use chrono::{Local, Utc};
 use imgui::{CollapsingHeader, Ui};
 use lifec::editor::*;
 use lifec::*;
@@ -5,18 +6,20 @@ use specs::*;
 use std::{
     collections::BTreeMap,
     fmt::Display,
-    process::{Command, Output},
+    process::{Command, Output}
 };
 
 #[derive(Debug, Clone, Default, Component)]
 #[storage(HashMapStorage)]
 pub struct Process {
-    pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>,
-    pub code: Option<i32>,
     pub command: String,
     pub subcommand: String,
     pub flags: BTreeMap<String, String>,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+    pub code: Option<i32>,
+    pub last_timestamp_utc: Option<String>,
+    pub last_timestamp_local: Option<String>,
 }
 
 impl SectionExtension<Process> for Process
@@ -31,7 +34,10 @@ impl Process {
         // Show the default view for this editor
         Process::show_editor(&mut section.state, ui);
 
-        // Retrieve a value from section state
+        ui.new_line();
+        // Some tools to edit the process
+        ui.text("Edit Process:");
+        ui.new_line();
         section.edit_state_string(
             "edit the process command",
             "command",
@@ -46,17 +52,28 @@ impl Process {
         );
 
         if ui.button("execute") {
-            if let (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommand))) = (
-                section.get_attr_value("command"),
-                section.get_attr_value("subcommand"),
-            ) {
-                if let Some(next) = section
-                    .state
-                    .process(&format!("{} {}", command, subcommand))
-                    .ok()
-                {
-                    section.state = next;
+            match ( section.get_attr_value("command"),
+                    section.get_attr_value("subcommand")
+                  ) {
+                (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommand))) => {
+                    if let Some(next) = section
+                        .state
+                        .process(&format!("{} {}", command, subcommand))
+                        .ok()
+                    {
+                        section.state = next;
+                    }
                 }
+                (Some(Value::TextBuffer(command)), None) => {
+                    if let Some(next) = section
+                        .state
+                        .process(&command)
+                        .ok()
+                    {
+                        section.state = next;
+                    }
+                }
+                _ => (),
             }
         }
 
@@ -103,24 +120,28 @@ impl App for Process {
         ui.label_text("command", &self.command);
         ui.label_text("subcommand", &self.subcommand);
 
-        if CollapsingHeader::new("Arguments").begin(ui) {
-            self.flags.iter().for_each(|arg_entry| {
-                ui.text(format!("{:?}", arg_entry));
-            });
+        if !self.flags.is_empty() {
+            if CollapsingHeader::new("Arguments").begin(ui) {
+                self.flags.iter().for_each(|arg_entry| {
+                    ui.text(format!("{:?}", arg_entry));
+                });
+            }
         }
 
-        ui.label_text("status code", format!("{:?}", self.code));
-
-        if let Some(mut output) = String::from_utf8(self.stdout.to_vec()).ok() {
-            ui.input_text_multiline("stdout", &mut output, [0.0, 0.0])
-                .read_only(true)
-                .build();
-        }
-
-        if let Some(mut output) = String::from_utf8(self.stderr.to_vec()).ok() {
-            ui.input_text_multiline("stderr", &mut output, [0.0, 0.0])
-                .read_only(true)
-                .build();
+        if (!self.stdout.is_empty() || !self.stderr.is_empty()) && self.code.is_some() {
+            if CollapsingHeader::new(format!("Standard I/O, Exit Code: {:?}, Local Timestamp: {:?}, UTC Timestamp: {:?}", self.code, self.last_timestamp_local, self.last_timestamp_utc)).leaf(true).begin(ui) {
+                if let Some(mut output) = String::from_utf8(self.stdout.to_vec()).ok() {
+                    ui.input_text_multiline("stdout", &mut output, [0.0, 0.0])
+                        .read_only(true)
+                        .build();
+                }
+        
+                if let Some(mut output) = String::from_utf8(self.stderr.to_vec()).ok() {
+                    ui.input_text_multiline("stderr", &mut output, [0.0, 0.0])
+                        .read_only(true)
+                        .build();
+                }
+            }
         }
     }
 }
@@ -151,6 +172,8 @@ impl RuntimeState for Process {
                 command: command.to_string(),
                 subcommand: subcommand.join(" "),
                 flags: self.flags.clone(),
+                last_timestamp_local: None,
+                last_timestamp_utc: None
             };
 
             let mut command = Command::new(&process.command);
@@ -170,6 +193,8 @@ impl RuntimeState for Process {
                 process.stdout = stdout;
                 process.stderr = stderr;
                 process.code = status.code();
+                process.last_timestamp_local = Some(Local::now().to_string());
+                process.last_timestamp_utc = Some(Utc::now().to_string());
                 Ok(process)
             } else {
                 Err(ProcessExecutionError {})
@@ -199,6 +224,8 @@ impl RuntimeState for Process {
                 command: command.to_string(),
                 subcommand: subcommand.join(" "),
                 flags: parse_flags(state.get_args().to_vec()),
+                last_timestamp_utc: None,
+                last_timestamp_local: None,
             };
 
             let mut command = Command::new(&process.command);
@@ -218,6 +245,8 @@ impl RuntimeState for Process {
                 process.stdout = stdout;
                 process.stderr = stderr;
                 process.code = status.code();
+                process.last_timestamp_local = Some(Local::now().to_string());
+                process.last_timestamp_utc = Some(Utc::now().to_string());
                 Ok(process)
             } else {
                 Err(ProcessExecutionError {})

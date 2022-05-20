@@ -201,6 +201,10 @@ impl<S: RuntimeState> Section<S> {
         next
     }
 
+    pub fn with_symbol(&mut self, name: impl AsRef<str>) -> Self {
+        self.update(move |next| next.add_empty_attr(name))
+    }
+
     /// try to load a file into an attribute
     pub fn with_file(&mut self, file_name: impl AsRef<Path> + AsRef<str> + Display) -> Self {
         match fs::read_to_string(&file_name) {
@@ -260,6 +264,14 @@ impl<S: RuntimeState> Section<S> {
 
     pub fn with_parent_entity(&mut self, id: u32) -> Self {
         self.update(move |next| next.set_parent_entity(id))
+    }
+
+    pub fn add_empty_attr(&mut self, name: impl AsRef<str>) {
+        self.add_attribute(Attribute::new(
+            self.id,
+            name.as_ref().to_string(),
+            Value::Empty
+        ));
     }
 
     pub fn add_binary_attr(&mut self, name: impl AsRef<str>, init_value: impl Into<Vec<u8>>) {
