@@ -1,4 +1,4 @@
-use lifec::editor::{open_editor, open_editor_with, App, RuntimeEditor, Section};
+use lifec::editor::{open_editor_with, App, Section};
 use lifec::Runtime;
 use osprocess::Process;
 
@@ -26,6 +26,7 @@ fn main() {
         vec![
             Section::new(<Process as App>::name(), Process::edit, Process::default())
                 .with_text("command", "")
+                .with_text("arg::--help", "")
         ],
         |_| {},
         |_| {},

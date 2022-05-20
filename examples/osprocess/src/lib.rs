@@ -1,10 +1,11 @@
-use imgui::{Ui, CollapsingHeader};
+use imgui::{CollapsingHeader, Ui};
 use lifec::editor::*;
 use lifec::*;
 use specs::*;
 use std::{
+    collections::BTreeMap,
     fmt::Display,
-    process::{Command, Output}, collections::{BTreeMap},
+    process::{Command, Output},
 };
 
 #[derive(Debug, Clone, Default, Component)]
@@ -24,70 +25,55 @@ impl Process {
         Process::show_editor(&mut section.state, ui);
 
         // Retrieve a value from section state
-        section.edit_attr("edit the process command", "command", ui);
-        section.edit_state_with_attr("command", |attr, state| match attr.value() {
-            Value::TextBuffer(command) => {
-                if &state.command != command {
-                    let mut out = state.clone();
-                    out.command = command.to_string();
-                    Some(out)
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        });
-
-        section.edit_attr("edit the process subcommand", "subcommand", ui);
-        section.edit_state_with_attr("subcommand", |attr, state| match attr.value() {
-            Value::TextBuffer(subcommand) => {
-                if &state.subcommand != subcommand {
-                    let mut out = state.clone();
-                    out.subcommand = subcommand.to_string();
-                    Some(out)
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        });
+        section.edit_state_string(
+            "edit the process command",
+            "command",
+            |s| Some(&mut s.command),
+            ui,
+        );
+        section.edit_state_string(
+            "edit the process subcommand",
+            "subcommand",
+            |s| Some(&mut s.subcommand),
+            ui,
+        );
 
         if ui.button("execute") {
             if let (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommand))) = (
                 section.get_attr_value("command"),
                 section.get_attr_value("subcommand"),
             ) {
-                if let Some(next) = section.state.process(&format!("{} {}", command, subcommand)).ok() {
+                if let Some(next) = section
+                    .state
+                    .process(&format!("{} {}", command, subcommand))
+                    .ok()
+                {
                     section.state = next;
                 }
             }
         }
 
-        if ui.button(format!("fix arguments")) {
-            section.state.flags.clear();
-        }
-        if ui.is_item_hovered() {
-            ui.tooltip_text("(Note: If you change the attribute name of an existing arg, you will need to reset arguments)");
-        }
-
+        section.state.flags.clear();
         section
             .attributes
             .clone()
             .iter_mut()
             .filter(|f| f.name().starts_with("arg::"))
             .for_each(|arg| {
-                if let Value::TextBuffer(_) = arg.value() {
+                if let Value::TextBuffer(value) = arg.value() {
                     let arg_name = &arg.name()[5..];
-                    section.edit_attr(format!("edit arg {}", arg_name), &arg.name(), ui);
-                    section.edit_state_with_attr(&arg.name(), |a, s| {
-                        if let Value::TextBuffer(arg_value) = a.value() {
-                            let mut next = s.clone();
-                            next.flags.insert(arg_name.to_string(), arg_value.to_string());
-                            Some(next)
-                        } else {
-                            None
-                        }
-                    });
+                    section.edit_state_string(
+                        format!("edit flag {}", arg_name),
+                        arg.name(),
+                        |s| {
+                            if let None = s.flags.get(arg_name) {
+                                s.flags.insert(arg_name.to_string(), value.to_string());
+
+                            }
+                            s.flags.get_mut(arg_name)
+                        },
+                        ui,
+                    );
                 }
             });
     }
@@ -111,7 +97,7 @@ impl App for Process {
         ui.label_text("subcommand", &self.subcommand);
 
         if CollapsingHeader::new("Arguments").begin(ui) {
-            self.flags.iter().for_each(|arg_entry|{
+            self.flags.iter().for_each(|arg_entry| {
                 ui.text(format!("{:?}", arg_entry));
             });
         }
@@ -137,7 +123,7 @@ pub struct ProcessExecutionError {}
 impl RuntimeState for Process {
     type Error = ProcessExecutionError;
 
-    fn load<'a, S: AsRef<str> + ?Sized>(&self, init: &'a S) -> Self
+    fn load<'a, S: AsRef<str> + ?Sized>(&self, _: &'a S) -> Self
     where
         Self: Sized,
     {
@@ -207,7 +193,6 @@ impl RuntimeState for Process {
                 subcommand: subcommand.join(" "),
                 flags: parse_flags(state.get_args().to_vec()),
             };
-
 
             let mut command = Command::new(&process.command);
             let mut command = &mut command;

@@ -1,8 +1,8 @@
-use std::{fmt::Display, path::Path, fs};
+use std::{fmt::Display, fs, path::Path};
 
-use super::{App, Attribute, ShowEditor, Value, unique_title};
+use super::{unique_title, App, Attribute, ShowEditor, Value};
 use crate::RuntimeState;
-use imgui::{CollapsingHeader, TreeNodeFlags};
+use imgui::CollapsingHeader;
 use serde::{Deserialize, Serialize};
 use specs::{Component, HashMapStorage};
 
@@ -72,7 +72,8 @@ impl<S: RuntimeState> Section<S> {
     }
 
     pub fn get_attr_value_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Value> {
-        self.get_attr_mut(with_name).and_then(|a| Some(a.get_value_mut()))
+        self.get_attr_mut(with_name)
+            .and_then(|a| Some(a.get_value_mut()))
     }
 
     pub fn get_attr(&self, with_name: impl AsRef<str>) -> Option<&Attribute> {
@@ -104,12 +105,34 @@ impl<S: RuntimeState> Section<S> {
         }
     }
 
-    pub fn edit_state_with_attr<Str: AsRef<str>>(&mut self, attr_name: Str, update: impl Fn(&Attribute, &S) -> Option<S>) {
-        if let Some(attr) = self.get_attr(attr_name) {
-            if let Some(next) = update(attr, &self.state) {
-                self.state = next;
-            }
+    pub fn modify_state_with_attr(
+        &mut self,
+        attr_name: impl AsRef<str>,
+        update: impl Fn(&Attribute, &mut S),
+    ) {
+        let clone = self.clone();
+        let attr = clone.get_attr(attr_name);
+        if let Some(attr) = attr {
+            let state = &mut self.state;
+            update(attr, state);
         }
+    }
+
+    pub fn edit_state_string(
+        &mut self,
+        label: impl AsRef<str> + Display,
+        attr_name: impl AsRef<str>,
+        select: impl Fn(&mut S) -> Option<&mut String>,
+        ui: &imgui::Ui,
+    ) {
+        self.edit_attr(label.as_ref(), attr_name.as_ref(), ui);
+        self.modify_state_with_attr(attr_name.as_ref(), |a, s| {
+            if let Value::TextBuffer(arg_value) = a.value() {
+                if let Some(to_update) = select(s) {
+                    *to_update = arg_value.to_string();
+                }
+            }
+        });
     }
 
     /// This method allows you to edit an attribute from this section
@@ -122,8 +145,7 @@ impl<S: RuntimeState> Section<S> {
         ui: &imgui::Ui,
     ) {
         let label = format!("{} {}", label, self.id);
-        match self.get_attr_value_mut(attr_name)
-        {
+        match self.get_attr_value_mut(attr_name) {
             Some(Value::TextBuffer(val)) => {
                 ui.input_text(label, val).build();
             }
@@ -181,13 +203,16 @@ impl<S: RuntimeState> Section<S> {
 
     /// try to load a file into an attribute
     pub fn with_file(&mut self, file_name: impl AsRef<Path> + AsRef<str> + Display) -> Self {
-        match  fs::read_to_string(&file_name){
-            Ok(contents) => {
-                self.update(move |next| next.add_binary_attr(format!("file::{}", file_name), contents.as_bytes().to_vec()))
-            },
-            Err(err) => { 
-                eprintln!("Could not load file '{}', for with_file on section '{}', entity {}. Error: {}", &file_name, self.title, self.id, err);
-                self.update(|_| { })
+        match fs::read_to_string(&file_name) {
+            Ok(contents) => self.update(move |next| {
+                next.add_binary_attr(format!("file::{}", file_name), contents.as_bytes().to_vec())
+            }),
+            Err(err) => {
+                eprintln!(
+                    "Could not load file '{}', for with_file on section '{}', entity {}. Error: {}",
+                    &file_name, self.title, self.id, err
+                );
+                self.update(|_| {})
             }
         }
     }
@@ -241,7 +266,7 @@ impl<S: RuntimeState> Section<S> {
         self.add_attribute(Attribute::new(
             self.id,
             name.as_ref().to_string(),
-            Value::BinaryVector(init_value.into())
+            Value::BinaryVector(init_value.into()),
         ));
     }
 
@@ -358,7 +383,9 @@ impl<S: RuntimeState> App for Section<S> {
 
             if self.enable_edit_attributes {
                 ui.new_line();
-                if CollapsingHeader::new(format!("Attributes {:#4x}", self.id)).flags(TreeNodeFlags::SPAN_AVAIL_WIDTH).build(ui) {
+                if CollapsingHeader::new(format!("Attributes {:#4x}", self.id))
+                    .build(ui)
+                {
                     for a in self.attributes.iter_mut() {
                         a.edit(ui);
                         ui.new_line();
