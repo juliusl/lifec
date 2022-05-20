@@ -19,7 +19,8 @@ fn main() {
 
     runtime.on("{ after_echo;; }").call("print_results");
 
-    let mut file_editor = FileEditor::default();
+    let mut file_editor = FileEditor::new();
+    let mut attr_editor = AttributeEditor::new();
     open_editor_with(
         "OS Process",
         runtime.parse_event("{ setup;; }"),
@@ -30,12 +31,16 @@ fn main() {
         )
         .with_text("command", "")
         .with_symbol("file::name::echo.json")
+        .with_symbol("file::name::echo.toml")
         ],
         |_| {},
         |_| {},
         move |w, ui| {
             let file_editor = &mut file_editor;
             file_editor.extend_app_world(w, ui);
+
+            let attr_editor = &mut attr_editor;
+            attr_editor.extend_app_world(w, ui);
         },
     );
 }

@@ -1,24 +1,26 @@
 use std::collections::HashMap;
 use std::fmt::Display;
 
-use atlier::system::{App, Extension};
+use atlier::system::{App, Extension, Value};
 use imgui::Window;
 use specs::storage::HashMapStorage;
 use specs::{Component, Entities, Join, ReadStorage, RunNow, System};
 
 use crate::RuntimeState;
 
-use super::{SectionAttributes, SectionExtension};
+use super::{unique_title, SectionAttributes, SectionExtension};
 
-#[derive(Component, Default)]
+#[derive(Component)]
 #[storage(HashMapStorage)]
 pub struct FileEditor {
+    title: String,
     files: HashMap<u32, FileEntry>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct FileEntry {
     file_name: String,
+    value: Option<Value>,
 }
 
 pub struct FileEntryRuntimeError {}
@@ -29,12 +31,22 @@ impl Display for FileEntry {
     }
 }
 
+impl FileEditor {
+    pub fn new() -> Self {
+        Self {
+            title: unique_title(Self::name()),
+            files: HashMap::default(),
+        }
+    }
+}
+
 impl RuntimeState for FileEntry {
     type Error = FileEntryRuntimeError;
 
     fn load<S: AsRef<str> + ?Sized>(&self, _: &S) -> Self
     where
-        Self: Sized {
+        Self: Sized,
+    {
         todo!()
     }
 
@@ -55,8 +67,7 @@ impl Extension for FileEditor {
 }
 
 impl SectionExtension<FileEntry> for FileEditor {
-    fn show_extension(_: &mut super::Section<FileEntry>, _: &imgui::Ui) {
-    }
+    fn show_extension(_: &mut super::Section<FileEntry>, _: &imgui::Ui) {}
 }
 
 impl App for FileEditor {
@@ -65,13 +76,19 @@ impl App for FileEditor {
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
-        Window::new("Files")
-            .size([800.0, 600.0], imgui::Condition::Appearing)
-            .build(ui, || {
-                self.files
-                    .iter()
-                    .for_each(|(_, file_entry)| ui.text(format!("{:?}", file_entry.file_name)));
-            });
+        if !self.files.is_empty() {
+            Window::new(&self.title)
+                .size([800.0, 600.0], imgui::Condition::Appearing)
+                .build(ui, || {
+                    self.files.iter().for_each(|(_, file_entry)| {
+                        ui.text(format!("{:?}", file_entry.file_name));
+                        ui.same_line();
+                        if let None = file_entry.value {
+                            ui.text(format!("Unloaded"));
+                        }
+                    });
+                });
+        }
     }
 }
 
@@ -96,7 +113,13 @@ impl<'a> System<'a> for FileEditor {
                                 }
                             });
                         if let Some(file_name) = file_name.and_then(|s| Some(s.to_string())) {
-                            self.files.insert(e.id(), FileEntry { file_name });
+                            self.files.insert(
+                                e.id(),
+                                FileEntry {
+                                    file_name,
+                                    value: None,
+                                },
+                            );
                         }
                     }
                     Some(false) => {

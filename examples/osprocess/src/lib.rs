@@ -1,4 +1,4 @@
-use chrono::{Local, Utc};
+use chrono::{Local, Utc, DateTime, Duration};
 use imgui::{CollapsingHeader, Ui};
 use lifec::editor::*;
 use lifec::*;
@@ -18,6 +18,8 @@ pub struct Process {
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
     pub code: Option<i32>,
+    pub start_time: Option<DateTime<Utc>>,
+    pub elapsed: Option<String>,
     pub last_timestamp_utc: Option<String>,
     pub last_timestamp_local: Option<String>,
 }
@@ -118,7 +120,10 @@ impl App for Process {
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
         ui.label_text("command", &self.command);
-        ui.label_text("subcommand", &self.subcommand);
+
+        if !self.subcommand.is_empty() {
+            ui.label_text("subcommand", &self.subcommand);
+        }
 
         if !self.flags.is_empty() {
             if CollapsingHeader::new("Arguments").begin(ui) {
@@ -129,7 +134,7 @@ impl App for Process {
         }
 
         if (!self.stdout.is_empty() || !self.stderr.is_empty()) && self.code.is_some() {
-            if CollapsingHeader::new(format!("Standard I/O, Exit Code: {:?}, Local Timestamp: {:?}, UTC Timestamp: {:?}", self.code, self.last_timestamp_local, self.last_timestamp_utc)).leaf(true).begin(ui) {
+            if CollapsingHeader::new(format!("Standard I/O, Exit Code: {:?}, Local Timestamp: {:?}, UTC Timestamp: {:?}, Elapsed: {:?}", self.code, self.last_timestamp_local, self.last_timestamp_utc, self.elapsed)).leaf(true).begin(ui) {
                 if let Some(mut output) = String::from_utf8(self.stdout.to_vec()).ok() {
                     ui.input_text_multiline("stdout", &mut output, [0.0, 0.0])
                         .read_only(true)
@@ -172,6 +177,8 @@ impl RuntimeState for Process {
                 command: command.to_string(),
                 subcommand: subcommand.join(" "),
                 flags: self.flags.clone(),
+                start_time: Some(Utc::now()),
+                elapsed: None,
                 last_timestamp_local: None,
                 last_timestamp_utc: None
             };
@@ -193,8 +200,9 @@ impl RuntimeState for Process {
                 process.stdout = stdout;
                 process.stderr = stderr;
                 process.code = status.code();
-                process.last_timestamp_local = Some(Local::now().to_string());
                 process.last_timestamp_utc = Some(Utc::now().to_string());
+                process.last_timestamp_local = Some(Local::now().to_string());
+                process.elapsed = process.start_time.and_then(|s| Some(Utc::now()-s)).and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
                 Ok(process)
             } else {
                 Err(ProcessExecutionError {})
@@ -224,6 +232,8 @@ impl RuntimeState for Process {
                 command: command.to_string(),
                 subcommand: subcommand.join(" "),
                 flags: parse_flags(state.get_args().to_vec()),
+                start_time: Some(Utc::now()),
+                elapsed: None,
                 last_timestamp_utc: None,
                 last_timestamp_local: None,
             };
@@ -247,6 +257,7 @@ impl RuntimeState for Process {
                 process.code = status.code();
                 process.last_timestamp_local = Some(Local::now().to_string());
                 process.last_timestamp_utc = Some(Utc::now().to_string());
+                process.elapsed = process.start_time.and_then(|s| Some(Utc::now()-s)).and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
                 Ok(process)
             } else {
                 Err(ProcessExecutionError {})
