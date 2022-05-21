@@ -2,6 +2,7 @@ mod attribute_editor;
 mod file_editor;
 mod node_editor;
 mod node_editor_graph;
+mod event_editor;
 mod runtime_editor;
 mod section;
 
@@ -18,6 +19,8 @@ pub use file_editor::FileEditor;
 pub use node_editor::NodeEditor;
 pub use runtime_editor::RuntimeEditor;
 pub use runtime_editor::SectionAttributes;
+pub use event_editor::EventEditor;
+pub use event_editor::EventComponent;
 pub use section::Section;
 pub use section::SectionExtension;
 
@@ -37,72 +40,6 @@ where
 {
     fn default() -> Self {
         Self(|_, _| {})
-    }
-}
-
-/// Event component is the the most basic data unit of the runtime
-#[derive(Clone, Component)]
-#[storage(DenseVecStorage)]
-pub struct EventComponent {
-    pub label: String,
-    pub on: String,
-    pub dispatch: String,
-    pub call: String,
-    pub transitions: Vec<String>,
-    // pub flags: BTreeMap<String, String>,
-    // pub variales: BTreeMap<String, String>,
-}
-
-impl<S: RuntimeState> Into<Section<S>> for &mut EventComponent {
-    fn into(self) -> Section<S> {
-        Section::<S>::new(
-            self.label.to_string(),
-            |s, ui| {
-                s.edit_attr("edit the 'on' property",  "on", ui);
-                s.edit_attr("edit the 'dispatch' property",  "dispatch", ui);
-                s.edit_attr("edit the 'call' property", "call", ui);
-            },
-            S::default(),
-        )
-        .with_text("label", self.label.clone())
-        .with_text("on", self.on.clone())
-        .with_text("dispatch", self.dispatch.clone())
-        .with_text("call", self.call.clone())
-    }
-}
-
-impl<S: RuntimeState> From<&mut Section<S>> for EventComponent {
-    fn from(s: &mut Section<S>) -> Self {
-        if let (
-            Some(Value::TextBuffer(label)), 
-            Some(Value::TextBuffer(on)), 
-            Some(Value::TextBuffer(dispatch)), 
-            Some(Value::TextBuffer(call))) = (
-            s.get_attr_value("label"), 
-            s.get_attr_value("on"),
-            s.get_attr_value("dispatch"),
-            s.get_attr_value("call"),  
-        ){
-            let label = label.to_string();
-            let on = on.to_string();
-            let dispatch = dispatch.to_string();
-            let call = call.to_string();
-            Self {
-                label,
-                on,
-                dispatch,
-                call,
-                transitions: Vec::default()
-            }
-        } else {
-            Self {
-                label: String::default(),
-                on: String::default(),
-                dispatch: String::default(),
-                call: String::default(),
-                transitions: Vec::default(),
-            }
-        }
     }
 }
 

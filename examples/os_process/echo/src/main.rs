@@ -1,5 +1,5 @@
 use lifec::{editor::*, editor::FileEditor, Runtime};
-use osprocess::Process;
+use lifec::plugins::Process;
 
 fn main() {
     let mut runtime = Runtime::<Process>::default().with_call("print_results", |s, _| {
@@ -19,6 +19,7 @@ fn main() {
 
     runtime.on("{ after_echo;; }").call("print_results");
 
+    let mut event_editor = EventEditor::new();
     let mut file_editor = FileEditor::new();
     let mut attr_editor = AttributeEditor::new();
     open_editor_with(
@@ -41,6 +42,9 @@ fn main() {
 
             let attr_editor = &mut attr_editor;
             attr_editor.extend_app_world(w, ui);
+
+            let event_editor = &mut event_editor;
+            event_editor.extend_app_world(w, ui);
         },
     );
 }

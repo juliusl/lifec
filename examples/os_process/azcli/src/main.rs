@@ -1,6 +1,6 @@
 use lifec::{Event, Runtime};
 use lifec::editor::{App, RuntimeEditor};
-use osprocess::Process;
+use lifec::plugins::Process;
 
 fn main() {
     let mut runtime = Runtime::<Process>::default()

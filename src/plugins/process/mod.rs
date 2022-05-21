@@ -1,13 +1,15 @@
-use chrono::{Local, Utc, DateTime, Duration};
+use atlier::system::{App, Value};
+use chrono::{Local, Utc, DateTime};
 use imgui::{CollapsingHeader, Ui};
-use lifec::editor::*;
-use lifec::*;
-use specs::*;
+use specs::Component;
+use specs::HashMapStorage;
 use std::{
     collections::BTreeMap,
     fmt::Display,
     process::{Command, Output}
 };
+
+use crate::{RuntimeState, editor::{Section, SectionExtension}, WithArgs, parse_flags};
 
 #[derive(Debug, Clone, Default, Component)]
 #[storage(HashMapStorage)]
@@ -213,7 +215,7 @@ impl RuntimeState for Process {
     }
 
     fn process_with_args<S: AsRef<str> + ?Sized>(
-        state: lifec::WithArgs<Self>,
+        state: WithArgs<Self>,
         msg: &S,
     ) -> Result<Self, Self::Error>
     where

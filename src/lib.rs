@@ -5,6 +5,7 @@ use std::fmt::{Debug, Display};
 use std::any::Any;
 
 pub mod editor;
+pub mod plugins;
 
 pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
     type Error;
