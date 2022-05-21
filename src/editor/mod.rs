@@ -1,12 +1,14 @@
 mod attribute_editor;
+mod event_editor;
+mod event_graph;
 mod file_editor;
 mod node_editor;
 mod node_editor_graph;
-mod event_editor;
 mod runtime_editor;
 mod section;
 
 use atlier::system::start_editor;
+use knot::store::Store;
 use rand::Rng;
 use specs::{prelude::*, Component};
 
@@ -15,17 +17,19 @@ pub use atlier::system::Attribute;
 pub use atlier::system::Extension;
 pub use atlier::system::Value;
 pub use attribute_editor::AttributeEditor;
+pub use event_editor::EventComponent;
+pub use event_editor::EventEditor;
 pub use file_editor::FileEditor;
 pub use node_editor::NodeEditor;
 pub use runtime_editor::RuntimeEditor;
 pub use runtime_editor::SectionAttributes;
-pub use event_editor::EventEditor;
-pub use event_editor::EventComponent;
 pub use section::Section;
 pub use section::SectionExtension;
 
 use crate::Runtime;
 use crate::RuntimeState;
+
+use self::event_graph::EventGraph;
 
 /// ShowEditor is a wrapper over a show function stored as a specs Component
 #[derive(Clone, Component)]
@@ -99,10 +103,20 @@ pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
     start_runtime_editor::<RtS, _, _>(
         title.as_ref(),
         initial_runtime,
-        move |_, w, d| {
+        move |e, w, d| {
             w.register::<Section<RtS>>();
+            w.register::<EventGraph>();
+
+            let mut store = Store::<EventComponent>::default();
+            e.events.iter().cloned().for_each(|e| {
+                store = store.node(e);
+            });
+
             sections.iter().for_each(|s| {
-                w.create_entity().maybe_with(Some(s.clone())).build();
+                w.create_entity()
+                    .maybe_with(Some(s.clone()))
+                    .maybe_with(Some(EventGraph(store.clone())))
+                    .build();
             });
             with_world(w);
             with_systems(d);

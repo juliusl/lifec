@@ -10,7 +10,7 @@ logos = "0.12.0"
 # Add's support for built-in editors
 atlier = { path = "../atlier" } #{ git = "https://github.com/juliusl/atlier.git"   }
 imnodes = { git = "https://github.com/benmkw/imnodes-rs.git" }
-knot = { git = "https://github.com/juliusl/knot.git"  }
+knot = { git = "https://github.com/juliusl/knot.git", branch="main"  }
 imgui = "0.8.2" 
 specs = { version = "0.17.0", features = ["default", "derive"] }
 rand = "0.8.5"

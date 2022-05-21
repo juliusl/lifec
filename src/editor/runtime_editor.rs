@@ -13,7 +13,7 @@ where
     S: RuntimeState,
 {
     pub runtime: Runtime<S>,
-    events: Vec<EventComponent>,
+    pub events: Vec<EventComponent>,
     sections: BTreeMap<u32, Section<S>>,
 }
 
@@ -223,19 +223,6 @@ where
                         }
     
                         ui.unindent();
-                    }
-                    ui.unindent();
-                }
-
-                if CollapsingHeader::new(format!("Edit Current Runtime Events")).begin(ui) {
-                    ui.indent();
-                    for (i, e) in self.events.iter_mut().enumerate() {
-                        let mut section: Section::<S> = e.into();
-                        let section = &mut section;
-                        let mut section = section.with_parent_entity(i as u32);
-                        section.show_editor(ui);
-
-                        *e = EventComponent::from(&mut section);
                     }
                     ui.unindent();
                 }

@@ -1,24 +1,26 @@
 use std::collections::{BTreeSet, HashMap};
 
-use atlier::system::{Value, App, Extension};
+use atlier::system::{App, Extension, Value};
 use imgui::Window;
+use knot::store::Store;
 use serde::{Deserialize, Serialize};
 use specs::storage::HashMapStorage;
-use specs::{Component, Entities, Join, ReadStorage, System, RunNow};
+use specs::{Component, Entities, Join, ReadStorage, RunNow, System, WorldExt, WriteStorage};
 
-use super::{SectionAttributes, unique_title};
+use super::{unique_title, SectionAttributes};
 
-#[derive(Component, Default)]
-#[storage(HashMapStorage)]
+#[derive(Default)]
 pub struct AttributeEditor {
     title: String,
-    entities: HashMap<u32, AttributeEntry>,
+    entities: HashMap<u32, AttributeComponent>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct AttributeEntry {
+#[derive(Clone, Default, Serialize, Deserialize, Component)]
+#[storage(HashMapStorage)]
+pub struct AttributeComponent {
     id: u32,
     references: BTreeSet<(String, u64)>,
+    store: Store<Value>,
 }
 
 impl AttributeEditor {
@@ -30,11 +32,11 @@ impl AttributeEditor {
 }
 
 impl Extension for AttributeEditor {
-    fn configure_app_world(_: &mut specs::World) {
+    fn configure_app_world(w: &mut specs::World) {
+        w.register::<AttributeComponent>();
     }
 
-    fn configure_app_systems(_: &mut specs::DispatcherBuilder) {
-    }
+    fn configure_app_systems(_: &mut specs::DispatcherBuilder) {}
 
     fn extend_app_world(&mut self, app_world: &specs::World, ui: &imgui::Ui) {
         self.run_now(app_world);
@@ -44,36 +46,49 @@ impl Extension for AttributeEditor {
 
 impl App for AttributeEditor {
     fn name() -> &'static str {
-       "Attribute Editor"
+        "Attribute Editor"
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
-        Window::new(&self.title).size([800.0, 600.0], imgui::Condition::Appearing).build(ui, ||{
-            if ui.button("Refresh") {
-                self.entities.clear();
-            }
-    
-            self.entities.iter().for_each(|(e, ae)| {
-                ui.text(format!("Entity: {}", e));
-                for r in ae.references.iter() {
-                    ui.text(format!("{:?}", r));
+        Window::new(&self.title)
+            .size([800.0, 600.0], imgui::Condition::Appearing)
+            .build(ui, || {
+                if ui.button("Refresh") {
+                    self.entities.clear();
                 }
-                ui.new_line();
-            })
-        });
+
+                self.entities.iter().for_each(|(e, ae)| {
+                    ui.text(format!("Entity: {}", e));
+                    for r in ae.references.iter() {
+                        ui.text(format!("{:?}", r));
+                    }
+                    ui.new_line();
+                })
+            });
     }
 }
 
-
 impl<'a> System<'a> for AttributeEditor {
-    type SystemData = (Entities<'a>, ReadStorage<'a, SectionAttributes>);
+    type SystemData = (Entities<'a>, ReadStorage<'a, SectionAttributes>, WriteStorage<'a, AttributeComponent>);
 
-    fn run(&mut self, (entities, section_attributes): Self::SystemData) {
+    fn run(&mut self, (entities, section_attributes, mut attribute_components): Self::SystemData) {
         for e in entities.join() {
             match section_attributes.get(e) {
                 Some(attributes) => {
                     if let None = self.entities.get(&e.id()) {
-                        let entry = AttributeEntry {
+                        let entry = AttributeComponent {
+                            store: {
+                                let mut store = Store::default();
+                                attributes
+                                    .get_attrs()
+                                    .iter()
+                                    .cloned()
+                                    .map(|a| a.value())
+                                    .for_each(|v| {
+                                        store = store.node(v.clone());
+                                    });
+                                store
+                            },
                             references: {
                                 let mut set = BTreeSet::<(String, u64)>::default();
                                 attributes
@@ -98,7 +113,12 @@ impl<'a> System<'a> for AttributeEditor {
                             id: e.id(),
                         };
 
-                        self.entities.insert(e.id(), entry);
+                        match attribute_components.insert(e, entry.clone()) {
+                            Ok(_) => {
+                                self.entities.insert(e.id(), entry);
+                            },
+                            Err(err) => eprintln!("Error adding attribute component, {}", err),
+                        }
                     }
                 }
                 _ => {}

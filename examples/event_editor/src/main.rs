@@ -97,6 +97,7 @@ fn main() {
         |w| {
             w.register::<Attribute>();
             NodeEditor::configure_app_world(w);
+            AttributeEditor::configure_app_world(w);
         },
         |d| {
             d.add(Clock {}, "clock", &[]);
