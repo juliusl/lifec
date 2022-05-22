@@ -153,8 +153,8 @@ impl Process {
             .attributes
             .clone()
             .iter_mut()
-            .filter(|f| f.name().starts_with("arg::"))
-            .for_each(|arg| {
+            .filter(|(_, f)| f.name().starts_with("arg::"))
+            .for_each(|(_, arg)| {
                 let arg_name = &arg.name()[5..];
                 if arg_name.is_empty() {
                     return;

@@ -30,6 +30,7 @@ use crate::Runtime;
 use crate::RuntimeState;
 
 use self::event_graph::EventGraph;
+use self::runtime_editor::RuntimeDispatcher;
 
 /// ShowEditor is a wrapper over a show function stored as a specs Component
 #[derive(Clone, Component)]
@@ -106,6 +107,8 @@ pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
         move |e, w, d| {
             w.register::<Section<RtS>>();
             w.register::<EventGraph>();
+
+            d.add(RuntimeDispatcher::<RtS>::default(), "runtime_dispatcher", &[]);
 
             let mut store = Store::<EventComponent>::default();
             e.events.iter().cloned().for_each(|e| {

@@ -74,13 +74,13 @@ fn main() {
                 Test {
                     id: 1,
                     val: 11,
-                    clock: 0,
+                    clock: 1000,
                     open_test_window: false,
                 },
             )
             .with_text("test", "hello")
             .with_bool("test-bool", false)
-            .with_bool("node::enable clock", false)
+            .with_bool("enable clock", false)
             .with_bool("enable node editor", false)
             .with_bool("allow node editor to change state on close", false)
             .with_int("node::test int", 0)

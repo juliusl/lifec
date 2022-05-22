@@ -1,27 +1,31 @@
-use std::{collections::HashMap, fmt::Display};
-
-use atlier::system::{App, Extension, Value};
-use imgui::{CollapsingHeader, Window};
-use serde::{Deserialize, Serialize};
-use specs::{
-    storage::DenseVecStorage, Component, Entities, Join, ReadStorage, RunNow, System, WriteStorage, WorldExt,
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Display,
 };
 
-use crate::RuntimeState;
+use atlier::system::{App, Extension, Value};
+use imgui::Window;
+use serde::{Deserialize, Serialize};
+use specs::{
+    storage::DenseVecStorage, Component, Entities, Join, ReadStorage, RunNow, System, WorldExt,
+    WriteStorage,
+};
+
+use crate::{Event, RuntimeState};
 
 use super::{event_graph::EventGraph, unique_title, Section, SectionAttributes};
 
 #[derive(Default, Clone)]
 pub struct EventEditor {
     title: String,
-    events: HashMap<u32, Vec<EventComponent>>,
+    events: BTreeMap<u32, BTreeSet<EventComponent>>,
 }
 
 impl EventEditor {
     pub fn new() -> Self {
         Self {
             title: unique_title(Self::name()),
-            events: HashMap::new(),
+            events: BTreeMap::new(),
         }
     }
 }
@@ -36,19 +40,25 @@ impl<'a> System<'a> for EventEditor {
     fn run(&mut self, (entities, attributes, mut event_graph): Self::SystemData) {
         for e in entities.join() {
             if let Some(attrs) = attributes.get(e) {
-                if let Some(true) = attrs.is_attr_checkbox("enable event builder") {
-                    if let None = self.events.get(&e.id()) {
-                        if let Some(EventGraph(graph)) = event_graph.get_mut(e) {
-                            let mut events = vec![];
-                            graph.nodes().iter().cloned().for_each(|e| {
-                                events.push(e.to_owned());
-                            });
+                match attrs.is_attr_checkbox("enable event builder") {
+                    Some(true) => {
+                        if let None = self.events.get(&e.id()) {
+                            if let Some(EventGraph(graph)) = event_graph.get_mut(e) {
+                                let mut events = BTreeSet::new();
+                                graph.nodes().iter().cloned().for_each(|e| {
+                                    events.insert(e.to_owned());
+                                });
 
-                            if events.len() > 0 {
-                                self.events.insert(e.id(), events);
+                                if events.len() > 0 {
+                                    self.events.insert(e.id(), events);
+                                }
                             }
                         }
                     }
+                    Some(false) => {
+                        self.events.remove(&e.id());
+                    }
+                    _ => (),
                 }
             }
         }
@@ -61,25 +71,34 @@ impl App for EventEditor {
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
-        for (e, events) in self.events.iter_mut() {
+        for (e, events) in self.events.clone().iter_mut() {
             Window::new(format!("{} {}", &self.title, e))
                 .size([800.0, 600.0], imgui::Condition::Appearing)
                 .build(ui, || {
-                    if CollapsingHeader::new(format!("Events for Entity: {}", e)).build(ui) {
-                        if ui.button("Add Event") {
-                            events.push(EventComponent::new(
-                                unique_title("Event"),
-                                "{ new_event;; }",
-                            ));
-                        }
-
-                        for (id, e) in events.iter_mut().enumerate() {
-                            let mut section: Section<EventEditor> = e.into();
-                            let section = &mut section;
-                            section.with_parent_entity(id as u32).show_editor(ui);
-                            *e = EventComponent::from(section);
-                        }
+                    if ui.button("Add Event") {
+                        events.insert(EventComponent::new(
+                            unique_title("Event"),
+                            "{ new_event;; }",
+                        ));
                     }
+
+                    ui.same_line();
+                    if ui.button("Refresh") {
+                        self.events.clear();
+                        return;
+                    }
+
+                    let mut next_set = BTreeSet::new();
+                    for (id, mut e) in events.iter().cloned().enumerate() {
+                        let e = &mut e;
+                        let mut section: Section<EventEditor> = e.into();
+                        let section = &mut section;
+                        section.with_parent_entity(id as u32).show_editor(ui);
+                        let e = EventComponent::from(section);
+                        next_set.insert(e);
+                    }
+
+                    self.events.insert(*e, next_set);
                 });
         }
     }
@@ -122,7 +141,7 @@ impl Extension for EventEditor {
 }
 
 /// Event component is the the most basic data unit of the runtime
-#[derive(Clone, Component, Hash, Serialize, Deserialize)]
+#[derive(Clone, Component, Hash, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[storage(DenseVecStorage)]
 pub struct EventComponent {
     pub label: String,
@@ -143,6 +162,12 @@ impl EventComponent {
             call: String::default(),
             transitions: vec![],
         }
+    }
+}
+
+impl From<Event> for EventComponent {
+    fn from(_: Event) -> Self {
+        todo!()
     }
 }
 

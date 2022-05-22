@@ -1,4 +1,4 @@
-use std::{fmt::Display, fs, path::Path};
+use std::{fmt::Display, fs, path::Path, collections::BTreeMap};
 
 use super::{unique_title, App, Attribute, ShowEditor, Value};
 use crate::RuntimeState;
@@ -32,7 +32,7 @@ where
     /// title of this section, will be the header
     pub title: String,
     /// attributes are properties that this section owns and are editable
-    pub attributes: Vec<Attribute>,
+    pub attributes: BTreeMap<String, Attribute>,
     /// enable to allow external systems to make changes to state,
     /// in order for systems to commit these changes, RuntimeState::merge_with must be implemented (this is set todo!() by default)
     pub enable_app_systems: bool,
@@ -58,7 +58,7 @@ impl<S: RuntimeState> Section<S> {
             state: initial_state,
             enable_app_systems: false,
             enable_edit_attributes: false,
-            attributes: vec![],
+            attributes: BTreeMap::new(),
         }
     }
 
@@ -79,13 +79,15 @@ impl<S: RuntimeState> Section<S> {
     pub fn get_attr(&self, with_name: impl AsRef<str>) -> Option<&Attribute> {
         self.attributes
             .iter()
-            .find(|a| a.name() == with_name.as_ref())
+            .find(|(_, attr)| attr.name() == with_name.as_ref())
+            .and_then(|(_, a)|Some(a))
     }
 
     pub fn get_attr_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Attribute> {
         self.attributes
             .iter_mut()
-            .find(|a| a.name() == with_name.as_ref())
+            .find(|(_, attr)| attr.name() == with_name.as_ref())
+            .and_then(|(_, a)|Some(a))
     }
 
     pub fn show_debug(&mut self, attr_name: impl AsRef<str>, ui: &imgui::Ui) {
@@ -347,7 +349,7 @@ impl<S: RuntimeState> Section<S> {
     }
 
     pub fn add_attribute(&mut self, attr: Attribute) {
-        self.attributes.push(attr);
+        self.attributes.insert(format!("{}", attr), attr);
     }
 
     pub fn update(&mut self, func: impl FnOnce(&mut Self)) -> Self {
@@ -360,7 +362,7 @@ impl<S: RuntimeState> Section<S> {
 
     pub fn set_parent_entity(&mut self, id: u32) {
         self.id = id;
-        for a in self.attributes.iter_mut() {
+        for (_, a) in self.attributes.iter_mut() {
             a.set_id(id);
         }
     }
@@ -377,7 +379,7 @@ impl<S: RuntimeState + App> From<S> for Section<S> {
             state: initial,
             enable_app_systems: false,
             enable_edit_attributes: false,
-            attributes: vec![],
+            attributes: BTreeMap::new(),
         }
     }
 }
@@ -421,7 +423,7 @@ impl<S: RuntimeState> App for Section<S> {
                         self.add_bool_attr(unique_title("Bool"), false);
                     }
                     ui.new_line();
-                    for a in self.attributes.iter_mut() {
+                    for (_, a) in self.attributes.iter_mut() {
                         a.edit(ui);
                         ui.new_line();
                     }

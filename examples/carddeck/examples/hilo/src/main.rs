@@ -1,5 +1,5 @@
 use carddeck::Dealer;
-use lifec::{Event, Runtime};
+use lifec::{Event, Runtime, editor::{EventEditor, Extension}};
 
 fn main() {
     let mut runtime = get_runtime();
@@ -42,15 +42,21 @@ fn main() {
             "'{test: abc, test123: 12345}'",
         ]);
 
-    let runtime = runtime.parse_event("{ test_test;; }").process_state();
+   // let runtime = runtime.parse_event("{ test_test;; }").step();
 
+   let mut event_editor = EventEditor::new();
     lifec::editor::open_editor_with(
         format!("Dealer Editor"), 
         runtime, 
         vec![Dealer::dealer_section()],
-        |_| {}, 
+        |w| {
+            EventEditor::configure_app_world(w);
+        }, 
         |_| {},
-        |_, _| {}
+        move |s, ui| {
+            let event_editor = &mut event_editor;
+            event_editor.extend_app_world(s, ui);
+        }
     )
 }
 

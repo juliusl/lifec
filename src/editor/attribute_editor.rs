@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, BTreeMap};
 
 use atlier::system::{App, Extension, Value};
 use imgui::Window;
@@ -12,7 +12,7 @@ use super::{unique_title, SectionAttributes};
 #[derive(Default)]
 pub struct AttributeEditor {
     title: String,
-    entities: HashMap<u32, AttributeComponent>,
+    entities: BTreeMap<u32, AttributeComponent>,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, Component)]
@@ -50,21 +50,23 @@ impl App for AttributeEditor {
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
-        Window::new(&self.title)
+        let entities = self.entities.clone();
+
+        entities.iter().for_each(|(e, ae)| {
+            Window::new(format!("Entity: {}", e))
             .size([800.0, 600.0], imgui::Condition::Appearing)
-            .build(ui, || {
+            .build(ui, ||{
                 if ui.button("Refresh") {
                     self.entities.clear();
                 }
 
-                self.entities.iter().for_each(|(e, ae)| {
-                    ui.text(format!("Entity: {}", e));
-                    for r in ae.references.iter() {
-                        ui.text(format!("{:?}", r));
-                    }
-                    ui.new_line();
-                })
+                ui.text(format!("Entity: {}", e));
+                for r in ae.references.iter() {
+                    ui.text(format!("{:?}", r));
+                }
+                ui.new_line();
             });
+        });
     }
 }
 
@@ -75,49 +77,51 @@ impl<'a> System<'a> for AttributeEditor {
         for e in entities.join() {
             match section_attributes.get(e) {
                 Some(attributes) => {
-                    if let None = self.entities.get(&e.id()) {
-                        let entry = AttributeComponent {
-                            store: {
-                                let mut store = Store::default();
-                                attributes
-                                    .get_attrs()
-                                    .iter()
-                                    .cloned()
-                                    .map(|a| a.value())
-                                    .for_each(|v| {
-                                        store = store.node(v.clone());
-                                    });
-                                store
-                            },
-                            references: {
-                                let mut set = BTreeSet::<(String, u64)>::default();
-                                attributes
-                                    .get_attrs()
-                                    .iter()
-                                    .filter_map(|a| {
-                                        if let Value::Reference(r) = a.value() {
-                                            return Some((format!("ref {}", a), *r));
-                                        }
-
-                                        if let Value::Reference(r) = a.value().to_ref() {
-                                            Some((format!("{}", a), r))
-                                        } else {
-                                            None
-                                        }
-                                    })
-                                    .for_each(|entry| {
-                                        set.insert(entry);
-                                    });
-                                set
-                            },
-                            id: e.id(),
-                        };
-
-                        match attribute_components.insert(e, entry.clone()) {
-                            Ok(_) => {
-                                self.entities.insert(e.id(), entry);
-                            },
-                            Err(err) => eprintln!("Error adding attribute component, {}", err),
+                    if let Some(true) = attributes.is_attr_checkbox("enable attribute editor") {
+                        if let None = self.entities.get(&e.id()) {
+                            let entry = AttributeComponent {
+                                store: {
+                                    let mut store = Store::default();
+                                    attributes
+                                        .get_attrs()
+                                        .iter()
+                                        .cloned()
+                                        .map(|a| a.value())
+                                        .for_each(|v| {
+                                            store = store.node(v.clone());
+                                        });
+                                    store
+                                },
+                                references: {
+                                    let mut set = BTreeSet::<(String, u64)>::default();
+                                    attributes
+                                        .get_attrs()
+                                        .iter()
+                                        .filter_map(|a| {
+                                            if let Value::Reference(r) = a.value() {
+                                                return Some((format!("ref {}", a), *r));
+                                            }
+    
+                                            if let Value::Reference(r) = a.value().to_ref() {
+                                                Some((format!("{}", a), r))
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                        .for_each(|entry| {
+                                            set.insert(entry);
+                                        });
+                                    set
+                                },
+                                id: e.id(),
+                            };
+    
+                            match attribute_components.insert(e, entry.clone()) {
+                                Ok(_) => {
+                                    self.entities.insert(e.id(), entry);
+                                },
+                                Err(err) => eprintln!("Error adding attribute component, {}", err),
+                            }
                         }
                     }
                 }

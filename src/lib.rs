@@ -2,7 +2,7 @@ use atlier::system::Attribute;
 use logos::Logos;
 use parser::Lifecycle;
 use std::any::Any;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, BTreeSet};
 use std::fmt::{Debug, Display};
 
 pub mod editor;
@@ -41,7 +41,7 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
     /// merge_with specifies how to merge another instance of Self that has been modified externally
     /// this allows for only specific fields in state to be updated asynchronously
     fn merge_with(&self, _: &Self) -> Self {
-        todo!("Implement this to serialize external changes to state")
+        self.clone()
     }
 
     /// select decides which listener should be processed next
@@ -192,9 +192,23 @@ impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{{ {}_{}; {}_{}; {}_{} }}",
-            self.phase, self.lifecycle, self.prefix, self.label, self.payload.1, self.payload.0
-        )
+            "{{ {}_{}; {}_{};",
+            self.phase, self.lifecycle, self.prefix, self.label
+        )?;
+
+        if !self.payload.0.is_empty() && !self.payload.1.is_empty() {
+            write!(
+                f,
+                " {}_{}",
+                self.payload.1,
+                self.payload.0,
+            )
+        } else {
+            write!(
+                f,
+                " }}"
+            )
+        }
     }
 }
 
@@ -231,7 +245,7 @@ where
     calls: HashMap<String, ThunkFunc<T>>,
     state: Option<T>,
     current: Option<Event>,
-    attributes: Vec<Attribute>,
+    attributes: BTreeSet<Attribute>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -542,7 +556,7 @@ where
     }
 
     pub fn attribute(&mut self, attribute: Attribute) {
-        self.attributes.push(attribute);
+        self.attributes.insert(attribute);
     }
 
     /// on parses an event expression, and adds a new listener for that event
@@ -911,7 +925,7 @@ mod parser {
     #[test]
     fn test_arguments() {
         let mut lex = Argument::lexer(
-            r#"$TEST='test1234' --test abc -t test --te et32t --json { test: "test"; "test"} --test { test: "abc", test2: "value"} -$TEST='test1234'"#,
+            r#"$TEST='test1234' --test abc -t test --te et32t --json '{ test: "test"; "test"}' --test '{ test: "abc", test2: "value"}' -$TEST='test1234'"#,
         );
         assert_eq!(
             Some(Argument::Variable((
@@ -944,14 +958,14 @@ mod parser {
         assert_eq!(
             Some(Argument::Flag((
                 Flags::LongFlag("json".to_string()),
-                r#"{ test: "test"; "test"}"#.to_string()
+                r#"'{ test: "test"; "test"}'"#.to_string()
             ))),
             lex.next()
         );
         assert_eq!(
             Some(Argument::Flag((
                 Flags::LongFlag("test".to_string()),
-                r#"{ test: "abc", test2: "value"}"#.to_string()
+                r#"'{ test: "abc", test2: "value"}'"#.to_string()
             ))),
             lex.next()
         );
