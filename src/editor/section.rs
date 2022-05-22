@@ -270,7 +270,7 @@ impl<S: RuntimeState> Section<S> {
         self.add_attribute(Attribute::new(
             self.id,
             name.as_ref().to_string(),
-            Value::Empty
+            Value::Empty,
         ));
     }
 
@@ -388,16 +388,39 @@ impl<S: RuntimeState> App for Section<S> {
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
-        if CollapsingHeader::new(&self.title).build(ui) {
+        if CollapsingHeader::new(&self.title)
+            .default_open({
+                if let Some(Value::Bool(true)) = self.get_attr_value("opened::") {
+                    true
+                } else {
+                    false
+                }
+            })
+            .build(ui)
+        {
             ui.indent();
             let ShowEditor(editor) = &mut self.show_editor;
             editor(self, ui);
 
             if self.enable_edit_attributes {
                 ui.new_line();
-                if CollapsingHeader::new(format!("Attributes {:#4x}", self.id))
-                    .build(ui)
-                {
+                if CollapsingHeader::new(format!("Attributes {:#4x}", self.id)).build(ui) {
+                    if ui.button(format!("Add text Section[{}]", self.id)) {
+                        self.add_text_attr(unique_title("Text"), "");
+                    }
+                    ui.same_line();
+                    if ui.button(format!("Add int Section[{}]", self.id)) {
+                        self.add_int_attr(unique_title("Int"), 0);
+                    }
+                    ui.same_line();
+                    if ui.button(format!("Add float Section[{}]", self.id)) {
+                        self.add_float_attr(unique_title("Float"), 0.0);
+                    }
+                    ui.same_line();
+                    if ui.button(format!("Add bool Section[{}]", self.id)) {
+                        self.add_bool_attr(unique_title("Bool"), false);
+                    }
+                    ui.new_line();
                     for a in self.attributes.iter_mut() {
                         a.edit(ui);
                         ui.new_line();
@@ -405,6 +428,17 @@ impl<S: RuntimeState> App for Section<S> {
                 }
             }
             ui.unindent();
+            if let Some(Value::Bool(val)) = self.get_attr_value_mut("opened::") {
+                *val = true;
+            }
+        } else {
+            if let Some(Value::Bool(val)) = self.get_attr_value_mut("opened::") {
+                *val = false;
+            }
+        }
+
+        if let Some(Value::TextBuffer(title)) = self.get_attr_value("title::") {
+            self.title = title.clone();
         }
     }
 }
@@ -417,12 +451,16 @@ where
         Self {
             id: Default::default(),
             title: Default::default(),
-            show_editor: ShowEditor(|_, _| {}),
+            show_editor: ShowEditor(|s, ui| {
+                let label = format!("edit attributes for {}", s.title);
+                ui.checkbox(label, &mut s.enable_edit_attributes);
+            }),
             state: Default::default(),
             attributes: Default::default(),
             enable_app_systems: Default::default(),
             enable_edit_attributes: Default::default(),
         }
+        .with_bool("opened::", false)
     }
 }
 

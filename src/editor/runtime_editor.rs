@@ -14,7 +14,7 @@ where
 {
     pub runtime: Runtime<S>,
     pub events: Vec<EventComponent>,
-    sections: BTreeMap<u32, Section<S>>,
+    pub sections: BTreeMap<u32, Section<S>>,
 }
 
 impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
@@ -51,10 +51,27 @@ impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
             })
             .collect();
 
+        let mut sections: BTreeMap<u32, Section<S>> = BTreeMap::new();
+        let sections = &mut sections;
+        runtime.attributes.iter().for_each(|a| {
+            if let Some(section) = sections.get_mut(&a.id()) {
+                section.add_attribute(a.clone());
+            } else {
+                sections.insert(
+                    a.id(),
+                    Section::<S>::default()
+                        .with_attribute(a.clone())
+                        .with_title(format!("Runtime Entity {}", a.id()))
+                        .with_parent_entity(a.id()),
+                );
+            }
+        });
+
+        let sections = sections.clone();
         let next = Self {
             runtime,
             events,
-            sections: BTreeMap::new(),
+            sections,
         };
         next
     }
@@ -198,7 +215,7 @@ where
                 ui.new_line();
                 ui.text("Runtime/Editor Tools");
                 ui.new_line();
-                
+
                 if CollapsingHeader::new(format!("Current Runtime")).begin(ui) {
                     ui.indent();
 
@@ -211,7 +228,10 @@ where
                     let context = self.runtime.context();
                     ui.label_text(format!("Current Context"), format!("{}", context));
 
-                    if CollapsingHeader::new(format!("Debug Runtime")).default_open(true).begin(ui) {
+                    if CollapsingHeader::new(format!("Debug Runtime"))
+                        .default_open(true)
+                        .begin(ui)
+                    {
                         ui.indent();
 
                         if ui.button("Step") {
@@ -221,7 +241,7 @@ where
                         if ui.button("Setup") {
                             self.runtime.parse_event("{ setup;; }");
                         }
-    
+
                         ui.unindent();
                     }
                     ui.unindent();

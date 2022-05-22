@@ -12,13 +12,28 @@ fn main() {
         (s.clone(), "{ exit;; }".to_string())
     });
 
+    let mut runtime = runtime
+        .with_attribute(Attribute::new(1, "node::on", Value::TextBuffer("".to_string())))
+        .with_attribute(Attribute::new(1, "node::call", Value::TextBuffer("".to_string())))
+        .with_attribute(Attribute::new(1, "node::dispatch", Value::TextBuffer("".to_string())))
+        .with_attribute(Attribute::new(1, "enable node editor", Value::Bool(true)))
+        .with_attribute(Attribute::new(0, "enable node editor", Value::Bool(true)))
+        .with_attribute(Attribute::new(0, "node::on", Value::TextBuffer("".to_string())))
+        .with_attribute(Attribute::new(0, "node::call", Value::TextBuffer("".to_string())))
+        .with_attribute(Attribute::new(0, "node::dispatch", Value::TextBuffer("".to_string())));
+
+    let runtime = &mut runtime;
+
     runtime
         .on("{ setup;; }")
         .dispatch("echo", "{ after_echo;; }")
         .args(&["--o", "hello world"]);
 
-    runtime.on("{ after_echo;; }").call("print_results");
+    runtime
+        .on("{ after_echo;; }")
+        .call("print_results");
 
+    let mut node_editor = NodeEditor::new();
     let mut event_editor = EventEditor::new();
     let mut file_editor = FileEditor::new();
     let mut attr_editor = AttributeEditor::new();
@@ -36,6 +51,7 @@ fn main() {
         ],
         |w| {
             AttributeEditor::configure_app_world(w);
+            NodeEditor::configure_app_world(w);
         },
         |_| {},
         move |w, ui| {
@@ -47,6 +63,9 @@ fn main() {
 
             let event_editor = &mut event_editor;
             event_editor.extend_app_world(w, ui);
+
+            let node_editor = &mut node_editor;
+            node_editor.extend_app_world(w, ui);
         },
     );
 }

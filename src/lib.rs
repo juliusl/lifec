@@ -1,8 +1,9 @@
+use atlier::system::Attribute;
 use logos::Logos;
 use parser::Lifecycle;
+use std::any::Any;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Debug, Display};
-use std::any::Any;
 
 pub mod editor;
 pub mod plugins;
@@ -16,7 +17,7 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
     }
 
     /// load should take the serialized form of this state
-    /// and create a new instance of Self 
+    /// and create a new instance of Self
     fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self
     where
         Self: Sized;
@@ -230,6 +231,7 @@ where
     calls: HashMap<String, ThunkFunc<T>>,
     state: Option<T>,
     current: Option<Event>,
+    attributes: Vec<Attribute>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -331,7 +333,7 @@ where
 }
 
 #[derive(Clone)]
-pub enum ThunkFunc<T> 
+pub enum ThunkFunc<T>
 where
     T: RuntimeState,
 {
@@ -385,20 +387,23 @@ pub fn parse_variables(args: Vec<String>) -> BTreeMap<String, String> {
     use parser::Argument;
 
     let mut map = BTreeMap::<String, String>::default();
-    args.iter().map(|a| Argument::lexer(a)).filter_map(|mut p| {
-        if let Some(Argument::Variable(v)) = p.next() {
-            Some(v)
-        } else {
-            None
-        }
-    }).for_each(|(var, value)|{
-        if let Some(old) = map.insert(var.clone(), value.clone()) {
-            eprintln!(
-                "Warning: replacing flag {}, with {} -- original: {}",
-                var, value, old
-            );
-        }
-    });
+    args.iter()
+        .map(|a| Argument::lexer(a))
+        .filter_map(|mut p| {
+            if let Some(Argument::Variable(v)) = p.next() {
+                Some(v)
+            } else {
+                None
+            }
+        })
+        .for_each(|(var, value)| {
+            if let Some(old) = map.insert(var.clone(), value.clone()) {
+                eprintln!(
+                    "Warning: replacing flag {}, with {} -- original: {}",
+                    var, value, old
+                );
+            }
+        });
 
     map
 }
@@ -407,14 +412,17 @@ pub fn parse_flags(args: Vec<String>) -> BTreeMap<String, String> {
     use parser::Argument;
     use parser::Flags;
 
-    let args: Vec<String> = args.iter().map(|a| Argument::lexer(a)).filter_map(|mut p| {
-        if let Some(Argument::Variable(_)) = p.next() {
-            None
-        } else {
-            Some(p.source().to_string())
-        }
-    })
-    .collect();
+    let args: Vec<String> = args
+        .iter()
+        .map(|a| Argument::lexer(a))
+        .filter_map(|mut p| {
+            if let Some(Argument::Variable(_)) = p.next() {
+                None
+            } else {
+                Some(p.source().to_string())
+            }
+        })
+        .collect();
 
     let arguments = args.join(" ");
 
@@ -511,16 +519,30 @@ where
     }
 
     pub fn reset_listeners(&mut self, keep_update_listeners: bool) {
-        self.listeners = self.listeners.iter().filter(|l| {
-            match l.action {
+        self.listeners = self
+            .listeners
+            .iter()
+            .filter(|l| match l.action {
                 Action::Thunk(_) => keep_update_listeners,
-                _ => false
-            }
-        }).cloned().collect();
+                _ => false,
+            })
+            .cloned()
+            .collect();
     }
 
     pub fn get_listeners(&self) -> Vec<Listener<T>> {
         self.listeners.clone()
+    }
+
+    pub fn with_attribute(&mut self, attribute: Attribute) -> Self {
+        let mut _s = self.clone();
+        let _s = &mut _s;
+        _s.attribute(attribute);
+        _s.clone()
+    }
+
+    pub fn attribute(&mut self, attribute: Attribute) {
+        self.attributes.push(attribute);
     }
 
     /// on parses an event expression, and adds a new listener for that event
@@ -668,6 +690,7 @@ where
             listeners: self.listeners.to_vec(),
             state: self.state.clone(),
             current: self.current.clone(),
+            attributes: self.attributes.clone(),
         }
     }
 
@@ -711,6 +734,7 @@ where
                 state: self.state.clone(),
                 listeners: self.listeners.clone(),
                 current: self.current.clone(),
+                attributes: self.attributes.clone(),
             })
         } else {
             Err(RuntimeTestError {})

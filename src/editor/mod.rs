@@ -111,6 +111,13 @@ pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
             e.events.iter().cloned().for_each(|e| {
                 store = store.node(e);
             });
+            
+            e.sections.iter().for_each(|(_, section)|{
+                w.create_entity()
+                .maybe_with(Some(section.clone()))
+                .maybe_with(Some(EventGraph(store.clone())))
+                .build();
+            });
 
             sections.iter().for_each(|s| {
                 w.create_entity()
