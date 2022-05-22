@@ -34,7 +34,9 @@ fn main() {
         .with_symbol("file::name::echo.json")
         .with_symbol("file::name::echo.toml")
         ],
-        |_| {},
+        |w| {
+            AttributeEditor::configure_app_world(w);
+        },
         |_| {},
         move |w, ui| {
             let file_editor = &mut file_editor;

@@ -1,6 +1,8 @@
 use atlier::system::{App, Value};
 use chrono::{Local, Utc, DateTime};
 use imgui::{CollapsingHeader, Ui};
+use serde::Deserialize;
+use serde::Serialize;
 use specs::Component;
 use specs::HashMapStorage;
 use std::{
@@ -11,19 +13,20 @@ use std::{
 
 use crate::{RuntimeState, editor::{Section, SectionExtension}, WithArgs, parse_flags};
 
-#[derive(Debug, Clone, Default, Component)]
+#[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
 #[storage(HashMapStorage)]
 pub struct Process {
     pub command: String,
-    pub subcommand: String,
+    pub subcommands: String,
     pub flags: BTreeMap<String, String>,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
     pub code: Option<i32>,
-    pub start_time: Option<DateTime<Utc>>,
     pub elapsed: Option<String>,
-    pub last_timestamp_utc: Option<String>,
-    pub last_timestamp_local: Option<String>,
+    pub timestamp_utc: Option<String>,
+    pub timestamp_local: Option<String>,
+    #[serde(skip)]
+    start_time: Option<DateTime<Utc>>,
 }
 
 impl SectionExtension<Process> for Process
@@ -34,6 +37,70 @@ impl SectionExtension<Process> for Process
 }
 
 impl Process {
+    fn interpret_command(&self, expr: impl AsRef<str>, interpret: impl Fn(Self, &mut Command) -> Result<Self, ProcessExecutionError>) -> Result<Self, ProcessExecutionError> {
+        let parts: Vec<String> = expr.as_ref().split("::").map(|p| p.to_string()).collect();
+
+        if let Some(command) = parts.get(0) {
+            let subcommands = &parts[1..];
+
+            let process = Process {
+                stdout: vec![],
+                stderr: vec![],
+                code: None,
+                command: command.to_string(),
+                subcommands: subcommands.join("::"),
+                flags: self.flags.clone(),
+                start_time: Some(Utc::now()),
+                elapsed: None,
+                timestamp_local: None,
+                timestamp_utc: None
+            };
+
+            let mut command = Command::new(&command);
+            let mut command = &mut command;
+
+            for s in subcommands  {
+                command = command.arg(s);
+            }
+
+            interpret(process, command)
+        } else {
+            Err(ProcessExecutionError{})
+        }
+    }
+
+    fn handle_output(mut self, mut command: &mut Command) -> Result<Self, ProcessExecutionError> {
+        if !self.flags.is_empty() {
+           for (name, value) in &self.flags {
+               if !name.is_empty() {
+                command = command.arg(name);
+               }
+
+               if !value.is_empty() {
+                   command = command.arg(value);
+               }
+           }
+        }
+
+        let output = command.output().ok();
+            if let Some(Output {
+                status,
+                stdout,
+                stderr,
+            }) = output
+            {
+                self.stdout = stdout;
+                self.stderr = stderr;
+                self.code = status.code();
+                self.timestamp_utc = Some(Utc::now().to_string());
+                self.timestamp_local = Some(Local::now().to_string());
+                self.elapsed = self.start_time.and_then(|s| Some(Utc::now()-s)).and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
+                Ok(self)
+            } else {
+                Err(ProcessExecutionError{})
+            }
+    }
+
     fn edit(section: &mut Section<Process>, ui: &Ui) {
         // Show the default view for this editor
         Process::show_editor(&mut section.state, ui);
@@ -49,20 +116,20 @@ impl Process {
             ui,
         );
         section.edit_state_string(
-            "edit the process subcommand",
-            "subcommand",
-            |s| Some(&mut s.subcommand),
+            "edit process subcommands",
+            "subcommands",
+            |s| Some(&mut s.subcommands),
             ui,
         );
 
         if ui.button("execute") {
             match ( section.get_attr_value("command"),
-                    section.get_attr_value("subcommand")
+                    section.get_attr_value("subcommands")
                   ) {
                 (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommand))) => {
                     if let Some(next) = section
                         .state
-                        .process(&format!("{} {}", command, subcommand))
+                        .process(&format!("{}::{}", command, subcommand))
                         .ok()
                     {
                         section.state = next;
@@ -88,8 +155,12 @@ impl Process {
             .iter_mut()
             .filter(|f| f.name().starts_with("arg::"))
             .for_each(|arg| {
+                let arg_name = &arg.name()[5..];
+                if arg_name.is_empty() {
+                    return;
+                }
+                
                 if let Value::TextBuffer(value) = arg.value() {
-                    let arg_name = &arg.name()[5..];
                     section.edit_state_string(
                         format!("edit flag {}", arg_name),
                         arg.name(),
@@ -121,10 +192,12 @@ impl App for Process {
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
-        ui.label_text("command", &self.command);
+        if !self.command.is_empty() {
+            ui.label_text("command", &self.command);
+        }
 
-        if !self.subcommand.is_empty() {
-            ui.label_text("subcommand", &self.subcommand);
+        if !self.subcommands.is_empty() {
+            ui.label_text("subcommand", &self.subcommands);
         }
 
         if !self.flags.is_empty() {
@@ -136,7 +209,7 @@ impl App for Process {
         }
 
         if (!self.stdout.is_empty() || !self.stderr.is_empty()) && self.code.is_some() {
-            if CollapsingHeader::new(format!("Standard I/O, Exit Code: {:?}, Local Timestamp: {:?}, UTC Timestamp: {:?}, Elapsed: {:?}", self.code, self.last_timestamp_local, self.last_timestamp_utc, self.elapsed)).leaf(true).begin(ui) {
+            if CollapsingHeader::new(format!("Standard I/O, Exit Code: {:?}, Local Timestamp: {:?}, UTC Timestamp: {:?}, Elapsed: {:?}", self.code, self.timestamp_local, self.timestamp_utc, self.elapsed)).leaf(true).begin(ui) {
                 if let Some(mut output) = String::from_utf8(self.stdout.to_vec()).ok() {
                     ui.input_text_multiline("stdout", &mut output, [0.0, 0.0])
                         .read_only(true)
@@ -166,52 +239,7 @@ impl RuntimeState for Process {
     }
 
     fn process<'a, S: AsRef<str> + ?Sized>(&self, msg: &'a S) -> Result<Self, Self::Error> {
-        let parts = msg.as_ref().split(" ");
-        let command = parts.clone().take(1);
-        let command: Vec<&str> = command.collect();
-        if let Some(command) = command.get(0) {
-            let subcommand: Vec<&str> = parts.skip(1).collect();
-
-            let mut process = Process {
-                stdout: vec![],
-                stderr: vec![],
-                code: None,
-                command: command.to_string(),
-                subcommand: subcommand.join(" "),
-                flags: self.flags.clone(),
-                start_time: Some(Utc::now()),
-                elapsed: None,
-                last_timestamp_local: None,
-                last_timestamp_utc: None
-            };
-
-            let mut command = Command::new(&process.command);
-            let mut command = &mut command;
-
-            if !&process.subcommand.is_empty() {
-                command = command.arg(&process.subcommand);
-            }
-
-            let output = command.output().ok();
-            if let Some(Output {
-                status,
-                stdout,
-                stderr,
-            }) = output
-            {
-                process.stdout = stdout;
-                process.stderr = stderr;
-                process.code = status.code();
-                process.last_timestamp_utc = Some(Utc::now().to_string());
-                process.last_timestamp_local = Some(Local::now().to_string());
-                process.elapsed = process.start_time.and_then(|s| Some(Utc::now()-s)).and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
-                Ok(process)
-            } else {
-                Err(ProcessExecutionError {})
-            }
-        } else {
-            Err(ProcessExecutionError {})
-        }
+        self.interpret_command(msg, Self::handle_output)
     }
 
     fn process_with_args<S: AsRef<str> + ?Sized>(
@@ -221,51 +249,12 @@ impl RuntimeState for Process {
     where
         Self: Clone + Default + RuntimeState,
     {
-        let parts = msg.as_ref().split(" ");
-        let command = parts.clone().take(1);
-        let command: Vec<&str> = command.collect();
-        if let Some(command) = command.get(0) {
-            let subcommand: Vec<&str> = parts.skip(1).collect();
+        let process = state.get_state();
+        process.interpret_command(msg, move |mut p, command| {
+            p.flags = parse_flags(state.get_args().to_vec());
 
-            let mut process = Process {
-                stdout: vec![],
-                stderr: vec![],
-                code: None,
-                command: command.to_string(),
-                subcommand: subcommand.join(" "),
-                flags: parse_flags(state.get_args().to_vec()),
-                start_time: Some(Utc::now()),
-                elapsed: None,
-                last_timestamp_utc: None,
-                last_timestamp_local: None,
-            };
-
-            let mut command = Command::new(&process.command);
-            let mut command = &mut command;
-
-            if !&process.subcommand.is_empty() {
-                command = command.arg(&process.subcommand);
-            }
-
-            let output = command.args(state.get_args()).output().ok();
-            if let Some(Output {
-                status,
-                stdout,
-                stderr,
-            }) = output
-            {
-                process.stdout = stdout;
-                process.stderr = stderr;
-                process.code = status.code();
-                process.last_timestamp_local = Some(Local::now().to_string());
-                process.last_timestamp_utc = Some(Utc::now().to_string());
-                process.elapsed = process.start_time.and_then(|s| Some(Utc::now()-s)).and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
-                Ok(process)
-            } else {
-                Err(ProcessExecutionError {})
-            }
-        } else {
-            Err(ProcessExecutionError {})
-        }
+            let command = command.args(state.get_args());
+            p.handle_output(command)
+        })
     }
 }
