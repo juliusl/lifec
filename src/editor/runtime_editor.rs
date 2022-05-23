@@ -149,7 +149,10 @@ where
                     Section::new(
                         unique_title(format!("{}", self.runtime.context())),
                         |s, ui| {
-                            s.edit_attr("show events", "enable event builder", ui);
+                            s.edit_attr("edit events", "enable event builder", ui);
+
+                            let label = format!("edit attributes {}", s.get_parent_entity());
+                            ui.checkbox(label, &mut s.enable_edit_attributes);
                         },
                         state.clone(),
                     )
@@ -193,6 +196,7 @@ where
                     state,
                     attributes,
                     enable_edit_attributes,
+                    title,
                     ..
                 }) => {
                     // Update the world's copy of attributes from editor's copy
@@ -207,11 +211,13 @@ where
                     }
 
                     if *enable_app_systems {
+                        let title = title.to_string();
                         let state = state.merge_with(&s.state);
                         let attributes = attributes.clone();
                         let enable_edit_attributes = *enable_edit_attributes;
                         self.sections.insert(e.id(), {
                             let mut s = s.clone().with_parent_entity(e.id());
+                            s.title = title;
                             s.state = state;
                             s.attributes = attributes;
                             s.enable_edit_attributes = enable_edit_attributes;
