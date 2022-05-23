@@ -17,17 +17,6 @@ pub struct Project {
     documents: HashMap<u32, Document>,
 }
 
-pub enum Dispatch {
-    Empty,
-    Refresh,
-}
-
-impl Default for Dispatch {
-    fn default() -> Self {
-        Dispatch::Empty
-    }
-}
-
 impl<'a> System<'a> for Project {
     type SystemData = (
         Entities<'a>,
@@ -149,11 +138,18 @@ impl RuntimeState for Project {
     fn process<S: AsRef<str> + ?Sized>(&self, _: &S) -> Result<Self, Self::Error> {
         todo!()
     }
+
+    fn from_attributes(_: Vec<atlier::system::Attribute>) -> Self {
+        todo!()
+    }
+
+    fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
+        todo!()
+    }
 }
 
 impl Extension for Project {
     fn configure_app_world(world: &mut specs::World) {
-        world.insert(Dispatch::Empty);
         world.register::<Document>();
     }
 

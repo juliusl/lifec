@@ -125,6 +125,15 @@ impl RuntimeState for EventEditor {
     fn process<S: AsRef<str> + ?Sized>(&self, _: &S) -> Result<Self, Self::Error> {
         todo!()
     }
+
+    fn from_attributes(_: Vec<atlier::system::Attribute>) -> Self {
+        todo!()
+    }
+
+    fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
+        todo!()
+        
+    }
 }
 
 impl Extension for EventEditor {

@@ -1,11 +1,11 @@
 use imgui::Ui;
+use lifec::editor::{App, Section, SectionAttributes};
 use lifec::RuntimeState;
-use lifec::editor::{App, Section};
 use logos::{Lexer, Logos};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use specs::Component;
 use specs::storage::HashMapStorage;
+use specs::Component;
 use std::collections::BTreeSet;
 use std::fmt::{Debug, Display, Error};
 
@@ -582,12 +582,12 @@ impl Display for Deck {
                 std::fmt::Display::fmt(h, f)?;
                 write!(f, "]")?;
                 Ok(())
-            },
+            }
             Deck::EmptyHand => {
                 write!(f, "[")?;
                 write!(f, "]")?;
                 Ok(())
-            },
+            }
             Deck::Error => Err(Error {}),
         }
     }
@@ -704,7 +704,7 @@ pub struct Dealer {
 }
 
 impl Dealer {
-    pub fn dealer_section() -> Section::<Dealer> {
+    pub fn dealer_section() -> Section<Dealer> {
         Dealer::default().into()
     }
 }
@@ -729,7 +729,7 @@ impl TryFrom<&str> for Dealer {
                 Some(Deck::Deck(h)) => {
                     _deck = Deck::Deck(h);
                     break;
-                },
+                }
                 Some(Deck::EmptyHand) => {
                     hands.push(Hand(vec![]));
                     continue;
@@ -803,7 +803,11 @@ impl TryFrom<&str> for Dealer {
             }
 
             let deck = Deck::Deck(deck);
-            Ok(Self { deck, hands, expression: format!("")})
+            Ok(Self {
+                deck,
+                hands,
+                expression: format!(""),
+            })
         } else {
             Err(InvalidDealerExpression {})
         }
@@ -843,7 +847,7 @@ impl From<&Hand> for Dealer {
             Self {
                 deck: Deck::Deck(Hand(vec![])),
                 hands: vec![],
-                expression: String::default()
+                expression: String::default(),
             }
         }
     }
@@ -855,6 +859,7 @@ impl App for Dealer {
     }
 
     fn show_editor(&mut self, ui: &Ui) {
+        ui.text(format!("{:?}", self.into_attributes()));
         ui.indent();
         ui.label_text("Number of hands", format!("{}", self.hands()));
 
@@ -868,7 +873,8 @@ impl App for Dealer {
             ui.label_text("Deck", format!("{}", deck));
         }
 
-        ui.input_text(format!("Expression"), &mut self.expression).build();
+        ui.input_text(format!("Expression"), &mut self.expression)
+            .build();
         if ui.button(format!("Deal")) {
             match self.deal(&self.expression) {
                 Ok(next) => *self = next,
@@ -902,7 +908,10 @@ impl App for Dealer {
 impl RuntimeState for Dealer {
     type Error = InvalidDealerExpression;
 
-    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self where Self: Sized {
+    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self
+    where
+        Self: Sized,
+    {
         if let Ok(dealer) = Dealer::try_from(init.as_ref()) {
             dealer
         } else {
@@ -915,14 +924,32 @@ impl RuntimeState for Dealer {
         self.deal(msg.as_ref())
     }
 
-    fn process_with_args<S: AsRef<str> + ?Sized>(state: lifec::WithArgs<Self>, msg: &S) -> Result<Self, Self::Error>
+    fn process_with_args<S: AsRef<str> + ?Sized>(
+        state: lifec::WithArgs<Self>,
+        msg: &S,
+    ) -> Result<Self, Self::Error>
     where
-            Self: Clone + Default + RuntimeState {
+        Self: Clone + Default + RuntimeState,
+    {
         let args = state.parse_flags();
-        
+
         println!("Dealer received args: {:?}", args);
 
         state.get_state().deal(msg.as_ref())
+    }
+
+    fn from_attributes(attributes: Vec<lifec::editor::Attribute>) -> Self {
+        if let Some(lifec::editor::Value::TextBuffer(s)) = SectionAttributes::from(attributes).get_attr_value("carddeck::") {
+            Self::default().load(s)
+        } else {
+            Self::default()
+        }
+    }
+
+    fn into_attributes(&self) -> Vec<lifec::editor::Attribute> {
+        SectionAttributes::default()
+            .with_text("carddeck::", format!("{}", self))
+            .clone_attrs()
     }
 }
 

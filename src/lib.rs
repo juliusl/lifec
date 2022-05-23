@@ -11,16 +11,17 @@ pub mod plugins;
 pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
     type Error;
 
-    /// Save should serialize this state into a String
-    fn save(&self) -> String {
-        String::default()
-    }
-
     /// load should take the serialized form of this state
     /// and create a new instance of Self
     fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self
     where
         Self: Sized;
+
+    /// from_attributes loads runtime state from a vector of attributes
+    fn from_attributes(attributes: Vec<Attribute>) -> Self;
+
+    /// into_attributes converts current runtime state into a vector of attributes
+    fn into_attributes(&self) -> Vec<Attribute>;
 
     /// process is a function that should take a string message
     /// and return the next version of Self
@@ -197,17 +198,9 @@ impl Display for Event {
         )?;
 
         if !self.payload.0.is_empty() && !self.payload.1.is_empty() {
-            write!(
-                f,
-                " {}_{}",
-                self.payload.1,
-                self.payload.0,
-            )
+            write!(f, " {}_{}", self.payload.1, self.payload.0,)
         } else {
-            write!(
-                f,
-                " }}"
-            )
+            write!(f, " }}")
         }
     }
 }
@@ -506,6 +499,14 @@ where
             Err(e) => Err(e),
         }
     }
+
+    fn from_attributes(_: Vec<Attribute>) -> Self {
+        todo!()
+    }
+
+    fn into_attributes(&self) -> Vec<Attribute> {
+        todo!()
+    }
 }
 
 impl<T> Runtime<T>
@@ -657,7 +658,7 @@ where
             match &l.action {
                 Action::Call(name) => {
                     self.execute_call(name, state, Some(l.extensions));
-                },
+                }
                 Action::Thunk(thunk) => {
                     let (next_s, next_e) = thunk(&state, self.current.clone());
                     self.update(next_s, next_e);
@@ -771,7 +772,12 @@ where
         }
     }
 
-    fn execute_call(&mut self, call_name: impl AsRef<str>, state: T, extensions: Option<Extensions>) {
+    fn execute_call(
+        &mut self,
+        call_name: impl AsRef<str>,
+        state: T,
+        extensions: Option<Extensions>,
+    ) {
         match self.calls.get(call_name.as_ref()) {
             Some(ThunkFunc::Default(thunk)) => {
                 let (next_s, next_e) = thunk(&state, self.current.clone());
@@ -783,7 +789,7 @@ where
                         state: state.clone(),
                         args: extensions.get_args(),
                     };
-        
+
                     let (next_s, next_e) = thunk(&with_args, self.current.clone());
                     self.update(next_s, next_e);
                 }

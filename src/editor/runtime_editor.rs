@@ -91,9 +91,15 @@ impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
     }
 }
 
-#[derive(Component, Clone, Serialize, Deserialize)]
+#[derive(Default, Component, Clone, Serialize, Deserialize)]
 #[storage(DenseVecStorage)]
 pub struct SectionAttributes(Vec<Attribute>);
+
+impl From<Vec<Attribute>> for SectionAttributes {
+    fn from(attrs: Vec<Attribute>) -> Self {
+        Self(attrs)
+    }
+}
 
 impl SectionAttributes {
     pub fn get_attrs(&self) -> Vec<&Attribute> {
@@ -110,6 +116,26 @@ impl SectionAttributes {
         attributes.iter().find(|a| a.name() == name.as_ref())
     }
 
+    pub fn get_attr_mut(&mut self, name: impl AsRef<str>) -> Option<&mut Attribute> {
+        
+        let SectionAttributes(attributes) = self;
+
+        attributes.iter_mut().find(|a| a.name() == name.as_ref())
+    }
+
+    pub fn get_attr_value(&self, with_name: impl AsRef<str>) -> Option<&Value> {
+        self.get_attr(with_name).and_then(|a| Some(a.value()))
+    }
+
+    pub fn get_attr_value_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Value> {
+        self.get_attr_mut(with_name)
+            .and_then(|a| Some(a.get_value_mut()))
+    }
+
+    pub fn get_attrs_mut(&mut self) -> &mut Vec<Attribute> {
+        &mut self.0
+    }
+    
     pub fn is_attr_checkbox(&self, name: impl AsRef<str>) -> Option<bool> {
         if let Some(Value::Bool(val)) = self.get_attr(name).and_then(|a| Some(a.value())) {
             Some(*val)
@@ -118,8 +144,133 @@ impl SectionAttributes {
         }
     }
 
-    pub fn get_attrs_mut(&mut self) -> &mut Vec<Attribute> {
-        &mut self.0
+    pub fn with_attribute(&mut self, attr: Attribute) -> Self {
+        let attr = attr;
+        self.update(move |next| next.add_attribute(attr))
+    }
+
+    pub fn with_text(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) -> Self {
+        self.update(move |next| next.add_text_attr(name, init_value))
+    }
+
+    pub fn with_int(&mut self, name: impl AsRef<str>, init_value: i32) -> Self {
+        self.update(move |next| next.add_int_attr(name, init_value))
+    }
+
+    pub fn with_float(&mut self, name: impl AsRef<str>, init_value: f32) -> Self {
+        self.update(move |next| next.add_float_attr(name, init_value))
+    }
+
+    pub fn with_bool(&mut self, name: impl AsRef<str>, init_value: bool) -> Self {
+        self.update(move |next| next.add_bool_attr(name, init_value))
+    }
+
+    pub fn with_float_pair(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) -> Self {
+        self.update(move |next| next.add_float_pair_attr(name, init_value))
+    }
+
+    pub fn with_int_pair(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) -> Self {
+        self.update(move |next| next.add_int_pair_attr(name, init_value))
+    }
+
+    pub fn with_int_range(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) -> Self {
+        self.update(move |next| next.add_int_range_attr(name, init_value))
+    }
+
+    pub fn with_float_range(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) -> Self {
+        self.update(move |next| next.add_float_range_attr(name, init_value))
+    }
+
+    pub fn add_empty_attr(&mut self, name: impl AsRef<str>) {
+        self.add_attribute(Attribute::new(
+            0,
+            name.as_ref().to_string(),
+            Value::Empty,
+        ));
+    }
+
+    pub fn add_binary_attr(&mut self, name: impl AsRef<str>, init_value: impl Into<Vec<u8>>) {
+        self.add_attribute(Attribute::new(
+            0,
+            name.as_ref().to_string(),
+            Value::BinaryVector(init_value.into()),
+        ));
+    }
+
+    pub fn add_text_attr(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) {
+        self.add_attribute(Attribute::new(
+            0,
+            name.as_ref().to_string(),
+            Value::TextBuffer(init_value.as_ref().to_string()),
+        ));
+    }
+
+    pub fn add_int_attr(&mut self, name: impl AsRef<str>, init_value: i32) {
+        self.add_attribute(Attribute::new(
+            0,
+            name.as_ref().to_string(),
+            Value::Int(init_value),
+        ));
+    }
+
+    pub fn add_float_attr(&mut self, name: impl AsRef<str>, init_value: f32) {
+        self.add_attribute(Attribute::new(
+            0,
+            name.as_ref().to_string(),
+            Value::Float(init_value),
+        ));
+    }
+
+    pub fn add_bool_attr(&mut self, name: impl AsRef<str>, init_value: bool) {
+        self.add_attribute(Attribute::new(
+            0,
+            name.as_ref().to_string(),
+            Value::Bool(init_value),
+        ));
+    }
+
+    pub fn add_float_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) {
+        self.add_attribute(Attribute::new(
+            0,
+            name.as_ref().to_string(),
+            Value::FloatPair(init_value[0], init_value[1]),
+        ));
+    }
+
+    pub fn add_int_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) {
+        self.add_attribute(Attribute::new(
+            0,
+            name.as_ref().to_string(),
+            Value::IntPair(init_value[0], init_value[1]),
+        ));
+    }
+
+    pub fn add_int_range_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) {
+        self.add_attribute(Attribute::new(
+            0,
+            name.as_ref().to_string(),
+            Value::IntRange(init_value[0], init_value[1], init_value[2]),
+        ));
+    }
+
+    pub fn add_float_range_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) {
+        self.add_attribute(Attribute::new(
+            0,
+            name.as_ref().to_string(),
+            Value::FloatRange(init_value[0], init_value[1], init_value[2]),
+        ));
+    }
+
+    pub fn add_attribute(&mut self, attr: Attribute) {
+        self.0.push(attr);
+    }
+
+    pub fn update(&mut self, func: impl FnOnce(&mut Self)) -> Self {
+        let next = self;
+
+        (func)(next);
+
+        next.to_owned()
     }
 }
 

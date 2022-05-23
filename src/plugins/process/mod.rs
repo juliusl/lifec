@@ -11,6 +11,7 @@ use std::{
     process::{Command, Output}
 };
 
+use crate::editor::SectionAttributes;
 use crate::{RuntimeState, editor::{Section, SectionExtension}, WithArgs, parse_flags};
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
@@ -256,5 +257,30 @@ impl RuntimeState for Process {
             let command = command.args(state.get_args());
             p.handle_output(command)
         })
+    }
+
+    fn from_attributes(_: Vec<atlier::system::Attribute>) -> Self {
+        todo!()
+    }
+
+    fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
+       let mut attributes = SectionAttributes::default()
+            .with_text("command", self.command.to_string())
+            .with_text("subcommands", self.subcommands.to_string());
+
+
+        if !self.stdout.is_empty() {
+            attributes.add_binary_attr( "stdout", self.stdout.clone());
+        }
+
+        if !self.stderr.is_empty() {
+            attributes.add_binary_attr("stderr", self.stderr.clone());
+        }
+
+        for (flag, value) in self.flags.iter() {
+            attributes.add_text_attr(format!("arg::{}", flag), value);
+        }
+
+        attributes.clone_attrs()
     }
 }

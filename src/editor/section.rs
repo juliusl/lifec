@@ -491,4 +491,12 @@ where
     fn process<Str: AsRef<str> + ?Sized>(&self, _: &Str) -> Result<Self, Self::Error> {
         todo!()
     }
+
+    fn from_attributes(_: Vec<Attribute>) -> Self {
+        todo!()
+    }
+
+    fn into_attributes(&self) -> Vec<Attribute> {
+        todo!()
+    }
 }
