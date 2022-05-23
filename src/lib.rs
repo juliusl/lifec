@@ -647,27 +647,6 @@ where
             None
         }
     }
-    
-    fn execute_call(&mut self, call_name: impl AsRef<str>, state: T, extensions: Option<Extensions>) {
-        match self.calls.get(call_name.as_ref()) {
-            Some(ThunkFunc::Default(thunk)) => {
-                let (next_s, next_e) = thunk(&state, self.current.clone());
-                self.update(next_s, next_e);
-            }
-            Some(ThunkFunc::WithArgs(thunk)) => {
-                if let Some(extensions) = extensions {
-                    let with_args = WithArgs {
-                        state: state.clone(),
-                        args: extensions.get_args(),
-                    };
-        
-                    let (next_s, next_e) = thunk(&with_args, self.current.clone());
-                    self.update(next_s, next_e);
-                }
-            }
-            _ => (),
-        };
-    }
 
     /// process handles the internal logic
     /// based on the context, the state implementation selects the next listener
@@ -790,6 +769,27 @@ where
             }
             _ => {}
         }
+    }
+
+    fn execute_call(&mut self, call_name: impl AsRef<str>, state: T, extensions: Option<Extensions>) {
+        match self.calls.get(call_name.as_ref()) {
+            Some(ThunkFunc::Default(thunk)) => {
+                let (next_s, next_e) = thunk(&state, self.current.clone());
+                self.update(next_s, next_e);
+            }
+            Some(ThunkFunc::WithArgs(thunk)) => {
+                if let Some(extensions) = extensions {
+                    let with_args = WithArgs {
+                        state: state.clone(),
+                        args: extensions.get_args(),
+                    };
+        
+                    let (next_s, next_e) = thunk(&with_args, self.current.clone());
+                    self.update(next_s, next_e);
+                }
+            }
+            _ => (),
+        };
     }
 }
 
