@@ -55,7 +55,9 @@ fn main() {
             EventEditor::configure_app_world(w);
             Project::configure_app_world(w);
         },
-        |_| {},
+        |d| {
+            Project::configure_app_systems(d);
+        },
         move |s, ui| {
             let event_editor = &mut event_editor;
             event_editor.extend_app_world(s, ui);

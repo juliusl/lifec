@@ -1,13 +1,11 @@
-use std::{
-    collections::HashMap,
-    fmt::Display,
-};
+use std::{collections::HashMap, fmt::Display};
 
 use atlier::system::{App, Extension, Value};
 use imgui::Window;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
-use specs::{Entities, Join, ReadStorage, RunNow, System};
+use specs::storage::HashMapStorage;
+use specs::{Component, Entities, Join, ReadStorage, RunNow, System, WorldExt, WriteStorage};
 
 use crate::{
     editor::{EventGraph, SectionAttributes},
@@ -35,23 +33,38 @@ impl<'a> System<'a> for Project {
         Entities<'a>,
         ReadStorage<'a, SectionAttributes>,
         ReadStorage<'a, EventGraph>,
+        WriteStorage<'a, Document>,
     );
 
-    fn run(&mut self, (e, attributes, event_graph): Self::SystemData) {
+    fn run(&mut self, (e, attributes, event_graph, mut write_documents): Self::SystemData) {
         for (e, a, g) in (&e, &attributes, &event_graph).join() {
             match a.is_attr_checkbox("enable project") {
                 Some(true) => {
-                    if let None = self.documents.get(&e.id()) {
-                        self.documents.insert(
-                            e.id(),
+                    if let None = write_documents.get(e) {
+                        match write_documents.insert(
+                            e,
                             Document {
                                 attributes: a.clone(),
                                 events: g.clone(),
                             },
-                        );
+                        ) {
+                            Ok(_) => {
+                                if let None = self.documents.get(&e.id()) {
+                                    self.documents.insert(
+                                        e.id(),
+                                        Document {
+                                            attributes: a.clone(),
+                                            events: g.clone(),
+                                        },
+                                    );
+                                }
+                            }
+                            Err(_) => todo!(),
+                        }
                     }
                 }
                 Some(false) => {
+                    write_documents.remove(e);
                     self.documents.remove(&e.id());
                 }
                 _ => (),
@@ -66,12 +79,16 @@ impl App for Project {
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
-        self.documents.clone().iter().for_each(|(_, d)| {
-            Window::new(format!("Project {}", d)).build(ui, || {
-                if ui.button("Refresh") {
-                    self.documents.clear();
-                }
+        if self.documents.is_empty() {
+            return;
+        }
 
+        Window::new(format!("Projects Enabled: {}", self.documents.len())).build(ui, || {
+            if ui.button("Refresh") {
+                self.documents.clear();
+            }
+
+            self.documents.clone().iter().for_each(|(_, d)| {
                 if let Some(Value::TextBuffer(project_name)) = d
                     .attributes
                     .get_attr("project::name::")
@@ -137,9 +154,11 @@ impl RuntimeState for Project {
 impl Extension for Project {
     fn configure_app_world(world: &mut specs::World) {
         world.insert(Dispatch::Empty);
+        world.register::<Document>();
     }
 
-    fn configure_app_systems(_: &mut specs::DispatcherBuilder) {}
+    fn configure_app_systems(_: &mut specs::DispatcherBuilder) {
+    }
 
     fn extend_app_world(&mut self, app_world: &specs::World, ui: &imgui::Ui) {
         self.run_now(app_world);
@@ -147,7 +166,8 @@ impl Extension for Project {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Component)]
+#[storage(HashMapStorage)]
 pub struct Document {
     attributes: SectionAttributes,
     events: EventGraph,
