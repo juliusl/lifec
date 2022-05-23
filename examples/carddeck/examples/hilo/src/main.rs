@@ -1,7 +1,7 @@
 use carddeck::Dealer;
 use lifec::{
     editor::{EventEditor, Extension},
-    Event, Runtime,
+    Event, Runtime, plugins::Project,
 };
 
 fn main() {
@@ -44,6 +44,7 @@ fn main() {
     // let runtime = runtime.parse_event("{ test_test;; }").step();
 
     let mut event_editor = EventEditor::new();
+    let mut serializer = Project::default();
     lifec::editor::open_editor_with(
         format!("Dealer Editor"),
         runtime,
@@ -52,11 +53,15 @@ fn main() {
                 .with_text("context::", "{ setup;; }")],
         |w| {
             EventEditor::configure_app_world(w);
+            Project::configure_app_world(w);
         },
         |_| {},
         move |s, ui| {
             let event_editor = &mut event_editor;
             event_editor.extend_app_world(s, ui);
+
+            let serializer = &mut serializer;
+            serializer.extend_app_world(s, ui);
         },
     )
 }

@@ -24,7 +24,7 @@ where
     pub events: Vec<EventComponent>,
     pub sections: BTreeMap<u32, Section<S>>,
     pub running: (Option<bool>, Option<Instant>, Option<Instant>),
-    pub dispatch_runtime: Option<()>,
+    pub dispatch_snapshot: Option<()>,
     pub dispatch_remove: Option<u32>,
 }
 
@@ -84,7 +84,7 @@ impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
             events,
             sections,
             running: (None, None, None),
-            dispatch_runtime: None,
+            dispatch_snapshot: None,
             dispatch_remove: None,
         };
         next
@@ -140,7 +140,7 @@ where
         &mut self,
         (entities, read_sections, mut write_attributes, mut dispatcher): Self::SystemData,
     ) {
-        if let Some(_) = self.dispatch_runtime.take() {
+        if let Some(_) = self.dispatch_snapshot.take() {
             if let Some(state) = &self.runtime.state {
                 let msg = dispatcher.deref_mut();
                 let next = self.sections.len() as u32;
@@ -161,7 +161,7 @@ where
                     .with_bool("enable event builder", false)
                     .with_parent_entity(next),
                 );
-                *msg = Dispatch::Runtime(self.clone());
+                *msg = Dispatch::Snapshot(self.clone());
                 return;
             }
         }
@@ -255,7 +255,7 @@ where
     S: RuntimeState + Component,
 {
     Empty,
-    Runtime(RuntimeEditor<S>),
+    Snapshot(RuntimeEditor<S>),
     RemoveSnapshot(u32),
 }
 
@@ -299,7 +299,7 @@ where
             }
         }
 
-        if let Dispatch::Runtime(runtime) = msg.deref() {
+        if let Dispatch::Snapshot(runtime) = msg.deref() {
             self.runtime = Some(runtime.clone());
 
             let msg = msg.deref_mut();
@@ -360,7 +360,7 @@ where
             events: Default::default(),
             sections: Default::default(),
             running: (None, None, None),
-            dispatch_runtime: None,
+            dispatch_snapshot: None,
             dispatch_remove: None,
         }
     }
@@ -391,7 +391,7 @@ where
                         (Some(v), elapsed, stopped) => {
                             if ui.button("Stop") {
                                 self.dispatch_remove = None;
-                                self.dispatch_runtime = None;
+                                self.dispatch_snapshot = None;
                                 self.running = (None, None, None);
                             }
 
@@ -425,7 +425,7 @@ where
                         (None, Some(elapsed), Some(stopped)) => {       
                             if ui.button("Clear") {
                                 self.dispatch_remove = None;
-                                self.dispatch_runtime = None;
+                                self.dispatch_snapshot = None;
                                 self.running = (None, None, None);
                             }
                             ui.text(format!("Ran for {:#?}", stopped - elapsed));
@@ -482,7 +482,7 @@ where
                 ui.new_line();
                 if CollapsingHeader::new("Snapshots").leaf(true).begin(ui) {
                     if ui.button("Take Snapshot of Runtime") {
-                        self.dispatch_runtime = Some(());
+                        self.dispatch_snapshot = Some(());
                         return;
                     }
                     ui.new_line();

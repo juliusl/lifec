@@ -19,6 +19,7 @@ pub use atlier::system::Value;
 pub use attribute_editor::AttributeEditor;
 pub use event_editor::EventComponent;
 pub use event_editor::EventEditor;
+pub use event_graph::EventGraph;
 pub use file_editor::FileEditor;
 pub use node_editor::NodeEditor;
 pub use runtime_editor::RuntimeEditor;
@@ -29,7 +30,6 @@ pub use section::SectionExtension;
 use crate::Runtime;
 use crate::RuntimeState;
 
-use self::event_graph::EventGraph;
 use self::runtime_editor::RuntimeDispatcher;
 
 /// ShowEditor is a wrapper over a show function stored as a specs Component
