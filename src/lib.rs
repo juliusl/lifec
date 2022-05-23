@@ -2,7 +2,7 @@ use atlier::system::Attribute;
 use logos::Logos;
 use parser::Lifecycle;
 use std::any::Any;
-use std::collections::{BTreeMap, HashMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Debug, Display};
 
 pub mod editor;
@@ -242,7 +242,7 @@ where
     T: RuntimeState,
 {
     listeners: Vec<Listener<T>>,
-    calls: HashMap<String, ThunkFunc<T>>,
+    calls: BTreeMap<String, ThunkFunc<T>>,
     state: Option<T>,
     current: Option<Event>,
     attributes: BTreeSet<Attribute>,
@@ -647,6 +647,27 @@ where
             None
         }
     }
+    
+    fn execute_call(&mut self, call_name: impl AsRef<str>, state: T, extensions: Option<Extensions>) {
+        match self.calls.get(call_name.as_ref()) {
+            Some(ThunkFunc::Default(thunk)) => {
+                let (next_s, next_e) = thunk(&state, self.current.clone());
+                self.update(next_s, next_e);
+            }
+            Some(ThunkFunc::WithArgs(thunk)) => {
+                if let Some(extensions) = extensions {
+                    let with_args = WithArgs {
+                        state: state.clone(),
+                        args: extensions.get_args(),
+                    };
+        
+                    let (next_s, next_e) = thunk(&with_args, self.current.clone());
+                    self.update(next_s, next_e);
+                }
+            }
+            _ => (),
+        };
+    }
 
     /// process handles the internal logic
     /// based on the context, the state implementation selects the next listener
@@ -655,21 +676,8 @@ where
 
         if let Some(l) = self.next_listener() {
             match &l.action {
-                Action::Call(name) => match self.calls.get(name) {
-                    Some(ThunkFunc::Default(thunk)) => {
-                        let (next_s, next_e) = thunk(&state, self.current.clone());
-                        self.update(next_s, next_e);
-                    }
-                    Some(ThunkFunc::WithArgs(thunk)) => {
-                        let with_args = WithArgs {
-                            state: state.clone(),
-                            args: l.extensions.get_args(),
-                        };
-
-                        let (next_s, next_e) = thunk(&with_args, self.current.clone());
-                        self.update(next_s, next_e);
-                    }
-                    _ => (),
+                Action::Call(name) => {
+                    self.execute_call(name, state, Some(l.extensions));
                 },
                 Action::Thunk(thunk) => {
                     let (next_s, next_e) = thunk(&state, self.current.clone());
