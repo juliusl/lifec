@@ -11,8 +11,7 @@ impl NodeEditorGraph {
         let mut store = Store::<NodeId>::default();
         store.walk_unique = false;
 
-        let mut first: Option<NodeId> = None;
-        let coordinate_system = imnodes::CoordinateSystem::GridSpace;
+        let coordinate_system = imnodes::CoordinateSystem::ScreenSpace;
 
         // This first part arranges the events horizontally
         // meanwhile, start's adding links to the above store
@@ -24,15 +23,11 @@ impl NodeEditorGraph {
             } in links.clone().iter()
             {
                 let ImVec2 { x, y } = start_node.get_position(coordinate_system);
-                let start_x = x + 400.0;
+                let start_x = x + 700.0;
                 let start_y = y;
 
                 end_node.set_position(start_x, start_y, coordinate_system);
                 store = store.link_create_if_not_exists(start_node.clone(), end_node.clone());
-
-                if first.is_none() {
-                    first = Some(start_node.clone());
-                }
             }
         }
 
@@ -40,15 +35,15 @@ impl NodeEditorGraph {
         // we use the store we created above to rewalk the graph in order to figure out if we have branches
         // if we have branches, then the children of the parent need to spaced vertically.
         // if we don't have any branches, then we don't need any spacing vertically
-        if let Some(first) = first {
+        if let Some(last) = store.nodes().iter().last() {
             let (seen, _) =
-                store.new_walk::<_, NodeEditorGraph>(first, Some(&NodeEditorGraph::default()));
+                store.new_walk::<_, NodeEditorGraph>(**last, Some(&NodeEditorGraph::default()));
 
             for s in seen {
                 let node = store.get(s);
                 if let Some((id, refs)) = node.1 {
                     if refs.len() >= 2 {
-                        println!("vertical rearranging {:?} {:?}", id, refs);
+                        // println!("vertical rearranging {:?} {:?}", id, refs);
                         for (pos, end_node) in store
                             .clone()
                             .visit(*id)

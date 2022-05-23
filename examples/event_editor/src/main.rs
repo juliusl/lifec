@@ -230,13 +230,6 @@ impl Display for Test {
 impl RuntimeState for Test {
     type Error = TestRuntimeError;
 
-    fn load<S: AsRef<str> + ?Sized>(&self, _: &S) -> Self
-    where
-        Self: Sized,
-    {
-        self.clone()
-    }
-
     fn process<S: AsRef<str> + ?Sized>(&self, _: &S) -> Result<Self, Self::Error> {
         Ok(self.clone())
     }
@@ -245,5 +238,9 @@ impl RuntimeState for Test {
         let mut next = self.clone();
         next.clock = other.clock;
         next
+    }
+
+    fn from_attributes(attributes: Vec<Attribute>) -> Self {
+        todo!()
     }
 }

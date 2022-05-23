@@ -150,7 +150,7 @@ impl App for NodeEditor {
         for (id, (context, idgen)) in self.imnode_editors.iter_mut() {
             if let Some(nodes) = self.nodes.get_mut(id) {
                 Window::new(format!("Node editor {}", id))
-                    .size([1920.0, 1080.0], Condition::Appearing)
+                    .size([1500.0, 600.0], Condition::Appearing)
                     .build(ui, || {
                         if ui.button("Rearrange") {
                             if let Some((links, _)) = self.links.get_mut(id) {

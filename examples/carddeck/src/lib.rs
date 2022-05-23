@@ -908,17 +908,6 @@ impl App for Dealer {
 impl RuntimeState for Dealer {
     type Error = InvalidDealerExpression;
 
-    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self
-    where
-        Self: Sized,
-    {
-        if let Ok(dealer) = Dealer::try_from(init.as_ref()) {
-            dealer
-        } else {
-            panic!("could not parse {}", init.as_ref())
-        }
-    }
-
     fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error> {
         println!("Received: {}", msg.as_ref());
         self.deal(msg.as_ref())

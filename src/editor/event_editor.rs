@@ -115,13 +115,6 @@ impl Display for EventEditor {
 impl RuntimeState for EventEditor {
     type Error = EventEditorError;
 
-    fn load<S: AsRef<str> + ?Sized>(&self, _: &S) -> Self
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
-
     fn process<S: AsRef<str> + ?Sized>(&self, _: &S) -> Result<Self, Self::Error> {
         todo!()
     }

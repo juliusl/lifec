@@ -20,6 +20,7 @@ pub struct Process {
     pub command: String,
     pub subcommands: String,
     pub flags: BTreeMap<String, String>,
+    pub vars: BTreeMap<String, String>,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
     pub code: Option<i32>,
@@ -51,6 +52,7 @@ impl Process {
                 command: command.to_string(),
                 subcommands: subcommands.join("::"),
                 flags: self.flags.clone(),
+                vars: self.vars.clone(),
                 start_time: Some(Utc::now()),
                 elapsed: None,
                 timestamp_local: None,
@@ -232,13 +234,6 @@ pub struct ProcessExecutionError {}
 impl RuntimeState for Process {
     type Error = ProcessExecutionError;
 
-    fn load<'a, S: AsRef<str> + ?Sized>(&self, _: &'a S) -> Self
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
-
     fn process<'a, S: AsRef<str> + ?Sized>(&self, msg: &'a S) -> Result<Self, Self::Error> {
         self.interpret_command(msg, Self::handle_output)
     }
@@ -259,8 +254,57 @@ impl RuntimeState for Process {
         })
     }
 
-    fn from_attributes(_: Vec<atlier::system::Attribute>) -> Self {
-        todo!()
+    fn from_attributes(attrs: Vec<atlier::system::Attribute>) -> Self {
+        let mut process = Self::default();
+
+        let attributes = SectionAttributes::from(attrs);
+        if let Some(Value::TextBuffer(command)) = attributes.get_attr_value("command") {
+            process.command = command.to_string();
+        }
+        
+        if let Some(Value::TextBuffer(subcommands)) = attributes.get_attr_value("subcommands") {
+            process.subcommands = subcommands.to_string();
+        }
+
+        if let Some(Value::BinaryVector(stdout)) = attributes.get_attr_value("stdout") {
+            process.stdout = stdout.clone();
+        }
+
+        if let Some(Value::BinaryVector(stderr)) = attributes.get_attr_value("stderr") {
+            process.stderr = stderr.clone();
+        }
+
+        attributes
+            .get_attrs()
+            .iter()
+            .filter(|a| a.name().starts_with("arg::-"))
+            .filter_map(|a| match a.value() {
+                Value::TextBuffer(value) =>{
+                    let name = a.name()[5..].to_string();
+                    Some((name, value))
+                },
+                _ => None
+            })
+            .for_each(|(name, value)| {
+                process.flags.insert(name, value.to_string());
+            });
+        
+        attributes
+            .get_attrs()
+            .iter()
+            .filter(|a| a.name().starts_with("arg::$"))
+            .filter_map(|a| match a.value() {
+                Value::TextBuffer(value) =>{
+                    let name = a.name()[5..].to_string();
+                    Some((name, value))
+                },
+                _ => None
+            })
+            .for_each(|(name, value)| {
+                process.vars.insert(name, value.to_string());
+            });
+
+        process
     }
 
     fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
@@ -279,6 +323,10 @@ impl RuntimeState for Process {
 
         for (flag, value) in self.flags.iter() {
             attributes.add_text_attr(format!("arg::{}", flag), value);
+        }
+
+        for (var, value) in self.flags.iter() {
+            attributes.add_text_attr(format!("arg::{}", var), value);
         }
 
         attributes.clone_attrs()

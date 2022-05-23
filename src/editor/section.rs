@@ -481,13 +481,6 @@ where
 {
     type Error = ();
 
-    fn load<Str: AsRef<str> + ?Sized>(&self, _: &Str) -> Self
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
-
     fn process<Str: AsRef<str> + ?Sized>(&self, _: &Str) -> Result<Self, Self::Error> {
         todo!()
     }

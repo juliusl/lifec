@@ -11,17 +11,31 @@ pub mod plugins;
 pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
     type Error;
 
+    /// try to save the current state to a String
+    fn save(&self) -> Option<String> {
+        match serde_json::to_string(&self.into_attributes()) {
+            Ok(val) => Some(val),
+            Err(_) => None,
+        }
+    }
+
     /// load should take the serialized form of this state
     /// and create a new instance of Self
-    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self
-    where
-        Self: Sized;
+    fn load(&self, init: impl AsRef<str>) -> Self {
+        if let Some(state) = serde_json::from_str::<Vec<Attribute>>(init.as_ref()).ok() {
+            Self::from_attributes(state)
+        } else {
+            self.clone()
+        }
+    }
 
     /// from_attributes loads runtime state from a vector of attributes
     fn from_attributes(attributes: Vec<Attribute>) -> Self;
 
     /// into_attributes converts current runtime state into a vector of attributes
-    fn into_attributes(&self) -> Vec<Attribute>;
+    fn into_attributes(&self) -> Vec<Attribute> {
+        vec![]
+    }
 
     /// process is a function that should take a string message
     /// and return the next version of Self
@@ -478,10 +492,7 @@ where
 {
     type Error = <T as RuntimeState>::Error;
 
-    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self
-    where
-        Self: Sized,
-    {
+    fn load(&self, init: impl AsRef<str>) -> Self {
         Self {
             state: self.state.load(init),
             args: self.args.to_owned(),

@@ -43,13 +43,6 @@ impl FileEditor {
 impl RuntimeState for FileEntry {
     type Error = FileEntryRuntimeError;
 
-    fn load<S: AsRef<str> + ?Sized>(&self, _: &S) -> Self
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
-
     fn process<S: AsRef<str> + ?Sized>(&self, _: &S) -> Result<Self, Self::Error> {
         todo!()
     }

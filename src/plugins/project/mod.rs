@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::{collections::HashMap, fmt::Display};
 
 use atlier::system::{App, Extension, Value};
@@ -7,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use specs::storage::HashMapStorage;
 use specs::{Component, Entities, Join, ReadStorage, RunNow, System, WorldExt, WriteStorage};
 
+use crate::editor::EventComponent;
 use crate::{
     editor::{EventGraph, SectionAttributes},
     RuntimeState,
@@ -77,6 +79,21 @@ impl App for Project {
                 self.documents.clear();
             }
 
+            ui.same_line();
+            if ui.button(format!("Save state")) {
+                match self.save() {
+                    Some(serialized) => {
+                        match std::fs::write(format!("{}.json", "projects"), serialized) {
+                            Ok(_) => {
+                                println!("saved")
+                            }
+                            Err(_) => {},
+                        }
+                    },
+                    None => {},
+                }
+            }
+
             self.documents.clone().iter().for_each(|(_, d)| {
                 if let Some(Value::TextBuffer(project_name)) = d
                     .attributes
@@ -128,23 +145,43 @@ impl Display for Project {
 impl RuntimeState for Project {
     type Error = ProjectError;
 
-    fn load<S: AsRef<str> + ?Sized>(&self, _: &S) -> Self
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
-
     fn process<S: AsRef<str> + ?Sized>(&self, _: &S) -> Result<Self, Self::Error> {
         todo!()
     }
 
-    fn from_attributes(_: Vec<atlier::system::Attribute>) -> Self {
-        todo!()
+    fn from_attributes(attrs: Vec<atlier::system::Attribute>) -> Self {
+        let mut project = Self::default();
+
+        let documents = BTreeMap::new();
+
+        for a in attrs.iter().filter(|a| a.name().starts_with("Event")) {
+            if let None = project.documents.get(&a.id()) {
+                let document = Document::default();
+                if let Value::BinaryVector(b) = a.value() {
+                    if let Some(event) = ron::de::from_bytes(b).ok() {
+                        
+                    }
+                }
+
+                project.documents.insert(a.id(), Document::default());
+            }
+        }
+
+        project
     }
 
     fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
-        todo!()
+        let mut attrs = vec![];
+        for (e, doc) in self.documents.iter() {
+            let mut events = doc.events.into_attributes();
+            events.iter_mut().for_each(|a| { 
+                a.set_id(*e);
+            });
+
+            attrs.append(&mut events);
+        }
+
+        attrs
     }
 }
 
@@ -162,7 +199,7 @@ impl Extension for Project {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Component)]
+#[derive(Default, Clone, Serialize, Deserialize, Component)]
 #[storage(HashMapStorage)]
 pub struct Document {
     attributes: SectionAttributes,
