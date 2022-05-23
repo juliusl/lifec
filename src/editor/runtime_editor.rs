@@ -376,86 +376,52 @@ where
         Window::new(Self::name())
             .size(*Self::window_size(), imgui::Condition::Appearing)
             .build(ui, || {
-                if CollapsingHeader::new("Snapshots").leaf(true).begin(ui) {
-                    for (id, section) in self.sections.iter_mut() {
-                        if let Some(current) = self.runtime.current() {
-                            section.state.merge_with(current);
-                        }
-                        ui.text(format!("{}: ", id));
-                        ui.same_line();
-                        ui.indent();
-                        section.show_editor(ui);
-                        if ui.button(format!("Apply {}", section.title)) {
-                            // This will apply the sections current state and attributes to the current runtime
-                            let mut clone = self.runtime.clone();
-                            clone.state = Some(section.state.clone());
-                            section.attributes.values().for_each(|a| {
-                                clone.attribute(a.clone());
-                            });
-                            if let Some(Value::TextBuffer(event)) =
-                                section.get_attr_value("context::")
-                            {
-                                clone = clone.parse_event(event);
-                            }
-                            let next = RuntimeEditor::from(clone);
-                            self.runtime = next.runtime;
-                            return;
-                        }
-
-                        ui.same_line();
-                        if ui.button(format!("Remove {}", section.title)) {
-                            self.dispatch_remove = Some(*id);
-                            return;
-                        }
-                        ui.new_line();
-                        ui.separator();
-                        ui.unindent();
-                    }
-                }
-
-                ui.new_line();
                 if CollapsingHeader::new(format!("Current Runtime"))
                     .leaf(true)
                     .begin(ui)
                 {
-                    if ui.button("Take Snapshot of Runtime") {
-                        self.dispatch_runtime = Some(());
-                        return;
-                    }
-
-                    ui.same_line();
-                    if ui.button("Reset") {
-                        self.dispatch_remove = None;
-                        self.dispatch_runtime = None;
-                        self.running = (None, None, None);
-                    }
-                    ui.new_line();
                     ui.separator();
-
                     match self.running {
-                        (Some(true), Some(elapsed), None) => {
-                            ui.same_line();
-                            if ui.button("Pause") {
-                                self.running = (Some(false), Some(elapsed), Some(Instant::now()));
+                        (Some(v), elapsed, stopped) => {
+                            if ui.button("Stop") {
+                                self.dispatch_remove = None;
+                                self.dispatch_runtime = None;
+                                self.running = (None, None, None);
                             }
 
-                            ui.text(format!("Running {:#?}", elapsed.elapsed()));
+                            match (v, elapsed, stopped) {
+                                (true, Some(elapsed), None) => {
+                                    ui.same_line();
+                                    if ui.button("Pause") {
+                                        self.running =
+                                            (Some(false), Some(elapsed), Some(Instant::now()));
+                                    }
 
-                            if self.runtime.can_continue() {
-                                self.runtime = self.runtime.step();
-                            } else {
-                                self.running = (None, Some(elapsed), Some(Instant::now()));
+                                    ui.text(format!("Running {:#?}", elapsed.elapsed()));
+
+                                    if self.runtime.can_continue() {
+                                        self.runtime = self.runtime.step();
+                                    } else {
+                                        self.running = (None, Some(elapsed), Some(Instant::now()));
+                                    }
+                                }
+                                (false, Some(elapsed), Some(stopped)) => {
+                                    ui.same_line();
+                                    if ui.button("Continue") {
+                                        self.running = (Some(true), Some(elapsed), None);
+                                    }
+
+                                    ui.text(format!("Paused {:#?}", stopped.elapsed()));
+                                }
+                                _ => {}
                             }
                         }
-                        (Some(false), Some(elapsed), Some(stopped)) => {
-                            ui.same_line();
-                            if ui.button("Continue") {
-                                self.running = (Some(true), Some(elapsed), None);
+                        (None, Some(elapsed), Some(stopped)) => {       
+                            if ui.button("Clear") {
+                                self.dispatch_remove = None;
+                                self.dispatch_runtime = None;
+                                self.running = (None, None, None);
                             }
-
-                            ui.text(format!("Paused {:#?}", stopped.elapsed()));
-                        }
-                        (None, Some(elapsed), Some(stopped)) => {
                             ui.text(format!("Ran for {:#?}", stopped - elapsed));
                         }
                         _ => {}
@@ -506,6 +472,58 @@ where
                         }
                     }
                 }
+
+                ui.new_line();
+                if CollapsingHeader::new("Snapshots").leaf(true).begin(ui) {
+                    if ui.button("Take Snapshot of Runtime") {
+                        self.dispatch_runtime = Some(());
+                        return;
+                    }
+                    ui.new_line();
+
+                    self.show_snapshots(ui);
+                }
             });
+    }
+}
+
+impl<S> RuntimeEditor<S>
+where
+    S: RuntimeState + Component,
+{
+    fn show_snapshots(&mut self, ui: &imgui::Ui) {
+        for (id, section) in self.sections.iter_mut() {
+            if let Some(current) = self.runtime.current() {
+                section.state.merge_with(current);
+            }
+            ui.text(format!("{}: ", id));
+            ui.same_line();
+            ui.indent();
+
+            section.show_editor(ui);
+            if ui.button(format!("Apply {}", section.title)) {
+                // This will apply the sections current state and attributes to the current runtime
+                let mut clone = self.runtime.clone();
+                clone.state = Some(section.state.clone());
+                section.attributes.values().for_each(|a| {
+                    clone.attribute(a.clone());
+                });
+                if let Some(Value::TextBuffer(event)) = section.get_attr_value("context::") {
+                    clone = clone.parse_event(event);
+                }
+                let next = RuntimeEditor::from(clone);
+                self.runtime = next.runtime;
+                return;
+            }
+
+            ui.same_line();
+            if ui.button(format!("Remove {}", section.title)) {
+                self.dispatch_remove = Some(*id);
+                return;
+            }
+            ui.new_line();
+            ui.separator();
+            ui.unindent();
+        }
     }
 }

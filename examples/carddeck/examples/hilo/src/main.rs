@@ -1,5 +1,8 @@
 use carddeck::Dealer;
-use lifec::{Event, Runtime, editor::{EventEditor, Extension}};
+use lifec::{
+    editor::{EventEditor, Extension},
+    Event, Runtime,
+};
 
 fn main() {
     let mut runtime = get_runtime();
@@ -29,34 +32,32 @@ fn main() {
         .on("{ after_choose; player_2; }")
         .dispatch("[.1+2]", "{ game_over;; }");
 
-    runtime
-        .on("{ game_over;; }")
-        .call("game_over");
+    runtime.on("{ game_over;; }").call("game_over");
 
-    runtime
-        .on("{ test_test;; }")
-        .call("test_args").args(&[
-            "--test",
-            "value123",
-            "--object",
-            "'{test: abc, test123: 12345}'",
-        ]);
+    runtime.on("{ test_test;; }").call("test_args").args(&[
+        "--test",
+        "value123",
+        "--object",
+        "'{test: abc, test123: 12345}'",
+    ]);
 
-   // let runtime = runtime.parse_event("{ test_test;; }").step();
+    // let runtime = runtime.parse_event("{ test_test;; }").step();
 
-   let mut event_editor = EventEditor::new();
+    let mut event_editor = EventEditor::new();
     lifec::editor::open_editor_with(
-        format!("Dealer Editor"), 
-        runtime, 
-        vec![Dealer::dealer_section()],
+        format!("Dealer Editor"),
+        runtime,
+        vec![
+            Dealer::dealer_section()
+                .with_text("context::", "{ setup;; }")],
         |w| {
             EventEditor::configure_app_world(w);
-        }, 
+        },
         |_| {},
         move |s, ui| {
             let event_editor = &mut event_editor;
             event_editor.extend_app_world(s, ui);
-        }
+        },
     )
 }
 
