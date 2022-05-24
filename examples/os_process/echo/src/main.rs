@@ -56,7 +56,7 @@ fn main() {
             AttributeEditor::configure_app_world(w);
             NodeEditor::configure_app_world(w);
         },
-        |s| {
+        |_| {
         },
         move |w, ui| {
             let project = &mut project;
@@ -65,7 +65,7 @@ fn main() {
             let file_editor = &mut file_editor;
             file_editor.extend_app_world(w, ui);
 
-            let attr_editor = &mut attr_editor;
+            let attr_editor  = &mut attr_editor;
             attr_editor.extend_app_world(w, ui);
 
             let event_editor = &mut event_editor;

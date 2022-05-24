@@ -305,10 +305,10 @@ where
     ) {
         if let Some(_) = self.dispatch_snapshot.take() {
             if let Some(state) = &self.runtime.state {
-                let next = self.sections.len() as u32;
-                let mut section = Section::new(
+                let next = entities.create();
+                let section = Section::new(
                     unique_title(format!("{}", self.runtime.context())),
-                    |s, ui| {
+                    |_, _| {
                     },
                     state.clone(),
                 )
@@ -317,16 +317,15 @@ where
                 .with_bool("enable event builder", false)
                 .with_text("project::name::", unique_title("snapshot"))
                 .with_bool("enable project", false)
-                .with_parent_entity(next);
+                .with_parent_entity(next.id());
 
-                let mut section_attrs = SectionAttributes(section.into_attributes());
+                let section_attrs = SectionAttributes(section.into_attributes());
 
-                let next = entities.create();
-                match loader.insert(next, Loader::LoadSection(section_attrs.with_parent_entity(next.id()))) {
+                match loader.insert(next, Loader::LoadSection(section_attrs)) {
                     Ok(_) => {
                         self.sections.insert(
                             next.id(),
-                            section.with_parent_entity(next.id())
+                            section
                         );
         
                         println!("Loading {:?}", next);

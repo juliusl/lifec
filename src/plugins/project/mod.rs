@@ -116,19 +116,13 @@ impl<'a> System<'a> for Project {
                     if let None = write_documents.get(e) {
                         match write_documents.insert(
                             e,
-                            Document {
-                                attributes: a.clone(),
-                                events: g.clone(),
-                            },
+                            Document::new(e.id(), a.clone(), g.clone()),
                         ) {
                             Ok(_) => {
                                 if let None = self.documents.get(&e.id()) {
                                     self.documents.insert(
                                         e.id(),
-                                        Document {
-                                            attributes: a.clone(),
-                                            events: g.clone(),
-                                        },
+                                        Document::new(e.id(), a.clone(), g.clone()),
                                     );
                                 }
                             }
@@ -192,14 +186,14 @@ impl App for Project {
                 }
             }
 
-            self.documents.clone().iter().for_each(|(_, d)| {
+            self.documents.clone().iter().for_each(|(id, d)| {
                 if let Some(Value::TextBuffer(project_name)) = d
                     .attributes
                     .get_attr("project::name::")
                     .and_then(|a| Some(a.value()))
                 {
                     if ui.button(format!("Save state to .json file {}", project_name)) {
-                        match serde_json::to_string(d) {
+                        match serde_json::to_string(&d.sanitize(*id)) {
                             Ok(serialized) => {
                                 match std::fs::write(format!("{}.json", project_name), serialized) {
                                     Ok(_) => {
@@ -214,7 +208,7 @@ impl App for Project {
 
                     ui.same_line();
                     if ui.button(format!("Save state to .ron file {}", project_name)) {
-                        match ron::ser::to_string_pretty(d, PrettyConfig::new()) {
+                        match ron::ser::to_string_pretty(&d.sanitize(*id), PrettyConfig::new()) {
                             Ok(serialized) => {
                                 match std::fs::write(format!("{}.ron", project_name), serialized) {
                                     Ok(_) => {
@@ -342,6 +336,21 @@ impl Extension for Project {
 pub struct Document {
     attributes: SectionAttributes,
     events: EventGraph,
+}
+
+impl Document {
+    pub fn new(id: u32, attributes: SectionAttributes, events: EventGraph) -> Self {
+        let sanitized: Vec<Attribute> = attributes.get_attrs().iter().cloned().filter(|a| a.id() == id).map(|a| a.to_owned()).collect();
+
+        Self { attributes: SectionAttributes::from(sanitized), events }
+    }
+
+    /// ensure all attributes are from the same parent id
+    fn sanitize(&self, id: u32) -> Self {
+        let sanitized: Vec<Attribute> = self.attributes.get_attrs().iter().cloned().filter(|a| a.id() == id).map(|a| a.to_owned()).collect();
+
+        Self { attributes: SectionAttributes::from(sanitized), events: self.events.clone() }
+    }
 }
 
 impl Display for Document {
