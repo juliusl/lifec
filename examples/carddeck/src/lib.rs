@@ -929,7 +929,12 @@ impl RuntimeState for Dealer {
 
     fn from_attributes(attributes: Vec<lifec::editor::Attribute>) -> Self {
         if let Some(lifec::editor::Value::TextBuffer(s)) = SectionAttributes::from(attributes).get_attr_value("carddeck::") {
-            Self::default().load(s)
+            match Dealer::try_from(s.as_str()) {
+                Ok(dealer) => dealer,
+                Err(_) => {
+                    Self::default()
+                },
+            }
         } else {
             Self::default()
         }

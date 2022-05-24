@@ -2,7 +2,7 @@ use imgui::{CollapsingHeader, Window};
 use knot::store::Store;
 use serde::{Deserialize, Serialize};
 use specs::{
-    storage::DenseVecStorage, Component, Entities, Join, ReadStorage, System, Write, WriteStorage,
+    storage::DenseVecStorage, Component, Entities, Join, ReadStorage, System, Write, WriteStorage, Read,
 };
 use std::{
     collections::BTreeMap,
@@ -277,14 +277,15 @@ where
         Entities<'a>,
         ReadStorage<'a, Section<S>>,
         WriteStorage<'a, SectionAttributes>,
-        Write<'a, Dispatch<S>>,
+        Write<'a, RuntimeEditor<S>>,
+        Write<'a, Dispatch>,
     );
 
     /// The runtime editor maintains a vector of sections that it displays
     /// This system coordinates updates to those sections, as well as initialization
     fn run(
         &mut self,
-        (entities, read_sections, mut write_attributes, mut dispatcher): Self::SystemData,
+        (entities, read_sections, mut write_attributes, mut runtime_editor, mut dispatcher): Self::SystemData,
     ) {
         if let Some(_) = self.dispatch_snapshot.take() {
             if let Some(state) = &self.runtime.state {
@@ -306,8 +307,6 @@ where
                     .with_bool("enable event builder", false)
                     .with_parent_entity(next),
                 );
-                let msg = dispatcher.deref_mut();
-                *msg = Dispatch::Snapshot(self.clone());
                 return;
             }
         }
@@ -326,35 +325,36 @@ where
                     match write_attributes.insert(
                         e,
                         SectionAttributes(
-                            clone.attributes.iter().map(|(_, a)| a).cloned().collect(),
+                            clone.into_attributes()
                         ),
                     ) {
                         Ok(_) => {
-                            self.sections.insert(e.id(), clone);
                         }
                         Err(e) => {
                             eprintln!("Error adding Section Attributes to Storage, {}", e);
                         }
                     }
                 }
-                Some(Section {
-                    enable_app_systems,
-                    state,
-                    attributes,
-                    enable_edit_attributes,
-                    title,
-                    ..
-                }) => {
+                Some(section) => {
                     // Update the world's copy of attributes from editor's copy
                     match write_attributes.insert(
                         e,
-                        SectionAttributes(attributes.iter().map(|(_, a)| a).cloned().collect()),
+                        SectionAttributes(section.into_attributes()),
                     ) {
                         Ok(_) => {}
                         Err(err) => {
                             eprintln!("Error updating section attributes {}", err);
                         }
                     }
+
+                    let Section {
+                        title,
+                        attributes,
+                        enable_app_systems,
+                        enable_edit_attributes,
+                        state,
+                        ..
+                    } = section;
 
                     if *enable_app_systems {
                         let title = title.to_string();
@@ -377,12 +377,13 @@ where
 
         for section in read_sections.join() {
             if let None = self.sections.get(&section.get_parent_entity()) {
-                self.sections.insert(section.get_parent_entity(), section.clone());
-                
-                let msg = dispatcher.deref_mut();
-                *msg = Dispatch::Snapshot(self.clone());
+                self.sections
+                    .insert(section.get_parent_entity(), section.clone());
             }
         }
+
+        let runtime_editor = runtime_editor.deref_mut();
+        *runtime_editor = self.clone();
     }
 }
 
@@ -405,12 +406,9 @@ where
     }
 }
 
-pub enum Dispatch<S>
-where
-    S: RuntimeState + Component,
+pub enum Dispatch
 {
     Empty,
-    Snapshot(RuntimeEditor<S>),
     RemoveSnapshot(u32),
 }
 
@@ -425,9 +423,7 @@ impl Default for Loader {
     }
 }
 
-impl<S> Default for Dispatch<S>
-where
-    S: RuntimeState + Component,
+impl Default for Dispatch
 {
     fn default() -> Self {
         Self::Empty
@@ -440,7 +436,8 @@ where
 {
     type SystemData = (
         Entities<'a>,
-        Write<'a, Dispatch<S>>,
+        Read<'a, RuntimeEditor<S>>,
+        Write<'a, Dispatch>,
         Write<'a, Loader>,
         WriteStorage<'a, Section<S>>,
         WriteStorage<'a, SectionAttributes>,
@@ -449,7 +446,7 @@ where
 
     fn run(
         &mut self,
-        (entities, mut msg, mut loader, mut sections, mut section_attributes, mut event_graph): Self::SystemData,
+        (entities, runtime_editor, mut msg, mut loader, mut sections, mut section_attributes, mut event_graph): Self::SystemData,
     ) {
         if let Dispatch::RemoveSnapshot(id) = msg.deref() {
             let to_remove = entities.entity(*id);
@@ -466,13 +463,6 @@ where
             }
         }
 
-        if let Dispatch::Snapshot(runtime) = msg.deref() {
-            self.runtime = Some(runtime.clone());
-
-            let msg = msg.deref_mut();
-            *msg = Dispatch::Empty;
-        }
-
         if let Loader::LoadSection(size) = loader.deref() {
             println!("Load section {}", size);
             for id in 0..*size {
@@ -480,18 +470,27 @@ where
 
                 let attributes = section_attributes.get(entity);
                 if let Some(attributes) = attributes {
-                    let mut section = Section::<S>::default();
+                    let attributes: Vec<Attribute> = attributes
+                        .get_attrs()
+                        .iter()
+                        .cloned()
+                        .map(|a| a.to_owned())
+                        .collect();
+                    let initial = S::from_attributes(attributes.clone());
 
-                    attributes.get_attrs().iter().cloned().for_each(|a| {
+                    let mut section = Section::<S>::default();
+                    section.state = initial;
+
+                    attributes.iter().cloned().for_each(|a| {
                         section.add_attribute(a.clone());
                     });
 
                     let section = section
-                        .with_parent_entity(id)
                         .enable_app_systems()
-                        .with_title(format!("Loaded {}", id));
-                    match sections.insert(entity, section.clone())
-                    {
+                        .with_title(format!("Loaded {}", id))
+                        .with_parent_entity(id);
+
+                    match sections.insert(entity, section.clone()) {
                         Ok(_) => {
                             println!("RuntimeDispatcher added Section {}, {}", id, &section.title);
                         }
@@ -503,12 +502,13 @@ where
                     println!("Couldn't find any attributes for entity {}", id);
                 }
             }
-            
+
             let unset_loader = loader.deref_mut();
             *unset_loader = Loader::Empty;
             return;
         }
 
+        self.runtime = Some(runtime_editor.clone());
         if let Some(runtime) = self.runtime.as_mut() {
             let next = sections.count() as u32;
 
@@ -516,13 +516,15 @@ where
             if let Some(section) = runtime.sections.get(&next) {
                 match sections.insert(next_e, section.clone()) {
                     Ok(_) => {
+                        let mut section = section.clone();
+                        if let Some(state) = runtime.runtime.current() {
+                            section.state = state.clone();
+                        }
+
                         println!("RuntimeDispatcher added Section {:?}", next_e);
-                        match section_attributes.insert(
-                            next_e,
-                            SectionAttributes(
-                                section.attributes.iter().map(|(_, a)| a).cloned().collect(),
-                            ),
-                        ) {
+                        match section_attributes
+                            .insert(next_e, SectionAttributes(section.into_attributes()))
+                        {
                             Ok(_) => {
                                 println!("RuntimeDispatcher added Section Attributes {:?}", next_e);
                                 let mut store = Store::<EventComponent>::default();
@@ -703,9 +705,6 @@ where
 {
     fn show_snapshots(&mut self, ui: &imgui::Ui) {
         for (id, section) in self.sections.iter_mut() {
-            if let Some(current) = self.runtime.current() {
-                section.state.merge_with(current);
-            }
             ui.text(format!("{}: ", id));
             ui.same_line();
             ui.indent();
@@ -714,7 +713,7 @@ where
             if ui.button(format!("Apply {}", section.title)) {
                 // This will apply the sections current state and attributes to the current runtime
                 let mut clone = self.runtime.clone();
-                clone.state = Some(section.state.clone());
+                clone.state =  Some(S::from_attributes(section.into_attributes()));
                 section.attributes.values().for_each(|a| {
                     clone.attribute(a.clone());
                 });
@@ -723,6 +722,7 @@ where
                 }
                 let next = RuntimeEditor::from(clone);
                 self.runtime = next.runtime;
+
                 return;
             }
 

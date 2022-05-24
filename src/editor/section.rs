@@ -1,6 +1,6 @@
 use std::{fmt::Display, fs, path::Path, collections::BTreeMap};
 
-use super::{unique_title, App, Attribute, ShowEditor, Value};
+use super::{unique_title, App, Attribute, ShowEditor, Value, SectionAttributes};
 use crate::RuntimeState;
 use imgui::CollapsingHeader;
 use serde::{Deserialize, Serialize};
@@ -51,7 +51,8 @@ impl<S: RuntimeState> Section<S> {
         show: fn(&mut Section<S>, &imgui::Ui),
         initial_state: S,
     ) -> Section<S> {
-        Section {
+        let state_attrs = initial_state.into_attributes();
+        let mut section = Section {
             id: 0,
             title: title.as_ref().to_string(),
             show_editor: ShowEditor(show),
@@ -59,7 +60,10 @@ impl<S: RuntimeState> Section<S> {
             enable_app_systems: false,
             enable_edit_attributes: false,
             attributes: BTreeMap::new(),
-        }
+        };
+
+        state_attrs.iter().for_each(|a| section.add_attribute(a.clone()) );
+        section
     }
 
     /// The parent entity of this component
@@ -462,7 +466,6 @@ where
             enable_app_systems: Default::default(),
             enable_edit_attributes: Default::default(),
         }
-        .with_bool("opened::", false)
     }
 }
 
@@ -485,11 +488,36 @@ where
         todo!()
     }
 
-    fn from_attributes(_: Vec<Attribute>) -> Self {
-        todo!()
+    fn from_attributes(attributes: Vec<Attribute>) -> Self {
+        let mut next = Self::default();
+
+        let state = S::from_attributes(attributes.clone());
+        next.state = state;
+
+        let section = SectionAttributes::from(attributes);
+
+        if let Some(Value::TextBuffer(title)) = section.get_attr_value("title::") {
+            next.title = title.to_string(); 
+        }
+
+        next
     }
 
     fn into_attributes(&self) -> Vec<Attribute> {
-        todo!()
+        let mut attrs: Vec<Attribute> = self.attributes
+            .iter()
+            .map(|(_, a)| a).cloned()
+            .collect();
+
+        let mut state_attrs = self.state.into_attributes();
+        attrs.append(&mut state_attrs);
+
+        if let Some(Value::TextBuffer(_)) = self.get_attr_value("title::") {
+            attrs.push(self.get_attr("title::").expect("just checked").clone());
+        } else {
+            attrs.push(Attribute::new(self.id, "title::", Value::TextBuffer(self.title.to_string())));
+        }
+
+        attrs
     }
 }

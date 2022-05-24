@@ -34,9 +34,10 @@ impl<'a> System<'a> for ProjectDispatcher {
         Write<'a, Loader>,
         WriteStorage<'a, SectionAttributes>,
         WriteStorage<'a, EventGraph>,
+        WriteStorage<'a, Document>,
     );
 
-    fn run(&mut self, (entities, mut dispatcher, mut loader, mut attributes, mut event_graphs): Self::SystemData) {
+    fn run(&mut self, (entities, mut dispatcher, mut loader, mut attributes, mut event_graphs, mut documents): Self::SystemData) {
         match dispatcher.deref() {
             Dispatch::Empty => {}
             Dispatch::Load(project) => {
@@ -52,6 +53,15 @@ impl<'a> System<'a> for ProjectDispatcher {
                     if let Some(_) = event_graphs.insert(ent, doc.events.clone()).ok() {
                         println!("loaded project {}", id);
                     }
+                }
+
+                match documents.insert(ent, doc.clone()) {
+                    Ok(_) => {
+                        println!("Document loaded {}", id);
+                    },
+                    Err(err) => {
+                        eprintln!("Error loading document {}", err)
+                    },
                 }
             }
 
@@ -120,6 +130,22 @@ impl<'a> System<'a> for Project {
                             Err(_) => todo!(),
                         }
                     }
+
+                    if let Some(doc) = self.documents.get_mut(&e.id()) {
+                        doc.attributes = a.clone();
+                        doc.events = g.clone();
+
+                        if let Some(doc) = write_documents.get_mut(e) {
+                            doc.attributes = a.clone();
+                            doc.events = g.clone();   
+                        }
+                    } else {
+                        if let Some(doc) = write_documents.get(e) {
+                            self.documents.insert(e.id(), doc.clone());
+                        } else {
+                            self.documents.insert(e.id(), Document::default());
+                        }
+                    }
                 }
                 Some(false) => {
                     write_documents.remove(e);
@@ -137,15 +163,7 @@ impl App for Project {
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
-        if self.documents.is_empty() {
-            return;
-        }
-
         Window::new(format!("Projects Enabled: {}", self.documents.len())).build(ui, || {
-            if ui.button("Refresh") {
-                self.documents.clear();
-            }
-
             ui.same_line();
             if ui.button(format!("Save state")) {
                 match self.save() {
