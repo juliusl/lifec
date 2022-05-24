@@ -54,11 +54,12 @@ fn main() {
                 .with_bool("enable project", true)
                 .with_text("project::name::", "test_project_1"),
                 
-            Dealer::dealer_section()
-            .with_title("extra dealer editor")
-            .with_text("context::", "{ setup;; }")
-            .with_bool("enable project", true)
-            .with_text("project::name::", "test_project_2")],
+            // Dealer::dealer_section()
+            // .with_title("extra dealer editor")
+            // .with_text("context::", "{ setup;; }")
+            // .with_bool("enable project", true)
+            // .with_text("project::name::", "test_project_2")
+            ],
         |w| {
             EventEditor::configure_app_world(w);
             Project::configure_app_world(w);

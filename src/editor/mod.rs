@@ -24,6 +24,7 @@ pub use file_editor::FileEditor;
 pub use node_editor::NodeEditor;
 pub use runtime_editor::RuntimeEditor;
 pub use runtime_editor::SectionAttributes;
+pub use runtime_editor::Loader;
 pub use section::Section;
 pub use section::SectionExtension;
 
@@ -107,6 +108,7 @@ pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
         move |e, w, d| {
             w.register::<Section<RtS>>();
             w.register::<EventGraph>();
+            w.insert(Loader::Empty);
 
             d.add(RuntimeDispatcher::<RtS>::default(), "runtime_dispatcher", &[]);
 

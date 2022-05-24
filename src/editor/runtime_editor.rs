@@ -117,7 +117,6 @@ impl SectionAttributes {
     }
 
     pub fn get_attr_mut(&mut self, name: impl AsRef<str>) -> Option<&mut Attribute> {
-        
         let SectionAttributes(attributes) = self;
 
         attributes.iter_mut().find(|a| a.name() == name.as_ref())
@@ -135,7 +134,7 @@ impl SectionAttributes {
     pub fn get_attrs_mut(&mut self) -> &mut Vec<Attribute> {
         &mut self.0
     }
-    
+
     pub fn is_attr_checkbox(&self, name: impl AsRef<str>) -> Option<bool> {
         if let Some(Value::Bool(val)) = self.get_attr(name).and_then(|a| Some(a.value())) {
             Some(*val)
@@ -182,11 +181,7 @@ impl SectionAttributes {
     }
 
     pub fn add_empty_attr(&mut self, name: impl AsRef<str>) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::Empty,
-        ));
+        self.add_attribute(Attribute::new(0, name.as_ref().to_string(), Value::Empty));
     }
 
     pub fn add_binary_attr(&mut self, name: impl AsRef<str>, init_value: impl Into<Vec<u8>>) {
@@ -293,7 +288,6 @@ where
     ) {
         if let Some(_) = self.dispatch_snapshot.take() {
             if let Some(state) = &self.runtime.state {
-                let msg = dispatcher.deref_mut();
                 let next = self.sections.len() as u32;
                 self.sections.insert(
                     next,
@@ -312,6 +306,7 @@ where
                     .with_bool("enable event builder", false)
                     .with_parent_entity(next),
                 );
+                let msg = dispatcher.deref_mut();
                 *msg = Dispatch::Snapshot(self.clone());
                 return;
             }
@@ -379,6 +374,15 @@ where
                 }
             }
         }
+
+        for section in read_sections.join() {
+            if let None = self.sections.get(&section.get_parent_entity()) {
+                self.sections.insert(section.get_parent_entity(), section.clone());
+                
+                let msg = dispatcher.deref_mut();
+                *msg = Dispatch::Snapshot(self.clone());
+            }
+        }
     }
 }
 
@@ -410,6 +414,17 @@ where
     RemoveSnapshot(u32),
 }
 
+pub enum Loader {
+    Empty,
+    LoadSection(u32),
+}
+
+impl Default for Loader {
+    fn default() -> Self {
+        Loader::Empty
+    }
+}
+
 impl<S> Default for Dispatch<S>
 where
     S: RuntimeState + Component,
@@ -426,6 +441,7 @@ where
     type SystemData = (
         Entities<'a>,
         Write<'a, Dispatch<S>>,
+        Write<'a, Loader>,
         WriteStorage<'a, Section<S>>,
         WriteStorage<'a, SectionAttributes>,
         WriteStorage<'a, EventGraph>,
@@ -433,7 +449,7 @@ where
 
     fn run(
         &mut self,
-        (entities, mut msg, mut sections, mut section_attributes, mut event_graph): Self::SystemData,
+        (entities, mut msg, mut loader, mut sections, mut section_attributes, mut event_graph): Self::SystemData,
     ) {
         if let Dispatch::RemoveSnapshot(id) = msg.deref() {
             let to_remove = entities.entity(*id);
@@ -455,6 +471,42 @@ where
 
             let msg = msg.deref_mut();
             *msg = Dispatch::Empty;
+        }
+
+        if let Loader::LoadSection(size) = loader.deref() {
+            println!("Load section {}", size);
+            for id in 0..*size {
+                let entity = entities.entity(id);
+
+                let attributes = section_attributes.get(entity);
+                if let Some(attributes) = attributes {
+                    let mut section = Section::<S>::default();
+
+                    attributes.get_attrs().iter().cloned().for_each(|a| {
+                        section.add_attribute(a.clone());
+                    });
+
+                    let section = section
+                        .with_parent_entity(id)
+                        .enable_app_systems()
+                        .with_title(format!("Loaded {}", id));
+                    match sections.insert(entity, section.clone())
+                    {
+                        Ok(_) => {
+                            println!("RuntimeDispatcher added Section {}, {}", id, &section.title);
+                        }
+                        Err(err) => {
+                            println!("section could not be loaded {}", err);
+                        }
+                    }
+                } else {
+                    println!("Couldn't find any attributes for entity {}", id);
+                }
+            }
+            
+            let unset_loader = loader.deref_mut();
+            *unset_loader = Loader::Empty;
+            return;
         }
 
         if let Some(runtime) = self.runtime.as_mut() {
@@ -573,7 +625,7 @@ where
                                 _ => {}
                             }
                         }
-                        (None, Some(elapsed), Some(stopped)) => {       
+                        (None, Some(elapsed), Some(stopped)) => {
                             if ui.button("Clear") {
                                 self.dispatch_remove = None;
                                 self.dispatch_snapshot = None;
@@ -585,6 +637,7 @@ where
                     };
 
                     let context = self.runtime.context();
+                    ui.text(format!("Sections Loaded: {}", self.sections.len()));
                     ui.label_text(format!("Current Event"), format!("{}", context));
                     ui.disabled(self.running.0.is_some(), || {
                         if ui.button("Setup") {
