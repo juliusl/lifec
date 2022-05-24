@@ -31,13 +31,12 @@ impl<'a> System<'a> for ProjectDispatcher {
     type SystemData = (
         Entities<'a>,
         Write<'a, Dispatch>,
-        Write<'a, Loader>,
-        WriteStorage<'a, SectionAttributes>,
+        WriteStorage<'a, Loader>,
         WriteStorage<'a, EventGraph>,
         WriteStorage<'a, Document>,
     );
 
-    fn run(&mut self, (entities, mut dispatcher, mut loader, mut attributes, mut event_graphs, mut documents): Self::SystemData) {
+    fn run(&mut self, (entities, mut dispatcher, mut loader, mut event_graphs, mut documents): Self::SystemData) {
         match dispatcher.deref() {
             Dispatch::Empty => {}
             Dispatch::Load(project) => {
@@ -46,27 +45,28 @@ impl<'a> System<'a> for ProjectDispatcher {
         }
 
         if let Some(project) = &self.project {
-            for (id, doc) in project.documents.iter() {
-                let ent = entities.entity(*id);
+            for (_, doc) in project.documents.iter() {
+                let ent = entities.create();
 
-                if let Some(_) = attributes.insert(ent, doc.attributes.clone()).ok() {
-                    if let Some(_) = event_graphs.insert(ent, doc.events.clone()).ok() {
-                        println!("loaded project {}", id);
-                    }
+                if let Some(_) = event_graphs.insert(ent, doc.events.clone()).ok() {
+                    println!("inserted graph {:?}", ent);
+                }
+
+                let attrs = doc.attributes.clone().with_parent_entity(ent.id());
+
+                if let Some(_) = loader.insert(ent, Loader::LoadSection(attrs)).ok() {
+                    println!("inserted loader {:?}", ent);
                 }
 
                 match documents.insert(ent, doc.clone()) {
                     Ok(_) => {
-                        println!("Document loaded {}", id);
+                        println!("inserted document {:?}", ent);
                     },
-                    Err(err) => {
-                        eprintln!("Error loading document {}", err)
+                    Err(_) => {
+                        eprintln!("Error loading document {:?}", ent);
                     },
                 }
             }
-
-            let set_loader = loader.deref_mut(); 
-            *set_loader = Loader::LoadSection(project.documents.len() as u32);
 
             self.project = None;
             let unset = dispatcher.deref_mut();
@@ -326,7 +326,7 @@ impl Extension for Project {
         builder.add(
             ProjectDispatcher { project: None },
             "project_dispatcher",
-            &["runtime_dispatcher"],
+            &[],
         );
     }
 

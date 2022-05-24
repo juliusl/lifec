@@ -12,6 +12,7 @@ use std::{
 };
 
 use crate::editor::SectionAttributes;
+use crate::parse_variables;
 use crate::{RuntimeState, editor::{Section, SectionExtension}, WithArgs, parse_flags};
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
@@ -183,9 +184,9 @@ impl Process {
 
 impl Display for Process {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "os process")?;
-
-        Ok(())
+        writeln!(f, "code: {:?}", self.code)?;
+        writeln!(f, "stdout: {:?}", String::from_utf8(self.stdout.to_vec()))?;
+        writeln!(f, "stderr: {:?}", String::from_utf8(self.stderr.to_vec()))
     }
 }
 
@@ -248,6 +249,7 @@ impl RuntimeState for Process {
         let process = state.get_state();
         process.interpret_command(msg, move |mut p, command| {
             p.flags = parse_flags(state.get_args().to_vec());
+            p.vars = parse_variables(state.get_args().to_vec());
 
             let command = command.args(state.get_args());
             p.handle_output(command)

@@ -30,6 +30,7 @@ pub use section::SectionExtension;
 
 use crate::Runtime;
 use crate::RuntimeState;
+use crate::plugins::Project;
 
 use self::runtime_editor::RuntimeDispatcher;
 
@@ -107,10 +108,14 @@ pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
         initial_runtime,
         move |e, w, d| {
             w.register::<Section<RtS>>();
+            w.register::<SectionAttributes>();
             w.register::<EventGraph>();
             w.insert(Loader::Empty);
 
-            d.add(RuntimeDispatcher::<RtS>::default(), "runtime_dispatcher", &[]);
+            Project::configure_app_systems(d);
+            Project::configure_app_world(w);
+
+            d.add(RuntimeDispatcher::<RtS>::default(), "runtime_dispatcher", &["project_dispatcher"]);
 
             let mut store = Store::<EventComponent>::default();
             e.events.iter().cloned().for_each(|e| {

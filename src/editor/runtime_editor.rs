@@ -2,10 +2,12 @@ use imgui::{CollapsingHeader, Window};
 use knot::store::Store;
 use serde::{Deserialize, Serialize};
 use specs::{
-    storage::DenseVecStorage, Component, Entities, Join, ReadStorage, System, Write, WriteStorage, Read,
+    storage::DenseVecStorage, storage::DefaultVecStorage, Component, Entities, Join, ReadStorage, System, Write,
+    WriteStorage, Read,
 };
 use std::{
     collections::BTreeMap,
+    fmt::Display,
     ops::{Deref, DerefMut},
     time::Instant,
 };
@@ -101,7 +103,21 @@ impl From<Vec<Attribute>> for SectionAttributes {
     }
 }
 
+impl Display for SectionAttributes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
+    }
+}
+
 impl SectionAttributes {
+    pub fn with_parent_entity(&mut self, id: u32) -> Self {
+        self.update(move |next| {
+            for a in next.get_attrs_mut() {
+                a.set_id(id);
+            }
+        })
+    }
+
     pub fn get_attrs(&self) -> Vec<&Attribute> {
         self.0.iter().collect()
     }
@@ -276,7 +292,7 @@ where
     type SystemData = (
         Entities<'a>,
         ReadStorage<'a, Section<S>>,
-        WriteStorage<'a, SectionAttributes>,
+        WriteStorage<'a, Loader>,
         Write<'a, RuntimeEditor<S>>,
         Write<'a, Dispatch>,
     );
@@ -285,29 +301,48 @@ where
     /// This system coordinates updates to those sections, as well as initialization
     fn run(
         &mut self,
-        (entities, read_sections, mut write_attributes, mut runtime_editor, mut dispatcher): Self::SystemData,
+        (entities, read_sections, mut loader, mut runtime_editor, mut dispatcher): Self::SystemData,
     ) {
         if let Some(_) = self.dispatch_snapshot.take() {
             if let Some(state) = &self.runtime.state {
                 let next = self.sections.len() as u32;
-                self.sections.insert(
-                    next,
-                    Section::new(
-                        unique_title(format!("{}", self.runtime.context())),
-                        |s, ui| {
-                            s.edit_attr("edit events", "enable event builder", ui);
+                let mut section = Section::new(
+                    unique_title(format!("{}", self.runtime.context())),
+                    |s, ui| {
+                        s.edit_attr("edit events", "enable event builder", ui);
 
-                            let label = format!("edit attributes {}", s.get_parent_entity());
-                            ui.checkbox(label, &mut s.enable_edit_attributes);
-                        },
-                        state.clone(),
-                    )
-                    .enable_app_systems()
-                    .with_text("context::", format!("{}", self.runtime.context()))
-                    .with_bool("enable event builder", false)
-                    .with_parent_entity(next),
-                );
-                return;
+                        let label = format!("edit attributes {}", s.get_parent_entity());
+                        ui.checkbox(label, &mut s.enable_edit_attributes);
+
+                        s.edit_attr("save to project", "enable project", ui);
+
+                        if let Some(true) = s.is_attr_checkbox("enable project") {
+                            s.edit_attr("edit project name", "project::name::", ui);
+                        }
+                    },
+                    state.clone(),
+                )
+                .enable_app_systems()
+                .with_text("context::", format!("{}", self.runtime.context()))
+                .with_bool("enable event builder", false)
+                .with_text("project::name::", unique_title("snapshot"))
+                .with_bool("enable project", false)
+                .with_parent_entity(next);
+
+                let section_attrs = SectionAttributes(section.into_attributes());
+
+                let next = entities.create();
+                match loader.insert(next, Loader::LoadSection(section_attrs)) {
+                    Ok(_) => {
+                        self.sections.insert(
+                            next.id(),
+                            section.with_parent_entity(next.id())
+                        );
+        
+                        println!("Loading {:?}", next);
+                    },
+                    Err(_) => {},
+                }
             }
         }
 
@@ -321,32 +356,14 @@ where
         for (e, s) in (&entities, &read_sections).join() {
             match self.sections.get(&e.id()) {
                 None => {
-                    let clone = s.clone().with_parent_entity(e.id());
-                    match write_attributes.insert(
-                        e,
-                        SectionAttributes(
-                            clone.into_attributes()
-                        ),
-                    ) {
+                    match loader.insert(e, Loader::LoadSection(SectionAttributes(s.into_attributes()))) {
                         Ok(_) => {
-                        }
-                        Err(e) => {
-                            eprintln!("Error adding Section Attributes to Storage, {}", e);
-                        }
+                            println!("Loading {:?}", e);
+                        },
+                        Err(_) => {},
                     }
                 }
                 Some(section) => {
-                    // Update the world's copy of attributes from editor's copy
-                    match write_attributes.insert(
-                        e,
-                        SectionAttributes(section.into_attributes()),
-                    ) {
-                        Ok(_) => {}
-                        Err(err) => {
-                            eprintln!("Error updating section attributes {}", err);
-                        }
-                    }
-
                     let Section {
                         title,
                         attributes,
@@ -377,6 +394,7 @@ where
 
         for section in read_sections.join() {
             if let None = self.sections.get(&section.get_parent_entity()) {
+                println!("runtime editor inserting section {}", section.get_parent_entity());
                 self.sections
                     .insert(section.get_parent_entity(), section.clone());
             }
@@ -406,15 +424,16 @@ where
     }
 }
 
-pub enum Dispatch
-{
+pub enum Dispatch {
     Empty,
     RemoveSnapshot(u32),
 }
 
+#[derive(Component)]
+#[storage(DefaultVecStorage)]
 pub enum Loader {
     Empty,
-    LoadSection(u32),
+    LoadSection(SectionAttributes),
 }
 
 impl Default for Loader {
@@ -423,8 +442,7 @@ impl Default for Loader {
     }
 }
 
-impl Default for Dispatch
-{
+impl Default for Dispatch {
     fn default() -> Self {
         Self::Empty
     }
@@ -438,7 +456,7 @@ where
         Entities<'a>,
         Read<'a, RuntimeEditor<S>>,
         Write<'a, Dispatch>,
-        Write<'a, Loader>,
+        WriteStorage<'a, Loader>,
         WriteStorage<'a, Section<S>>,
         WriteStorage<'a, SectionAttributes>,
         WriteStorage<'a, EventGraph>,
@@ -446,7 +464,15 @@ where
 
     fn run(
         &mut self,
-        (entities, runtime_editor, mut msg, mut loader, mut sections, mut section_attributes, mut event_graph): Self::SystemData,
+        (
+            entities,
+            runtime_editor,
+            mut msg,
+            mut loader,
+            mut sections,
+            mut section_attributes,
+            mut event_graph,
+        ): Self::SystemData,
     ) {
         if let Dispatch::RemoveSnapshot(id) = msg.deref() {
             let to_remove = entities.entity(*id);
@@ -463,33 +489,30 @@ where
             }
         }
 
-        if let Loader::LoadSection(size) = loader.deref() {
-            println!("Load section {}", size);
-            for id in 0..*size {
+        for e in entities.join() {
+            if let Some(Loader::LoadSection(attributes)) = loader.get(e) {
+                let id = e.id();
+                println!("Load section {}", id);
+    
                 let entity = entities.entity(id);
-
-                let attributes = section_attributes.get(entity);
-                if let Some(attributes) = attributes {
-                    let attributes: Vec<Attribute> = attributes
-                        .get_attrs()
-                        .iter()
-                        .cloned()
-                        .map(|a| a.to_owned())
-                        .collect();
-                    let initial = S::from_attributes(attributes.clone());
-
-                    let mut section = Section::<S>::default();
-                    section.state = initial;
-
-                    attributes.iter().cloned().for_each(|a| {
-                        section.add_attribute(a.clone());
-                    });
-
-                    let section = section
-                        .enable_app_systems()
-                        .with_title(format!("Loaded {}", id))
-                        .with_parent_entity(id);
-
+    
+                let attributes: Vec<Attribute> = attributes
+                    .get_attrs()
+                    .iter()
+                    .cloned()
+                    .map(|a| a.to_owned())
+                    .collect();
+                let initial = S::from_attributes(attributes.clone());
+    
+                let mut section = Section::<S>::default();
+                section.state = initial;
+    
+                attributes.iter().cloned().for_each(|a| {
+                    section.add_attribute(a.clone());
+                });
+    
+                if let Some(Value::TextBuffer(title)) = section.clone().get_attr_value("title::") {
+                    let section = section.with_title(title.to_string()).with_parent_entity(id);
                     match sections.insert(entity, section.clone()) {
                         Ok(_) => {
                             println!("RuntimeDispatcher added Section {}, {}", id, &section.title);
@@ -498,57 +521,48 @@ where
                             println!("section could not be loaded {}", err);
                         }
                     }
-                } else {
-                    println!("Couldn't find any attributes for entity {}", id);
+                }
+    
+                if let Some(v) = loader.get_mut(e) {
+                    *v = Loader::Empty;
                 }
             }
-
-            let unset_loader = loader.deref_mut();
-            *unset_loader = Loader::Empty;
-            return;
         }
 
         self.runtime = Some(runtime_editor.clone());
-        if let Some(runtime) = self.runtime.as_mut() {
-            let next = sections.count() as u32;
-
-            let next_e = entities.create();
-            if let Some(section) = runtime.sections.get(&next) {
-                match sections.insert(next_e, section.clone()) {
-                    Ok(_) => {
-                        let mut section = section.clone();
-                        if let Some(state) = runtime.runtime.current() {
-                            section.state = state.clone();
-                        }
-
-                        println!("RuntimeDispatcher added Section {:?}", next_e);
-                        match section_attributes
-                            .insert(next_e, SectionAttributes(section.into_attributes()))
-                        {
-                            Ok(_) => {
-                                println!("RuntimeDispatcher added Section Attributes {:?}", next_e);
-                                let mut store = Store::<EventComponent>::default();
-                                runtime.events.iter().cloned().for_each(|e| {
-                                    store = store.node(e);
-                                });
-
-                                match event_graph.insert(next_e, EventGraph(store)) {
-                                    Ok(_) => {
-                                        println!(
-                                            "RuntimeDispatcher added Event Graph {:?}",
-                                            next_e
-                                        );
-                                        self.runtime = None;
-                                    }
-                                    Err(err) => {
-                                        eprintln!("RuntimeDispatcher Eror {}", err);
+        if let Some(runtime) = &self.runtime {
+            for e in entities.join() {
+                if let Some(section) = runtime.sections.get(&e.id()) {
+    
+                    match sections.insert(e, section.clone()) {
+                        Ok(_) => {
+                            let mut section = section.clone().with_parent_entity(e.id());
+                            if let Some(state) = runtime.runtime.current() {
+                                section.state = state.clone();
+                            }
+    
+                            match section_attributes
+                                .insert(e, SectionAttributes(section.into_attributes()))
+                            {
+                                Ok(_) => {
+                                    let mut store = Store::<EventComponent>::default();
+                                    runtime.events.iter().cloned().for_each(|e| {
+                                        store = store.node(e);
+                                    });
+    
+                                    match event_graph.insert(e, EventGraph(store)) {
+                                        Ok(_) => {
+                                        }
+                                        Err(err) => {
+                                            eprintln!("RuntimeDispatcher Eror {}", err);
+                                        }
                                     }
                                 }
+                                Err(err) => eprintln!("RuntimeDispatcher Error {}", err),
                             }
-                            Err(err) => eprintln!("RuntimeDispatcher Error {}", err),
                         }
+                        Err(err) => eprintln!("RuntimeDispatcher Error {}", err),
                     }
-                    Err(err) => eprintln!("RuntimeDispatcher Error {}", err),
                 }
             }
         }
@@ -713,7 +727,7 @@ where
             if ui.button(format!("Apply {}", section.title)) {
                 // This will apply the sections current state and attributes to the current runtime
                 let mut clone = self.runtime.clone();
-                clone.state =  Some(S::from_attributes(section.into_attributes()));
+                clone.state = Some(S::from_attributes(section.into_attributes()));
                 section.attributes.values().for_each(|a| {
                     clone.attribute(a.clone());
                 });

@@ -1,5 +1,5 @@
 use lifec::{editor::*, editor::FileEditor, Runtime};
-use lifec::plugins::Process;
+use lifec::plugins::{Process, Project};
 
 fn main() {
     let mut runtime = Runtime::<Process>::default().with_call("print_results", |s, _| {
@@ -37,6 +37,7 @@ fn main() {
     let mut event_editor = EventEditor::new();
     let mut file_editor = FileEditor::new();
     let mut attr_editor = AttributeEditor::new();
+    let mut project = Project::default();
     open_editor_with(
         "OS Process",
         runtime.parse_event("{ setup;; }"),
@@ -51,11 +52,16 @@ fn main() {
         .enable_app_systems()
         ],
         |w| {
+            EventEditor::configure_app_world(w);
             AttributeEditor::configure_app_world(w);
             NodeEditor::configure_app_world(w);
         },
-        |_| {},
+        |s| {
+        },
         move |w, ui| {
+            let project = &mut project;
+            project.extend_app_world(w, ui);
+
             let file_editor = &mut file_editor;
             file_editor.extend_app_world(w, ui);
 
