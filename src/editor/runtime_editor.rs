@@ -309,16 +309,6 @@ where
                 let mut section = Section::new(
                     unique_title(format!("{}", self.runtime.context())),
                     |s, ui| {
-                        s.edit_attr("edit events", "enable event builder", ui);
-
-                        let label = format!("edit attributes {}", s.get_parent_entity());
-                        ui.checkbox(label, &mut s.enable_edit_attributes);
-
-                        s.edit_attr("save to project", "enable project", ui);
-
-                        if let Some(true) = s.is_attr_checkbox("enable project") {
-                            s.edit_attr("edit project name", "project::name::", ui);
-                        }
                     },
                     state.clone(),
                 )
@@ -329,10 +319,10 @@ where
                 .with_bool("enable project", false)
                 .with_parent_entity(next);
 
-                let section_attrs = SectionAttributes(section.into_attributes());
+                let mut section_attrs = SectionAttributes(section.into_attributes());
 
                 let next = entities.create();
-                match loader.insert(next, Loader::LoadSection(section_attrs)) {
+                match loader.insert(next, Loader::LoadSection(section_attrs.with_parent_entity(next.id()))) {
                     Ok(_) => {
                         self.sections.insert(
                             next.id(),
@@ -526,6 +516,7 @@ where
                 if let Some(v) = loader.get_mut(e) {
                     *v = Loader::Empty;
                 }
+                return;
             }
         }
 
@@ -545,16 +536,19 @@ where
                                 .insert(e, SectionAttributes(section.into_attributes()))
                             {
                                 Ok(_) => {
-                                    let mut store = Store::<EventComponent>::default();
-                                    runtime.events.iter().cloned().for_each(|e| {
-                                        store = store.node(e);
-                                    });
-    
-                                    match event_graph.insert(e, EventGraph(store)) {
-                                        Ok(_) => {
-                                        }
-                                        Err(err) => {
-                                            eprintln!("RuntimeDispatcher Eror {}", err);
+                                    if let None = event_graph.get(e) {
+                                        let mut store = Store::<EventComponent>::default();
+                                        runtime.events.iter().cloned().for_each(|e| {
+                                            store = store.node(e);
+                                        });
+                                        match event_graph.insert(e, EventGraph(store)) {
+                                            Ok(v) =>  {
+                                                println!("inserting graph for {:?}", e);
+                                                println!("{:?}", v);
+                                            },
+                                            Err(_) => {
+
+                                            },
                                         }
                                     }
                                 }

@@ -458,8 +458,16 @@ where
             id: Default::default(),
             title: Default::default(),
             show_editor: ShowEditor(|s, ui| {
-                let label = format!("edit attributes for {}", s.title);
+                s.edit_attr("edit events", "enable event builder", ui);
+
+                let label = format!("edit attributes {}", s.get_parent_entity());
                 ui.checkbox(label, &mut s.enable_edit_attributes);
+
+                s.edit_attr("save to project", "enable project", ui);
+
+                if let Some(true) = s.is_attr_checkbox("enable project") {
+                    s.edit_attr("edit project name", "project::name::", ui);
+                }
             }),
             state: Default::default(),
             attributes: Default::default(),

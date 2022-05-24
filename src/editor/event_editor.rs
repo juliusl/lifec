@@ -67,9 +67,7 @@ impl<'a> System<'a> for EventEditor {
                     }
                     _ => (),
                 }
-            } else {
-                println!("Couldn't find attrs for {:?}", e);
-            }   
+            }
         }
     }
 }

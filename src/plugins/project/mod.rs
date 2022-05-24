@@ -45,7 +45,11 @@ impl<'a> System<'a> for ProjectDispatcher {
         }
 
         if let Some(project) = &self.project {
-            for (_, doc) in project.documents.iter() {
+            for (id, doc) in project.documents.iter() {
+                if !entities.is_alive(entities.entity(*id)) {
+                    println!("entity wasn't alive yet");
+                }
+
                 let ent = entities.create();
 
                 if let Some(_) = event_graphs.insert(ent, doc.events.clone()).ok() {
@@ -103,6 +107,7 @@ impl<'a> System<'a> for Project {
             let dispatch = dispatcher.deref_mut();
 
             *dispatch = Dispatch::Load(self.clone());
+            return;
         }
 
         for (e, a, g) in (&e, &attributes, &event_graph).join() {
@@ -138,12 +143,6 @@ impl<'a> System<'a> for Project {
                         if let Some(doc) = write_documents.get_mut(e) {
                             doc.attributes = a.clone();
                             doc.events = g.clone();   
-                        }
-                    } else {
-                        if let Some(doc) = write_documents.get(e) {
-                            self.documents.insert(e.id(), doc.clone());
-                        } else {
-                            self.documents.insert(e.id(), Document::default());
                         }
                     }
                 }
@@ -293,16 +292,18 @@ impl RuntimeState for Project {
     fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
         let mut attrs = vec![];
         for (e, doc) in self.documents.iter() {
-            let mut events = doc.events.into_attributes();
-            events.iter_mut().for_each(|a| {
-                a.set_id(*e);
-            });
-
-            attrs.append(&mut events);
-
-            doc.attributes.get_attrs().iter().cloned().for_each(|a| {
-                attrs.push(a.clone());
-            });
+            if let Some(true) = doc.attributes.is_attr_checkbox("enable project") {
+                let mut events = doc.events.into_attributes();
+                events.iter_mut().for_each(|a| {
+                    a.set_id(*e);
+                });
+    
+                attrs.append(&mut events);
+    
+                doc.attributes.get_attrs().iter().cloned().filter(|a| a.id() == *e).for_each(|a| {
+                    attrs.push(a.clone());
+                });
+            }
         }
 
         attrs
