@@ -1,4 +1,4 @@
-use lifec::{editor::*, editor::FileEditor, Runtime};
+use lifec::{editor::*, Runtime};
 use lifec::plugins::{Process, Project};
 
 fn main() {
