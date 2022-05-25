@@ -53,18 +53,18 @@ impl<'a> System<'a> for ProjectDispatcher {
                 let ent = entities.create();
 
                 if let Some(_) = event_graphs.insert(ent, doc.events.clone()).ok() {
-                    println!("inserted graph {:?}", ent);
+                    println!("Project inserted graph {:?}", ent);
                 }
 
                 let attrs = doc.attributes.clone().with_parent_entity(ent.id());
 
                 if let Some(_) = loader.insert(ent, Loader::LoadSection(attrs)).ok() {
-                    println!("inserted loader {:?}", ent);
+                    println!("Project inserted loader {:?}", ent);
                 }
 
                 match documents.insert(ent, doc.clone()) {
                     Ok(_) => {
-                        println!("inserted document {:?}", ent);
+                        println!("Project inserted document {:?}", ent);
                     },
                     Err(_) => {
                         eprintln!("Error loading document {:?}", ent);
@@ -158,7 +158,7 @@ impl App for Project {
     fn show_editor(&mut self, ui: &imgui::Ui) {
         Window::new(format!("Projects Enabled: {}", self.documents.len())).build(ui, || {
             ui.same_line();
-            if ui.button(format!("Save state")) {
+            if ui.button(format!("Save project to .json")) {
                 match self.save() {
                     Some(serialized) => {
                         match std::fs::write(format!("{}.json", "projects"), serialized) {
@@ -173,7 +173,7 @@ impl App for Project {
             }
 
             ui.same_line();
-            if ui.button(format!("Load state")) {
+            if ui.button(format!("Load project from .json")) {
                 match std::fs::read_to_string(format!("{}.json", "projects")) {
                     Ok(serialized) => {
                         println!("opened");

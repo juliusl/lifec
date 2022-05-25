@@ -2,8 +2,8 @@ use imgui::{CollapsingHeader, Window};
 use knot::store::Store;
 use serde::{Deserialize, Serialize};
 use specs::{
-    storage::DenseVecStorage, storage::DefaultVecStorage, Component, Entities, Join, ReadStorage, System, Write,
-    WriteStorage, Read,
+    storage::DefaultVecStorage, storage::DenseVecStorage, Component, Entities, Join, Read,
+    ReadStorage, System, Write, WriteStorage,
 };
 use std::{
     collections::BTreeMap,
@@ -308,8 +308,7 @@ where
                 let next = entities.create();
                 let section = Section::new(
                     unique_title(format!("{}", self.runtime.context())),
-                    |_, _| {
-                    },
+                    |_, _| {},
                     state.clone(),
                 )
                 .enable_app_systems()
@@ -323,14 +322,11 @@ where
 
                 match loader.insert(next, Loader::LoadSection(section_attrs)) {
                     Ok(_) => {
-                        self.sections.insert(
-                            next.id(),
-                            section
-                        );
-        
-                        println!("Loading {:?}", next);
-                    },
-                    Err(_) => {},
+                        self.sections.insert(next.id(), section);
+
+                        println!("RuntimeEditor dispatching Loader for Snapshot {:?}", next);
+                    }
+                    Err(_) => {}
                 }
             }
         }
@@ -345,11 +341,14 @@ where
         for (e, s) in (&entities, &read_sections).join() {
             match self.sections.get(&e.id()) {
                 None => {
-                    match loader.insert(e, Loader::LoadSection(SectionAttributes(s.into_attributes()))) {
+                    match loader.insert(
+                        e,
+                        Loader::LoadSection(SectionAttributes(s.into_attributes())),
+                    ) {
                         Ok(_) => {
-                            println!("Loading {:?}", e);
-                        },
-                        Err(_) => {},
+                            println!("RuntimeEditor dispatched Loader for {:?}", e);
+                        }
+                        Err(_) => {}
                     }
                 }
                 Some(section) => {
@@ -383,7 +382,10 @@ where
 
         for section in read_sections.join() {
             if let None = self.sections.get(&section.get_parent_entity()) {
-                println!("runtime editor inserting section {}", section.get_parent_entity());
+                println!(
+                    "RuntimeEditor inserting section under snapshots {}",
+                    section.get_parent_entity()
+                );
                 self.sections
                     .insert(section.get_parent_entity(), section.clone());
             }
@@ -478,41 +480,48 @@ where
             }
         }
 
-        for e in entities.join() {
-            if let Some(Loader::LoadSection(attributes)) = loader.get(e) {
-                let id = e.id();
-                println!("Load section {}", id);
-    
-                let entity = entities.entity(id);
-    
-                let attributes: Vec<Attribute> = attributes
-                    .get_attrs()
-                    .iter()
-                    .cloned()
-                    .map(|a| a.to_owned())
-                    .collect();
-                let initial = S::from_attributes(attributes.clone());
-    
-                let mut section = Section::<S>::default();
-                section.state = initial;
-    
-                attributes.iter().cloned().for_each(|a| {
-                    section.add_attribute(a.clone());
-                });
-    
-                if let Some(Value::TextBuffer(title)) = section.clone().get_attr_value("title::") {
-                    let section = section.with_title(title.to_string()).with_parent_entity(id);
-                    match sections.insert(entity, section.clone()) {
-                        Ok(_) => {
-                            println!("RuntimeDispatcher added Section {}, {}", id, &section.title);
-                        }
-                        Err(err) => {
-                            println!("section could not be loaded {}", err);
+        for entity in entities.join() {
+            if let Some(Loader::LoadSection(attributes)) = loader.get(entity) {
+                println!("Load section for {:?}", entity);
+
+                if let None = sections.get(entity) {
+                    println!(
+                        "Section not found for {:?}, Generating section from attributes",
+                        entity
+                    );
+                    let attributes: Vec<Attribute> = attributes.clone_attrs();
+                    let initial = S::from_attributes(attributes.clone());
+
+                    let mut section = Section::<S>::default();
+                    section.state = initial;
+
+                    attributes.iter().for_each(|a| {
+                        section.add_attribute(a.clone());
+                    });
+
+                    if let Some(Value::TextBuffer(title)) =
+                        section.clone().get_attr_value("title::")
+                    {
+                        let id = entity.id();
+                        let section = section
+                            .with_title(title.to_string())
+                            .with_parent_entity(id);
+
+                        match sections.insert(entity, section.clone()) {
+                            Ok(_) => {
+                                println!(
+                                    "RuntimeDispatcher added Section {}, {}",
+                                    id, &section.title
+                                );
+                            }
+                            Err(err) => {
+                                println!("section could not be loaded {}", err);
+                            }
                         }
                     }
                 }
-    
-                if let Some(v) = loader.get_mut(e) {
+
+                if let Some(v) = loader.get_mut(entity) {
                     *v = Loader::Empty;
                 }
                 return;
@@ -523,14 +532,13 @@ where
         if let Some(runtime) = &self.runtime {
             for e in entities.join() {
                 if let Some(section) = runtime.sections.get(&e.id()) {
-    
                     match sections.insert(e, section.clone()) {
                         Ok(_) => {
                             let mut section = section.clone().with_parent_entity(e.id());
                             if let Some(state) = runtime.runtime.current() {
                                 section.state = state.clone();
                             }
-    
+
                             match section_attributes
                                 .insert(e, SectionAttributes(section.into_attributes()))
                             {
@@ -541,13 +549,11 @@ where
                                             store = store.node(e);
                                         });
                                         match event_graph.insert(e, EventGraph(store)) {
-                                            Ok(v) =>  {
+                                            Ok(v) => {
                                                 println!("inserting graph for {:?}", e);
                                                 println!("{:?}", v);
-                                            },
-                                            Err(_) => {
-
-                                            },
+                                            }
+                                            Err(_) => {}
                                         }
                                     }
                                 }

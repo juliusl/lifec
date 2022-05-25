@@ -44,7 +44,7 @@ impl<'a> System<'a> for EventEditor {
                     Some(true) => {
                         if let None = self.events.get(&e.id()) {
                             if let Some(graph) = event_graph.get_mut(e) {
-                                println!("loading event graph for {:?}", e);
+                                println!("Loading event graph for {:?}", e);
                                 self.events.insert(e.id(), graph.clone());
                             } else {
                                 println!("graph not found");
@@ -53,11 +53,11 @@ impl<'a> System<'a> for EventEditor {
                     }
                     Some(false) => {
                         if let Some(graph) = self.events.remove(&e.id()) {
-                            println!("saving {:?}.", graph);
+                            println!("Saving event graph for {:?}.", e);
                             match event_graph.insert(e, graph) {
-                                Ok(v) => {
-                                    println!("event graph saved {:?}.", e);
-                                    println!("old {:?}", v);
+                                Ok(_) => {
+                                    println!("Event graph saved {:?}.", e);
+                                    //println!("old {:?}", v);
                                 },
                                 Err(err) => {
                                     println!("Could not save event graph {}", err);
