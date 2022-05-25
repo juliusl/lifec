@@ -1,7 +1,6 @@
 mod attribute_editor;
 mod event_editor;
 mod event_graph;
-mod file_editor;
 mod node_editor;
 mod node_editor_graph;
 mod runtime_editor;
@@ -20,7 +19,6 @@ pub use attribute_editor::AttributeEditor;
 pub use event_editor::EventComponent;
 pub use event_editor::EventEditor;
 pub use event_graph::EventGraph;
-pub use file_editor::FileEditor;
 pub use node_editor::NodeEditor;
 pub use runtime_editor::RuntimeEditor;
 pub use runtime_editor::SectionAttributes;

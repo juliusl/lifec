@@ -12,18 +12,7 @@ fn main() {
         (s.clone(), "{ exit;; }".to_string())
     });
 
-    // let mut runtime = runtime
-    //     .with_attribute(Attribute::new(1, "node::on", Value::TextBuffer("".to_string())))
-    //     .with_attribute(Attribute::new(1, "node::call", Value::TextBuffer("".to_string())))
-    //     .with_attribute(Attribute::new(1, "node::dispatch", Value::TextBuffer("".to_string())))
-    //     .with_attribute(Attribute::new(1, "enable node editor", Value::Bool(true)))
-    //     .with_attribute(Attribute::new(0, "enable node editor", Value::Bool(true)))
-    //     .with_attribute(Attribute::new(0, "node::on", Value::TextBuffer("".to_string())))
-    //     .with_attribute(Attribute::new(0, "node::call", Value::TextBuffer("".to_string())))
-    //     .with_attribute(Attribute::new(0, "node::dispatch", Value::TextBuffer("".to_string())));
-
     let runtime = &mut runtime;
-
     runtime
         .on("{ setup;; }")
         .dispatch("echo", "{ after_echo;; }")
