@@ -9,7 +9,8 @@ use super::{node_editor_graph::NodeEditorGraph, SectionAttributes};
 
 pub struct NodeEditor {
     pub imnodes: imnodes::Context,
-    pub editors: BTreeMap<u32, NodeEditorGraph>
+    pub editors: BTreeMap<u32, NodeEditorGraph>,
+    thunks: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>
 }
 
 /// Stores a graph representation of attributes
@@ -21,8 +22,15 @@ impl NodeEditor {
     pub fn new() -> NodeEditor {
         NodeEditor {
             imnodes: imnodes::Context::new(),
-            editors: BTreeMap::new()
+            editors: BTreeMap::new(),
+            thunks: BTreeMap::new(),
         }
+    }
+}
+
+impl NodeEditor {
+    pub fn add_thunk(&mut self, name: impl AsRef<str>, thunk: fn(&mut BTreeMap<String, Value>)) {
+        self.thunks.insert(name.as_ref().to_string(), thunk);
     }
 }
 
@@ -64,19 +72,16 @@ impl<'a> System<'a> for NodeEditor {
                             let idgen = editor_context.new_identifier_generator();
 
                             let mut editor = NodeEditorGraph::new(editor_context, idgen);
-
-                            editor.add_thunk("echo", |v| {
-                                println!("{:?}", v);
-
-                                v.insert("output".to_string(), Value::TextBuffer(format!("{:?}", v)));
-                            });
-
                             for attr in attributes
                                 .clone_attrs()
                                 .iter_mut()
                                 .filter(|a| a.name().starts_with("node::"))
                             {
                                 editor.add_node(attr);
+                            }
+
+                            for (call, thunk) in &self.thunks {
+                                editor.add_thunk(call, thunk.clone());
                             }
 
                             self.editors.insert(e.id(), editor);

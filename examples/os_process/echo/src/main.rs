@@ -1,5 +1,5 @@
-use lifec::{editor::*, Runtime};
 use lifec::plugins::{Process, Project};
+use lifec::{editor::*, Runtime};
 
 fn main() {
     let mut runtime = Runtime::<Process>::default().with_call("print_results", |s, _| {
@@ -18,11 +18,15 @@ fn main() {
         .dispatch("echo", "{ after_echo;; }")
         .args(&["--o", "hello world"]);
 
-    runtime
-        .on("{ after_echo;; }")
-        .call("print_results");
+    runtime.on("{ after_echo;; }").call("print_results");
 
     let mut node_editor = NodeEditor::new();
+
+    node_editor.add_thunk("echo", |v| {
+        println!("{:?}", v);
+        v.insert("output".to_string(), Value::TextBuffer(format!("{:?}", v)));
+    });
+
     let mut event_editor = EventEditor::new();
     let mut attr_editor = AttributeEditor::new();
     let mut project = Project::default();
@@ -41,20 +45,18 @@ fn main() {
         .with_symbol("node::echo", "call::echo")
         .with_text("node::cool name", "julius")
         .with_text("node::other name", "liu")
-        .enable_app_systems()
-        ],
+        .enable_app_systems()],
         |w| {
             EventEditor::configure_app_world(w);
             AttributeEditor::configure_app_world(w);
             NodeEditor::configure_app_world(w);
         },
-        |_| {
-        },
+        |_| {},
         move |w, ui| {
             let project = &mut project;
             project.extend_app_world(w, ui);
 
-            let attr_editor  = &mut attr_editor;
+            let attr_editor = &mut attr_editor;
             attr_editor.extend_app_world(w, ui);
 
             let event_editor = &mut event_editor;
@@ -64,15 +66,15 @@ fn main() {
             node_editor.extend_app_world(w, ui);
 
             ui.same_line();
-            if ui.button("Compress state") { 
+            if ui.button("Compress state") {
                 use compression::prelude::*;
                 match std::fs::read(format!("{}.json", "projects")) {
-                    Ok(serialized) => { 
+                    Ok(serialized) => {
                         let compressed = serialized
                             .encode(&mut BZip2Encoder::new(9), Action::Finish)
                             .collect::<Result<Vec<_>, _>>()
                             .unwrap();
-                        
+
                         if let Some(_) = std::fs::write("projects.json.bzip2", compressed).ok() {
                             println!("compressed");
                         }
@@ -80,18 +82,20 @@ fn main() {
                     Err(_) => {}
                 }
             }
-            
+
             ui.same_line();
-            if ui.button("Decompress state") { 
+            if ui.button("Decompress state") {
                 use compression::prelude::*;
                 match std::fs::read(format!("{}.json.bzip2", "projects")) {
-                    Ok(compressed) => { 
+                    Ok(compressed) => {
                         let decompressed = compressed
                             .decode(&mut BZip2Decoder::new())
                             .collect::<Result<Vec<_>, _>>()
                             .unwrap();
-                        
-                        if let Some(_) = std::fs::write("projects.json.bzip2.json", decompressed).ok() {
+
+                        if let Some(_) =
+                            std::fs::write("projects.json.bzip2.json", decompressed).ok()
+                        {
                             println!("decompressed");
                         }
                     }
