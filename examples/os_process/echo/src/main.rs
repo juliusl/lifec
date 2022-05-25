@@ -35,6 +35,12 @@ fn main() {
             Process::default(),
         )
         .with_text("command", "")
+        .with_bool("enable node editor", true)
+        .with_empty("node::name")
+        .with_empty("node::other name")
+        .with_symbol("node::echo", "call::echo")
+        .with_text("node::cool name", "julius")
+        .with_text("node::other name", "liu")
         .enable_app_systems()
         ],
         |w| {

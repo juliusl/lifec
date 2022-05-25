@@ -207,7 +207,11 @@ impl<S: RuntimeState> Section<S> {
         next
     }
 
-    pub fn with_symbol(&mut self, name: impl AsRef<str>) -> Self {
+    pub fn with_symbol(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) -> Self {
+        self.update(move |next| next.add_symbol(name, symbol))
+    }
+
+    pub fn with_empty(&mut self, name: impl AsRef<str>) -> Self {
         self.update(move |next| next.add_empty_attr(name))
     }
 
@@ -270,6 +274,14 @@ impl<S: RuntimeState> Section<S> {
 
     pub fn with_parent_entity(&mut self, id: u32) -> Self {
         self.update(move |next| next.set_parent_entity(id))
+    }
+
+    pub fn add_symbol(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) {
+        self.add_attribute(Attribute::new(
+            self.id,
+            name.as_ref().to_string(),
+            Value::Symbol(symbol.as_ref().to_string()),
+        ));
     }
 
     pub fn add_empty_attr(&mut self, name: impl AsRef<str>) {

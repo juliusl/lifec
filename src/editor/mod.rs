@@ -20,6 +20,7 @@ pub use event_editor::EventComponent;
 pub use event_editor::EventEditor;
 pub use event_graph::EventGraph;
 pub use node_editor::NodeEditor;
+pub use node_editor_graph::NodeEditorGraph;
 pub use runtime_editor::RuntimeEditor;
 pub use runtime_editor::SectionAttributes;
 pub use runtime_editor::Loader;
