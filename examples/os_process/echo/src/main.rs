@@ -21,10 +21,12 @@ fn main() {
     runtime.on("{ after_echo;; }").call("print_results");
 
     let mut node_editor = NodeEditor::new();
-
     node_editor.add_thunk("echo", |v| {
-        println!("{:?}", v);
-        v.insert("output".to_string(), Value::TextBuffer(format!("{:?}", v)));
+        let echo = format!("{:?}", v);
+
+        println!("{}", echo);
+
+        v.insert("output".to_string(), Value::Bool(true));
     });
 
     let mut event_editor = EventEditor::new();

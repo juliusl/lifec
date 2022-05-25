@@ -120,12 +120,15 @@ impl App for NodeEditorGraph {
                                     *input_id,
                                     imnodes::PinShape::CircleFilled,
                                     || {
-                                        if let Some((value, _)) = self.values.get_at(r) {
-                                            ui.set_next_item_width(130.0);
-                                            ui.text(format!("{}", value));
-                                        } else {
-                                            ui.set_next_item_width(130.0);
-                                            ui.text("Missing value");
+                                        match self.values.get_at(r) {
+                                            Some((value, _)) => {
+                                                ui.set_next_item_width(130.0);
+                                                ui.text(format!("{}", value));
+                                            }
+                                            None => {
+                                                 ui.set_next_item_width(130.0);
+                                                 ui.text("Missing value");
+                                            }
                                         }
                                     },
                                 );
@@ -364,6 +367,13 @@ impl Visitor<NodeId> for NodeEditorGraph {
             let to = &to_node.attribute;
 
             match (from.value(), to.value()) {
+                (Value::Reference(from), Value::Reference(_)) => {
+                    let from = *from;
+                    if let Some(update) = self.find_node_mut(t) {
+                        let updating = update.attribute.get_value_mut();
+                        *updating = Value::Reference(from);
+                    }
+                }
                 (Value::Symbol(_), Value::Empty) => {
                     if let Some(output) = from_node.values.get("output") {
                         let reference = output.to_ref();
