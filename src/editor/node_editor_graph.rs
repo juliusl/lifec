@@ -50,6 +50,7 @@ pub struct NodeEditorGraph {
     editing: Option<bool>,
     debugging: Option<bool>,
     filtering: Option<String>,
+    filtering_nodes: Option<String>,
     thunk_index: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>,
 }
 
@@ -65,38 +66,44 @@ impl App for NodeEditorGraph {
                     ChildWindow::new("Debugger")
                         .size([500.0, 0.0])
                         .build(ui, || {
+                            // if let Some(filtering_nodes) = self.filtering_nodes.as_mut() {
+                            //     ui.input_text("Filter nodes", filtering_nodes).build();
+                            // }
+
                             if CollapsingHeader::new("Edit attributes").begin(ui) {
                                 if let Some(filter) = self.filtering.as_mut() {
                                     ui.input_text("Filter attributes", filter).build();
                                     ui.new_line();
                                 }
 
-                                self.nodes.iter_mut().filter(|n| {
-                                    if let Some(filter) = &self.filtering {
-                                        format!("{}", n.attribute).contains(filter)
-                                    } else {
-                                        false
-                                    }
-                                }).for_each(|n| {
-                                    n.attribute.edit(ui);
-                                    if let Some(values) = &n.values {
-                                        if ui.is_item_hovered() {
-                                            ui.tooltip(|| {
-                                                ui.text("Current Values:");
-                                                ui.new_line();
-                                                for t in values {
-                                                    ui.text(format!("{:?}", t));
-                                                }
-                                            });
+                                self.nodes
+                                    .iter_mut()
+                                    .filter(|n| {
+                                        if let Some(filter) = &self.filtering {
+                                            format!("{}", n.attribute).contains(filter)
+                                        } else {
+                                            false
                                         }
-                                    }
-                                    ui.new_line();
-                                    ui.separator();
-                                    self.values = self.values.link_create_if_not_exists(
-                                        n.attribute.value().clone(),
-                                        Value::Symbol("ACTIVE".to_string()),
-                                    );
-                                });
+                                    })
+                                    .for_each(|n| {
+                                        n.attribute.edit(ui);
+                                        if let Some(values) = &n.values {
+                                            ui.text("Current Values:");
+                                            ui.new_line();
+                                            for t in values {
+                                                ui.text(format!("{:?}", t));
+                                            }
+                                        }
+                                        if ui.button(format!("Move editor to {}", n.title)) {
+                                            n.node_id.move_editor_to();
+                                        }
+                                        ui.new_line();
+                                        ui.separator();
+                                        self.values = self.values.link_create_if_not_exists(
+                                            n.attribute.value().clone(),
+                                            Value::Symbol("ACTIVE".to_string()),
+                                        );
+                                    });
                             }
 
                             if CollapsingHeader::new("Active values").begin(ui) {
@@ -118,57 +125,115 @@ impl App for NodeEditorGraph {
                 let detatch = context.push(AttributeFlag::EnableLinkDetachWithDragClick);
                 let outer_scope = editor(context, |mut editor_scope| {
                     editor_scope.add_mini_map(imnodes::MiniMapLocation::BottomRight);
-                    self.nodes.iter_mut().for_each(|node_component| {
-                        let NodeComponent {
-                            title,
-                            node_id,
-                            input_id,
-                            output_id,
-                            attribute_id,
-                            attribute,
-                            thunk,
-                            values,
-                        } = node_component;
-
-                        ui.set_next_item_width(130.0);
-                        editor_scope.add_node(*node_id, |mut node_scope| {
-                            ui.set_next_item_width(130.0);
-                            node_scope.add_titlebar(|| {
-                                ui.text(title);
-                            });
-
-                            if let atlier::system::Value::Reference(r) = attribute.clone().value() {
-                                match self.values.get_at(r)  {
-                                    None => {
-                                        let resetting = attribute.get_value_mut();
-                                        *resetting = Value::Empty;
-                                    }
-                                    _ => {}
-                                }
+                    self.nodes
+                        .iter_mut()
+                        .filter(|n| {
+                            if let Some(filtering_nodes) = &self.filtering_nodes {
+                                n.title.contains(filtering_nodes)
+                            } else {
+                                true
                             }
+                        })
+                        .for_each(|node_component| {
+                            let NodeComponent {
+                                title,
+                                node_id,
+                                input_id,
+                                output_id,
+                                attribute_id,
+                                attribute,
+                                thunk,
+                                values,
+                            } = node_component;
 
-                            match attribute.value() {
-                                // Empty means this attribute needs a value
-                                atlier::system::Value::Symbol(symbol) => {
-                                    let output_key = format!("{}::output::", symbol);
-                                    node_scope.add_input(
-                                        *input_id,
-                                        imnodes::PinShape::Triangle,
-                                        || {
-                                            ui.set_next_item_width(130.0);
-                                            ui.label_text("symbol", symbol);
-                                        },
-                                    );
-                                    if let (Some(thunk), Some(values)) = (thunk, values) {
-                                        node_scope.attribute(*attribute_id, || {
-                                            ui.set_next_item_width(130.0);
-                                            let thunk_name = symbol[7..].to_string();
-                                            if ui.button(format!("{}", thunk_name)) {
-                                                thunk(values);
+                            ui.set_next_item_width(130.0);
+                            editor_scope.add_node(*node_id, |mut node_scope| {
+                                ui.set_next_item_width(130.0);
+                                node_scope.add_titlebar(|| {
+                                    ui.text(title);
+                                });
 
-                                                if let Some(output) = values.get(&output_key) {
-                                                    self.values = self.values.node(output.clone());
+                                if let atlier::system::Value::Reference(r) =
+                                    attribute.clone().value()
+                                {
+                                    match self.values.get_at(r) {
+                                        None => {
+                                            let resetting = attribute.get_value_mut();
+                                            *resetting = Value::Empty;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+
+                                match attribute.value() {
+                                    // Empty means this attribute needs a value
+                                    atlier::system::Value::Symbol(symbol) => {
+                                        let output_key = format!("{}::output::", symbol);
+                                        node_scope.add_input(
+                                            *input_id,
+                                            imnodes::PinShape::Triangle,
+                                            || {
+                                                ui.set_next_item_width(130.0);
+                                                ui.label_text("symbol", symbol);
+                                            },
+                                        );
+                                        if let (Some(thunk), Some(values)) = (thunk, values) {
+                                            node_scope.attribute(*attribute_id, || {
+                                                ui.set_next_item_width(130.0);
+                                                let thunk_name = symbol[7..].to_string();
+                                                if ui.button(format!("{}", thunk_name)) {
+                                                    thunk(values);
+
+                                                    if let Some(output) = values.get(&output_key) {
+                                                        self.values =
+                                                            self.values.node(output.clone());
+                                                    }
                                                 }
+                                            });
+
+                                            node_scope.add_output(
+                                                *output_id,
+                                                imnodes::PinShape::TriangleFilled,
+                                                || {
+                                                    ui.set_next_item_width(130.0);
+                                                    ui.text(output_key);
+                                                },
+                                            );
+                                        }
+                                    }
+                                    // Empty means this attribute needs a value
+                                    atlier::system::Value::Empty => {
+                                        node_scope.add_input(
+                                            *input_id,
+                                            imnodes::PinShape::Circle,
+                                            || {
+                                                ui.set_next_item_width(130.0);
+                                                ui.text(attribute.name());
+                                                ui.set_next_item_width(130.0);
+                                                ui.text("Empty");
+                                            },
+                                        );
+                                    }
+                                    // Reference means use the value from reference
+                                    atlier::system::Value::Reference(r) => {
+                                        node_scope.add_input(
+                                            *input_id,
+                                            imnodes::PinShape::CircleFilled,
+                                            || match self.values.get_at(r) {
+                                                Some((value, _)) => {
+                                                    ui.set_next_item_width(130.0);
+                                                    ui.text(format!("{}", value));
+                                                }
+                                                None => {}
+                                            },
+                                        );
+
+                                        node_scope.attribute(*attribute_id, || {
+                                            if let Some(editing) = self.editing {
+                                                ui.disabled(!editing, || {
+                                                    ui.set_next_item_width(130.0);
+                                                    attribute.edit(ui);
+                                                });
                                             }
                                         });
 
@@ -177,89 +242,42 @@ impl App for NodeEditorGraph {
                                             imnodes::PinShape::TriangleFilled,
                                             || {
                                                 ui.set_next_item_width(130.0);
-                                                ui.text(output_key);
+                                                ui.text("value");
+                                            },
+                                        );
+                                    }
+                                    _ => {
+                                        node_scope.attribute(*attribute_id, || {
+                                            ui.set_next_item_width(130.0);
+
+                                            if let Some(editing) = self.editing {
+                                                ui.disabled(!editing, || {
+                                                    let old = attribute.clone();
+                                                    attribute.edit(ui);
+
+                                                    if old != *attribute {
+                                                        let new_value = attribute.value().clone();
+                                                        self.values =
+                                                            self.values.node(new_value.clone());
+                                                    }
+                                                });
+                                            }
+                                        });
+
+                                        node_scope.add_output(
+                                            *output_id,
+                                            imnodes::PinShape::TriangleFilled,
+                                            || {
+                                                ui.set_next_item_width(130.0);
+                                                ui.text("value");
                                             },
                                         );
                                     }
                                 }
-                                // Empty means this attribute needs a value
-                                atlier::system::Value::Empty => {
-                                    node_scope.add_input(
-                                        *input_id,
-                                        imnodes::PinShape::Circle,
-                                        || {
-                                            ui.set_next_item_width(130.0);
-                                            ui.text(attribute.name());
-                                            ui.set_next_item_width(130.0);
-                                            ui.text("Empty");
-                                        },
-                                    );
-                                }
-                                // Reference means use the value from reference
-                                atlier::system::Value::Reference(r) => {
-                                    node_scope.add_input(
-                                        *input_id,
-                                        imnodes::PinShape::CircleFilled,
-                                        || match self.values.get_at(r) {
-                                            Some((value, _)) => {
-                                                ui.set_next_item_width(130.0);
-                                                ui.text(format!("{}", value));
-                                            }
-                                            None => {
-                                            }
-                                        },
-                                    );
 
-                                    node_scope.attribute(*attribute_id, || {
-                                        if let Some(editing) = self.editing {
-                                            ui.disabled(!editing, || {
-                                                ui.set_next_item_width(130.0);
-                                                attribute.edit(ui);
-                                            });
-                                        }
-                                    });
-
-                                    node_scope.add_output(
-                                        *output_id,
-                                        imnodes::PinShape::TriangleFilled,
-                                        || {
-                                            ui.set_next_item_width(130.0);
-                                            ui.text("value");
-                                        },
-                                    );
-                                }
-                                _ => {
-                                    node_scope.attribute(*attribute_id, || {
-                                        ui.set_next_item_width(130.0);
-
-                                        if let Some(editing) = self.editing {
-                                            ui.disabled(!editing, || {
-                                                let old = attribute.clone();
-                                                attribute.edit(ui);
-
-                                                if old != *attribute {
-                                                    let new_value = attribute.value().clone();
-                                                    self.values =
-                                                        self.values.node(new_value.clone());
-                                                }
-                                            });
-                                        }
-                                    });
-
-                                    node_scope.add_output(
-                                        *output_id,
-                                        imnodes::PinShape::TriangleFilled,
-                                        || {
-                                            ui.set_next_item_width(130.0);
-                                            ui.text("value");
-                                        },
-                                    );
-                                }
-                            }
-
-                            ui.new_line();
+                                ui.new_line();
+                            });
                         });
-                    });
 
                     self.link_index.iter().for_each(|(link_id, link)| {
                         editor_scope.add_link(*link_id, link.end_pin, link.start_pin);
@@ -330,6 +348,7 @@ impl NodeEditorGraph {
             debugging: Some(false),
             editing: Some(false),
             filtering: Some(String::default()),
+            filtering_nodes: Some(String::default()),
             thunk_index: BTreeMap::new(),
         }
     }
@@ -421,11 +440,8 @@ impl NodeEditorGraph {
             let ImVec2 { x, y: _ } = n
                 .node_id
                 .get_position(imnodes::CoordinateSystem::ScreenSpace);
-            n.node_id.set_position(
-                x,
-                spacing,
-                imnodes::CoordinateSystem::ScreenSpace,
-            );
+            n.node_id
+                .set_position(x, spacing, imnodes::CoordinateSystem::ScreenSpace);
         });
     }
 
