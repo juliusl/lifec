@@ -21,7 +21,7 @@ fn main() {
     runtime.on("{ after_echo;; }").call("print_results");
 
     let mut node_editor = NodeEditor::new();
-    node_editor.add_thunk("echo", |v| {
+    node_editor.add_thunk("println", |v| {
         let echo = format!("{:?}", v);
 
         println!("{}", echo);
@@ -44,9 +44,11 @@ fn main() {
         .with_bool("enable node editor", true)
         .with_empty("node::name")
         .with_empty("node::other name")
-        .with_symbol("node::echo", "call::echo")
+        .with_symbol("node::println 1", "call::println")
+        .with_symbol("node::println 2", "call::println")
+        .with_symbol("node::println 3", "call::println")
         .with_text("node::cool name", "julius")
-        .with_text("node::other name", "liu")
+        .with_text("node::other cool name", "liu")
         .enable_app_systems()],
         |w| {
             EventEditor::configure_app_world(w);

@@ -15,7 +15,7 @@ pub struct NodeComponent {
     attribute_id: AttributeId,
     attribute: Attribute,
     thunk: Option<fn(&mut BTreeMap<String, Value>)>,
-    values: BTreeMap<String, Value>,
+    values: Option<BTreeMap<String, Value>>,
 }
 
 #[derive(Default)]
@@ -77,12 +77,11 @@ impl App for NodeEditorGraph {
                                     imnodes::PinShape::Triangle,
                                     || {
                                         ui.set_next_item_width(130.0);
-                                        ui.text(attribute.name());
-                                        ui.set_next_item_width(130.0);
                                         ui.label_text("symbol", symbol);
                                     },
                                 );
-                                if let Some(thunk) = thunk {
+                                if let (Some(thunk), Some(values)) = (thunk, values) {
+                                    
                                     node_scope.attribute(*attribute_id, || {
                                         ui.set_next_item_width(130.0);
                                         let call = symbol[6..].to_string();
@@ -210,7 +209,9 @@ impl App for NodeEditorGraph {
 
                         if let Value::Symbol(_) = &n.attribute.value() {
                             if let Some(n) = self.find_node_mut(&to) {
-                                n.values.clear();
+                                if let Some(values) = n.values.as_mut() {
+                                    values.clear();
+                                }
                             }
                         }
                     }
@@ -257,7 +258,7 @@ impl NodeEditorGraph {
                 attribute_id: idgen.next_attribute(),
                 attribute: attr.clone(),
                 thunk: None,
-                values: BTreeMap::new(),
+                values: None,
             });
         }
     }
@@ -375,11 +376,13 @@ impl Visitor<NodeId> for NodeEditorGraph {
                     }
                 }
                 (Value::Symbol(_), Value::Empty) => {
-                    if let Some(output) = from_node.values.get("output") {
-                        let reference = output.to_ref();
-                        if let Some(update) = self.find_node_mut(t) {
-                            let updating = update.attribute.get_value_mut();
-                            *updating = reference;
+                    if let Some(values) = &from_node.values {
+                        if let Some(output) = values.get("output") {
+                            let reference = output.to_ref();
+                            if let Some(update) = self.find_node_mut(t) {
+                                let updating = update.attribute.get_value_mut();
+                                *updating = reference;
+                            }
                         }
                     }
                 }
@@ -408,7 +411,14 @@ impl Visitor<NodeId> for NodeEditorGraph {
 
                             if let Some(update) = self.find_node_mut(t) {
                                 update.thunk = Some(thunk);
-                                update.values.insert(input_name, input);
+
+                                if let None = update.values {
+                                    update.values = Some(BTreeMap::new());
+                                }
+                                
+                                if let Some(values) = update.values.as_mut() {
+                                    values.insert(input_name, input);
+                                }
                             }
                         }
                     }
