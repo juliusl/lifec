@@ -75,13 +75,6 @@ fn main() {
         .with_bool("enable node editor", true)
         .with_empty("node::name")
         .with_empty("node::other name")
-        .with_symbol(unique_title("node::"), "thunk::println")
-        .with_symbol(unique_title("node::"), "thunk::println")
-        .with_symbol(unique_title("node::"), "thunk::println")
-        .with_symbol(unique_title("node::"), "thunk::print_results")
-        .with_symbol(unique_title("node::"), "thunk::broadcast")
-        .with_symbol(unique_title("node::"), "thunk::broadcast")
-        .with_symbol(unique_title("node::"), "thunk::broadcast")
         .with_text("node::cool name", "julius")
         .with_text("node::other cool name", "liu")
         .enable_app_systems()],

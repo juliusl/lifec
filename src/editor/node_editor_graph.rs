@@ -86,6 +86,9 @@ impl App for NodeEditorGraph {
                                         }
                                     })
                                     .for_each(|n| {
+                                        ui.set_next_item_width(200.0);
+                                        ui.input_text(format!("title {:?}", &n.node_id), &mut n.title).build();
+
                                         n.attribute.edit(ui);
                                         if let Some(values) = &n.values {
                                             ui.text("Current Values:");
