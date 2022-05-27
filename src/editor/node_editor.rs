@@ -142,10 +142,18 @@ impl App for NodeEditor {
                     .build(ui, || {
                         ui.menu_bar(|| {
                             ui.menu("File", ||{
-                                
+
                             });
 
                             ui.menu("Edit", || {
+                                if MenuItem::new("Refresh values")
+                                    .enabled(editor.is_debugging_enabled())
+                                    .build(ui)
+                                {
+                                    editor.refresh_values();
+                                }
+                                ui.separator();
+
                                 ui.menu("Attributes", ||{
                                     if MenuItem::new("Add text attribute").build(ui) {
                                         editor.add_node(&mut Attribute::new(
@@ -203,21 +211,24 @@ impl App for NodeEditor {
                             });
 
                             ui.menu("Tools", || {
-                                if MenuItem::new("Arrange graph").build(ui) {
-                                    editor.rearrange();
-                                }
-
-                                if MenuItem::new("Arrange nodes vertically").build(ui) {
-                                    editor.arrange_vertical();
-                                }
-
+                                ui.menu("Arrange", ||{
+                                    if MenuItem::new("Connected nodes").build(ui) {
+                                        editor.rearrange();
+                                    }
+    
+                                    if MenuItem::new("All nodes vertically").build(ui) {
+                                        editor.arrange_vertical();
+                                    }
+                                });
+                           
                                 ui.separator();
-                                if MenuItem::new("Refresh values")
-                                    .enabled(editor.is_debugging_enabled())
-                                    .build(ui)
-                                {
-                                    editor.refresh_values();
-                                }
+                                ui.menu("Move editor to", ||{
+                                    for n in editor.nodes() {
+                                        if MenuItem::new(n.title()).build(ui) {
+                                            n.move_editor_to();
+                                        }
+                                    }
+                                });
                             });
 
                             ui.menu("Options", || {

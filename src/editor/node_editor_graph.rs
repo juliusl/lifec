@@ -20,6 +20,14 @@ pub struct NodeComponent {
 }
 
 impl NodeComponent {
+    pub fn title(&self) -> &String {
+        &self.title
+    }
+
+    pub fn move_editor_to(&mut self) {
+        self.node_id.move_editor_to();
+    }
+
     /// updates the current state of the node_component
     pub fn update(
         &mut self,
@@ -354,6 +362,10 @@ impl NodeEditorGraph {
             filtering_nodes: Some(String::default()),
             thunk_index: BTreeMap::new(),
         }
+    }
+
+    pub fn nodes(&mut self) -> &mut Vec<NodeComponent> {
+        &mut self.nodes
     }
 
     pub fn add_thunk(&mut self, name: impl AsRef<str>, thunk: fn(&mut BTreeMap<String, Value>)) {
