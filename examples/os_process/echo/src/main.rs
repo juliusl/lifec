@@ -20,6 +20,11 @@ fn main() {
 
     runtime.on("{ after_echo;; }").call("print_results");
 
+    let mut runtime = runtime.ensure_call(
+        "print_results", 
+        None, 
+        None);
+
     let mut node_editor = NodeEditor::new();
     node_editor.add_thunk("println", |v| {
         let echo = format!("{:?}", v);

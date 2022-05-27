@@ -239,8 +239,8 @@ where
 #[derive(Debug, Clone, Default)]
 pub struct Extensions {
     pub context: Option<Event>,
-    pub tests: Vec<(String, String)>,
     pub args: Vec<String>,
+    pub tests: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -511,12 +511,15 @@ where
         }
     }
 
-    fn from_attributes(_: Vec<Attribute>) -> Self {
-        todo!()
+    fn from_attributes(attrs: Vec<Attribute>) -> Self {
+        Self {
+            state: T::from_attributes(attrs),
+            args: vec![],
+        }
     }
 
     fn into_attributes(&self) -> Vec<Attribute> {
-        todo!()
+        self.get_state().into_attributes()
     }
 }
 
@@ -524,6 +527,51 @@ impl<T> Runtime<T>
 where
     T: RuntimeState,
 {
+    /// ensures that the runtime is returned after excuting a thunk with call_name, otherwise panic
+    pub fn ensure_call(
+        &self,
+        call_name: impl AsRef<str>,
+        state: Option<T>,
+        args: Option<Vec<String>>,
+    ) -> Self {
+        if let None = self.calls.get(call_name.as_ref()) {
+            panic!(
+                "call: '{}' is not defined on this runtime",
+                call_name.as_ref()
+            );
+        }
+
+        self.after_call(call_name, state, args)
+    }
+
+    /// returns the runtime after calling a thunk with the specified name
+    /// with optional initial state and initial args, otherwise with no args
+    /// and current state of runtime
+    pub fn after_call(
+        &self,
+        call_name: impl AsRef<str>,
+        state: Option<T>,
+        args: Option<Vec<String>>,
+    ) -> Self {
+        let mut clone = self.clone();
+
+        let state = state.or(self.clone().state).unwrap_or(Self::init());
+
+        clone.execute_call(
+            call_name,
+            state,
+            args.and_then(|a| {
+                Some(Extensions {
+                    args: a,
+                    context: Some(clone.context()),
+                    tests: vec![],
+                })
+            }),
+        );
+
+        clone
+    }
+
     /// context gets the current event context of this runtime
     pub fn context(&self) -> Event {
         self.current.clone().unwrap_or(Event::exit())
