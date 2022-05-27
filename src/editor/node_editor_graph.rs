@@ -1,4 +1,5 @@
 use atlier::system::{App, Attribute, Value};
+use imgui::*;
 use imnodes::{
     editor, AttributeFlag, AttributeId, EditorContext, IdentifierGenerator, ImVec2, InputPinId,
     Link, LinkId, NodeId, OutputPinId,
@@ -18,6 +19,26 @@ pub struct NodeComponent {
     values: Option<BTreeMap<String, Value>>,
 }
 
+impl NodeComponent {
+    /// updates the current state of the node_component
+    pub fn update(
+        &mut self,
+        thunk: fn(&mut BTreeMap<String, Value>),
+        input_name: impl AsRef<str>,
+        input: Value,
+    ) {
+        self.thunk = Some(thunk);
+
+        if let None = self.values {
+            self.values = Some(BTreeMap::new());
+        }
+
+        if let Some(values) = self.values.as_mut() {
+            values.insert(input_name.as_ref().to_string(), input);
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct NodeEditorGraph {
     editor_context: Option<imnodes::EditorContext>,
@@ -27,6 +48,8 @@ pub struct NodeEditorGraph {
     link_index: HashMap<LinkId, Link>,
     values: Store<Value>,
     editing: Option<bool>,
+    debugging: Option<bool>,
+    filtering: Option<String>,
     thunk_index: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>,
 }
 
@@ -37,60 +60,162 @@ impl App for NodeEditorGraph {
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
         if let Some(context) = self.editor_context.as_mut() {
-            if ui.button("Rearrange") {
-                NodeEditorGraph::rearrange(&mut self.links);
-            }
+            if let Some(debugging) = self.debugging.as_ref() {
+                if *debugging {
+                    ChildWindow::new("Debugger")
+                        .size([500.0, 0.0])
+                        .build(ui, || {
+                            if CollapsingHeader::new("Edit attributes").begin(ui) {
+                                if let Some(filter) = self.filtering.as_mut() {
+                                    ui.input_text("Filter attributes", filter).build();
+                                    ui.new_line();
+                                }
 
-            if let Some(readonly) = self.editing.as_mut() {
-                ui.same_line();
-                ui.checkbox("enable attribute editing", readonly);
-            }
+                                self.nodes.iter_mut().filter(|n| {
+                                    if let Some(filter) = &self.filtering {
+                                        format!("{}", n.attribute).contains(filter)
+                                    } else {
+                                        false
+                                    }
+                                }).for_each(|n| {
+                                    n.attribute.edit(ui);
+                                    if let Some(values) = &n.values {
+                                        if ui.is_item_hovered() {
+                                            ui.tooltip(|| {
+                                                ui.text("Current Values:");
+                                                ui.new_line();
+                                                for t in values {
+                                                    ui.text(format!("{:?}", t));
+                                                }
+                                            });
+                                        }
+                                    }
+                                    ui.new_line();
+                                    ui.separator();
+                                    self.values = self.values.link_create_if_not_exists(
+                                        n.attribute.value().clone(),
+                                        Value::Symbol("ACTIVE".to_string()),
+                                    );
+                                });
+                            }
 
-            let detatch = context.push(AttributeFlag::EnableLinkDetachWithDragClick);
-
-            let outer_scope = editor(context, |mut editor_scope| {
-                editor_scope.add_mini_map(imnodes::MiniMapLocation::BottomRight);
-                self.nodes.iter_mut().for_each(|node_component| {
-                    let NodeComponent {
-                        title,
-                        node_id,
-                        input_id,
-                        output_id,
-                        attribute_id,
-                        attribute,
-                        thunk,
-                        values,
-                    } = node_component;
-
-                    ui.set_next_item_width(130.0);
-                    editor_scope.add_node(*node_id, |mut node_scope| {
-                        ui.set_next_item_width(130.0);
-                        node_scope.add_titlebar(|| {
-                            ui.text(title);
-                        });
-
-                        match attribute.value() {
-                            // Empty means this attribute needs a value
-                            atlier::system::Value::Symbol(symbol) => {
-                                node_scope.add_input(
-                                    *input_id,
-                                    imnodes::PinShape::Triangle,
-                                    || {
-                                        ui.set_next_item_width(130.0);
-                                        ui.label_text("symbol", symbol);
-                                    },
+                            if CollapsingHeader::new("Active values").begin(ui) {
+                                let (seen, _) = self.values.new_walk_ordered(
+                                    Value::Symbol("ACTIVE".to_string()),
+                                    Some(&ValueWalker {}),
                                 );
-                                if let (Some(thunk), Some(values)) = (thunk, values) {
-                                    
-                                    node_scope.attribute(*attribute_id, || {
-                                        ui.set_next_item_width(130.0);
-                                        let call = symbol[6..].to_string();
-                                        if ui.button(format!("{}", call)) {
-                                            thunk(values);
 
-                                            if let Some(output) = values.get("output") {
-                                                self.values = self.values.node(output.clone());
+                                for s in seen {
+                                    ui.text(s.to_string());
+                                }
+                            }
+                        });
+                    ui.same_line();
+                }
+            }
+
+            if let Some(ntoken) = ChildWindow::new("Node Editor").size([0.0, 0.0]).begin(ui) {
+                let detatch = context.push(AttributeFlag::EnableLinkDetachWithDragClick);
+                let outer_scope = editor(context, |mut editor_scope| {
+                    editor_scope.add_mini_map(imnodes::MiniMapLocation::BottomRight);
+                    self.nodes.iter_mut().for_each(|node_component| {
+                        let NodeComponent {
+                            title,
+                            node_id,
+                            input_id,
+                            output_id,
+                            attribute_id,
+                            attribute,
+                            thunk,
+                            values,
+                        } = node_component;
+
+                        ui.set_next_item_width(130.0);
+                        editor_scope.add_node(*node_id, |mut node_scope| {
+                            ui.set_next_item_width(130.0);
+                            node_scope.add_titlebar(|| {
+                                ui.text(title);
+                            });
+
+                            if let atlier::system::Value::Reference(r) = attribute.clone().value() {
+                                match self.values.get_at(r)  {
+                                    None => {
+                                        let resetting = attribute.get_value_mut();
+                                        *resetting = Value::Empty;
+                                    }
+                                    _ => {}
+                                }
+                            }
+
+                            match attribute.value() {
+                                // Empty means this attribute needs a value
+                                atlier::system::Value::Symbol(symbol) => {
+                                    let output_key = format!("{}::output::", symbol);
+                                    node_scope.add_input(
+                                        *input_id,
+                                        imnodes::PinShape::Triangle,
+                                        || {
+                                            ui.set_next_item_width(130.0);
+                                            ui.label_text("symbol", symbol);
+                                        },
+                                    );
+                                    if let (Some(thunk), Some(values)) = (thunk, values) {
+                                        node_scope.attribute(*attribute_id, || {
+                                            ui.set_next_item_width(130.0);
+                                            let thunk_name = symbol[7..].to_string();
+                                            if ui.button(format!("{}", thunk_name)) {
+                                                thunk(values);
+
+                                                if let Some(output) = values.get(&output_key) {
+                                                    self.values = self.values.node(output.clone());
+                                                }
                                             }
+                                        });
+
+                                        node_scope.add_output(
+                                            *output_id,
+                                            imnodes::PinShape::TriangleFilled,
+                                            || {
+                                                ui.set_next_item_width(130.0);
+                                                ui.text(output_key);
+                                            },
+                                        );
+                                    }
+                                }
+                                // Empty means this attribute needs a value
+                                atlier::system::Value::Empty => {
+                                    node_scope.add_input(
+                                        *input_id,
+                                        imnodes::PinShape::Circle,
+                                        || {
+                                            ui.set_next_item_width(130.0);
+                                            ui.text(attribute.name());
+                                            ui.set_next_item_width(130.0);
+                                            ui.text("Empty");
+                                        },
+                                    );
+                                }
+                                // Reference means use the value from reference
+                                atlier::system::Value::Reference(r) => {
+                                    node_scope.add_input(
+                                        *input_id,
+                                        imnodes::PinShape::CircleFilled,
+                                        || match self.values.get_at(r) {
+                                            Some((value, _)) => {
+                                                ui.set_next_item_width(130.0);
+                                                ui.text(format!("{}", value));
+                                            }
+                                            None => {
+                                            }
+                                        },
+                                    );
+
+                                    node_scope.attribute(*attribute_id, || {
+                                        if let Some(editing) = self.editing {
+                                            ui.disabled(!editing, || {
+                                                ui.set_next_item_width(130.0);
+                                                attribute.edit(ui);
+                                            });
                                         }
                                     });
 
@@ -99,129 +224,95 @@ impl App for NodeEditorGraph {
                                         imnodes::PinShape::TriangleFilled,
                                         || {
                                             ui.set_next_item_width(130.0);
-                                            ui.text("output");
+                                            ui.text("value");
+                                        },
+                                    );
+                                }
+                                _ => {
+                                    node_scope.attribute(*attribute_id, || {
+                                        ui.set_next_item_width(130.0);
+
+                                        if let Some(editing) = self.editing {
+                                            ui.disabled(!editing, || {
+                                                let old = attribute.clone();
+                                                attribute.edit(ui);
+
+                                                if old != *attribute {
+                                                    let new_value = attribute.value().clone();
+                                                    self.values =
+                                                        self.values.node(new_value.clone());
+                                                }
+                                            });
+                                        }
+                                    });
+
+                                    node_scope.add_output(
+                                        *output_id,
+                                        imnodes::PinShape::TriangleFilled,
+                                        || {
+                                            ui.set_next_item_width(130.0);
+                                            ui.text("value");
                                         },
                                     );
                                 }
                             }
-                            // Empty means this attribute needs a value
-                            atlier::system::Value::Empty => {
-                                node_scope.add_input(*input_id, imnodes::PinShape::Circle, || {
-                                    ui.set_next_item_width(130.0);
-                                    ui.text(attribute.name());
-                                    ui.set_next_item_width(130.0);
-                                    ui.text("Empty");
-                                });
-                            }
-                            // Reference means use the value from reference
-                            atlier::system::Value::Reference(r) => {
-                                node_scope.add_input(
-                                    *input_id,
-                                    imnodes::PinShape::CircleFilled,
-                                    || {
-                                        match self.values.get_at(r) {
-                                            Some((value, _)) => {
-                                                ui.set_next_item_width(130.0);
-                                                ui.text(format!("{}", value));
-                                            }
-                                            None => {
-                                                 ui.set_next_item_width(130.0);
-                                                 ui.text("Missing value");
-                                            }
-                                        }
-                                    },
-                                );
 
-                                node_scope.attribute(*attribute_id, || {
-                                    if let Some(editing) = self.editing {
-                                        ui.disabled(!editing, || {
-                                            ui.set_next_item_width(130.0);
-                                            attribute.edit(ui);
-                                        });
-                                    }
-                                });
+                            ui.new_line();
+                        });
+                    });
 
-                                node_scope.add_output(
-                                    *output_id,
-                                    imnodes::PinShape::TriangleFilled,
-                                    || {
-                                        ui.set_next_item_width(130.0);
-                                        ui.text("value");
-                                    },
-                                );
-                            }
-                            _ => {
-                                node_scope.attribute(*attribute_id, || {
-                                    ui.set_next_item_width(130.0);
-
-                                    if let Some(editing) = self.editing {
-                                        ui.disabled(!editing, || {
-                                            let old = attribute.clone();
-                                            attribute.edit(ui);
-
-                                            if old != *attribute {
-                                                let new_value = attribute.value().clone();
-                                                self.values = self.values.node(new_value.clone());
-                                            }
-                                        });
-                                    }
-                                });
-
-                                node_scope.add_output(
-                                    *output_id,
-                                    imnodes::PinShape::TriangleFilled,
-                                    || {
-                                        ui.set_next_item_width(130.0);
-                                        ui.text("value");
-                                    },
-                                );
-                            }
-                        }
-
-                        ui.new_line();
+                    self.link_index.iter().for_each(|(link_id, link)| {
+                        editor_scope.add_link(*link_id, link.end_pin, link.start_pin);
                     });
                 });
 
-                self.link_index.iter().for_each(|(link_id, link)| {
-                    editor_scope.add_link(*link_id, link.end_pin, link.start_pin);
-                });
-            });
-
-            if let Some(link) = outer_scope.links_created() {
-                if let Some(idgen) = self.idgen.as_mut() {
-                    if self.links.insert(link) {
-                        self.link_index.insert(idgen.next_link(), link);
+                if let Some(link) = outer_scope.links_created() {
+                    if let Some(idgen) = self.idgen.as_mut() {
+                        if self.links.insert(link) {
+                            self.link_index.insert(idgen.next_link(), link);
+                        }
                     }
                 }
-            }
 
-            if let Some(dropped) = outer_scope.get_dropped_link() {
-                if let Some(dropped_link) = self.link_index.clone().get(&dropped) {
-                    let to = dropped_link.end_node;
-
-                    if let Some(n) = self.find_node(&to).cloned() {
-                        if let Value::Reference(_) = &n.attribute.value() {
-                            if let Some(n) = self.find_node_mut(&to) {
-                                let updating = n.attribute.get_value_mut();
-                                *updating = Value::Empty
+                if let Some(dropped) = outer_scope.get_dropped_link() {
+                    if let Some(dropped_link) = self.link_index.clone().get(&dropped) {
+                        let to = dropped_link.end_node;
+                        if let Some(n) = self.find_node(&to).cloned() {
+                            if let Value::Reference(_) = &n.attribute.value() {
+                                if let Some(n) = self.find_node_mut(&to) {
+                                    let updating = n.attribute.get_value_mut();
+                                    *updating = Value::Empty
+                                }
                             }
-                        }
 
-                        if let Value::Symbol(_) = &n.attribute.value() {
-                            if let Some(n) = self.find_node_mut(&to) {
-                                if let Some(values) = n.values.as_mut() {
-                                    values.clear();
+                            if let Value::Symbol(_) = &n.attribute.value() {
+                                if let Some(n) = self.find_node_mut(&to) {
+                                    if let Some(values) = n.values.as_mut() {
+                                        values.clear();
+                                    }
                                 }
                             }
                         }
+
+                        let from = dropped_link.start_node;
+                        if let Some(n) = self.find_node(&from).cloned() {
+                            if let Value::Symbol(_) = &n.attribute.value() {
+                                if let Some(n) = self.find_node_mut(&from) {
+                                    if let Some(values) = n.values.as_mut() {
+                                        values.clear();
+                                    }
+                                }
+                            }
+                        }
+
+                        self.links.remove(dropped_link);
+                        self.link_index.remove(&dropped);
                     }
-
-                    self.links.remove(dropped_link);
-                    self.link_index.remove(&dropped);
                 }
-            }
 
-            detatch.pop();
+                detatch.pop();
+                ntoken.end();
+            }
         }
     }
 }
@@ -236,7 +327,9 @@ impl NodeEditorGraph {
             links: HashSet::new(),
             link_index: HashMap::new(),
             values: Store::default(),
+            debugging: Some(false),
             editing: Some(false),
+            filtering: Some(String::default()),
             thunk_index: BTreeMap::new(),
         }
     }
@@ -294,12 +387,55 @@ impl NodeEditorGraph {
         }
 
         if let Some(last) = store.nodes().iter().last() {
-            store.new_walk_mut(**last, Some(self));
+            let (_, visited) = store.new_walk_mut(**last, Some(self));
+
+            let _ = std::fs::write("node_editor.out", format!("{:?}", visited));
         }
     }
 
+    pub fn thunk_index(&mut self) -> &mut BTreeMap<String, fn(&mut BTreeMap<String, Value>)> {
+        &mut self.thunk_index
+    }
+
+    pub fn show_enable_debug_option(&mut self, ui: &imgui::Ui) {
+        if let Some(debugging) = self.debugging.as_mut() {
+            ui.checkbox("Enable debug mode", debugging);
+        }
+    }
+
+    pub fn show_enable_edit_attributes_option(&mut self, ui: &imgui::Ui) {
+        if let Some(readonly) = self.editing.as_mut() {
+            ui.checkbox("Enable attribute editing", readonly);
+        }
+    }
+
+    pub fn refresh_values(&mut self) {
+        self.values = Store::default();
+    }
+
+    pub fn arrange_vertical(&mut self) {
+        self.nodes.iter_mut().enumerate().for_each(|(i, n)| {
+            let spacing = i as f32;
+            let spacing = spacing * 150.0;
+
+            let ImVec2 { x, y: _ } = n
+                .node_id
+                .get_position(imnodes::CoordinateSystem::ScreenSpace);
+            n.node_id.set_position(
+                x,
+                spacing,
+                imnodes::CoordinateSystem::ScreenSpace,
+            );
+        });
+    }
+
+    pub fn is_debugging_enabled(&mut self) -> bool {
+        self.debugging.unwrap_or(false)
+    }
+
     /// rearrange a set of linked nodes
-    pub fn rearrange(links: &mut HashSet<Link>) {
+    pub fn rearrange(&mut self) {
+        let links = &mut self.links;
         let mut store = Store::<NodeId>::default();
         store.walk_unique = false;
 
@@ -357,6 +493,17 @@ impl NodeEditorGraph {
     }
 }
 
+struct ValueWalker;
+
+impl Visitor<Value> for ValueWalker {
+    fn visit(&self, from: &Value, to: &Value) -> bool {
+        match (&from, &to) {
+            (Value::Symbol(symbol), _) => symbol == "ACTIVE",
+            _ => false,
+        }
+    }
+}
+
 impl Visitor<NodeId> for NodeEditorGraph {
     fn visit(&self, _: &NodeId, _: &NodeId) -> bool {
         true
@@ -368,6 +515,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
             let to = &to_node.attribute;
 
             match (from.value(), to.value()) {
+                // Set the value of to, to from's value
                 (Value::Reference(from), Value::Reference(_)) => {
                     let from = *from;
                     if let Some(update) = self.find_node_mut(t) {
@@ -375,9 +523,18 @@ impl Visitor<NodeId> for NodeEditorGraph {
                         *updating = Value::Reference(from);
                     }
                 }
-                (Value::Symbol(_), Value::Empty) => {
+                (Value::Reference(from), Value::Empty) => {
+                    let from = *from;
+                    if let Some(update) = self.find_node_mut(t) {
+                        let updating = update.attribute.get_value_mut();
+                        *updating = Value::Reference(from);
+                    }
+                }
+                (Value::Symbol(symbol), Value::Empty) => {
                     if let Some(values) = &from_node.values {
-                        if let Some(output) = values.get("output") {
+                        let output_key = format!("{}::output::", symbol);
+
+                        if let Some(output) = values.get(&output_key) {
                             let reference = output.to_ref();
                             if let Some(update) = self.find_node_mut(t) {
                                 let updating = update.attribute.get_value_mut();
@@ -393,32 +550,59 @@ impl Visitor<NodeId> for NodeEditorGraph {
                         *updating = reference;
                     }
                 }
-                (input, Value::Symbol(symbol)) => {
-                    if symbol.starts_with("call::") {
-                        let call = symbol[6..].to_string();
-                        if let Some(thunk) = self.thunk_index.get(&call) {
+                (Value::Symbol(other), Value::Symbol(symbol)) => {
+                    if symbol.starts_with("thunk::") {
+                        let thunk = symbol[7..].to_string();
+                        if let Some(thunk) = self.thunk_index.get(&thunk) {
                             let thunk = thunk.clone();
                             let input_name = format!("{}", &from.name());
-                            let input = if let Value::Reference(reference) = input {
-                                if let Some((input, _)) = self.values.get_at(reference).clone() {
-                                    input.clone()
-                                } else {
-                                    input.clone()
+                            let input = from_node.clone().clone();
+                            let input = input
+                                .values
+                                .as_ref()
+                                .and_then(|a| a.get(&format!("{}::output::", other)));
+
+                            if let Some(input) = input.clone() {
+                                if let Some(update) = self.find_node_mut(t) {
+                                    update.update(thunk, input_name, input.to_owned())
                                 }
                             } else {
-                                input.clone()
-                            };
+                                return false;
+                            }
+                        }
+                    }
+                }
+                (Value::Reference(reference), Value::Symbol(symbol)) => {
+                    if symbol.starts_with("thunk::") {
+                        let thunk = symbol[7..].to_string();
+                        if let Some(thunk) = self.thunk_index.get(&thunk) {
+                            let thunk = thunk.clone();
+                            let input_name = format!("{}", &from.name());
+                            let input = self
+                                .values
+                                .get_at(reference)
+                                .and_then(|(v, _)| Some(v.clone()));
+
+                            if let Some(input) = input {
+                                if let Some(update) = self.find_node_mut(t) {
+                                    update.update(thunk, input_name, input)
+                                }
+                            } else {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                (input, Value::Symbol(symbol)) => {
+                    if symbol.starts_with("thunk::") {
+                        let thunk = symbol[7..].to_string();
+                        if let Some(thunk) = self.thunk_index.get(&thunk) {
+                            let thunk = thunk.clone();
+                            let input_name = format!("{}", &from.name());
+                            let input = input.clone();
 
                             if let Some(update) = self.find_node_mut(t) {
-                                update.thunk = Some(thunk);
-
-                                if let None = update.values {
-                                    update.values = Some(BTreeMap::new());
-                                }
-                                
-                                if let Some(values) = update.values.as_mut() {
-                                    values.insert(input_name, input);
-                                }
+                                update.update(thunk, input_name, input)
                             }
                         }
                     }

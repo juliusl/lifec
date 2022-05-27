@@ -1,16 +1,19 @@
 use atlier::system::{App, Attribute, Extension, Value};
+use imgui::MenuItem;
 use specs::{
     storage::HashMapStorage, Component, Entities, Join, ReadStorage, RunNow, System, WorldExt,
     WriteStorage,
 };
 use std::collections::BTreeMap;
 
+use crate::editor::unique_title;
+
 use super::{node_editor_graph::NodeEditorGraph, SectionAttributes};
 
 pub struct NodeEditor {
     pub imnodes: imnodes::Context,
     pub editors: BTreeMap<u32, NodeEditorGraph>,
-    thunks: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>
+    thunks: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>,
 }
 
 /// Stores a graph representation of attributes
@@ -135,7 +138,94 @@ impl App for NodeEditor {
             if !editor.is_empty() {
                 Window::new(format!("Node editor {}", id))
                     .size([1500.0, 600.0], Condition::Appearing)
+                    .menu_bar(true)
                     .build(ui, || {
+                        ui.menu_bar(|| {
+                            ui.menu("File", ||{
+                                
+                            });
+
+                            ui.menu("Edit", || {
+                                ui.menu("Attributes", ||{
+                                    if MenuItem::new("Add text attribute").build(ui) {
+                                        editor.add_node(&mut Attribute::new(
+                                            0,
+                                            unique_title("node::text"),
+                                            Value::TextBuffer(String::default()),
+                                        ));
+                                    }
+
+                                    if MenuItem::new("Add float attribute").build(ui) {
+                                        editor.add_node(&mut Attribute::new(
+                                            0,
+                                            unique_title("node::float"),
+                                            Value::Float(0.0),
+                                        ));
+                                    }
+
+                                    if MenuItem::new("Add int attribute").build(ui) {
+                                        editor.add_node(&mut Attribute::new(
+                                            0,
+                                            unique_title("node::int"),
+                                            Value::Int(0),
+                                        ));
+                                    }
+
+                                    if MenuItem::new("Add bool attribute").build(ui) {
+                                        editor.add_node(&mut Attribute::new(
+                                            0,
+                                            unique_title("node::bool"),
+                                            Value::Bool(false),
+                                        ));
+                                    }
+                                });
+                                ui.menu("Thunks", || {
+                                    let index = editor.thunk_index();
+
+                                    for (key, _) in index.clone() {
+                                        if MenuItem::new(format!("Add {}", key)).build(ui) {
+                                            editor.add_node(&mut Attribute::new(
+                                                0,
+                                                unique_title("node::"),
+                                                Value::Symbol(format!("thunk::{}", key.to_string())),
+                                            ));
+                                        }
+                                    }
+                                });
+
+                                if MenuItem::new("Add empty reference").build(ui) {
+                                    editor.add_node(&mut Attribute::new(
+                                        0,
+                                        unique_title("node::reference"),
+                                        Value::Empty,
+                                    ));
+                                }
+                            });
+
+                            ui.menu("Tools", || {
+                                if MenuItem::new("Arrange graph").build(ui) {
+                                    editor.rearrange();
+                                }
+
+                                if MenuItem::new("Arrange nodes vertically").build(ui) {
+                                    editor.arrange_vertical();
+                                }
+
+                                ui.separator();
+                                if MenuItem::new("Refresh values")
+                                    .enabled(editor.is_debugging_enabled())
+                                    .build(ui)
+                                {
+                                    editor.refresh_values();
+                                }
+                            });
+
+                            ui.menu("Options", || {
+                                editor.show_enable_debug_option(ui);
+                                editor.show_enable_edit_attributes_option(ui);
+                            });
+                        });
+
                         editor.show_editor(ui);
                     });
             }
