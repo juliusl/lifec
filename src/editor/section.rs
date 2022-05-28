@@ -223,14 +223,19 @@ impl<S: RuntimeState> Section<S> {
 
     /// try to load a file into an attribute
     pub fn with_file(&mut self, file_name: impl AsRef<Path> + AsRef<str> + Display) -> Self {
-        match fs::read_to_string(&file_name) {
+        self.with_file_src(&file_name, &file_name)
+    }
+
+    /// try to load a file into an attribute
+    pub fn with_file_src(&mut self, file_name: impl AsRef<str>, src: impl AsRef<Path> + AsRef<str> + Display)-> Self {
+        match fs::read_to_string(&src) {
             Ok(contents) => self.update(move |next| {
-                next.add_binary_attr(format!("file::{}", file_name), contents.as_bytes().to_vec())
+                next.add_binary_attr(format!("file::{}", file_name.as_ref()), contents.as_bytes().to_vec())
             }),
             Err(err) => {
                 eprintln!(
                     "Could not load file '{}', for with_file on section '{}', entity {}. Error: {}",
-                    &file_name, self.title, self.id, err
+                    &src, self.title, self.id, err
                 );
                 self.update(|_| {})
             }
