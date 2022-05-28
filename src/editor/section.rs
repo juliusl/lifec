@@ -150,6 +150,12 @@ impl<S: RuntimeState> Section<S> {
         attr_name: impl AsRef<str>,
         ui: &imgui::Ui,
     ) {
+        if let Some(Value::Float(width)) = self.get_attr_value("edit_width::") {
+            ui.set_next_item_width(*width);
+        } else {
+            ui.set_next_item_width(130.0);
+        }
+
         let label = format!("{} {}", label, self.id);
         match self.get_attr_value_mut(attr_name) {
             Some(Value::TextBuffer(val)) => {
@@ -183,7 +189,7 @@ impl<S: RuntimeState> Section<S> {
                 imgui::Slider::new(label, *f_min, *f_max).build(ui, f);
             }
             None => {}
-            _ => todo!(),
+            _ => {},
         }
     }
 

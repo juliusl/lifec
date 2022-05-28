@@ -7,6 +7,8 @@ use imnodes::{
 use knot::store::{Store, Visitor};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use crate::plugins::ThunkContext;
+
 #[derive(Clone)]
 pub struct NodeComponent {
     title: String,
@@ -56,9 +58,10 @@ pub struct NodeEditorGraph {
     link_index: HashMap<LinkId, Link>,
     values: Store<Value>,
     editing: Option<bool>,
-    debugging: Option<bool>,
-    filtering: Option<String>,
+    editing_graph_resources: Option<bool>,
+    filtering_attributes: Option<String>,
     filtering_nodes: Option<String>,
+    pause_updating_graph: bool,
     thunk_index: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>,
 }
 
@@ -69,7 +72,7 @@ impl App for NodeEditorGraph {
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
         if let Some(context) = self.editor_context.as_mut() {
-            if let Some(debugging) = self.debugging.as_ref() {
+            if let Some(debugging) = self.editing_graph_resources.as_ref() {
                 if *debugging {
                     ChildWindow::new("Debugger")
                         .size([500.0, 0.0])
@@ -77,9 +80,62 @@ impl App for NodeEditorGraph {
                             // if let Some(filtering_nodes) = self.filtering_nodes.as_mut() {
                             //     ui.input_text("Filter nodes", filtering_nodes).build();
                             // }
+                            if ui.collapsing_header("Active thunks", TreeNodeFlags::empty()) {
+                                ui.checkbox("Pause graph updates", &mut self.pause_updating_graph);
+                                if ui.is_item_hovered() {
+                                    ui.tooltip_text("Pausing graph updates allows you to edit the thunk state. Useful for testing thunks w/o modifying existing values directly.");
+                                }
 
-                            if CollapsingHeader::new("Edit attributes").begin(ui) {
-                                if let Some(filter) = self.filtering.as_mut() {
+                                ui.new_line();
+                                ui.indent();
+                                self.nodes
+                                    .iter_mut()
+                                    .filter(|n| n.values.is_some() && n.thunk.is_some())
+                                    .for_each(|n| {
+                                        let values = n
+                                            .values
+                                            .as_mut()
+                                            .expect("filtered only values with some");
+                                        if let Value::Symbol(symbol) = n.attribute.value() {
+                                            let mut thunk_context =
+                                                ThunkContext::new(&n.title, symbol, values.clone());
+
+                                            if !self.pause_updating_graph {
+                                                thunk_context.values_mut().insert(
+                                                    "opened::".to_string(),
+                                                    Value::Bool(true),
+                                                );
+                                            } else {
+                                                thunk_context.values_mut().remove("opened::");
+                                            }
+
+                                            ui.disabled(!self.pause_updating_graph, || {
+                                                thunk_context.show_editor(ui);
+                                            });
+
+                                            if ui.button(format!("Call [{}]", symbol)) {
+                                                let thunk = n
+                                                    .thunk
+                                                    .clone()
+                                                    .expect("filtered only thunks with some");
+
+                                                thunk(thunk_context.values_mut());
+                                            }
+
+                                            ui.same_line();
+                                            if ui.button(format!("Move to [{}]", symbol)) {
+                                                n.node_id.move_editor_to();
+                                            }
+
+                                            *values = thunk_context.values_mut().clone();
+                                            ui.new_line();
+                                        }
+                                    });
+                                ui.unindent();
+                            }
+
+                            if CollapsingHeader::new("Active attributes").begin(ui) {
+                                if let Some(filter) = self.filtering_attributes.as_mut() {
                                     ui.input_text("Filter attributes", filter).build();
                                     ui.new_line();
                                 }
@@ -87,7 +143,7 @@ impl App for NodeEditorGraph {
                                 self.nodes
                                     .iter_mut()
                                     .filter(|n| {
-                                        if let Some(filter) = &self.filtering {
+                                        if let Some(filter) = &self.filtering_attributes {
                                             format!("{}", n.attribute).contains(filter)
                                         } else {
                                             false
@@ -95,7 +151,11 @@ impl App for NodeEditorGraph {
                                     })
                                     .for_each(|n| {
                                         ui.set_next_item_width(200.0);
-                                        ui.input_text(format!("title {:?}", &n.node_id), &mut n.title).build();
+                                        ui.input_text(
+                                            format!("title {:?}", &n.node_id),
+                                            &mut n.title,
+                                        )
+                                        .build();
 
                                         n.attribute.edit(ui);
                                         if let Some(values) = &n.values {
@@ -296,11 +356,7 @@ impl App for NodeEditorGraph {
                 });
 
                 if let Some(link) = outer_scope.links_created() {
-                    if let Some(idgen) = self.idgen.as_mut() {
-                        if self.links.insert(link) {
-                            self.link_index.insert(idgen.next_link(), link);
-                        }
-                    }
+                    self.add_link(link);
                 }
 
                 if let Some(dropped) = outer_scope.get_dropped_link() {
@@ -356,10 +412,11 @@ impl NodeEditorGraph {
             links: HashSet::new(),
             link_index: HashMap::new(),
             values: Store::default(),
-            debugging: Some(false),
+            editing_graph_resources: Some(false),
             editing: Some(false),
-            filtering: Some(String::default()),
+            filtering_attributes: Some(String::default()),
             filtering_nodes: Some(String::default()),
+            pause_updating_graph: false,
             thunk_index: BTreeMap::new(),
         }
     }
@@ -390,6 +447,14 @@ impl NodeEditorGraph {
         }
     }
 
+    pub fn add_link(&mut self, link: Link) {
+        if let Some(idgen) = self.idgen.as_mut() {
+            if self.links.insert(link) {
+                self.link_index.insert(idgen.next_link(), link);
+            }
+        }
+    }
+
     /// returns true if nodes are empty
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
@@ -407,6 +472,10 @@ impl NodeEditorGraph {
 
     /// update resolves reference values
     pub fn update(&mut self) {
+        if self.pause_updating_graph {
+            return;
+        }
+
         let mut store = Store::<NodeId>::default();
 
         for _ in 0..self.links.len() {
@@ -431,9 +500,9 @@ impl NodeEditorGraph {
         &mut self.thunk_index
     }
 
-    pub fn show_enable_debug_option(&mut self, ui: &imgui::Ui) {
-        if let Some(debugging) = self.debugging.as_mut() {
-            ui.checkbox("Enable debug mode", debugging);
+    pub fn show_enable_graph_resource_view(&mut self, ui: &imgui::Ui) {
+        if let Some(debugging) = self.editing_graph_resources.as_mut() {
+            ui.checkbox("Graph Resources", debugging);
         }
     }
 
@@ -461,7 +530,7 @@ impl NodeEditorGraph {
     }
 
     pub fn is_debugging_enabled(&mut self) -> bool {
-        self.debugging.unwrap_or(false)
+        self.editing_graph_resources.unwrap_or(false)
     }
 
     /// rearrange a set of linked nodes

@@ -6,7 +6,7 @@ use specs::{
 };
 use std::collections::BTreeMap;
 
-use crate::editor::unique_title;
+use crate::{editor::unique_title, RuntimeState};
 
 use super::{node_editor_graph::NodeEditorGraph, SectionAttributes};
 
@@ -141,8 +141,12 @@ impl App for NodeEditor {
                     .menu_bar(true)
                     .build(ui, || {
                         ui.menu_bar(|| {
-                            ui.menu("File", ||{
+                            // ui.menu("File", ||{
 
+                            // });
+
+                            ui.menu("View", ||{
+                                editor.show_enable_graph_resource_view(ui);
                             });
 
                             ui.menu("Edit", || {
@@ -191,7 +195,7 @@ impl App for NodeEditor {
                                     let index = editor.thunk_index();
 
                                     for (key, _) in index.clone() {
-                                        if MenuItem::new(format!("Add {}", key)).build(ui) {
+                                        if MenuItem::new(format!("Add {} thunk", key)).build(ui) {
                                             editor.add_node(&mut Attribute::new(
                                                 0,
                                                 unique_title("node::"),
@@ -232,7 +236,6 @@ impl App for NodeEditor {
                             });
 
                             ui.menu("Options", || {
-                                editor.show_enable_debug_option(ui);
                                 editor.show_enable_edit_attributes_option(ui);
                             });
                         });
