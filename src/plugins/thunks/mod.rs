@@ -7,6 +7,21 @@ use crate::{
     RuntimeState,
 };
 
+/// This trait is to organize different types of thunks
+pub trait Thunk {
+    fn symbol() -> &'static str; 
+
+    fn call_with_context(context: &mut ThunkContext);
+
+    fn call(values: &mut BTreeMap<String, Value>) {
+        let mut context = ThunkContext::new("", Self::symbol(), values.clone());
+
+        Self::call_with_context(&mut context);
+        
+        *values = context.values_mut().clone();
+    }
+}
+
 /// Thunk Context exists so that the contracts used in implementation
 /// can depend on built in collection types, such as BTreeMap/Vec, etc
 /// and Thunk Context can encapsulate methods to work with these collections
@@ -28,6 +43,13 @@ impl ThunkContext {
     pub fn values_mut(&mut self) -> &mut BTreeMap<String, Value> {
        &mut self.values
     }
+
+    pub fn set_output(&mut self, output: Value) {
+        let symbol = self.symbol.clone();
+        let values = self.values_mut();
+        
+        values.insert(format!("thunk::{}::output::", symbol), output);
+    }
 }
 
 impl Display for ThunkContext {
@@ -44,12 +66,10 @@ impl RuntimeState for ThunkContext {
     fn from_attributes(attributes: Vec<Attribute>) -> Self {
         let mut context = ThunkContext::default();
 
-        if let Some(Value::Symbol(symbol)) =
-            SectionAttributes::from(attributes.clone()).get_attr_value("symbol::")
-        {
+        if let Some(Value::Symbol(symbol)) = SectionAttributes::from(attributes.clone()).get_attr_value("symbol::") {
             context.symbol = symbol.to_string();
         } else {
-            context.symbol = unique_title("thunk::anonymous");
+            context.symbol = unique_title("anonymous");
         }
 
         attributes.iter().cloned().for_each(|a| {
@@ -65,7 +85,7 @@ impl RuntimeState for ThunkContext {
         let mut attributes = SectionAttributes::default();
 
         self.values.iter().clone().for_each(|(n, v)| {
-            attributes.add_attribute(Attribute::new(0, n, v.clone()));
+            attributes.add_attribute(Attribute::new(0, n.strip_prefix("node::").unwrap_or(n), v.clone()));
         });
 
         attributes

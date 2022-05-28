@@ -23,6 +23,9 @@ fn main() {
     let mut runtime = runtime.ensure_call("print_results", None, None);
 
     let mut node_editor = NodeEditor::new();
+
+    node_editor.with_thunk::<Process>();
+
     node_editor.add_thunk("println", |v| {
         let echo = format!("{:?}", v);
 
@@ -77,6 +80,7 @@ fn main() {
         .with_empty("node::other name")
         .with_text("node::cool name", "julius")
         .with_text("node::other cool name", "liu")
+        .with_text("node::command", "")
         .enable_app_systems()],
         |w| {
             EventEditor::configure_app_world(w);

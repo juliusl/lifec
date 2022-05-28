@@ -14,6 +14,7 @@ use std::{
 use crate::editor::SectionAttributes;
 use crate::parse_variables;
 use crate::{RuntimeState, editor::{Section, SectionExtension}, WithArgs, parse_flags};
+use super::thunks::Thunk;
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
 #[storage(HashMapStorage)]
@@ -30,6 +31,25 @@ pub struct Process {
     pub timestamp_local: Option<String>,
     #[serde(skip)]
     start_time: Option<DateTime<Utc>>,
+}
+
+impl Thunk for Process {
+    fn symbol() -> &'static str {
+        "process"
+    }
+
+    fn call_with_context(context: &mut super::ThunkContext) {
+        let process = Self::from_attributes(context.into_attributes());
+
+        match process.process(&process.command) {
+            Ok(output) => {
+                context.set_output(Value::BinaryVector(output.stdout));
+            },
+            Err(e) => {
+                context.values_mut().insert("error".to_string(), Value::TextBuffer(format!("Error: {:?}", e)));
+            },
+        }
+    }
 }
 
 impl SectionExtension<Process> for Process
@@ -230,6 +250,7 @@ impl App for Process {
     }
 }
 
+#[derive(Debug)]
 pub struct ProcessExecutionError {}
 
 impl RuntimeState for Process {

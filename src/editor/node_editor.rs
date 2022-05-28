@@ -6,7 +6,7 @@ use specs::{
 };
 use std::collections::BTreeMap;
 
-use crate::{editor::unique_title};
+use crate::{editor::unique_title, plugins::Thunk};
 
 use super::{node_editor_graph::NodeEditorGraph, SectionAttributes};
 
@@ -32,6 +32,13 @@ impl NodeEditor {
 }
 
 impl NodeEditor {
+    pub fn with_thunk<T>(&mut self) 
+    where
+        T: Thunk
+    {
+        self.add_thunk(T::symbol(), T::call); 
+    }
+
     pub fn add_thunk(&mut self, name: impl AsRef<str>, thunk: fn(&mut BTreeMap<String, Value>)) {
         self.thunks.insert(name.as_ref().to_string(), thunk);
     }

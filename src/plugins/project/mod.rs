@@ -36,7 +36,10 @@ impl<'a> System<'a> for ProjectDispatcher {
         WriteStorage<'a, Document>,
     );
 
-    fn run(&mut self, (entities, mut dispatcher, mut loader, mut event_graphs, mut documents): Self::SystemData) {
+    fn run(
+        &mut self,
+        (entities, mut dispatcher, mut loader, mut event_graphs, mut documents): Self::SystemData,
+    ) {
         match dispatcher.deref() {
             Dispatch::Empty => {}
             Dispatch::Load(project) => {
@@ -65,10 +68,10 @@ impl<'a> System<'a> for ProjectDispatcher {
                 match documents.insert(ent, doc.clone()) {
                     Ok(_) => {
                         println!("Project inserted document {:?}", ent);
-                    },
+                    }
                     Err(_) => {
                         eprintln!("Error loading document {:?}", ent);
-                    },
+                    }
                 }
             }
 
@@ -114,10 +117,8 @@ impl<'a> System<'a> for Project {
             match a.is_attr_checkbox("enable project") {
                 Some(true) => {
                     if let None = write_documents.get(e) {
-                        match write_documents.insert(
-                            e,
-                            Document::new(e.id(), a.clone(), g.clone()),
-                        ) {
+                        match write_documents.insert(e, Document::new(e.id(), a.clone(), g.clone()))
+                        {
                             Ok(_) => {
                                 if let None = self.documents.get(&e.id()) {
                                     self.documents.insert(
@@ -136,7 +137,7 @@ impl<'a> System<'a> for Project {
 
                         if let Some(doc) = write_documents.get_mut(e) {
                             doc.attributes = a.clone();
-                            doc.events = g.clone();   
+                            doc.events = g.clone();
                         }
                     }
                 }
@@ -291,12 +292,17 @@ impl RuntimeState for Project {
                 events.iter_mut().for_each(|a| {
                     a.set_id(*e);
                 });
-    
+
                 attrs.append(&mut events);
-    
-                doc.attributes.get_attrs().iter().cloned().filter(|a| a.id() == *e).for_each(|a| {
-                    attrs.push(a.clone());
-                });
+
+                doc.attributes
+                    .get_attrs()
+                    .iter()
+                    .cloned()
+                    .filter(|a| a.id() == *e)
+                    .for_each(|a| {
+                        attrs.push(a.clone());
+                    });
             }
         }
 
@@ -340,16 +346,35 @@ pub struct Document {
 
 impl Document {
     pub fn new(id: u32, attributes: SectionAttributes, events: EventGraph) -> Self {
-        let sanitized: Vec<Attribute> = attributes.get_attrs().iter().cloned().filter(|a| a.id() == id).map(|a| a.to_owned()).collect();
+        let sanitized: Vec<Attribute> = attributes
+            .get_attrs()
+            .iter()
+            .cloned()
+            .filter(|a| a.id() == id)
+            .map(|a| a.to_owned())
+            .collect();
 
-        Self { attributes: SectionAttributes::from(sanitized), events }
+        Self {
+            attributes: SectionAttributes::from(sanitized),
+            events,
+        }
     }
 
     /// ensure all attributes are from the same parent id
     fn sanitize(&self, id: u32) -> Self {
-        let sanitized: Vec<Attribute> = self.attributes.get_attrs().iter().cloned().filter(|a| a.id() == id).map(|a| a.to_owned()).collect();
+        let sanitized: Vec<Attribute> = self
+            .attributes
+            .get_attrs()
+            .iter()
+            .cloned()
+            .filter(|a| a.id() == id)
+            .map(|a| a.to_owned())
+            .collect();
 
-        Self { attributes: SectionAttributes::from(sanitized), events: self.events.clone() }
+        Self {
+            attributes: SectionAttributes::from(sanitized),
+            events: self.events.clone(),
+        }
     }
 }
 

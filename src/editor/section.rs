@@ -157,7 +157,8 @@ impl<S: RuntimeState> Section<S> {
         }
 
         let label = format!("{} {}", label, self.id);
-        match self.get_attr_value_mut(attr_name) {
+        let attr_name = attr_name.as_ref().to_string();
+        match self.get_attr_value_mut(&attr_name) {
             Some(Value::TextBuffer(val)) => {
                 ui.input_text(label, val).build();
             }
@@ -189,7 +190,14 @@ impl<S: RuntimeState> Section<S> {
                 imgui::Slider::new(label, *f_min, *f_max).build(ui, f);
             }
             None => {}
-            _ => {},
+            _ => {
+                match self.get_attr_mut(&attr_name) {
+                    Some(attr) => {
+                        attr.show_editor(ui);
+                    },
+                    None => {},
+                }
+            },
         }
     }
 

@@ -7,3 +7,4 @@ pub use project::Project;
 mod thunks;
 pub use thunks::ThunkContext;
 pub use thunks::ThunkError;
+pub use thunks::Thunk;
