@@ -40,6 +40,10 @@ impl ThunkContext {
         Self { node_title, symbol, values }
     }
 
+    pub fn get_value(&self, key: impl AsRef<str>) -> Option<Value> {
+        self.values.get(key.as_ref()).and_then(|v| Some(v.clone()))
+    }
+
     pub fn values_mut(&mut self) -> &mut BTreeMap<String, Value> {
        &mut self.values
     }
