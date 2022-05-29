@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, fmt::Display};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Display,
+};
 
 use atlier::system::{App, Attribute, Value};
 
@@ -9,15 +12,16 @@ use crate::{
 
 /// This trait is to organize different types of thunks
 pub trait Thunk {
-    fn symbol() -> &'static str; 
+    fn symbol() -> &'static str;
 
     fn call_with_context(context: &mut ThunkContext);
 
     fn call(values: &mut BTreeMap<String, Value>) {
-        let mut context = ThunkContext::new("", Self::symbol(), values.clone());
+        let mut context =
+            ThunkContext::new("", format!("thunk::{}", Self::symbol()), values.clone());
 
         Self::call_with_context(&mut context);
-        
+
         *values = context.values_mut().clone();
     }
 }
@@ -34,10 +38,30 @@ pub struct ThunkContext {
 }
 
 impl ThunkContext {
-    pub fn new(node_title: impl AsRef<str>, symbol: impl AsRef<str>, values: BTreeMap<String, Value>) -> Self {
+    pub fn new(
+        node_title: impl AsRef<str>,
+        symbol: impl AsRef<str>,
+        values: BTreeMap<String, Value>,
+    ) -> Self {
         let node_title = node_title.as_ref().to_string();
         let symbol = symbol.as_ref().to_string();
-        Self { node_title, symbol, values }
+        Self {
+            node_title,
+            symbol,
+            values,
+        }
+    }
+
+    pub fn returns_key(&self) -> String {
+        let symbol = self.symbol.clone();
+
+        format!("{}::returns::", symbol)
+    }
+
+    pub fn outputs_key(&self, output_name: impl AsRef<str>) -> String {
+        let symbol = self.symbol.clone();
+
+        format!("{}::output::{}", symbol, output_name.as_ref())
     }
 
     pub fn get_value(&self, key: impl AsRef<str>) -> Option<Value> {
@@ -45,14 +69,37 @@ impl ThunkContext {
     }
 
     pub fn values_mut(&mut self) -> &mut BTreeMap<String, Value> {
-       &mut self.values
+        &mut self.values
     }
 
-    pub fn set_output(&mut self, output: Value) {
-        let symbol = self.symbol.clone();
+    pub fn set_returns(&mut self, returns: Value) {
+        let returns_key = &self.returns_key();
         let values = self.values_mut();
-        
-        values.insert(format!("thunk::{}::output::", symbol), output);
+
+        values.insert(returns_key.to_string(), returns.clone());
+    }
+
+    pub fn returns(&self) -> Option<&Value> {
+        let returns_key = &self.returns_key();
+
+        self.values.get(returns_key)
+    }
+
+    pub fn set_output(&mut self, output_key: impl AsRef<str>, output: Value) {
+        let output_key = self.outputs_key(output_key);
+        let values = self.values_mut();
+
+        values.insert(output_key, output);
+    }
+
+    pub fn get_outputs(&self) -> Vec<(&String, &Value)> {
+        let symbol = self.symbol.clone();
+        let prefix = format!("{}::output::", symbol);
+
+        self.values
+            .iter()
+            .filter(|(k, _)| k.starts_with(&prefix))
+            .collect()
     }
 }
 
@@ -70,7 +117,9 @@ impl RuntimeState for ThunkContext {
     fn from_attributes(attributes: Vec<Attribute>) -> Self {
         let mut context = ThunkContext::default();
 
-        if let Some(Value::Symbol(symbol)) = SectionAttributes::from(attributes.clone()).get_attr_value("symbol::") {
+        if let Some(Value::Symbol(symbol)) =
+            SectionAttributes::from(attributes.clone()).get_attr_value("symbol::")
+        {
             context.symbol = symbol.to_string();
         } else {
             context.symbol = unique_title("anonymous");
@@ -89,7 +138,11 @@ impl RuntimeState for ThunkContext {
         let mut attributes = SectionAttributes::default();
 
         self.values.iter().clone().for_each(|(n, v)| {
-            attributes.add_attribute(Attribute::new(0, n.strip_prefix("node::").unwrap_or(n), v.clone()));
+            attributes.add_attribute(Attribute::new(
+                0,
+                n.strip_prefix("node::").unwrap_or(n),
+                v.clone(),
+            ));
         });
 
         attributes
@@ -114,16 +167,28 @@ impl App for ThunkContext {
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
         let mut section = Section::<ThunkContext>::new(
-            format!("{} {}", self.symbol, self.node_title), 
+            format!("{} {}", self.symbol, self.node_title),
             |s, ui| {
-                s.state.into_attributes().iter().filter(|a| !a.name().starts_with("opened::")).for_each(|a| {
-                    s.edit_attr(format!("edit {}", a.name()), a.name(), ui);
-                });
+                let mut set = BTreeSet::new();
 
-                s.state = ThunkContext::from_attributes(s.attributes.iter().map(|(_, a)| a.clone()).collect());
-            }, 
-            self.clone());
-        
+                let mut attributes = s.state.into_attributes();
+                attributes.iter_mut()
+                    .filter(|a| {
+                        !a.name().starts_with("opened::") && !a.name().starts_with("symbol::")
+                    })
+                    .for_each(|a| {
+                        set.insert(a);
+                    });
+
+                for a in set {
+                    s.edit_attr(format!("{} [{}]", a.name(), s.title), a.name(), ui);
+                }
+
+                s.state = ThunkContext::from_attributes(attributes);
+            },
+            self.clone(),
+        );
+
         section.show_editor(ui);
 
         *self = section.state;

@@ -43,7 +43,9 @@ impl Thunk for Process {
 
         match process.process(&process.command) {
             Ok(output) => {
-                context.set_output(Value::BinaryVector(output.stdout));
+                context.set_output("stdout", Value::BinaryVector(output.stdout));
+                context.set_returns(Value::Bool(true));
+                context.values_mut().remove("error");
             },
             Err(e) => {
                 context.values_mut().insert("error".to_string(), Value::TextBuffer(format!("Error: {:?}", e)));

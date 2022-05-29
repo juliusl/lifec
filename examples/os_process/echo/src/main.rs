@@ -13,7 +13,7 @@ impl Thunk for Println {
             println!("{}: {}", name, value); 
         });
 
-        context.set_output(Value::Bool(true))
+        context.set_returns(Value::Bool(true))
     }
 }
 
@@ -26,7 +26,7 @@ impl Thunk for Broadcast {
 
     fn call_with_context(context: &mut lifec::plugins::ThunkContext) {
         if let Some(message) = context.get_value("message") {
-            context.set_output(message);
+            context.set_returns(message);
         }
     }
 }
@@ -70,7 +70,7 @@ fn main() {
         )
         .with_text("command", "")
         .with_bool("enable node editor", true)
-        .with_text("node::command", "")
+        .with_text("node::command", "cargo")
         .with_text("node::message", "")
         .enable_app_systems()],
         |w| {

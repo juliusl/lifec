@@ -76,6 +76,7 @@ impl App for NodeEditorGraph {
                 if *debugging {
                     ChildWindow::new("Debugger")
                         .size([500.0, 0.0])
+                        .always_auto_resize(true)
                         .build(ui, || {
                             // if let Some(filtering_nodes) = self.filtering_nodes.as_mut() {
                             //     ui.input_text("Filter nodes", filtering_nodes).build();
@@ -105,8 +106,6 @@ impl App for NodeEditorGraph {
                                                     "opened::".to_string(),
                                                     Value::Bool(true),
                                                 );
-                                            } else {
-                                                thunk_context.values_mut().remove("opened::");
                                             }
 
                                             ui.disabled(!self.pause_updating_graph, || {
@@ -127,7 +126,12 @@ impl App for NodeEditorGraph {
                                                 n.node_id.move_editor_to();
                                             }
 
-                                            *values = thunk_context.values_mut().clone();
+                                            if ui.button(format!("Refresh values [{}]", symbol)) {
+                                                values.clear();
+                                            } else {
+                                                *values = thunk_context.values_mut().clone();
+                                            }
+
                                             ui.new_line();
                                         }
                                     });
@@ -217,6 +221,7 @@ impl App for NodeEditorGraph {
                                 values,
                             } = node_component;
 
+                            let title = title.as_str();
                             ui.set_next_item_width(130.0);
                             editor_scope.add_node(*node_id, |mut node_scope| {
                                 ui.set_next_item_width(130.0);
@@ -225,21 +230,20 @@ impl App for NodeEditorGraph {
                                 });
 
                                 if let atlier::system::Value::Reference(r) =
-                                    attribute.clone().value()
-                                {
-                                    match self.values.get_at(r) {
-                                        None => {
-                                            let resetting = attribute.get_value_mut();
-                                            *resetting = Value::Empty;
-                                        }
-                                        _ => {}
+                                attribute.clone().value()
+                            {
+                                match self.values.get_at(r) {
+                                    None => {
+                                        let resetting = attribute.get_value_mut();
+                                        *resetting = Value::Empty;
                                     }
+                                    _ => {}
                                 }
-
+                            }
+                            
                                 match attribute.value() {
                                     // Empty means this attribute needs a value
                                     atlier::system::Value::Symbol(symbol) => {
-                                        let output_key = format!("{}::output::", symbol);
                                         node_scope.add_input(
                                             *input_id,
                                             imnodes::PinShape::Triangle,
@@ -254,20 +258,39 @@ impl App for NodeEditorGraph {
                                                 let thunk_name = symbol[7..].to_string();
                                                 if ui.button(format!("{}", thunk_name)) {
                                                     thunk(values);
-
-                                                    if let Some(output) = values.get(&output_key) {
-                                                        self.values =
-                                                            self.values.node(output.clone());
-                                                    }
                                                 }
                                             });
+                                            let context = ThunkContext::new(
+                                                title,
+                                                symbol,
+                                                values.clone(),
+                                            );
+
+                                            let mut current_outputs = vec![];
+                                            context.get_outputs().iter().cloned().for_each(
+                                                |(k, o)| {
+                                                    current_outputs.push(k.to_string());
+                                                    self.values =
+                                                        self.values.node(o.clone());
+                                                },
+                                            );
+
+                                            if let Some(returns) = context.returns() {
+                                                current_outputs.push(context.returns_key());
+
+                                                self.values =
+                                                    self.values.node(returns.clone());
+                                            }
 
                                             node_scope.add_output(
                                                 *output_id,
                                                 imnodes::PinShape::TriangleFilled,
                                                 || {
                                                     ui.set_next_item_width(130.0);
-                                                    ui.text(output_key);
+
+                                                    current_outputs.iter().for_each(|o| {
+                                                        ui.text(o);
+                                                    });
                                                 },
                                             );
                                         }
@@ -632,9 +655,9 @@ impl Visitor<NodeId> for NodeEditorGraph {
                 }
                 (Value::Symbol(symbol), Value::Empty) => {
                     if let Some(values) = &from_node.values {
-                        let output_key = format!("{}::output::", symbol);
+                        let context = ThunkContext::new(&from_node.title, symbol, values.clone());
 
-                        if let Some(output) = values.get(&output_key) {
+                        if let Some(output) = context.returns() {
                             let reference = output.to_ref();
                             if let Some(update) = self.find_node_mut(t) {
                                 let updating = update.attribute.get_value_mut();
@@ -650,21 +673,30 @@ impl Visitor<NodeId> for NodeEditorGraph {
                         *updating = reference;
                     }
                 }
+                // symbol -> symbol, can share outputs
                 (Value::Symbol(other), Value::Symbol(symbol)) => {
                     if symbol.starts_with("thunk::") {
                         let thunk = symbol[7..].to_string();
                         if let Some(thunk) = self.thunk_index.get(&thunk) {
                             let thunk = thunk.clone();
-                            let input_name = format!("{}", &from.name());
                             let input = from_node.clone().clone();
-                            let input = input
-                                .values
-                                .as_ref()
-                                .and_then(|a| a.get(&format!("{}::output::", other)));
 
-                            if let Some(input) = input.clone() {
+                            if let Some(values) = input.values {
+                                let thunk_context = ThunkContext::new(input.title, other, values);
+                                let inputs = thunk_context.get_outputs();
+
                                 if let Some(update) = self.find_node_mut(t) {
-                                    update.update(thunk, input_name, input.to_owned())
+                                    for (input_name, input) in inputs {
+                                        update.update(thunk, input_name, input.to_owned())
+                                    }
+
+                                    if let Some(returns) = thunk_context.returns() {
+                                        update.update(
+                                            thunk,
+                                            thunk_context.returns_key(),
+                                            returns.clone(),
+                                        );
+                                    }
                                 }
                             } else {
                                 return false;
