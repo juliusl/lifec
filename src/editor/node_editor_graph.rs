@@ -61,6 +61,7 @@ pub struct NodeEditorGraph {
     editing_graph_resources: Option<bool>,
     filtering_attributes: Option<String>,
     filtering_nodes: Option<String>,
+    show_runtime_editor: bool,
     pause_updating_graph: bool,
     thunk_index: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>,
 }
@@ -440,6 +441,7 @@ impl NodeEditorGraph {
             filtering_attributes: Some(String::default()),
             filtering_nodes: Some(String::default()),
             pause_updating_graph: false,
+            show_runtime_editor: false,
             thunk_index: BTreeMap::new(),
         }
     }
@@ -523,10 +525,18 @@ impl NodeEditorGraph {
         &mut self.thunk_index
     }
 
+    pub fn is_runtime_editor_open(&self) -> bool {
+        self.show_runtime_editor
+    }
+
     pub fn show_enable_graph_resource_view(&mut self, ui: &imgui::Ui) {
         if let Some(debugging) = self.editing_graph_resources.as_mut() {
             ui.checkbox("Graph Resources", debugging);
         }
+    }
+
+    pub fn show_enable_runtime_editor_view(&mut self, ui: &imgui::Ui) {
+        ui.checkbox("Runtime Editor", &mut self.show_runtime_editor);
     }
 
     pub fn show_enable_edit_attributes_option(&mut self, ui: &imgui::Ui) {

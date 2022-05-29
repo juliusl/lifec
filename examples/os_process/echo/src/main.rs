@@ -1,36 +1,6 @@
 use lifec::plugins::{Process, Project, Thunk};
 use lifec::{editor::*, Runtime};
 
-struct Println;
-
-impl Thunk for Println {
-    fn symbol() -> &'static str {
-        "println"
-    }
-
-    fn call_with_context(context: &mut lifec::plugins::ThunkContext) {
-        context.values_mut().iter().for_each(|(name, value)| {
-            println!("{}: {}", name, value); 
-        });
-
-        context.set_returns(Value::Bool(true))
-    }
-}
-
-struct Broadcast;
-
-impl Thunk for Broadcast {
-    fn symbol() -> &'static str {
-        "broadcast"
-    }
-
-    fn call_with_context(context: &mut lifec::plugins::ThunkContext) {
-        if let Some(message) = context.get_value("message") {
-            context.set_returns(message);
-        }
-    }
-}
-
 fn main() {
     let mut runtime = Runtime::<Process>::default().with_call("print_results", |s, _| {
         let output = String::from_utf8(s.stdout.clone()).ok();
@@ -52,7 +22,7 @@ fn main() {
 
     let mut runtime = runtime.ensure_call("print_results", None, None);
 
-    let mut node_editor = NodeEditor::new();
+    let mut node_editor = NodeEditor::<Process>::new();
     node_editor.with_thunk::<Process>();
     node_editor.with_thunk::<Println>();
     node_editor.with_thunk::<Broadcast>();
@@ -76,7 +46,7 @@ fn main() {
         |w| {
             EventEditor::configure_app_world(w);
             AttributeEditor::configure_app_world(w);
-            NodeEditor::configure_app_world(w);
+            NodeEditor::<Process>::configure_app_world(w);
         },
         |_| {},
         move |w, ui| {
@@ -132,4 +102,34 @@ fn main() {
             }
         },
     );
+}
+
+struct Println;
+
+impl Thunk for Println {
+    fn symbol() -> &'static str {
+        "println"
+    }
+
+    fn call_with_context(context: &mut lifec::plugins::ThunkContext) {
+        context.values_mut().iter().for_each(|(name, value)| {
+            println!("{}: {}", name, value); 
+        });
+
+        context.set_returns(Value::Bool(true))
+    }
+}
+
+struct Broadcast;
+
+impl Thunk for Broadcast {
+    fn symbol() -> &'static str {
+        "broadcast"
+    }
+
+    fn call_with_context(context: &mut lifec::plugins::ThunkContext) {
+        if let Some(message) = context.get_value("message") {
+            context.set_returns(message);
+        }
+    }
 }

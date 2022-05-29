@@ -503,9 +503,7 @@ where
                         section.clone().get_attr_value("title::")
                     {
                         let id = entity.id();
-                        let section = section
-                            .with_title(title.to_string())
-                            .with_parent_entity(id);
+                        let section = section.with_title(title.to_string()).with_parent_entity(id);
 
                         match sections.insert(entity, section.clone()) {
                             Ok(_) => {
@@ -605,97 +603,7 @@ where
                     .begin(ui)
                 {
                     ui.separator();
-                    match self.running {
-                        (Some(v), elapsed, stopped) => {
-                            if ui.button("Stop") {
-                                self.dispatch_remove = None;
-                                self.dispatch_snapshot = None;
-                                self.running = (None, None, None);
-                            }
-
-                            match (v, elapsed, stopped) {
-                                (true, Some(elapsed), None) => {
-                                    ui.same_line();
-                                    if ui.button("Pause") {
-                                        self.running =
-                                            (Some(false), Some(elapsed), Some(Instant::now()));
-                                    }
-
-                                    ui.text(format!("Running {:#?}", elapsed.elapsed()));
-
-                                    if self.runtime.can_continue() {
-                                        self.runtime = self.runtime.step();
-                                    } else {
-                                        self.running = (None, Some(elapsed), Some(Instant::now()));
-                                    }
-                                }
-                                (false, Some(elapsed), Some(stopped)) => {
-                                    ui.same_line();
-                                    if ui.button("Continue") {
-                                        self.running = (Some(true), Some(elapsed), None);
-                                    }
-
-                                    ui.text(format!("Paused {:#?}", stopped.elapsed()));
-                                }
-                                _ => {}
-                            }
-                        }
-                        (None, Some(elapsed), Some(stopped)) => {
-                            if ui.button("Clear") {
-                                self.dispatch_remove = None;
-                                self.dispatch_snapshot = None;
-                                self.running = (None, None, None);
-                            }
-                            ui.text(format!("Ran for {:#?}", stopped - elapsed));
-                        }
-                        _ => {}
-                    };
-
-                    let context = self.runtime.context();
-                    ui.text(format!("Sections Loaded: {}", self.sections.len()));
-                    ui.label_text(format!("Current Event"), format!("{}", context));
-                    ui.disabled(self.running.0.is_some(), || {
-                        if ui.button("Setup") {
-                            self.runtime.parse_event("{ setup;; }");
-                        }
-                        ui.same_line();
-                        if ui.button("Start") {
-                            self.running = (Some(true), Some(Instant::now()), None);
-                        }
-
-                        ui.same_line();
-                        if ui.button("Step") {
-                            self.runtime = self.runtime.step();
-                        }
-
-                        ui.same_line();
-                        if ui.button("Clear Attributes") {
-                            self.runtime.attributes.clear();
-                        }
-                    });
-                    ui.new_line();
-                    ui.separator();
-                    if let Some(state) = self.runtime.current() {
-                        ui.input_text_multiline(
-                            format!("Current State"),
-                            &mut format!("{}", state),
-                            [0.0, 0.0],
-                        )
-                        .read_only(true)
-                        .build();
-                        ui.new_line();
-                    }
-
-                    if !self.runtime.attributes.is_empty() {
-                        if CollapsingHeader::new(format!("Runtime Attributes"))
-                            .leaf(true)
-                            .build(ui)
-                        {
-                            self.runtime.attributes.iter().for_each(|a| {
-                                ui.text(format!("{}", a));
-                            });
-                        }
-                    }
+                    self.show_current(ui);
                 }
 
                 ui.new_line();
@@ -716,7 +624,113 @@ impl<S> RuntimeEditor<S>
 where
     S: RuntimeState + Component,
 {
-    fn show_snapshots(&mut self, ui: &imgui::Ui) {
+    pub fn apply_section(section: Section<S>, mut runtime: Runtime<S>) -> Self {
+        // This will apply the sections current state and attributes to the current runtime
+        runtime.state = Some(S::from_attributes(section.into_attributes()));
+        section.attributes.values().for_each(|a| {
+            runtime.attribute(a.clone());
+        });
+        if let Some(Value::TextBuffer(event)) = section.get_attr_value("context::") {
+            runtime = runtime.parse_event(event);
+        }
+
+        RuntimeEditor::from(runtime)
+    }
+
+    pub fn show_current(&mut self, ui: &imgui::Ui) {
+        match self.running {
+            (Some(v), elapsed, stopped) => {
+                if ui.button("Stop") {
+                    self.dispatch_remove = None;
+                    self.dispatch_snapshot = None;
+                    self.running = (None, None, None);
+                }
+
+                match (v, elapsed, stopped) {
+                    (true, Some(elapsed), None) => {
+                        ui.same_line();
+                        if ui.button("Pause") {
+                            self.running = (Some(false), Some(elapsed), Some(Instant::now()));
+                        }
+
+                        ui.text(format!("Running {:#?}", elapsed.elapsed()));
+
+                        if self.runtime.can_continue() {
+                            self.runtime = self.runtime.step();
+                        } else {
+                            self.running = (None, Some(elapsed), Some(Instant::now()));
+                        }
+                    }
+                    (false, Some(elapsed), Some(stopped)) => {
+                        ui.same_line();
+                        if ui.button("Continue") {
+                            self.running = (Some(true), Some(elapsed), None);
+                        }
+
+                        ui.text(format!("Paused {:#?}", stopped.elapsed()));
+                    }
+                    _ => {}
+                }
+            }
+            (None, Some(elapsed), Some(stopped)) => {
+                if ui.button("Clear") {
+                    self.dispatch_remove = None;
+                    self.dispatch_snapshot = None;
+                    self.running = (None, None, None);
+                }
+                ui.text(format!("Ran for {:#?}", stopped - elapsed));
+            }
+            _ => {}
+        };
+
+        let context = self.runtime.context();
+        ui.label_text(format!("Current Event"), format!("{}", context));
+        ui.disabled(self.running.0.is_some(), || {
+            if ui.button("Setup") {
+                self.runtime.parse_event("{ setup;; }");
+            }
+            ui.same_line();
+            if ui.button("Start") {
+                self.running = (Some(true), Some(Instant::now()), None);
+            }
+
+            ui.same_line();
+            if ui.button("Step") {
+                self.runtime = self.runtime.step();
+            }
+
+            ui.same_line();
+            if ui.button("Clear Attributes") {
+                self.runtime.attributes.clear();
+            }
+        });
+        ui.new_line();
+        ui.separator();
+        if let Some(state) = self.runtime.current() {
+            ui.input_text_multiline(
+                format!("Current State"),
+                &mut format!("{}", state),
+                [0.0, 0.0],
+            )
+            .read_only(true)
+            .build();
+            ui.new_line();
+        }
+
+        if !self.runtime.attributes.is_empty() {
+            if CollapsingHeader::new(format!("Runtime Attributes"))
+                .leaf(true)
+                .build(ui)
+            {
+                self.runtime.attributes.iter().for_each(|a| {
+                    ui.text(format!("{}", a));
+                });
+            }
+        }
+    }
+
+    pub fn show_snapshots(&mut self, ui: &imgui::Ui) {
+        let current_runtime = self.runtime.clone();
         for (id, section) in self.sections.iter_mut() {
             ui.text(format!("{}: ", id));
             ui.same_line();
@@ -724,17 +738,8 @@ where
 
             section.show_editor(ui);
             if ui.button(format!("Apply {}", section.title)) {
-                // This will apply the sections current state and attributes to the current runtime
-                let mut clone = self.runtime.clone();
-                clone.state = Some(S::from_attributes(section.into_attributes()));
-                section.attributes.values().for_each(|a| {
-                    clone.attribute(a.clone());
-                });
-                if let Some(Value::TextBuffer(event)) = section.get_attr_value("context::") {
-                    clone = clone.parse_event(event);
-                }
-                let next = RuntimeEditor::from(clone);
-                self.runtime = next.runtime;
+                let applied = Self::apply_section(section.clone(), current_runtime);
+                self.runtime = applied.runtime.clone();
 
                 return;
             }

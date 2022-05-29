@@ -1,18 +1,23 @@
 use atlier::system::{App, Attribute, Extension, Value};
-use imgui::MenuItem;
+use imgui::{ChildWindow, MenuItem};
 use specs::{
-    storage::HashMapStorage, Component, Entities, Join, ReadStorage, RunNow, System, WorldExt,
-    WriteStorage,
+    storage::HashMapStorage, Component, Entities, Join, Read, ReadStorage, RunNow, System,
+    WorldExt, WriteStorage,
 };
 use std::collections::BTreeMap;
 
-use crate::{editor::unique_title, plugins::Thunk};
+use crate::{editor::unique_title, plugins::Thunk, Runtime, RuntimeState};
 
-use super::{node_editor_graph::NodeEditorGraph, SectionAttributes};
+use super::{node_editor_graph::NodeEditorGraph, RuntimeEditor, Section, SectionAttributes};
 
-pub struct NodeEditor {
+pub struct NodeEditor<S>
+where
+    S: RuntimeState + Component,
+{
     pub imnodes: imnodes::Context,
     pub editors: BTreeMap<u32, NodeEditorGraph>,
+    sections: BTreeMap<u32, Section<S>>,
+    runtime_editor: Option<RuntimeEditor<S>>,
     thunks: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>,
 }
 
@@ -21,22 +26,30 @@ pub struct NodeEditor {
 #[storage(HashMapStorage)]
 pub struct AttributeGraph(knot::store::Store<Attribute>);
 
-impl NodeEditor {
-    pub fn new() -> NodeEditor {
-        NodeEditor {
+impl<S> NodeEditor<S>
+where
+    S: RuntimeState + Component,
+{
+    pub fn new() -> Self {
+        Self {
             imnodes: imnodes::Context::new(),
             editors: BTreeMap::new(),
+            sections: BTreeMap::new(),
             thunks: BTreeMap::new(),
+            runtime_editor: None,
         }
     }
 }
 
-impl NodeEditor {
-    pub fn with_thunk<T>(&mut self) 
+impl<S> NodeEditor<S>
+where
+    S: RuntimeState + Component,
+{
+    pub fn with_thunk<T>(&mut self)
     where
-        T: Thunk
+        T: Thunk,
     {
-        self.add_thunk(T::symbol(), T::call); 
+        self.add_thunk(T::symbol(), T::call);
     }
 
     pub fn add_thunk(&mut self, name: impl AsRef<str>, thunk: fn(&mut BTreeMap<String, Value>)) {
@@ -44,7 +57,10 @@ impl NodeEditor {
     }
 }
 
-impl Extension for NodeEditor {
+impl<S> Extension for NodeEditor<S>
+where
+    S: RuntimeState + Component,
+{
     fn extend_app_world(&mut self, world: &specs::World, ui: &imgui::Ui) {
         self.run_now(world);
         self.show_editor(ui);
@@ -60,11 +76,16 @@ impl Extension for NodeEditor {
     }
 }
 
-impl<'a> System<'a> for NodeEditor {
+impl<'a, S> System<'a> for NodeEditor<S>
+where
+    S: RuntimeState + Component,
+{
     type SystemData = (
         Entities<'a>,
         ReadStorage<'a, SectionAttributes>,
+        ReadStorage<'a, Section<S>>,
         WriteStorage<'a, AttributeGraph>,
+        Read<'a, RuntimeEditor<S>>,
     );
     /// This system initializes a node editor when it detects
     /// the attribute "enable node editor" has been set to true
@@ -72,7 +93,14 @@ impl<'a> System<'a> for NodeEditor {
     /// and initialize the node_editor state
     /// When the attribute is set to false, this system will remove those resources from this
     /// system
-    fn run(&mut self, (entities, attributes, _attribute_graph): Self::SystemData) {
+    fn run(
+        &mut self,
+        (entities, attributes, sections, _attribute_graph, runtime): Self::SystemData,
+    ) {
+        if let None = self.runtime_editor {
+            self.runtime_editor = Some(runtime.clone());
+        }
+
         entities.join().for_each(|e| {
             if let Some(attributes) = attributes.get(e) {
                 match attributes.is_attr_checkbox("enable node editor") {
@@ -95,11 +123,16 @@ impl<'a> System<'a> for NodeEditor {
                             }
 
                             self.editors.insert(e.id(), editor);
+
+                            if let Some(section) = sections.get(e) {
+                                self.sections.insert(e.id(), section.clone());
+                            }
                         }
                         Some(editor) => editor.update(),
                     },
                     Some(false) => {
                         self.editors.remove(&e.id());
+                        self.sections.remove(&e.id());
                         // TODO: Save the attribute graph to storage
                         // match attributes.is_attr_checkbox("allow node editor to change state on close") {
                         //     Some(true) => {
@@ -132,7 +165,10 @@ impl<'a> System<'a> for NodeEditor {
     }
 }
 
-impl App for NodeEditor {
+impl<S> App for NodeEditor<S>
+where
+    S: RuntimeState + Component,
+{
     fn name() -> &'static str {
         "Node Editor"
     }
@@ -152,7 +188,8 @@ impl App for NodeEditor {
 
                             // });
 
-                            ui.menu("View", ||{
+                            ui.menu("View", || {
+                                editor.show_enable_runtime_editor_view(ui);
                                 editor.show_enable_graph_resource_view(ui);
                             });
 
@@ -165,7 +202,7 @@ impl App for NodeEditor {
                                 }
                                 ui.separator();
 
-                                ui.menu("Attributes", ||{
+                                ui.menu("Attributes", || {
                                     if MenuItem::new("Add text attribute").build(ui) {
                                         editor.add_node(&mut Attribute::new(
                                             0,
@@ -206,7 +243,10 @@ impl App for NodeEditor {
                                             editor.add_node(&mut Attribute::new(
                                                 0,
                                                 unique_title("node::"),
-                                                Value::Symbol(format!("thunk::{}", key.to_string())),
+                                                Value::Symbol(format!(
+                                                    "thunk::{}",
+                                                    key.to_string()
+                                                )),
                                             ));
                                         }
                                     }
@@ -222,18 +262,18 @@ impl App for NodeEditor {
                             });
 
                             ui.menu("Tools", || {
-                                ui.menu("Arrange", ||{
+                                ui.menu("Arrange", || {
                                     if MenuItem::new("Connected nodes").build(ui) {
                                         editor.rearrange();
                                     }
-    
+
                                     if MenuItem::new("All nodes vertically").build(ui) {
                                         editor.arrange_vertical();
                                     }
                                 });
-                           
+
                                 ui.separator();
-                                ui.menu("Move editor to", ||{
+                                ui.menu("Move editor to", || {
                                     for n in editor.nodes() {
                                         if MenuItem::new(n.title()).build(ui) {
                                             n.move_editor_to();
@@ -246,6 +286,25 @@ impl App for NodeEditor {
                                 editor.show_enable_edit_attributes_option(ui);
                             });
                         });
+
+                        if let (Some(_), Some(section)) =
+                            (self.runtime_editor.as_mut(), self.sections.get_mut(id))
+                        {
+                            if editor.is_runtime_editor_open() {
+                                ChildWindow::new("Runtime editor").size([500.0, 0.0]).build(
+                                    ui,
+                                    || {
+                                        section.show_editor(ui);
+
+                                        let mut overview = Runtime::<S>::default();
+                                        overview.state = Some(section.state.clone());
+
+                                        RuntimeEditor::from(overview).show_current(ui);
+                                    },
+                                );
+                                ui.same_line();
+                            }
+                        }
 
                         editor.show_editor(ui);
                     });
