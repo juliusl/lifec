@@ -5,9 +5,7 @@ use specs::{
     WorldExt, WriteStorage,
 };
 use std::collections::BTreeMap;
-
 use crate::{editor::unique_title, plugins::Thunk, Runtime, RuntimeState};
-
 use super::{node_editor_graph::NodeEditorGraph, RuntimeEditor, Section, SectionAttributes};
 
 pub struct NodeEditor<S>
@@ -209,6 +207,10 @@ where
                                             unique_title("node::text"),
                                             Value::TextBuffer(String::default()),
                                         ));
+
+                                        if let Some(n) = editor.nodes().iter_mut().last() {
+                                            n.move_node_to_grid_space_origin();
+                                         }
                                     }
 
                                     if MenuItem::new("Add float attribute").build(ui) {
@@ -217,6 +219,10 @@ where
                                             unique_title("node::float"),
                                             Value::Float(0.0),
                                         ));
+
+                                        if let Some(n) = editor.nodes().iter_mut().last() {
+                                            n.move_node_to_grid_space_origin();
+                                         }
                                     }
 
                                     if MenuItem::new("Add int attribute").build(ui) {
@@ -225,6 +231,10 @@ where
                                             unique_title("node::int"),
                                             Value::Int(0),
                                         ));
+
+                                        if let Some(n) = editor.nodes().iter_mut().last() {
+                                            n.move_node_to_grid_space_origin();
+                                         }
                                     }
 
                                     if MenuItem::new("Add bool attribute").build(ui) {
@@ -233,6 +243,10 @@ where
                                             unique_title("node::bool"),
                                             Value::Bool(false),
                                         ));
+
+                                        if let Some(n) = editor.nodes().iter_mut().last() {
+                                           n.move_node_to_grid_space_origin();
+                                        }
                                     }
                                 });
                                 ui.menu("Thunks", || {
@@ -248,6 +262,10 @@ where
                                                     key.to_string()
                                                 )),
                                             ));
+
+                                            if let Some(n) = editor.nodes().iter_mut().last() {
+                                                n.move_node_to_grid_space_origin();
+                                             }
                                         }
                                     }
                                 });
@@ -258,6 +276,10 @@ where
                                         unique_title("node::reference"),
                                         Value::Empty,
                                     ));
+
+                                    if let Some(n) = editor.nodes().iter_mut().last() {
+                                        n.move_node_to_grid_space_origin();
+                                     }
                                 }
                             });
 
@@ -284,6 +306,7 @@ where
 
                             ui.menu("Options", || {
                                 editor.show_enable_edit_attributes_option(ui);
+                                editor.show_preserve_thunk_reference_inputs(ui);
                             });
                         });
 
