@@ -3,6 +3,7 @@ pub use process::Process;
 
 mod project;
 pub use project::Project;
+pub use project::Document;
 
 mod thunks;
 pub use thunks::ThunkContext;

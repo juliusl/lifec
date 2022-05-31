@@ -140,6 +140,8 @@ impl Process {
     }
 
     fn edit(section: &mut Section<Process>, ui: &Ui) {
+        section.edit_attr("Enable node editor", "enable node editor", ui);
+
         // Show the default view for this editor
         Process::show_editor(&mut section.state, ui);
 

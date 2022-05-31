@@ -38,7 +38,6 @@ fn main() {
             <Process as SectionExtension<Process>>::show_extension,
             Process::default(),
         )
-        .with_text("command", "")
         .with_bool("enable node editor", true)
         .with_text("node::command", "cargo")
         .with_text("node::message", "")

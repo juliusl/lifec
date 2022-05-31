@@ -5,9 +5,12 @@ use imnodes::{
     Link, LinkId, NodeId, OutputPinId, CoordinateSystem,
 };
 use knot::store::{Store, Visitor};
+use ron::ser::PrettyConfig;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::plugins::ThunkContext;
+
+use super::SectionAttributes;
 
 #[derive(Clone)]
 pub struct NodeComponent {
@@ -30,8 +33,16 @@ impl NodeComponent {
         self.node_id.move_editor_to();
     }
 
-    pub fn move_node_to_grid_space_origin(&mut self) {
-        self.node_id.set_position(400.0, 200.0, CoordinateSystem::EditorSpace);
+    pub fn move_node_to_grid_center(&mut self) {
+        self.move_node_to_grid(400.0, 200.0);
+    }
+
+    pub fn move_node_to_grid(&mut self, x: f32, y: f32) {
+        self.node_id.set_position(x, y, CoordinateSystem::EditorSpace);
+    }
+
+    pub fn move_node_to_screen(&mut self, x: f32, y: f32) {
+        self.node_id.set_position(x, y, CoordinateSystem::ScreenSpace);
     }
 
     /// updates the current state of the node_component
@@ -55,11 +66,11 @@ impl NodeComponent {
 
 #[derive(Default)]
 pub struct NodeEditorGraph {
+    title: String,
     editor_context: Option<imnodes::EditorContext>,
     idgen: Option<imnodes::IdentifierGenerator>,
     thunk_index: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>,
     link_index: HashMap<LinkId, Link>,
-    values: Store<Value>,
     editing: Option<bool>,
     editing_graph_resources: Option<bool>,
     filtering_attributes: Option<String>,
@@ -67,14 +78,15 @@ pub struct NodeEditorGraph {
     preserve_thunk_reference_inputs: bool,
     show_runtime_editor: bool,
     pause_updating_graph: bool,
+    value_store: Store<Value>,
     nodes: Vec<NodeComponent>,
     links: HashSet<Link>,
-    attributes: Store<(String, Attribute)>,
+    attribute_store: Store<(i32, Attribute)>,
 }
 
 impl App for NodeEditorGraph {
     fn name() -> &'static str {
-        "Node Editor Graph"
+        "node_editor_graph"
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
@@ -82,7 +94,7 @@ impl App for NodeEditorGraph {
             if let Some(debugging) = self.editing_graph_resources.as_ref() {
                 if *debugging {
                     ChildWindow::new("Debugger")
-                        .size([500.0, 0.0])
+                        .size([400.0, 0.0])
                         .always_auto_resize(true)
                         .build(ui, || {
                             if ui.collapsing_header("Active thunks", TreeNodeFlags::empty()) {
@@ -178,7 +190,7 @@ impl App for NodeEditorGraph {
                                         }
                                         ui.new_line();
                                         ui.separator();
-                                        self.values = self.values.link_create_if_not_exists(
+                                        self.value_store = self.value_store.link_create_if_not_exists(
                                             n.attribute.value().clone(),
                                             Value::Symbol("ACTIVE".to_string()),
                                         );
@@ -186,7 +198,7 @@ impl App for NodeEditorGraph {
                             }
 
                             if ui.collapsing_header("Active values", TreeNodeFlags::empty()) {
-                                let (seen, _) = self.values.new_walk_ordered(
+                                let (seen, _) = self.value_store.new_walk_ordered(
                                     Value::Symbol("ACTIVE".to_string()),
                                     Some(&ValueWalker {}),
                                 );
@@ -198,7 +210,7 @@ impl App for NodeEditorGraph {
                         
                             if ui.collapsing_header("Attribute Store", TreeNodeFlags::empty()) {
                                 let attribute_visitor = AttributeWalker { ui }; 
-                                 self.attributes.new_walk_ordered_now(Some(&attribute_visitor));
+                                 self.attribute_store.new_walk_ordered_now(Some(&attribute_visitor));
                             }
                         });
                     ui.same_line();
@@ -241,7 +253,7 @@ impl App for NodeEditorGraph {
                                 if let atlier::system::Value::Reference(r) =
                                     attribute.clone().value()
                                 {
-                                    match self.values.get_at(r) {
+                                    match self.value_store.get_at(r) {
                                         None => {
                                             let resetting = attribute.get_value_mut();
                                             *resetting = Value::Empty;
@@ -276,14 +288,14 @@ impl App for NodeEditorGraph {
                                             context.get_outputs().iter().cloned().for_each(
                                                 |(k, o)| {
                                                     current_outputs.push(k.to_string());
-                                                    self.values = self.values.node(o.clone());
+                                                    self.value_store = self.value_store.node(o.clone());
                                                 },
                                             );
 
                                             if let Some(returns) = context.returns() {
                                                 current_outputs.push(context.returns_key());
 
-                                                self.values = self.values.node(returns.clone());
+                                                self.value_store = self.value_store.node(returns.clone());
                                             }
 
                                             node_scope.add_output(
@@ -326,7 +338,7 @@ impl App for NodeEditorGraph {
                                         node_scope.add_input(
                                             *input_id,
                                             imnodes::PinShape::CircleFilled,
-                                            || match self.values.get_at(r) {
+                                            || match self.value_store.get_at(r) {
                                                 Some((value, _)) => {
                                                     ui.set_next_item_width(130.0);
                                                     ui.text(format!("{}", value));
@@ -364,8 +376,8 @@ impl App for NodeEditorGraph {
 
                                                     if old != *attribute {
                                                         let new_value = attribute.value().clone();
-                                                        self.values =
-                                                            self.values.node(new_value.clone());
+                                                        self.value_store =
+                                                            self.value_store.node(new_value.clone());
                                                     }
                                                 });
                                             }
@@ -396,30 +408,30 @@ impl App for NodeEditorGraph {
                 }
 
                 if let Some(dropped) = outer_scope.get_dropped_link() {
-                    self.attributes = Store::default();
+                    self.attribute_store = Store::default();
 
                     if let Some(dropped_link) = self.link_index.clone().get(&dropped) {
                         let to = dropped_link.end_node;
-                        if let Some(n) = self.find_node(&to).cloned() {
+                        if let Some(n) = self.find_node(to).cloned() {
                             if let Value::Reference(r) = &n.attribute.value() {
                                 if self.preserve_thunk_reference_inputs {
-                                    let referenced_value = &self.values.clone();
+                                    let referenced_value = &self.value_store.clone();
                                     let referenced_value = referenced_value.get_at(r);
-                                    let node = self.find_node_mut(&to);
+                                    let node = self.find_node_mut(to);
     
                                     if let (Some((v, _)), Some(n)) = (referenced_value, node) {
                                         let v = v.clone();
                                         let updating = n.attribute.get_value_mut();
                                         *updating = v.clone();
                                     }
-                                } else if let Some(n) = self.find_node_mut(&to) {
+                                } else if let Some(n) = self.find_node_mut(to) {
                                     let updating = n.attribute.get_value_mut();
                                     *updating = Value::Empty;
                                 }
                             }
 
                             if let Value::Symbol(_) = &n.attribute.value() {
-                                if let Some(n) = self.find_node_mut(&to) {
+                                if let Some(n) = self.find_node_mut(to) {
                                     if let Some(values) = n.values.as_mut() {
                                         values.clear();
                                     }
@@ -428,16 +440,16 @@ impl App for NodeEditorGraph {
                         }
 
                         let from = dropped_link.start_node;
-                        if let Some(n) = self.find_node(&from).cloned() {
+                        if let Some(n) = self.find_node(from).cloned() {
                             if let Value::Reference(_) = &n.attribute.value() {
-                                if let Some(n) = self.find_node_mut(&from) {
+                                if let Some(n) = self.find_node_mut(from) {
                                     let updating = n.attribute.get_value_mut();
                                     *updating = Value::Empty
                                 }
                             }
 
                             if let Value::Symbol(_) = &n.attribute.value() {
-                                if let Some(n) = self.find_node_mut(&from) {
+                                if let Some(n) = self.find_node_mut(from) {
                                     if let Some(values) = n.values.as_mut() {
                                         values.clear();
                                     }
@@ -459,15 +471,16 @@ impl App for NodeEditorGraph {
 
 impl NodeEditorGraph {
     /// creates a new graph editor
-    pub fn new(editor_context: EditorContext, idgen: IdentifierGenerator) -> NodeEditorGraph {
+    pub fn new(title: impl AsRef<str>, editor_context: EditorContext, idgen: IdentifierGenerator) -> NodeEditorGraph {
         Self {
+            title: title.as_ref().to_string(),
             editor_context: Some(editor_context),
             idgen: Some(idgen),
             nodes: vec![],
             links: HashSet::new(),
             link_index: HashMap::new(),
-            values: Store::default(),
-            attributes: Store::default(),
+            value_store: Store::default(),
+            attribute_store: Store::default(),
             editing_graph_resources: Some(false),
             editing: Some(false),
             filtering_attributes: Some(String::default()),
@@ -479,21 +492,74 @@ impl NodeEditorGraph {
         }
     }
 
-    pub fn nodes(&mut self) -> &mut Vec<NodeComponent> {
+    pub fn title(&self) -> String {
+        self.title.to_string()
+    }
+
+    /// get's a mutable collection of nodes
+    pub fn nodes_mut(&mut self) -> &mut Vec<NodeComponent> {
         &mut self.nodes
     }
 
+    /// resolve current attributes that have a reference value into an actual value
+    /// only resolves attributes that are connected
+    pub fn resolve_attributes(&self) -> Vec<Attribute> {
+        self.attribute_store.nodes().iter().map(|(_, n)| {
+            let mut n = n.clone();
+            let n = &mut n;
+            match n.value() {
+                Value::Reference(r) => {
+                    if let Some((v, _)) = self.value_store.get_at(&r) {
+                        let updating = n.get_value_mut();
+                        *updating = v.clone();
+                    }
+                },
+                _ => {}
+            }
+            n.clone()
+        }).collect()
+    }
+
+    pub fn save_attribute_store(&self, id: u32) -> Attribute {
+        let vec = match ron::ser::to_string_pretty(&self.attribute_store, PrettyConfig::default()) {
+            Ok(vec) => vec.as_bytes().to_vec(),
+            Err(_) => vec![],
+        };
+
+        Attribute::new(id, format!("file::{}_attribute_store.out", self.title()), Value::BinaryVector(vec))
+    }
+
+    pub fn load_attribute_store(&mut self, attributes: &SectionAttributes) {
+        let attribute_store = attributes.get_attr_value(format!("file::{}_attribute_store.out", self.title()));
+        if let Some(Value::BinaryVector(attr_store)) = attribute_store {
+            match ron::de::from_bytes::<Store<(i32, Attribute)>>(attr_store) {
+                Ok(store) => {
+                
+                }
+                Err(_) => todo!(),
+            }
+        }
+    }
+
+    /// add's a thunk to the graph
     pub fn add_thunk(&mut self, name: impl AsRef<str>, thunk: fn(&mut BTreeMap<String, Value>)) {
         self.thunk_index.insert(name.as_ref().to_string(), thunk);
     }
 
-    /// add's a node to the graph
-    pub fn add_node(&mut self, attr: &mut Attribute) {
+    /// add's a node to the graph, use an empty title to infer the title from the attribute name
+    pub fn add_node(&mut self, title: impl AsRef<str>, attr: &mut Attribute) {
         if let Some(idgen) = self.idgen.as_mut() {
-            self.values = self.values.node(attr.value().clone());
 
+            let mut title = title.as_ref();
+            if title.is_empty() {
+                title = &attr.name()[6..];
+            }
+
+            self.value_store = self.value_store.node(attr.value().clone());
+
+            let title = title.to_string();
             self.nodes.push(NodeComponent {
-                title: attr.name()[6..].to_string(),
+                title,
                 node_id: idgen.next_node(),
                 input_id: idgen.next_input_pin(),
                 output_id: idgen.next_output_pin(),
@@ -505,6 +571,7 @@ impl NodeEditorGraph {
         }
     }
 
+    /// add's a link to the graph
     pub fn add_link(&mut self, link: Link) {
         if let Some(idgen) = self.idgen.as_mut() {
             if self.links.insert(link) {
@@ -519,13 +586,23 @@ impl NodeEditorGraph {
     }
 
     /// finds a specific node component with matching nodeid
-    pub fn find_node(&self, id: &NodeId) -> Option<&NodeComponent> {
-        self.nodes.iter().find(|n| n.node_id == *id)
+    pub fn find_node(&self, id: impl Into<i32>) -> Option<&NodeComponent> {
+        let id: i32 = id.into();
+        self.nodes.iter().find(|n| { 
+            let a: i32 = n.node_id.into();
+            let b: i32 = id;
+            a == b
+        })
     }
 
     /// mutable version of find node
-    pub fn find_node_mut(&mut self, id: &NodeId) -> Option<&mut NodeComponent> {
-        self.nodes.iter_mut().find(|n| n.node_id == *id)
+    pub fn find_node_mut(&mut self, id: impl Into<i32>) -> Option<&mut NodeComponent> {
+        let id: i32 = id.into();
+        self.nodes.iter_mut().find(|n| { 
+            let a: i32 = n.node_id.into();
+            let b: i32 = id;
+            a == b
+        })
     }
 
     /// update resolves reference values
@@ -552,12 +629,18 @@ impl NodeEditorGraph {
 
             let _ = std::fs::write("node_editor.out", format!("{:?}", visited));
         }
+
+        if let Some(true) = self.editing {
+            self.attribute_store = Store::default();
+        }
     }
 
-    pub fn thunk_index(&mut self) -> &mut BTreeMap<String, fn(&mut BTreeMap<String, Value>)> {
+    /// gets a mutable reference to the thunk index
+    pub fn thunk_index_mut(&mut self) -> &mut BTreeMap<String, fn(&mut BTreeMap<String, Value>)> {
         &mut self.thunk_index
     }
 
+    /// returns true if the runtime editor view is open
     pub fn is_runtime_editor_open(&self) -> bool {
         self.show_runtime_editor
     }
@@ -582,29 +665,12 @@ impl NodeEditorGraph {
         ui.checkbox("Preserve thunk reference inputs", &mut self.preserve_thunk_reference_inputs);
     }
 
-    pub fn refresh_values(&mut self) {
-        self.values = Store::default();
-    }
-
-    pub fn arrange_vertical(&mut self) {
-        self.nodes.iter_mut().enumerate().for_each(|(i, n)| {
-            let spacing = i as f32;
-            let spacing = spacing * 150.0;
-
-            let ImVec2 { x, y: _ } = n
-                .node_id
-                .get_position(imnodes::CoordinateSystem::ScreenSpace);
-            n.node_id
-                .set_position(x, spacing, imnodes::CoordinateSystem::ScreenSpace);
-        });
-    }
-
     pub fn is_debugging_enabled(&mut self) -> bool {
         self.editing_graph_resources.unwrap_or(false)
     }
 
-    /// rearrange a set of linked nodes
-    pub fn rearrange(&mut self) {
+    /// rearrange all linked nodes
+    pub fn arrange_linked(&mut self) {
         let links = &mut self.links;
         let mut store = Store::<NodeId>::default();
         store.walk_unique = false;
@@ -662,6 +728,23 @@ impl NodeEditorGraph {
         }
     }
 
+    pub fn refresh_values(&mut self) {
+        self.value_store = Store::default();
+    }
+
+    pub fn arrange_vertical(&mut self) {
+        self.nodes.iter_mut().enumerate().for_each(|(i, n)| {
+            let spacing = i as f32;
+            let spacing = spacing * 150.0;
+
+            let ImVec2 { x, y: _ } = n
+                .node_id
+                .get_position(imnodes::CoordinateSystem::ScreenSpace);
+            n.node_id
+                .set_position(x, spacing, imnodes::CoordinateSystem::ScreenSpace);
+        });
+    }
+
     pub fn create_link(from: NodeComponent, to: NodeComponent) -> Link {
         Link {
             start_node: from.node_id,
@@ -675,11 +758,11 @@ impl NodeEditorGraph {
 
 struct AttributeWalker<'a, 'ui> { ui: &'a imgui::Ui<'ui> }
 
-impl<'a, 'ui> Visitor<(String, Attribute)> for AttributeWalker<'a, 'ui> {
-    fn visit(&self, (from_title, from): &(String, Attribute), (to_title, to): &(String, Attribute)) -> bool {
+impl<'a, 'ui> Visitor<(i32, Attribute)> for AttributeWalker<'a, 'ui> {
+    fn visit(&self, (from_node_id, from): &(i32, Attribute), (to_node_id, to): &(i32, Attribute)) -> bool {
         let ui = self.ui;
-        ui.label_text("from", format!("{} [{}]", from.name(), from_title));
-        ui.label_text("to", format!("{} [{}]", to.name(), to_title));
+        ui.label_text("from", format!("{} nid: {}", from.name(), from_node_id));
+        ui.label_text("to", format!("{} nid: {}", to.name(), to_node_id));
         ui.new_line();
         true
     }
@@ -702,28 +785,28 @@ impl Visitor<NodeId> for NodeEditorGraph {
     }
 
     fn visit_mut(&mut self, f: &NodeId, t: &NodeId) -> bool {
-        let mut next_store = self.attributes.clone();
+        let mut next_store = self.attribute_store.clone();
 
-        if let (Some(from_node), Some(to_node)) = (&self.find_node(f), &self.find_node(t)) {
+        if let (Some(from_node), Some(to_node)) = (&self.find_node(*f), &self.find_node(*t)) {
             let from = &from_node.attribute;
             let to = &to_node.attribute;
 
             next_store = next_store.link_create_if_not_exists(
-                (from_node.title.to_string(), from.clone()), 
-                (to_node.title.to_string(), to.clone()));
+                (from_node.node_id.into(), from.clone()), 
+                (to_node.node_id.into(), to.clone()));
 
             match (from.value(), to.value()) {
                 // Set the value of to, to from's value
                 (Value::Reference(from), Value::Reference(_)) => {
                     let from = *from;
-                    if let Some(update) = self.find_node_mut(t) {
+                    if let Some(update) = self.find_node_mut(*t) {
                         let updating = update.attribute.get_value_mut();
                         *updating = Value::Reference(from);
                     }
                 }
                 (Value::Reference(from), Value::Empty) => {
                     let from = *from;
-                    if let Some(update) = self.find_node_mut(t) {
+                    if let Some(update) = self.find_node_mut(*t) {
                         let updating = update.attribute.get_value_mut();
                         *updating = Value::Reference(from);
                     }
@@ -734,7 +817,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
 
                         if let Some(output) = context.returns() {
                             let reference = output.to_ref();
-                            if let Some(update) = self.find_node_mut(t) {
+                            if let Some(update) = self.find_node_mut(*t) {
                                 let updating = update.attribute.get_value_mut();
                                 *updating = reference;
                             }
@@ -746,7 +829,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
                 }
                 (value, Value::Empty) => {
                     let reference = value.to_ref();
-                    if let Some(update) = self.find_node_mut(t) {
+                    if let Some(update) = self.find_node_mut(*t) {
                         let updating = update.attribute.get_value_mut();
                         *updating = reference;
                     }
@@ -763,7 +846,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
                                 let thunk_context = ThunkContext::new(input.title, other, values);
                                 let inputs = thunk_context.get_outputs();
 
-                                if let Some(update) = self.find_node_mut(t) {
+                                if let Some(update) = self.find_node_mut(*t) {
                                     for (input_name, input) in inputs {
                                         update.update(thunk, input_name, input.to_owned())
                                     }
@@ -789,12 +872,12 @@ impl Visitor<NodeId> for NodeEditorGraph {
                             let thunk = thunk.clone();
                             let input_name = format!("{}", &from.name());
                             let input = self
-                                .values
+                                .value_store
                                 .get_at(reference)
                                 .and_then(|(v, _)| Some(v.clone()));
 
                             if let Some(input) = input {
-                                if let Some(update) = self.find_node_mut(t) {
+                                if let Some(update) = self.find_node_mut(*t) {
                                     update.update(thunk, input_name, input)
                                 }
                             } else {
@@ -811,7 +894,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
                             let input_name = format!("{}", &from.name());
                             let input = input.clone();
 
-                            if let Some(update) = self.find_node_mut(t) {
+                            if let Some(update) = self.find_node_mut(*t) {
                                 update.update(thunk, input_name, input)
                             }
                         }
@@ -821,8 +904,8 @@ impl Visitor<NodeId> for NodeEditorGraph {
             }
         }
 
-        if next_store != self.attributes {
-            self.attributes = next_store;
+        if next_store != self.attribute_store {
+            self.attribute_store = next_store;
         }
 
         true

@@ -1,3 +1,7 @@
+use super::{
+    node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor, Section, SectionAttributes,
+};
+use crate::{editor::unique_title, plugins::Thunk, Runtime, RuntimeState};
 use atlier::system::{App, Attribute, Extension, Value};
 use imgui::{ChildWindow, MenuItem};
 use specs::{
@@ -5,8 +9,6 @@ use specs::{
     WorldExt, WriteStorage,
 };
 use std::collections::BTreeMap;
-use crate::{editor::unique_title, plugins::Thunk, Runtime, RuntimeState};
-use super::{node_editor_graph::NodeEditorGraph, RuntimeEditor, Section, SectionAttributes};
 
 pub struct NodeEditor<S>
 where
@@ -83,6 +85,7 @@ where
         ReadStorage<'a, SectionAttributes>,
         ReadStorage<'a, Section<S>>,
         WriteStorage<'a, AttributeGraph>,
+        WriteStorage<'a, Loader>,
         Read<'a, RuntimeEditor<S>>,
     );
     /// This system initializes a node editor when it detects
@@ -93,7 +96,7 @@ where
     /// system
     fn run(
         &mut self,
-        (entities, attributes, sections, _attribute_graph, runtime): Self::SystemData,
+        (entities, attributes, sections, _attribute_graph, mut section_loader, runtime): Self::SystemData,
     ) {
         if let None = self.runtime_editor {
             self.runtime_editor = Some(runtime.clone());
@@ -107,30 +110,48 @@ where
                             let editor_context = self.imnodes.create_editor();
                             let idgen = editor_context.new_identifier_generator();
 
-                            let mut editor = NodeEditorGraph::new(editor_context, idgen);
+                            let mut editor =
+                                NodeEditorGraph::new(format!("{}", e.id()), editor_context, idgen);
+
                             for attr in attributes
                                 .clone_attrs()
                                 .iter_mut()
                                 .filter(|a| a.name().starts_with("node::"))
                             {
-                                editor.add_node(attr);
+                                editor.add_node("", attr);
                             }
 
                             for (call, thunk) in &self.thunks {
                                 editor.add_thunk(call, thunk.clone());
                             }
 
+                           editor.load_attribute_store(attributes);
+
                             self.editors.insert(e.id(), editor);
 
                             if let Some(section) = sections.get(e) {
-                                self.sections.insert(e.id(), section.clone());
+                                self.sections.insert(e.id(), section.clone().enable_edit_attributes());
                             }
                         }
                         Some(editor) => editor.update(),
                     },
                     Some(false) => {
                         self.editors.remove(&e.id());
-                        self.sections.remove(&e.id());
+                        let section = self.sections.remove(&e.id());
+
+                        if let Some(section) = section {
+                            match section_loader.insert(
+                                e,
+                                Loader::LoadSection(SectionAttributes::from(
+                                    section.into_attributes(),
+                                )),
+                            ) {
+                                Ok(_) => {
+                                    println!("NodeEditor dispatched load section");
+                                }
+                                Err(_) => {}
+                            }
+                        }
                         // TODO: Save the attribute graph to storage
                         // match attributes.is_attr_checkbox("allow node editor to change state on close") {
                         //     Some(true) => {
@@ -202,91 +223,109 @@ where
 
                                 ui.menu("Attributes", || {
                                     if MenuItem::new("Add text attribute").build(ui) {
-                                        editor.add_node(&mut Attribute::new(
-                                            0,
-                                            unique_title("node::text"),
-                                            Value::TextBuffer(String::default()),
-                                        ));
+                                        editor.add_node(
+                                            "",
+                                            &mut Attribute::new(
+                                                *id,
+                                                unique_title("node::text"),
+                                                Value::TextBuffer(String::default()),
+                                            ),
+                                        );
 
-                                        if let Some(n) = editor.nodes().iter_mut().last() {
-                                            n.move_node_to_grid_space_origin();
-                                         }
+                                        if let Some(n) = editor.nodes_mut().iter_mut().last() {
+                                            n.move_node_to_grid_center();
+                                        }
                                     }
 
                                     if MenuItem::new("Add float attribute").build(ui) {
-                                        editor.add_node(&mut Attribute::new(
-                                            0,
-                                            unique_title("node::float"),
-                                            Value::Float(0.0),
-                                        ));
+                                        editor.add_node(
+                                            "",
+                                            &mut Attribute::new(
+                                                *id,
+                                                unique_title("node::float"),
+                                                Value::Float(0.0),
+                                            ),
+                                        );
 
-                                        if let Some(n) = editor.nodes().iter_mut().last() {
-                                            n.move_node_to_grid_space_origin();
-                                         }
+                                        if let Some(n) = editor.nodes_mut().iter_mut().last() {
+                                            n.move_node_to_grid_center();
+                                        }
                                     }
 
                                     if MenuItem::new("Add int attribute").build(ui) {
-                                        editor.add_node(&mut Attribute::new(
-                                            0,
-                                            unique_title("node::int"),
-                                            Value::Int(0),
-                                        ));
+                                        editor.add_node(
+                                            "",
+                                            &mut Attribute::new(
+                                                *id,
+                                                unique_title("node::int"),
+                                                Value::Int(0),
+                                            ),
+                                        );
 
-                                        if let Some(n) = editor.nodes().iter_mut().last() {
-                                            n.move_node_to_grid_space_origin();
-                                         }
+                                        if let Some(n) = editor.nodes_mut().iter_mut().last() {
+                                            n.move_node_to_grid_center();
+                                        }
                                     }
 
                                     if MenuItem::new("Add bool attribute").build(ui) {
-                                        editor.add_node(&mut Attribute::new(
-                                            0,
-                                            unique_title("node::bool"),
-                                            Value::Bool(false),
-                                        ));
+                                        editor.add_node(
+                                            "",
+                                            &mut Attribute::new(
+                                                *id,
+                                                unique_title("node::bool"),
+                                                Value::Bool(false),
+                                            ),
+                                        );
 
-                                        if let Some(n) = editor.nodes().iter_mut().last() {
-                                           n.move_node_to_grid_space_origin();
+                                        if let Some(n) = editor.nodes_mut().iter_mut().last() {
+                                            n.move_node_to_grid_center();
                                         }
                                     }
                                 });
                                 ui.menu("Thunks", || {
-                                    let index = editor.thunk_index();
+                                    let index = editor.thunk_index_mut();
 
                                     for (key, _) in index.clone() {
                                         if MenuItem::new(format!("Add {} thunk", key)).build(ui) {
-                                            editor.add_node(&mut Attribute::new(
-                                                0,
-                                                unique_title("node::"),
-                                                Value::Symbol(format!(
-                                                    "thunk::{}",
-                                                    key.to_string()
-                                                )),
-                                            ));
+                                            editor.add_node(
+                                                "",
+                                                &mut Attribute::new(
+                                                    *id,
+                                                    unique_title("node::"),
+                                                    Value::Symbol(format!(
+                                                        "thunk::{}",
+                                                        key.to_string()
+                                                    )),
+                                                ),
+                                            );
 
-                                            if let Some(n) = editor.nodes().iter_mut().last() {
-                                                n.move_node_to_grid_space_origin();
-                                             }
+                                            if let Some(n) = editor.nodes_mut().iter_mut().last() {
+                                                n.move_node_to_grid_center();
+                                            }
                                         }
                                     }
                                 });
 
                                 if MenuItem::new("Add empty reference").build(ui) {
-                                    editor.add_node(&mut Attribute::new(
-                                        0,
-                                        unique_title("node::reference"),
-                                        Value::Empty,
-                                    ));
+                                    editor.add_node(
+                                        "",
+                                        &mut Attribute::new(
+                                            *id,
+                                            unique_title("node::reference"),
+                                            Value::Empty,
+                                        ),
+                                    );
 
-                                    if let Some(n) = editor.nodes().iter_mut().last() {
-                                        n.move_node_to_grid_space_origin();
-                                     }
+                                    if let Some(n) = editor.nodes_mut().iter_mut().last() {
+                                        n.move_node_to_grid_center();
+                                    }
                                 }
                             });
 
                             ui.menu("Tools", || {
                                 ui.menu("Arrange", || {
                                     if MenuItem::new("Connected nodes").build(ui) {
-                                        editor.rearrange();
+                                        editor.arrange_linked();
                                     }
 
                                     if MenuItem::new("All nodes vertically").build(ui) {
@@ -296,12 +335,20 @@ where
 
                                 ui.separator();
                                 ui.menu("Move editor to", || {
-                                    for n in editor.nodes() {
+                                    for n in editor.nodes_mut() {
                                         if MenuItem::new(n.title()).build(ui) {
                                             n.move_editor_to();
                                         }
                                     }
                                 });
+
+                                ui.separator();
+                                if MenuItem::new("Dump editor output attributes").build(ui) {
+                                    println!("Outputting: {}", editor.resolve_attributes().len());
+                                    editor.resolve_attributes().iter().for_each(|a| {
+                                        println!("{}", a);
+                                    });
+                                }
                             });
 
                             ui.menu("Options", || {
@@ -323,6 +370,24 @@ where
                                         overview.state = Some(section.state.clone());
 
                                         RuntimeEditor::from(overview).show_current(ui);
+
+                                        if editor.is_debugging_enabled() {
+                                            if ui.button("Dump runtime editor output") {
+                                                section.into_attributes().iter().for_each(|a| {
+                                                    println!("{}", a);
+                                                });
+                                            }
+    
+                                            if ui.button("Save attribute store") {
+                                                section.add_attribute(editor.save_attribute_store(*id));
+                                            }
+
+                                            section.edit_attr(
+                                                "Attribute Store",
+                                                format!("file::{}_attribute_store.out", editor.title()),
+                                                ui,
+                                            );
+                                        }
                                     },
                                 );
                                 ui.same_line();
@@ -330,6 +395,12 @@ where
                         }
 
                         editor.show_editor(ui);
+
+                        if let Some(section) = self.sections.get_mut(id) {
+                            editor.resolve_attributes().iter().cloned().for_each(|a| {
+                                section.add_attribute(a);
+                            });
+                        }
                     });
             }
         }

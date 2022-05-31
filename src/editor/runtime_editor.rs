@@ -1,4 +1,4 @@
-use imgui::{CollapsingHeader, Window};
+use imgui::{ChildWindow, CollapsingHeader, Window};
 use knot::store::Store;
 use serde::{Deserialize, Serialize};
 use specs::{
@@ -308,14 +308,23 @@ where
                 let next = entities.create();
                 let section = Section::new(
                     unique_title(format!("{}", self.runtime.context())),
-                    |_, _| {},
+                    |s, ui| {
+                        s.edit_attr("Enable Node Editor", "enable node editor", ui);
+                        s.edit_attr("Enable Event Editor", "enable event builder", ui);
+                        s.edit_attr("Enable project", "enable project", ui);
+                        if let Some(true) = s.is_attr_checkbox("enable project") {
+                            s.edit_attr("Project name", "project::name::", ui);
+                        }
+                    },
                     state.clone(),
                 )
                 .enable_app_systems()
                 .with_text("context::", format!("{}", self.runtime.context()))
                 .with_bool("enable event builder", false)
+                .with_bool("enable node editor", false)
                 .with_text("project::name::", unique_title("snapshot"))
                 .with_bool("enable project", false)
+                .enable_edit_attributes()
                 .with_parent_entity(next.id());
 
                 let section_attrs = SectionAttributes(section.into_attributes());
@@ -353,28 +362,13 @@ where
                 }
                 Some(section) => {
                     let Section {
-                        title,
-                        attributes,
+                        gen,
                         enable_app_systems,
-                        enable_edit_attributes,
-                        state,
                         ..
                     } = section;
 
-                    if *enable_app_systems {
-                        let title = title.to_string();
-                        let state = state.merge_with(&s.state);
-                        let attributes = attributes.clone();
-                        let enable_edit_attributes = *enable_edit_attributes;
-                        self.sections.insert(e.id(), {
-                            let mut s = s.clone().with_parent_entity(e.id());
-                            s.title = title;
-                            s.state = state;
-                            s.attributes = attributes;
-                            s.enable_edit_attributes = enable_edit_attributes;
-                            s.enable_app_systems = true;
-                            s
-                        });
+                    if *enable_app_systems && *gen != s.get_gen() {
+                        self.sections.insert(e.id(), s.clone());
                     }
                 }
             }
@@ -484,36 +478,49 @@ where
             if let Some(Loader::LoadSection(attributes)) = loader.get(entity) {
                 println!("Load section for {:?}", entity);
 
-                if let None = sections.get(entity) {
-                    println!(
-                        "Section not found for {:?}, Generating section from attributes",
-                        entity
-                    );
-                    let attributes: Vec<Attribute> = attributes.clone_attrs();
-                    let initial = S::from_attributes(attributes.clone());
+                match sections.get(entity) {
+                    Some(_) => {
+                        if let Some(section) = sections.get_mut(entity) {
+                            println!("Existing section found, updating attributes");
+                            attributes.clone_attrs().iter().cloned().for_each(|a| {
+                                section.add_attribute(a);
+                            });
 
-                    let mut section = Section::<S>::default();
-                    section.state = initial;
+                            section.next_gen();
+                        }
+                    }
+                    None => {
+                        println!(
+                            "Section not found for {:?}, Generating section from attributes",
+                            entity
+                        );
+                        let attributes: Vec<Attribute> = attributes.clone_attrs();
+                        let initial = S::from_attributes(attributes.clone());
 
-                    attributes.iter().for_each(|a| {
-                        section.add_attribute(a.clone());
-                    });
+                        let mut section = Section::<S>::default();
+                        section.state = initial;
 
-                    if let Some(Value::TextBuffer(title)) =
-                        section.clone().get_attr_value("title::")
-                    {
-                        let id = entity.id();
-                        let section = section.with_title(title.to_string()).with_parent_entity(id);
+                        attributes.iter().for_each(|a| {
+                            section.add_attribute(a.clone());
+                        });
 
-                        match sections.insert(entity, section.clone()) {
-                            Ok(_) => {
-                                println!(
-                                    "RuntimeDispatcher added Section {}, {}",
-                                    id, &section.title
-                                );
-                            }
-                            Err(err) => {
-                                println!("section could not be loaded {}", err);
+                        if let Some(Value::TextBuffer(title)) =
+                            section.clone().get_attr_value("title::")
+                        {
+                            let id = entity.id();
+                            let section =
+                                section.with_title(title.to_string()).with_parent_entity(id);
+
+                            match sections.insert(entity, section.clone()) {
+                                Ok(_) => {
+                                    println!(
+                                        "RuntimeDispatcher added Section {}, {}",
+                                        id, &section.title
+                                    );
+                                }
+                                Err(err) => {
+                                    println!("section could not be loaded {}", err);
+                                }
                             }
                         }
                     }
@@ -598,24 +605,28 @@ where
         Window::new(Self::name())
             .size(*Self::window_size(), imgui::Condition::Appearing)
             .build(ui, || {
-                if CollapsingHeader::new(format!("Current Runtime"))
-                    .leaf(true)
-                    .begin(ui)
-                {
-                    ui.separator();
-                    self.show_current(ui);
-                }
+                ChildWindow::new("Sections").always_use_window_padding(true).size([1000.0, 0.0]).build(ui, || {
+                    if CollapsingHeader::new("Snapshots").leaf(true).begin(ui) {
+                        if ui.button("Take Snapshot of Runtime") {
+                            self.dispatch_snapshot = Some(());
+                            return;
+                        }
+                        ui.new_line();
 
-                ui.new_line();
-                if CollapsingHeader::new("Snapshots").leaf(true).begin(ui) {
-                    if ui.button("Take Snapshot of Runtime") {
-                        self.dispatch_snapshot = Some(());
-                        return;
+                        self.show_snapshots(ui);
+                    }
+                });
+                ui.same_line();
+                ChildWindow::new("Runtime").always_use_window_padding(true).size([0.0, 0.0]).build(ui, || {
+                    if CollapsingHeader::new(format!("Current Runtime"))
+                        .leaf(true)
+                        .begin(ui)
+                    {
+                        ui.separator();
+                        self.show_current(ui);
                     }
                     ui.new_line();
-
-                    self.show_snapshots(ui);
-                }
+                });
             });
     }
 }

@@ -39,6 +39,8 @@ where
     /// enable inherent attribute editor for section
     pub enable_edit_attributes: bool,
     #[serde(skip)]
+    pub gen: u64,
+    #[serde(skip)]
     pub state: S,
     /// main editor show function
     #[serde(skip)]
@@ -53,6 +55,7 @@ impl<S: RuntimeState> Section<S> {
     ) -> Section<S> {
         let state_attrs = initial_state.into_attributes();
         let mut section = Section {
+            gen: 0,
             id: 0,
             title: title.as_ref().to_string(),
             show_editor: ShowEditor(show),
@@ -64,6 +67,14 @@ impl<S: RuntimeState> Section<S> {
 
         state_attrs.iter().for_each(|a| section.add_attribute(a.clone()) );
         section
+    }
+
+    pub fn get_gen(&self) -> u64 {
+        self.gen
+    }
+
+    pub fn next_gen(&mut self) {
+        self.gen += 1;
     }
 
     /// The parent entity of this component
@@ -384,7 +395,7 @@ impl<S: RuntimeState> Section<S> {
     }
 
     pub fn add_attribute(&mut self, attr: Attribute) {
-        self.attributes.insert(format!("{}", attr), attr);
+        self.attributes.insert(attr.name().to_string(), attr);
     }
 
     pub fn update(&mut self, func: impl FnOnce(&mut Self)) -> Self {
@@ -406,6 +417,7 @@ impl<S: RuntimeState> Section<S> {
 impl<S: RuntimeState + App> From<S> for Section<S> {
     fn from(initial: S) -> Self {
         Section {
+            gen: 0,
             id: 0,
             title: unique_title(S::name().to_string()),
             show_editor: ShowEditor(|section, ui| {
@@ -430,7 +442,7 @@ impl<S: RuntimeState> App for Section<S> {
                 if let Some(Value::Bool(true)) = self.get_attr_value("opened::") {
                     true
                 } else {
-                    false
+                    false || (self.id == 0)
                 }
             })
             .build(ui)
@@ -449,7 +461,8 @@ impl<S: RuntimeState> App for Section<S> {
                     if ui.button(format!("Add int Section[{}]", self.id)) {
                         self.add_int_attr(unique_title("Int"), 0);
                     }
-                    ui.same_line();
+
+
                     if ui.button(format!("Add float Section[{}]", self.id)) {
                         self.add_float_attr(unique_title("Float"), 0.0);
                     }
@@ -460,6 +473,11 @@ impl<S: RuntimeState> App for Section<S> {
                     ui.new_line();
                     for (_, a) in self.attributes.iter_mut() {
                         a.edit(ui);
+                        ui.same_line();
+                        if ui.button(format!("remove [{} {}]", a.name(), self.id)) {
+                            let value = a.get_value_mut();
+                            *value = Value::Empty;
+                        }
                         ui.new_line();
                     }
                 }
@@ -477,6 +495,19 @@ impl<S: RuntimeState> App for Section<S> {
         if let Some(Value::TextBuffer(title)) = self.get_attr_value("title::") {
             self.title = title.clone();
         }
+
+        self.cleanup_empty_attributes();
+    }
+}
+
+impl<S> Section<S> 
+where
+    S: RuntimeState
+{
+    fn cleanup_empty_attributes(&mut self) {
+        self.attributes.clone().values().filter(|v| v.value() == &Value::Empty).for_each(|v| {
+            self.attributes.remove(v.name());
+        });
     }
 }
 
@@ -486,6 +517,7 @@ where
 {
     fn default() -> Self {
         Self {
+            gen: 0,
             id: Default::default(),
             title: Default::default(),
             show_editor: ShowEditor(|s, ui| {
