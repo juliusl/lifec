@@ -366,10 +366,10 @@ where
                                     || {
                                         section.show_editor(ui);
 
-                                        let mut overview = Runtime::<S>::default();
-                                        overview.state = Some(section.state.clone());
-
-                                        RuntimeEditor::from(overview).show_current(ui);
+                                        // TODO: Changes here won't have an affect because changes aren't being passed back
+                                        // let mut overview = Runtime::<S>::default();
+                                        // overview.state = Some(section.state.clone());
+                                        // RuntimeEditor::from(overview).show_current(ui);
 
                                         if editor.is_debugging_enabled() {
                                             if ui.button("Dump runtime editor output") {
