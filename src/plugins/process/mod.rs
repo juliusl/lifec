@@ -95,7 +95,9 @@ impl Process {
             let mut command = &mut command;
 
             for s in subcommands {
-                command = command.arg(s);
+                if !s.is_empty() {
+                    command = command.arg(s);
+                }
             }
 
             interpret(process, command)
@@ -177,7 +179,7 @@ impl Process {
                     }
                 }
                 (Some(Value::TextBuffer(command)), None) => {
-                    if let Some(next) = section.state.process(&command).ok() {
+                    if let Some(next) = section.state.process(&&format!("{}::", command)).ok() {
                         section.state = next;
                     }
                 }
