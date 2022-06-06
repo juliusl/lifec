@@ -1,12 +1,11 @@
 use super::{
-    node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor, Section, SectionAttributes, ShowEditor,
+    node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor, Section, SectionAttributes,
 };
-use crate::{editor::unique_title, plugins::Thunk, Runtime, RuntimeState};
+use crate::{editor::unique_title, plugins::Thunk, RuntimeState};
 use atlier::system::{App, Attribute, Extension, Value};
 use imgui::{ChildWindow, MenuItem};
 use specs::{
-    storage::HashMapStorage, Component, Entities, Join, Read, ReadStorage, RunNow, System,
-    WorldExt, WriteStorage,
+    Component, Entities, Join, Read, ReadStorage, RunNow, System, WriteStorage
 };
 use std::collections::BTreeMap;
 
@@ -20,11 +19,6 @@ where
     runtime_editor: Option<RuntimeEditor<S>>,
     thunks: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>,
 }
-
-/// Stores a graph representation of attributes
-#[derive(Component, Clone)]
-#[storage(HashMapStorage)]
-pub struct AttributeGraph(knot::store::Store<Attribute>);
 
 impl<S> NodeEditor<S>
 where
@@ -66,8 +60,8 @@ where
         self.show_editor(ui);
     }
 
-    fn configure_app_world(world: &mut specs::World) {
-        world.register::<AttributeGraph>();
+    fn configure_app_world(_: &mut specs::World) {
+        
     }
 
     fn configure_app_systems(_: &mut specs::DispatcherBuilder) {
@@ -84,7 +78,6 @@ where
         Entities<'a>,
         ReadStorage<'a, SectionAttributes>,
         ReadStorage<'a, Section<S>>,
-        WriteStorage<'a, AttributeGraph>,
         WriteStorage<'a, Loader>,
         Read<'a, RuntimeEditor<S>>,
     );
@@ -96,7 +89,7 @@ where
     /// system
     fn run(
         &mut self,
-        (entities, attributes, sections, _attribute_graph, mut section_loader, runtime): Self::SystemData,
+        (entities, attributes, sections, mut section_loader, runtime): Self::SystemData,
     ) {
         if let None = self.runtime_editor {
             self.runtime_editor = Some(runtime.clone());
@@ -379,7 +372,7 @@ where
                                             }
     
                                             if ui.button("Save attribute store") {
-                                                section.attributes.add_attribute(editor.save_attribute_store(*id));
+                                                section.attributes.copy_attribute(&editor.save_attribute_store(*id));
                                             }
 
                                             section.edit_attr(
@@ -396,11 +389,11 @@ where
 
                         editor.show_editor(ui);
 
-                        if let Some(section) = self.sections.get_mut(id) {
-                            editor.resolve_attributes().iter().cloned().for_each(|a| {
-                                section.attributes.add_attribute(a);
-                            });
-                        }
+                        // if let Some(section) = self.sections.get_mut(id) {
+                        //     editor.resolve_attributes().iter().for_each(|a| {
+                        //         section.attributes.copy_attribute(a);
+                        //     });
+                        // }
                     });
             }
         }

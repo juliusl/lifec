@@ -11,7 +11,7 @@ use specs::{
     WriteStorage,
 };
 
-use crate::{RuntimeState};
+use crate::{RuntimeState, AttributeGraph};
 
 use super::{event_graph::EventGraph, unique_title, Section, SectionAttributes};
 
@@ -178,6 +178,11 @@ where
     fn into(self) -> Section<S> {
         let section = Section::<S>::new(
             self.label.to_string(),
+            AttributeGraph::default()
+                .with_text("label", self.label.clone())
+                .with_text("on", self.on.clone())
+                .with_text("dispatch", self.dispatch.clone())
+                .with_text("call", self.call.clone()),
             |s, ui| {
                 s.edit_attr("edit the 'on' property", "on", ui);
                 s.edit_attr("edit the 'dispatch' property", "dispatch", ui);
@@ -185,15 +190,6 @@ where
             },
             S::default(),
         );
-
-        let attributes = section
-            .edit_attributes()
-            .with_text("label", self.label.clone())
-            .with_text("on", self.on.clone())
-            .with_text("dispatch", self.dispatch.clone())
-            .with_text("call", self.call.clone());
-
-        *section.edit_attributes() = attributes;
 
         section
     }

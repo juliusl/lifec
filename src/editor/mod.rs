@@ -29,6 +29,7 @@ pub use runtime_editor::Loader;
 pub use section::Section;
 pub use section::SectionExtension;
 
+use crate::AttributeGraph;
 use crate::Runtime;
 use crate::RuntimeState;
 use crate::plugins::Project;
@@ -111,6 +112,7 @@ pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
             w.register::<Section<RtS>>();
             w.register::<SectionAttributes>();
             w.register::<EventGraph>();
+            w.register::<AttributeGraph>();
             w.insert(Loader::Empty);
 
             Project::configure_app_systems(d);

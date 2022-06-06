@@ -1,10 +1,10 @@
-use std::{fmt::Display, fs, path::Path, collections::BTreeMap};
+use std::{fmt::Display, fs, path::Path};
 
 use super::{unique_title, App, Attribute, ShowEditor, Value, SectionAttributes};
 use crate::{RuntimeState, AttributeGraph};
 use imgui::CollapsingHeader;
 use serde::{Deserialize, Serialize};
-use specs::{Component, HashMapStorage};
+use specs::{Component, HashMapStorage, Entity};
 
 /// This trait allows others to author extensions using Section<S> as the main runtime-state
 /// for the extension
@@ -50,6 +50,7 @@ where
 impl<S: RuntimeState> Section<S> {
     pub fn new(
         title: impl AsRef<str>,
+        attributes: AttributeGraph,
         show: fn(&mut Section<S>, &imgui::Ui),
         initial_state: S,
     ) -> Section<S> {
@@ -62,10 +63,10 @@ impl<S: RuntimeState> Section<S> {
             state: initial_state,
             enable_app_systems: false,
             enable_edit_attributes: false,
-            attributes: AttributeGraph::default(),
+            attributes,
         };
 
-        state_attrs.iter().for_each(|a| section.attributes.add_attribute(a.clone()) );
+        state_attrs.iter().for_each(|a| section.attributes.copy_attribute(a) );
         section
     }
 
@@ -210,36 +211,39 @@ impl<S: RuntimeState> Section<S> {
     }
 
     /// try to load a file into an attribute
-    pub fn with_file(&mut self, file_name: impl AsRef<Path> + AsRef<str> + Display) -> Self {
+    pub fn with_file(&mut self, file_name: impl AsRef<Path> + AsRef<str> + Display) -> &mut Self {
         self.with_file_src(&file_name, &file_name)
     }
 
-    /// try to load a file into an attribute
-    pub fn with_file_src(&mut self, file_name: impl AsRef<str>, src: impl AsRef<Path> + AsRef<str> + Display)-> Self {
+    // /// try to load a file into an attribute
+    pub fn with_file_src(&mut self, file_name: impl AsRef<str>, src: impl AsRef<Path> + AsRef<str> + Display)-> &mut Self {
         match fs::read_to_string(&src) {
-            Ok(contents) => self.attributes.update(move |next| {
-                next.add_binary_attr(format!("file::{}", file_name.as_ref()), contents.as_bytes().to_vec())
-            }),
-            Err(err) => {
-                eprintln!(
+            Ok(contents) => self.edit_attributes().add_binary_attr(format!("file::{}", file_name.as_ref()), contents.as_bytes().to_vec()),
+            Err(err) => eprintln!(
                     "Could not load file '{}', for with_file on section '{}', entity {}. Error: {}",
                     &src, self.title, self.id, err
-                );
-                self.update(|_| {})
-            }
+                )
         }
-    }
-
-    pub fn with_title(&mut self, title: impl AsRef<str>) -> &mut Self {
-        let attributes = self.attributes.with_text("title::", title);
-
-        *self.edit_attributes() = attributes;
-
         self
     }
 
-    pub fn with_attribute(&mut self, attribute: Attribute) -> &mut Self {
-        self.edit_attributes().add_attribute(attribute);
+    pub fn with_title(&mut self, title: impl AsRef<str>) -> &mut Self {
+        self.edit_attributes().add_text_attr("title::", title);
+        self
+    }
+
+    pub fn with_attribute(&mut self, attribute: &Attribute) -> &mut Self {
+        self.edit_attributes().copy_attribute(attribute);
+        self
+    }
+
+    pub fn with_parent_entity(&mut self, entity: Entity) -> &mut Self {
+        self.edit_attributes().set_parent_entity(entity);
+        self
+    }
+
+    pub fn with_parent_entity_id(&mut self, entity_id: u32) -> &mut Self {
+        self.edit_attributes().set_parent_entity_id(entity_id);
         self
     }
 
@@ -280,7 +284,7 @@ impl<S: RuntimeState> App for Section<S> {
     fn show_editor(&mut self, ui: &imgui::Ui) {
         if CollapsingHeader::new(&self.title)
             .default_open({
-                if let Some(Value::Bool(true)) = self.get_attr_value("opened::") {
+                if let Some(Value::Bool(true)) = self.attributes.get_attr_value("opened::") {
                     true
                 } else {
                     false || (self.id == 0)
@@ -347,7 +351,7 @@ where
 {
     fn cleanup_empty_attributes(&mut self) {
         self.attributes.clone().iter_attributes().filter(|v| v.value() == &Value::Empty).for_each(|v| {
-            self.attributes.remove(v.name());
+            self.attributes.remove(v);
         });
     }
 }

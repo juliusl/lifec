@@ -15,7 +15,7 @@ use std::{
 use super::{
     event_graph::EventGraph, section::Section, unique_title, App, Attribute, EventComponent, Value,
 };
-use crate::{Action, Runtime, RuntimeState};
+use crate::{Action, Runtime, RuntimeState, AttributeGraph};
 
 #[derive(Clone)]
 pub struct RuntimeEditor<S>
@@ -66,16 +66,19 @@ impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
 
         let mut sections: BTreeMap<u32, Section<S>> = BTreeMap::new();
         let sections = &mut sections;
-        runtime.attributes.iter().for_each(|a| {
+        runtime.attributes.iter_attributes().for_each(|a| {
             if let Some(section) = sections.get_mut(&a.id()) {
-                section.attributes.add_attribute(a.clone());
+                section.attributes.copy_attribute(a);
             } else {
+                let mut section = Section::<S>::default();
+                let section = section
+                    .with_parent_entity_id(a.id())
+                    .with_attribute(a)
+                    .with_title(format!("Runtime Entity {}", a.id()));
+                let section = section.to_owned();
                 sections.insert(
                     a.id(),
-                    Section::<S>::default()
-                        .with_attribute(a.clone())
-                        .with_title(format!("Runtime Entity {}", a.id()))
-                        .with_parent_entity(a.id()),
+                    section,
                 );
             }
         });
@@ -308,6 +311,12 @@ where
                 let next = entities.create();
                 let section = Section::new(
                     unique_title(format!("{}", self.runtime.context())),
+                    AttributeGraph::from(next)
+                        .with_text("context::", format!("{}", self.runtime.context()))
+                        .with_bool("enable event builder", false)
+                        .with_bool("enable node editor", false)
+                        .with_text("project::name::", unique_title("snapshot"))
+                        .with_bool("enable project", false),
                     |s, ui| {
                         s.edit_attr("Enable Node Editor", "enable node editor", ui);
                         s.edit_attr("Enable Event Editor", "enable event builder", ui);
@@ -319,13 +328,7 @@ where
                     state.clone(),
                 )
                 .enable_app_systems()
-                .enable_edit_attributes()
-                .with_text("context::", format!("{}", self.runtime.context()))
-                .with_bool("enable event builder", false)
-                .with_bool("enable node editor", false)
-                .with_text("project::name::", unique_title("snapshot"))
-                .with_bool("enable project", false)
-                .with_parent_entity(next.id());
+                .enable_edit_attributes();
 
                 let section_attrs = SectionAttributes(section.into_attributes());
 
@@ -482,8 +485,8 @@ where
                     Some(_) => {
                         if let Some(section) = sections.get_mut(entity) {
                             println!("Existing section found, updating attributes");
-                            attributes.clone_attrs().iter().cloned().for_each(|a| {
-                                section.attributes.add_attribute(a);
+                            attributes.clone_attrs().iter().for_each(|a| {
+                                section.attributes.copy_attribute(a);
                             });
 
                             section.next_gen();
@@ -501,21 +504,20 @@ where
                         section.state = initial;
 
                         attributes.iter().for_each(|a| {
-                            section.attributes.add_attribute(a.clone());
+                            section.attributes.copy_attribute(a);
                         });
 
                         if let Some(Value::TextBuffer(title)) =
                             section.clone().attributes.get_attr_value("title::")
                         {
-                            let id = entity.id();
                             let section =
-                                section.with_title(title.to_string()).with_parent_entity(id);
+                                section.with_title(title.to_string()).with_parent_entity(entity);
 
                             match sections.insert(entity, section.clone()) {
                                 Ok(_) => {
                                     println!(
-                                        "RuntimeDispatcher added Section {}, {}",
-                                        id, &section.title
+                                        "RuntimeDispatcher added Section {:?}, {}",
+                                        entity, &section.title
                                     );
                                 }
                                 Err(err) => {
@@ -539,7 +541,8 @@ where
                 if let Some(section) = runtime.sections.get(&e.id()) {
                     match sections.insert(e, section.clone()) {
                         Ok(_) => {
-                            let mut section = section.clone().with_parent_entity(e.id());
+                            let mut section = section.clone();
+                            let section = section.with_parent_entity(e);
                             if let Some(state) = runtime.runtime.current() {
                                 section.state = state.clone();
                             }
@@ -639,7 +642,7 @@ where
         // This will apply the sections current state and attributes to the current runtime
         runtime.state = Some(S::from_attributes(section.into_attributes()));
         section.attributes.iter_attributes().for_each(|a| {
-            runtime.attribute(a.clone());
+            runtime.attribute(a);
         });
         if let Some(Value::TextBuffer(event)) = section.attributes.get_attr_value("context::") {
             runtime = runtime.parse_event(&event);
@@ -712,7 +715,7 @@ where
 
             ui.same_line();
             if ui.button("Clear Attributes") {
-                self.runtime.attributes.clear();
+                self.runtime.attributes.clear_index();
             }
         });
         ui.new_line();
@@ -728,12 +731,12 @@ where
             ui.new_line();
         }
 
-        if !self.runtime.attributes.is_empty() {
+        if !self.runtime.attributes.is_index_empty() {
             if CollapsingHeader::new(format!("Runtime Attributes"))
                 .leaf(true)
                 .build(ui)
             {
-                self.runtime.attributes.iter().for_each(|a| {
+                self.runtime.attributes.iter_attributes().for_each(|a| {
                     ui.text(format!("{}", a));
                 });
             }

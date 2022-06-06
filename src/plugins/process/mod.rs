@@ -12,7 +12,6 @@ use std::{
 };
 
 use super::thunks::Thunk;
-use crate::AttributeGraph;
 use crate::editor::SectionAttributes;
 use crate::parse_variables;
 use crate::{

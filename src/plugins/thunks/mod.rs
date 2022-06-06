@@ -170,6 +170,7 @@ impl App for ThunkContext {
     fn show_editor(&mut self, ui: &imgui::Ui) {
         let mut section = Section::<ThunkContext>::new(
             format!("{} {}", self.symbol, self.node_title),
+            AttributeGraph::default(),
             |s, ui| {
                 let mut set = BTreeSet::new();
 

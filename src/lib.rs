@@ -1,248 +1,14 @@
-use atlier::system::{Attribute, Value};
+use atlier::system::Attribute;
 use logos::Logos;
 use parser::Lifecycle;
-use serde::{Serialize, Deserialize};
-use specs::Entity;
 use std::any::Any;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
 
 pub mod editor;
 pub mod plugins;
-
-#[derive(Debug, Default, Clone, Hash, Serialize, Deserialize, PartialEq, PartialOrd)]
-pub struct AttributeGraph {
-    entity: u32,
-    index: BTreeMap<String, Attribute>
-}
-
-impl From<Entity> for AttributeGraph {
-    fn from(entity: Entity) -> Self {
-        AttributeGraph { entity: entity.id(), index: BTreeMap::default() }
-    }
-}
-
-impl AttributeGraph {
-    pub fn iter_mut_attributes(&mut self) -> impl Iterator<Item = &mut Attribute> {
-        self.index.iter_mut().map(|(_, a)| a)
-    }
-
-    pub fn iter_attributes(&self) -> impl Iterator<Item = &Attribute> {
-        self.index.values().into_iter()
-    }
-
-    pub fn get_attr_value(&self, with_name: impl AsRef<str>) -> Option<&Value> {
-        self.get_attr(with_name).and_then(|a| Some(a.value()))
-    }
-
-    pub fn get_attr_value_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Value> {
-        self.get_attr_mut(with_name)
-            .and_then(|a| Some(a.get_value_mut()))
-    }
-
-    pub fn get_attr(&self, with_name: impl AsRef<str>) -> Option<&Attribute> {
-        self.index
-            .iter()
-            .find(|(_, attr)| attr.name() == with_name.as_ref())
-            .and_then(|(_, a)|Some(a))
-    }
-
-    pub fn get_attr_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Attribute> {
-        self.index
-            .iter_mut()
-            .find(|(_, attr)| attr.name() == with_name.as_ref())
-            .and_then(|(_, a)|Some(a))
-    }
-
-    pub fn with_symbol(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) -> Self {
-        self.with(name, Value::Symbol(symbol.as_ref().to_string()))
-    }
-
-    pub fn with_empty(&mut self, name: impl AsRef<str>) -> Self {
-        self.with(name, Value::Empty)
-    }
-
-    pub fn with_text(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) -> Self {
-        self.with(name, Value::TextBuffer(init_value.as_ref().to_string()))
-    }
-
-    pub fn with_int(&mut self, name: impl AsRef<str>, init_value: i32) -> Self {
-        self.with(name, Value::Int(init_value))
-    }
-
-    pub fn with_float(&mut self, name: impl AsRef<str>, init_value: f32) -> Self {
-        self.with(name, Value::Float(init_value))
-    }
-
-    pub fn with_bool(&mut self, name: impl AsRef<str>, init_value: bool) -> Self {
-        self.with(name, Value::Bool(init_value))
-    }
-
-    pub fn with_float_pair(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) -> Self {
-        self.with(name, Value::FloatPair(init_value[0], init_value[1]))
-    }
-
-    pub fn with_int_pair(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) -> Self {
-        self.with(name, Value::IntPair(init_value[0], init_value[1]))
-    }
-
-    pub fn with_int_range(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) -> Self {
-        self.with(name, Value::IntRange(init_value[0], init_value[1], init_value[2]))
-    }
-
-    pub fn with_float_range(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) -> Self {
-        self.with(name, Value::FloatRange(init_value[0], init_value[1], init_value[2]))
-    }
-
-    pub fn with(&mut self, name: impl AsRef<str>, value: Value) -> Self {
-        self.update(move |g| match value {
-            Value::Empty => {
-                g.add_empty_attr(name);
-            },
-            Value::Symbol(symbol) => {
-                g.add_symbol(name, symbol);
-            },
-            Value::TextBuffer(text_buffer) => {
-                g.add_text_attr(name, text_buffer);
-            },
-            Value::Float(init_value) => {
-                g.add_float_attr(name, init_value);
-            },
-            Value::Int(init_value) => {
-                g.add_int_attr(name, init_value);
-            },
-            Value::Bool(init_value) => {
-                g.add_bool_attr(name, init_value);
-            },
-            Value::IntPair(e0, e1) => {
-                g.add_int_pair_attr(name, &[e0, e1]);
-            },
-            Value::FloatPair(e0, e1) => {
-                g.add_float_pair_attr(name, &[e0, e1]);
-            },
-            Value::FloatRange(value, min, max) => {
-                g.add_float_range_attr(name, &[value, min, max]);
-            },
-            Value::IntRange(value, min, max) => {
-                g.add_int_range_attr(name, &[value, min, max]);
-            },
-            Value::BinaryVector(init_value) => {
-                g.add_binary_attr(name, init_value);
-            },
-            Value::Reference(init_value) => {
-                g.add_reference(name, init_value);
-            },
-        })
-    }
-
-    pub fn add_reference(&mut self, name: impl AsRef<str>, init_value: impl Into<u64>) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::Reference(init_value.into()),
-        ));
-    }
-
-    pub fn add_symbol(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::Symbol(symbol.as_ref().to_string()),
-        ));
-    }
-
-    pub fn add_empty_attr(&mut self, name: impl AsRef<str>) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::Empty,
-        ));
-    }
-
-    pub fn add_binary_attr(&mut self, name: impl AsRef<str>, init_value: impl Into<Vec<u8>>) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::BinaryVector(init_value.into()),
-        ));
-    }
-
-    pub fn add_text_attr(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::TextBuffer(init_value.as_ref().to_string()),
-        ));
-    }
-
-    pub fn add_int_attr(&mut self, name: impl AsRef<str>, init_value: i32) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::Int(init_value),
-        ));
-    }
-
-    pub fn add_float_attr(&mut self, name: impl AsRef<str>, init_value: f32) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::Float(init_value),
-        ));
-    }
-
-    pub fn add_bool_attr(&mut self, name: impl AsRef<str>, init_value: bool) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::Bool(init_value),
-        ));
-    }
-
-    pub fn add_float_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::FloatPair(init_value[0], init_value[1]),
-        ));
-    }
-
-    pub fn add_int_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::IntPair(init_value[0], init_value[1]),
-        ));
-    }
-
-    pub fn add_int_range_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::IntRange(init_value[0], init_value[1], init_value[2]),
-        ));
-    }
-
-    pub fn add_float_range_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) {
-        self.add_attribute(Attribute::new(
-            self.entity,
-            name.as_ref().to_string(),
-            Value::FloatRange(init_value[0], init_value[1], init_value[2]),
-        ));
-    }
-
-    fn add_attribute(&mut self, attr: Attribute) {
-        self.index.insert(attr.to_string(), attr);
-    }
-
-    fn update(&mut self, func: impl FnOnce(&mut Self)) -> Self {
-        let next = self;
-
-        (func)(next);
-
-        next.to_owned()
-    }
-}
+pub mod state;
+pub use state::AttributeGraph;
 
 pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
     type Error;
@@ -488,7 +254,7 @@ where
     calls: BTreeMap<String, ThunkFunc<T>>,
     state: Option<T>,
     current: Option<Event>,
-    attributes: BTreeSet<Attribute>,
+    attributes: AttributeGraph,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -844,15 +610,15 @@ where
         self.listeners.clone()
     }
 
-    pub fn with_attribute(&mut self, attribute: Attribute) -> Self {
-        let mut _s = self.clone();
-        let _s = &mut _s;
-        _s.attribute(attribute);
-        _s.clone()
+    /// Adds an attribute to this runtime and returns itself for further mutation
+    pub fn with_attribute(&mut self, attribute: Attribute) -> &mut Self {
+        self.attribute(&attribute);
+        self
     }
 
-    pub fn attribute(&mut self, attribute: Attribute) {
-        self.attributes.insert(attribute);
+    /// This add's an attribute to the runtime
+    pub fn attribute(&mut self, attribute: &Attribute) {
+        self.attributes.copy_attribute(attribute);
     }
 
     /// on parses an event expression, and adds a new listener for that event
