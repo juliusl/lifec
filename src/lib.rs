@@ -13,16 +13,87 @@ pub mod plugins;
 #[derive(Debug, Default, Clone, Hash, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct AttributeGraph {
     entity: u32,
-    index: BTreeSet<Attribute>
+    index: BTreeMap<String, Attribute>
 }
 
 impl From<Entity> for AttributeGraph {
     fn from(entity: Entity) -> Self {
-        AttributeGraph { entity: entity.id(), index: BTreeSet::default() }
+        AttributeGraph { entity: entity.id(), index: BTreeMap::default() }
     }
 }
 
 impl AttributeGraph {
+    pub fn iter_mut_attributes(&mut self) -> impl Iterator<Item = &mut Attribute> {
+        self.index.iter_mut().map(|(_, a)| a)
+    }
+
+    pub fn iter_attributes(&self) -> impl Iterator<Item = &Attribute> {
+        self.index.values().into_iter()
+    }
+
+    pub fn get_attr_value(&self, with_name: impl AsRef<str>) -> Option<&Value> {
+        self.get_attr(with_name).and_then(|a| Some(a.value()))
+    }
+
+    pub fn get_attr_value_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Value> {
+        self.get_attr_mut(with_name)
+            .and_then(|a| Some(a.get_value_mut()))
+    }
+
+    pub fn get_attr(&self, with_name: impl AsRef<str>) -> Option<&Attribute> {
+        self.index
+            .iter()
+            .find(|(_, attr)| attr.name() == with_name.as_ref())
+            .and_then(|(_, a)|Some(a))
+    }
+
+    pub fn get_attr_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Attribute> {
+        self.index
+            .iter_mut()
+            .find(|(_, attr)| attr.name() == with_name.as_ref())
+            .and_then(|(_, a)|Some(a))
+    }
+
+    pub fn with_symbol(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) -> Self {
+        self.with(name, Value::Symbol(symbol.as_ref().to_string()))
+    }
+
+    pub fn with_empty(&mut self, name: impl AsRef<str>) -> Self {
+        self.with(name, Value::Empty)
+    }
+
+    pub fn with_text(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) -> Self {
+        self.with(name, Value::TextBuffer(init_value.as_ref().to_string()))
+    }
+
+    pub fn with_int(&mut self, name: impl AsRef<str>, init_value: i32) -> Self {
+        self.with(name, Value::Int(init_value))
+    }
+
+    pub fn with_float(&mut self, name: impl AsRef<str>, init_value: f32) -> Self {
+        self.with(name, Value::Float(init_value))
+    }
+
+    pub fn with_bool(&mut self, name: impl AsRef<str>, init_value: bool) -> Self {
+        self.with(name, Value::Bool(init_value))
+    }
+
+    pub fn with_float_pair(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) -> Self {
+        self.with(name, Value::FloatPair(init_value[0], init_value[1]))
+    }
+
+    pub fn with_int_pair(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) -> Self {
+        self.with(name, Value::IntPair(init_value[0], init_value[1]))
+    }
+
+    pub fn with_int_range(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) -> Self {
+        self.with(name, Value::IntRange(init_value[0], init_value[1], init_value[2]))
+    }
+
+    pub fn with_float_range(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) -> Self {
+        self.with(name, Value::FloatRange(init_value[0], init_value[1], init_value[2]))
+    }
+
     pub fn with(&mut self, name: impl AsRef<str>, value: Value) -> Self {
         self.update(move |g| match value {
             Value::Empty => {
@@ -160,11 +231,11 @@ impl AttributeGraph {
         ));
     }
 
-    pub fn add_attribute(&mut self, attr: Attribute) {
-        self.index.insert(attr);
+    fn add_attribute(&mut self, attr: Attribute) {
+        self.index.insert(attr.to_string(), attr);
     }
 
-    pub fn update(&mut self, func: impl FnOnce(&mut Self)) -> Self {
+    fn update(&mut self, func: impl FnOnce(&mut Self)) -> Self {
         let next = self;
 
         (func)(next);

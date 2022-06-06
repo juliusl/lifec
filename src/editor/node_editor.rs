@@ -1,5 +1,5 @@
 use super::{
-    node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor, Section, SectionAttributes,
+    node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor, Section, SectionAttributes, ShowEditor,
 };
 use crate::{editor::unique_title, plugins::Thunk, Runtime, RuntimeState};
 use atlier::system::{App, Attribute, Extension, Value};
@@ -379,7 +379,7 @@ where
                                             }
     
                                             if ui.button("Save attribute store") {
-                                                section.add_attribute(editor.save_attribute_store(*id));
+                                                section.attributes.add_attribute(editor.save_attribute_store(*id));
                                             }
 
                                             section.edit_attr(
@@ -398,7 +398,7 @@ where
 
                         if let Some(section) = self.sections.get_mut(id) {
                             editor.resolve_attributes().iter().cloned().for_each(|a| {
-                                section.add_attribute(a);
+                                section.attributes.add_attribute(a);
                             });
                         }
                     });

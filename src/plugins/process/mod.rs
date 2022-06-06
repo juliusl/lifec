@@ -12,6 +12,7 @@ use std::{
 };
 
 use super::thunks::Thunk;
+use crate::AttributeGraph;
 use crate::editor::SectionAttributes;
 use crate::parse_variables;
 use crate::{
@@ -166,8 +167,8 @@ impl Process {
 
         if ui.button("execute") {
             match (
-                section.get_attr_value("command"),
-                section.get_attr_value("subcommands"),
+                section.attributes.get_attr_value("command"),
+                section.attributes.get_attr_value("subcommands"),
             ) {
                 (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommand))) => {
                     if let Some(next) = section
@@ -188,31 +189,31 @@ impl Process {
         }
 
         section.state.flags.clear();
-        section
-            .attributes
-            .clone()
-            .iter_mut()
-            .filter(|(_, f)| f.name().starts_with("arg::"))
-            .for_each(|(_, arg)| {
-                let arg_name = &arg.name()[5..];
-                if arg_name.is_empty() {
-                    return;
-                }
+        // section
+        //     .attributes
+        //     .clone()
+        //     .iter_mut()
+        //     .filter(|(_, f)| f.name().starts_with("arg::"))
+        //     .for_each(|(_, arg)| {
+        //         let arg_name = &arg.name()[5..];
+        //         if arg_name.is_empty() {
+        //             return;
+        //         }
 
-                if let Value::TextBuffer(value) = arg.value() {
-                    section.edit_state_string(
-                        format!("edit flag {}", arg_name),
-                        arg.name(),
-                        |s| {
-                            if let None = s.flags.get(arg_name) {
-                                s.flags.insert(arg_name.to_string(), value.to_string());
-                            }
-                            s.flags.get_mut(arg_name)
-                        },
-                        ui,
-                    );
-                }
-            });
+        //         if let Value::TextBuffer(value) = arg.value() {
+        //             section.edit_state_string(
+        //                 format!("edit flag {}", arg_name),
+        //                 arg.name(),
+        //                 |s| {
+        //                     if let None = s.flags.get(arg_name) {
+        //                         s.flags.insert(arg_name.to_string(), value.to_string());
+        //                     }
+        //                     s.flags.get_mut(arg_name)
+        //                 },
+        //                 ui,
+        //             );
+        //         }
+        //     });
     }
 }
 

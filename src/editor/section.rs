@@ -1,7 +1,7 @@
 use std::{fmt::Display, fs, path::Path, collections::BTreeMap};
 
 use super::{unique_title, App, Attribute, ShowEditor, Value, SectionAttributes};
-use crate::RuntimeState;
+use crate::{RuntimeState, AttributeGraph};
 use imgui::CollapsingHeader;
 use serde::{Deserialize, Serialize};
 use specs::{Component, HashMapStorage};
@@ -32,7 +32,7 @@ where
     /// title of this section, will be the header
     pub title: String,
     /// attributes are properties that this section owns and are editable
-    pub attributes: BTreeMap<String, Attribute>,
+    pub attributes: AttributeGraph,
     /// enable to allow external systems to make changes to state,
     /// in order for systems to commit these changes, RuntimeState::merge_with must be implemented (this is set todo!() by default)
     pub enable_app_systems: bool,
@@ -62,10 +62,10 @@ impl<S: RuntimeState> Section<S> {
             state: initial_state,
             enable_app_systems: false,
             enable_edit_attributes: false,
-            attributes: BTreeMap::new(),
+            attributes: AttributeGraph::default(),
         };
 
-        state_attrs.iter().for_each(|a| section.add_attribute(a.clone()) );
+        state_attrs.iter().for_each(|a| section.attributes.add_attribute(a.clone()) );
         section
     }
 
@@ -82,31 +82,8 @@ impl<S: RuntimeState> Section<S> {
         self.id
     }
 
-    pub fn get_attr_value(&self, with_name: impl AsRef<str>) -> Option<&Value> {
-        self.get_attr(with_name).and_then(|a| Some(a.value()))
-    }
-
-    pub fn get_attr_value_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Value> {
-        self.get_attr_mut(with_name)
-            .and_then(|a| Some(a.get_value_mut()))
-    }
-
-    pub fn get_attr(&self, with_name: impl AsRef<str>) -> Option<&Attribute> {
-        self.attributes
-            .iter()
-            .find(|(_, attr)| attr.name() == with_name.as_ref())
-            .and_then(|(_, a)|Some(a))
-    }
-
-    pub fn get_attr_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Attribute> {
-        self.attributes
-            .iter_mut()
-            .find(|(_, attr)| attr.name() == with_name.as_ref())
-            .and_then(|(_, a)|Some(a))
-    }
-
     pub fn show_debug(&mut self, attr_name: impl AsRef<str>, ui: &imgui::Ui) {
-        if let Some(value) = self.get_attr(attr_name) {
+        if let Some(value) = self.attributes.get_attr(attr_name) {
             ui.label_text(
                 format!("Debug view of: {}, Entity: {}", value.name(), value.id()),
                 format!("{:?}", value),
@@ -115,7 +92,7 @@ impl<S: RuntimeState> Section<S> {
     }
 
     pub fn is_attr_checkbox(&self, with_name: impl AsRef<str>) -> Option<bool> {
-        if let Some(Value::Bool(value)) = self.get_attr(with_name).and_then(|a| Some(a.value())) {
+        if let Some(Value::Bool(value)) = self.attributes.get_attr(with_name).and_then(|a| Some(a.value())) {
             Some(*value)
         } else {
             None
@@ -128,7 +105,7 @@ impl<S: RuntimeState> Section<S> {
         update: impl Fn(&Attribute, &mut S),
     ) {
         let clone = self.clone();
-        let attr = clone.get_attr(attr_name);
+        let attr = clone.attributes.get_attr(attr_name);
         if let Some(attr) = attr {
             let state = &mut self.state;
             update(attr, state);
@@ -161,7 +138,7 @@ impl<S: RuntimeState> Section<S> {
         attr_name: impl AsRef<str>,
         ui: &imgui::Ui,
     ) {
-        if let Some(Value::Float(width)) = self.get_attr_value("edit_width::") {
+        if let Some(Value::Float(width)) = self.attributes.get_attr_value("edit_width::") {
             ui.set_next_item_width(*width);
         } else {
             ui.set_next_item_width(130.0);
@@ -169,7 +146,7 @@ impl<S: RuntimeState> Section<S> {
 
         let label = format!("{} {}", label, self.id);
         let attr_name = attr_name.as_ref().to_string();
-        match self.get_attr_value_mut(&attr_name) {
+        match self.attributes.get_attr_value_mut(&attr_name) {
             Some(Value::TextBuffer(val)) => {
                 ui.input_text(label, val).build();
             }
@@ -202,7 +179,7 @@ impl<S: RuntimeState> Section<S> {
             }
             None => {}
             _ => {
-                match self.get_attr_mut(&attr_name) {
+                match self.attributes.get_attr_mut(&attr_name) {
                     Some(attr) => {
                         attr.show_editor(ui);
                     },
@@ -215,7 +192,7 @@ impl<S: RuntimeState> Section<S> {
     /// This method allows you to create a custom editor for your attribute,
     /// in case the built in methods are not enough
     pub fn edit_attr_custom(&mut self, attr_name: impl AsRef<str>, show: impl Fn(&mut Attribute)) {
-        if let Some(attr) = self.get_attr_mut(attr_name) {
+        if let Some(attr) = self.attributes.get_attr_mut(attr_name) {
             show(attr);
         }
     }
@@ -232,14 +209,6 @@ impl<S: RuntimeState> Section<S> {
         next
     }
 
-    pub fn with_symbol(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) -> Self {
-        self.update(move |next| next.add_symbol(name, symbol))
-    }
-
-    pub fn with_empty(&mut self, name: impl AsRef<str>) -> Self {
-        self.update(move |next| next.add_empty_attr(name))
-    }
-
     /// try to load a file into an attribute
     pub fn with_file(&mut self, file_name: impl AsRef<Path> + AsRef<str> + Display) -> Self {
         self.with_file_src(&file_name, &file_name)
@@ -248,7 +217,7 @@ impl<S: RuntimeState> Section<S> {
     /// try to load a file into an attribute
     pub fn with_file_src(&mut self, file_name: impl AsRef<str>, src: impl AsRef<Path> + AsRef<str> + Display)-> Self {
         match fs::read_to_string(&src) {
-            Ok(contents) => self.update(move |next| {
+            Ok(contents) => self.attributes.update(move |next| {
                 next.add_binary_attr(format!("file::{}", file_name.as_ref()), contents.as_bytes().to_vec())
             }),
             Err(err) => {
@@ -261,157 +230,29 @@ impl<S: RuntimeState> Section<S> {
         }
     }
 
-    pub fn with_title(&mut self, title: impl AsRef<str>) -> Self {
-        self.update(move |next| next.title = title.as_ref().to_string())
+    pub fn with_title(&mut self, title: impl AsRef<str>) -> &mut Self {
+        let attributes = self.attributes.with_text("title::", title);
+
+        *self.edit_attributes() = attributes;
+
+        self
     }
 
-    pub fn with_attribute(&mut self, attr: Attribute) -> Self {
-        let attr = attr;
-        self.update(move |next| next.add_attribute(attr))
+    pub fn with_attribute(&mut self, attribute: Attribute) -> &mut Self {
+        self.edit_attributes().add_attribute(attribute);
+        self
     }
 
-    pub fn with_text(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) -> Self {
-        self.update(move |next| next.add_text_attr(name, init_value))
+    pub fn edit_attributes(&mut self) -> &mut AttributeGraph {
+        &mut self.attributes
     }
 
-    pub fn with_int(&mut self, name: impl AsRef<str>, init_value: i32) -> Self {
-        self.update(move |next| next.add_int_attr(name, init_value))
-    }
-
-    pub fn with_float(&mut self, name: impl AsRef<str>, init_value: f32) -> Self {
-        self.update(move |next| next.add_float_attr(name, init_value))
-    }
-
-    pub fn with_bool(&mut self, name: impl AsRef<str>, init_value: bool) -> Self {
-        self.update(move |next| next.add_bool_attr(name, init_value))
-    }
-
-    pub fn with_float_pair(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) -> Self {
-        self.update(move |next| next.add_float_pair_attr(name, init_value))
-    }
-
-    pub fn with_int_pair(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) -> Self {
-        self.update(move |next| next.add_int_pair_attr(name, init_value))
-    }
-
-    pub fn with_int_range(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) -> Self {
-        self.update(move |next| next.add_int_range_attr(name, init_value))
-    }
-
-    pub fn with_float_range(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) -> Self {
-        self.update(move |next| next.add_float_range_attr(name, init_value))
-    }
-
-    pub fn with_parent_entity(&mut self, id: u32) -> Self {
-        self.update(move |next| next.set_parent_entity(id))
-    }
-
-    pub fn add_symbol(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) {
-        self.add_attribute(Attribute::new(
-            self.id,
-            name.as_ref().to_string(),
-            Value::Symbol(symbol.as_ref().to_string()),
-        ));
-    }
-
-    pub fn add_empty_attr(&mut self, name: impl AsRef<str>) {
-        self.add_attribute(Attribute::new(
-            self.id,
-            name.as_ref().to_string(),
-            Value::Empty,
-        ));
-    }
-
-    pub fn add_binary_attr(&mut self, name: impl AsRef<str>, init_value: impl Into<Vec<u8>>) {
-        self.add_attribute(Attribute::new(
-            self.id,
-            name.as_ref().to_string(),
-            Value::BinaryVector(init_value.into()),
-        ));
-    }
-
-    pub fn add_text_attr(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) {
-        self.add_attribute(Attribute::new(
-            self.id,
-            name.as_ref().to_string(),
-            Value::TextBuffer(init_value.as_ref().to_string()),
-        ));
-    }
-
-    pub fn add_int_attr(&mut self, name: impl AsRef<str>, init_value: i32) {
-        self.add_attribute(Attribute::new(
-            self.id,
-            name.as_ref().to_string(),
-            Value::Int(init_value),
-        ));
-    }
-
-    pub fn add_float_attr(&mut self, name: impl AsRef<str>, init_value: f32) {
-        self.add_attribute(Attribute::new(
-            self.id,
-            name.as_ref().to_string(),
-            Value::Float(init_value),
-        ));
-    }
-
-    pub fn add_bool_attr(&mut self, name: impl AsRef<str>, init_value: bool) {
-        self.add_attribute(Attribute::new(
-            self.id,
-            name.as_ref().to_string(),
-            Value::Bool(init_value),
-        ));
-    }
-
-    pub fn add_float_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) {
-        self.add_attribute(Attribute::new(
-            self.id,
-            name.as_ref().to_string(),
-            Value::FloatPair(init_value[0], init_value[1]),
-        ));
-    }
-
-    pub fn add_int_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) {
-        self.add_attribute(Attribute::new(
-            self.id,
-            name.as_ref().to_string(),
-            Value::IntPair(init_value[0], init_value[1]),
-        ));
-    }
-
-    pub fn add_int_range_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) {
-        self.add_attribute(Attribute::new(
-            self.id,
-            name.as_ref().to_string(),
-            Value::IntRange(init_value[0], init_value[1], init_value[2]),
-        ));
-    }
-
-    pub fn add_float_range_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) {
-        self.add_attribute(Attribute::new(
-            self.id,
-            name.as_ref().to_string(),
-            Value::FloatRange(init_value[0], init_value[1], init_value[2]),
-        ));
-    }
-
-    pub fn add_attribute(&mut self, attr: Attribute) {
-        self.attributes.insert(attr.name().to_string(), attr);
-    }
-
-    pub fn update(&mut self, func: impl FnOnce(&mut Self)) -> Self {
-        let next = self;
-
-        (func)(next);
-
-        next.to_owned()
-    }
-
-    pub fn set_parent_entity(&mut self, id: u32) {
-        self.id = id;
-        for (_, a) in self.attributes.iter_mut() {
-            a.set_id(id);
-        }
-    }
+    // pub fn set_parent_entity(&mut self, id: u32) {
+    //     self.id = id;
+    //     for (_, a) in self.attributes.iter_mut() {
+    //         a.set_id(id);
+    //     }
+    // }
 }
 
 impl<S: RuntimeState + App> From<S> for Section<S> {
@@ -426,7 +267,7 @@ impl<S: RuntimeState + App> From<S> for Section<S> {
             state: initial,
             enable_app_systems: false,
             enable_edit_attributes: false,
-            attributes: BTreeMap::new(),
+            attributes: AttributeGraph::default(),
         }
     }
 }
@@ -455,23 +296,23 @@ impl<S: RuntimeState> App for Section<S> {
                 ui.new_line();
                 if CollapsingHeader::new(format!("Attributes {:#4x}", self.id)).build(ui) {
                     if ui.button(format!("Add text Section[{}]", self.id)) {
-                        self.add_text_attr(unique_title("Text"), "");
+                        self.attributes.add_text_attr(unique_title("Text"), "");
                     }
                     ui.same_line();
                     if ui.button(format!("Add int Section[{}]", self.id)) {
-                        self.add_int_attr(unique_title("Int"), 0);
+                        self.attributes.add_int_attr(unique_title("Int"), 0);
                     }
 
 
                     if ui.button(format!("Add float Section[{}]", self.id)) {
-                        self.add_float_attr(unique_title("Float"), 0.0);
+                        self.attributes.add_float_attr(unique_title("Float"), 0.0);
                     }
                     ui.same_line();
                     if ui.button(format!("Add bool Section[{}]", self.id)) {
-                        self.add_bool_attr(unique_title("Bool"), false);
+                        self.attributes.add_bool_attr(unique_title("Bool"), false);
                     }
                     ui.new_line();
-                    for (_, a) in self.attributes.iter_mut() {
+                    for a in self.attributes.iter_mut_attributes() {
                         a.edit(ui);
                         ui.same_line();
                         if ui.button(format!("remove [{} {}]", a.name(), self.id)) {
@@ -483,16 +324,16 @@ impl<S: RuntimeState> App for Section<S> {
                 }
             }
             ui.unindent();
-            if let Some(Value::Bool(val)) = self.get_attr_value_mut("opened::") {
+            if let Some(Value::Bool(val)) = self.attributes.get_attr_value_mut("opened::") {
                 *val = true;
             }
         } else {
-            if let Some(Value::Bool(val)) = self.get_attr_value_mut("opened::") {
+            if let Some(Value::Bool(val)) = self.attributes.get_attr_value_mut("opened::") {
                 *val = false;
             }
         }
 
-        if let Some(Value::TextBuffer(title)) = self.get_attr_value("title::") {
+        if let Some(Value::TextBuffer(title)) = self.attributes.get_attr_value("title::") {
             self.title = title.clone();
         }
 
@@ -505,7 +346,7 @@ where
     S: RuntimeState
 {
     fn cleanup_empty_attributes(&mut self) {
-        self.attributes.clone().values().filter(|v| v.value() == &Value::Empty).for_each(|v| {
+        self.attributes.clone().iter_attributes().filter(|v| v.value() == &Value::Empty).for_each(|v| {
             self.attributes.remove(v.name());
         });
     }
@@ -576,15 +417,15 @@ where
 
     fn into_attributes(&self) -> Vec<Attribute> {
         let mut attrs: Vec<Attribute> = self.attributes
-            .iter()
-            .map(|(_, a)| a).cloned()
+            .iter_attributes()
+            .map(|a| a).cloned()
             .collect();
 
         let mut state_attrs = self.state.into_attributes();
         attrs.append(&mut state_attrs);
 
-        if let Some(Value::TextBuffer(_)) = self.get_attr_value("title::") {
-            attrs.push(self.get_attr("title::").expect("just checked").clone());
+        if let Some(Value::TextBuffer(_)) = self.attributes.get_attr_value("title::") {
+            attrs.push(self.attributes.get_attr("title::").expect("just checked").clone());
         } else {
             attrs.push(Attribute::new(self.id, "title::", Value::TextBuffer(self.title.to_string())));
         }

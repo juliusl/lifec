@@ -7,7 +7,7 @@ use atlier::system::{App, Attribute, Value};
 
 use crate::{
     editor::{unique_title, Section, SectionAttributes},
-    RuntimeState,
+    RuntimeState, AttributeGraph,
 };
 
 /// This trait is to organize different types of thunks
@@ -35,6 +35,7 @@ pub struct ThunkContext {
     node_title: String,
     symbol: String,
     values: BTreeMap<String, Value>,
+    _a: AttributeGraph
 }
 
 impl ThunkContext {
@@ -49,6 +50,7 @@ impl ThunkContext {
             node_title,
             symbol,
             values,
+            _a: AttributeGraph::default()
         }
     }
 

@@ -49,7 +49,6 @@ fn main() {
         },
         |_| {},
         move |w, ui| {
-
             let project = &mut project;
             project.extend_app_world(w, ui);
 

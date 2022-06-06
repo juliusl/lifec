@@ -10,6 +10,8 @@ use atlier::system::start_editor;
 use knot::store::Store;
 use rand::Rng;
 use specs::{prelude::*, Component};
+pub use specs::prelude::WorldExt;
+pub use specs::prelude::Builder;
 
 pub use atlier::system::App;
 pub use atlier::system::Attribute;
@@ -54,7 +56,7 @@ pub fn open_simple_editor<S>()
 where
     S: crate::RuntimeState + Component + App,
 {
-    start_runtime_editor::<S, _, _>(
+    start_runtime_editor(
         format!("Simple Runtime Editor for {}", <S as App>::name()).as_str(),
         Runtime::<S>::default(),
         |_, w, _| {
@@ -102,7 +104,7 @@ pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
     SysInitF: 'static + Fn(&mut DispatcherBuilder),
     Ext: 'static + FnMut(&World, &imgui::Ui),
 {
-    start_runtime_editor::<RtS, _, _>(
+    start_runtime_editor(
         title.as_ref(),
         initial_runtime,
         move |e, w, d| {

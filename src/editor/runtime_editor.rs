@@ -68,7 +68,7 @@ impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
         let sections = &mut sections;
         runtime.attributes.iter().for_each(|a| {
             if let Some(section) = sections.get_mut(&a.id()) {
-                section.add_attribute(a.clone());
+                section.attributes.add_attribute(a.clone());
             } else {
                 sections.insert(
                     a.id(),
@@ -319,12 +319,12 @@ where
                     state.clone(),
                 )
                 .enable_app_systems()
+                .enable_edit_attributes()
                 .with_text("context::", format!("{}", self.runtime.context()))
                 .with_bool("enable event builder", false)
                 .with_bool("enable node editor", false)
                 .with_text("project::name::", unique_title("snapshot"))
                 .with_bool("enable project", false)
-                .enable_edit_attributes()
                 .with_parent_entity(next.id());
 
                 let section_attrs = SectionAttributes(section.into_attributes());
@@ -483,7 +483,7 @@ where
                         if let Some(section) = sections.get_mut(entity) {
                             println!("Existing section found, updating attributes");
                             attributes.clone_attrs().iter().cloned().for_each(|a| {
-                                section.add_attribute(a);
+                                section.attributes.add_attribute(a);
                             });
 
                             section.next_gen();
@@ -501,11 +501,11 @@ where
                         section.state = initial;
 
                         attributes.iter().for_each(|a| {
-                            section.add_attribute(a.clone());
+                            section.attributes.add_attribute(a.clone());
                         });
 
                         if let Some(Value::TextBuffer(title)) =
-                            section.clone().get_attr_value("title::")
+                            section.clone().attributes.get_attr_value("title::")
                         {
                             let id = entity.id();
                             let section =
@@ -638,11 +638,11 @@ where
     pub fn apply_section(section: Section<S>, mut runtime: Runtime<S>) -> Self {
         // This will apply the sections current state and attributes to the current runtime
         runtime.state = Some(S::from_attributes(section.into_attributes()));
-        section.attributes.values().for_each(|a| {
+        section.attributes.iter_attributes().for_each(|a| {
             runtime.attribute(a.clone());
         });
-        if let Some(Value::TextBuffer(event)) = section.get_attr_value("context::") {
-            runtime = runtime.parse_event(event);
+        if let Some(Value::TextBuffer(event)) = section.attributes.get_attr_value("context::") {
+            runtime = runtime.parse_event(&event);
         }
 
         RuntimeEditor::from(runtime)

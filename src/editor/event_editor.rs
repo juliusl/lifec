@@ -176,7 +176,7 @@ where
     S: RuntimeState,
 {
     fn into(self) -> Section<S> {
-        Section::<S>::new(
+        let section = Section::<S>::new(
             self.label.to_string(),
             |s, ui| {
                 s.edit_attr("edit the 'on' property", "on", ui);
@@ -184,11 +184,18 @@ where
                 s.edit_attr("edit the 'call' property", "call", ui);
             },
             S::default(),
-        )
-        .with_text("label", self.label.clone())
-        .with_text("on", self.on.clone())
-        .with_text("dispatch", self.dispatch.clone())
-        .with_text("call", self.call.clone())
+        );
+
+        let attributes = section
+            .edit_attributes()
+            .with_text("label", self.label.clone())
+            .with_text("on", self.on.clone())
+            .with_text("dispatch", self.dispatch.clone())
+            .with_text("call", self.call.clone());
+
+        *section.edit_attributes() = attributes;
+
+        section
     }
 }
 
@@ -203,10 +210,10 @@ where
             Some(Value::TextBuffer(dispatch)),
             Some(Value::TextBuffer(call)),
         ) = (
-            s.get_attr_value("label"),
-            s.get_attr_value("on"),
-            s.get_attr_value("dispatch"),
-            s.get_attr_value("call"),
+            s.attributes.get_attr_value("label"),
+            s.attributes.get_attr_value("on"),
+            s.attributes.get_attr_value("dispatch"),
+            s.attributes.get_attr_value("call"),
         ) {
             let label = label.to_string();
             let on = on.to_string();
