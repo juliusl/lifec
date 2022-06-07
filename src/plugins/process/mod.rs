@@ -12,7 +12,6 @@ use std::{
 };
 
 use super::thunks::Thunk;
-use crate::editor::SectionAttributes;
 use crate::parse_variables;
 use crate::{
     editor::{Section, SectionExtension},
@@ -42,7 +41,7 @@ impl Thunk for Process {
     }
 
     fn call_with_context(context: &mut super::ThunkContext) {
-        let process = Self::from_attributes(context.into_attributes());
+        let process = Self::from_attribute_graph(context.attribute_graph().clone());
 
         match process.process(&process.command) {
             Ok(output) => {
@@ -302,80 +301,80 @@ impl RuntimeState for Process {
         })
     }
 
-    fn from_attributes(attrs: Vec<atlier::system::Attribute>) -> Self {
-        let mut process = Self::default();
+    // fn from_attributes(attrs: Vec<atlier::system::Attribute>) -> Self {
+    //     let mut process = Self::default();
 
-        let attributes = SectionAttributes::from(attrs);
-        if let Some(Value::TextBuffer(command)) = attributes.get_attr_value("command") {
-            process.command = command.to_string();
-        }
+    //     let attributes = SectionAttributes::from(attrs);
+    //     if let Some(Value::TextBuffer(command)) = attributes.get_attr_value("command") {
+    //         process.command = command.to_string();
+    //     }
 
-        if let Some(Value::TextBuffer(subcommands)) = attributes.get_attr_value("subcommands") {
-            process.subcommands = subcommands.to_string();
-        }
+    //     if let Some(Value::TextBuffer(subcommands)) = attributes.get_attr_value("subcommands") {
+    //         process.subcommands = subcommands.to_string();
+    //     }
 
-        if let Some(Value::BinaryVector(stdout)) = attributes.get_attr_value("stdout") {
-            process.stdout = stdout.clone();
-        }
+    //     if let Some(Value::BinaryVector(stdout)) = attributes.get_attr_value("stdout") {
+    //         process.stdout = stdout.clone();
+    //     }
 
-        if let Some(Value::BinaryVector(stderr)) = attributes.get_attr_value("stderr") {
-            process.stderr = stderr.clone();
-        }
+    //     if let Some(Value::BinaryVector(stderr)) = attributes.get_attr_value("stderr") {
+    //         process.stderr = stderr.clone();
+    //     }
 
-        attributes
-            .get_attrs()
-            .iter()
-            .filter(|a| a.name().starts_with("arg::-"))
-            .filter_map(|a| match a.value() {
-                Value::TextBuffer(value) => {
-                    let name = a.name()[5..].to_string();
-                    Some((name, value))
-                }
-                _ => None,
-            })
-            .for_each(|(name, value)| {
-                process.flags.insert(name, value.to_string());
-            });
+    //     attributes
+    //         .get_attrs()
+    //         .iter()
+    //         .filter(|a| a.name().starts_with("arg::-"))
+    //         .filter_map(|a| match a.value() {
+    //             Value::TextBuffer(value) => {
+    //                 let name = a.name()[5..].to_string();
+    //                 Some((name, value))
+    //             }
+    //             _ => None,
+    //         })
+    //         .for_each(|(name, value)| {
+    //             process.flags.insert(name, value.to_string());
+    //         });
 
-        attributes
-            .get_attrs()
-            .iter()
-            .filter(|a| a.name().starts_with("arg::$"))
-            .filter_map(|a| match a.value() {
-                Value::TextBuffer(value) => {
-                    let name = a.name()[5..].to_string();
-                    Some((name, value))
-                }
-                _ => None,
-            })
-            .for_each(|(name, value)| {
-                process.vars.insert(name, value.to_string());
-            });
+    //     attributes
+    //         .get_attrs()
+    //         .iter()
+    //         .filter(|a| a.name().starts_with("arg::$"))
+    //         .filter_map(|a| match a.value() {
+    //             Value::TextBuffer(value) => {
+    //                 let name = a.name()[5..].to_string();
+    //                 Some((name, value))
+    //             }
+    //             _ => None,
+    //         })
+    //         .for_each(|(name, value)| {
+    //             process.vars.insert(name, value.to_string());
+    //         });
 
-        process
-    }
+    //     process
+    // }
 
-    fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
-        let mut attributes = SectionAttributes::default()
-            .with_text("command", self.command.to_string())
-            .with_text("subcommands", self.subcommands.to_string());
+    // fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
+    //     let mut attributes = SectionAttributes::default()
+    //         .with_text("command", self.command.to_string())
+    //         .with_text("subcommands", self.subcommands.to_string());
 
-        if !self.stdout.is_empty() {
-            attributes.add_binary_attr("stdout", self.stdout.clone());
-        }
+    //     if !self.stdout.is_empty() {
+    //         attributes.add_binary_attr("stdout", self.stdout.clone());
+    //     }
 
-        if !self.stderr.is_empty() {
-            attributes.add_binary_attr("stderr", self.stderr.clone());
-        }
+    //     if !self.stderr.is_empty() {
+    //         attributes.add_binary_attr("stderr", self.stderr.clone());
+    //     }
 
-        for (flag, value) in self.flags.iter() {
-            attributes.add_text_attr(format!("arg::{}", flag), value);
-        }
+    //     for (flag, value) in self.flags.iter() {
+    //         attributes.add_text_attr(format!("arg::{}", flag), value);
+    //     }
 
-        for (var, value) in self.flags.iter() {
-            attributes.add_text_attr(format!("arg::{}", var), value);
-        }
+    //     for (var, value) in self.flags.iter() {
+    //         attributes.add_text_attr(format!("arg::{}", var), value);
+    //     }
 
-        attributes.clone_attrs()
-    }
+    //     attributes.clone_attrs()
+    // }
 }

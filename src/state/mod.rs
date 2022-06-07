@@ -21,6 +21,15 @@ impl From<Entity> for AttributeGraph {
 }
 
 impl AttributeGraph {
+    /// returns some bool if there is a matching name attribute with bool value
+    pub fn is_enabled(&self, with_name: impl AsRef<str>) -> Option<bool> {
+        if let Some(Value::Bool(val)) = self.get_attr_value(with_name) {
+            Some(*val)
+        } else {
+            None 
+        }
+    }
+
     /// updates the parent entity id of the graph 
     pub fn set_parent_entity(&mut self, parent: Entity) {
         self.set_parent_entity_id(parent.id());

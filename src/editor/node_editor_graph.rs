@@ -8,9 +8,7 @@ use knot::store::{Store, Visitor};
 use ron::ser::PrettyConfig;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::plugins::ThunkContext;
-
-use super::SectionAttributes;
+use crate::{plugins::ThunkContext, AttributeGraph};
 
 #[derive(Clone)]
 pub struct NodeComponent {
@@ -529,7 +527,7 @@ impl NodeEditorGraph {
         Attribute::new(id, format!("file::{}_attribute_store.out", self.title()), Value::BinaryVector(vec))
     }
 
-    pub fn load_attribute_store(&mut self, attributes: &SectionAttributes) {
+    pub fn load_attribute_store(&mut self, attributes: &AttributeGraph) {
         let attribute_store = attributes.get_attr_value(format!("file::{}_attribute_store.out", self.title()));
         if let Some(Value::BinaryVector(attr_store)) = attribute_store {
             match ron::de::from_bytes::<Store<(i32, Attribute)>>(attr_store) {

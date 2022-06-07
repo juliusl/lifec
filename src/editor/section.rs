@@ -1,6 +1,6 @@
 use std::{fmt::Display, fs, path::Path};
 
-use super::{unique_title, App, Attribute, ShowEditor, Value, SectionAttributes};
+use super::{unique_title, App, Attribute, ShowEditor, Value};
 use crate::{RuntimeState, AttributeGraph};
 use imgui::CollapsingHeader;
 use serde::{Deserialize, Serialize};
@@ -54,19 +54,19 @@ impl<S: RuntimeState> Section<S> {
         show: fn(&mut Section<S>, &imgui::Ui),
         initial_state: S,
     ) -> Section<S> {
-        let state_attrs = initial_state.into_attributes();
         let mut section = Section {
             gen: 0,
             id: 0,
             title: title.as_ref().to_string(),
             show_editor: ShowEditor(show),
-            state: initial_state,
+            state: initial_state.clone(),
             enable_app_systems: false,
             enable_edit_attributes: false,
             attributes,
         };
 
-        state_attrs.iter().for_each(|a| section.attributes.copy_attribute(a) );
+        let state_attrs = initial_state.attribute_graph();
+        state_attrs.iter_attributes().for_each(|a| section.attributes.copy_attribute(a) );
         section
     }
 
@@ -404,36 +404,36 @@ where
         todo!()
     }
 
-    fn from_attributes(attributes: Vec<Attribute>) -> Self {
-        let mut next = Self::default();
+    // fn from_attributes(attributes: Vec<Attribute>) -> Self {
+    //     let mut next = Self::default();
 
-        let state = S::from_attributes(attributes.clone());
-        next.state = state;
+    //     let state = S::from_attributes(attributes.clone());
+    //     next.state = state;
 
-        let section = SectionAttributes::from(attributes);
+    //     let section = SectionAttributes::from(attributes);
 
-        if let Some(Value::TextBuffer(title)) = section.get_attr_value("title::") {
-            next.title = title.to_string(); 
-        }
+    //     if let Some(Value::TextBuffer(title)) = section.get_attr_value("title::") {
+    //         next.title = title.to_string(); 
+    //     }
 
-        next
-    }
+    //     next
+    // }
 
-    fn into_attributes(&self) -> Vec<Attribute> {
-        let mut attrs: Vec<Attribute> = self.attributes
-            .iter_attributes()
-            .map(|a| a).cloned()
-            .collect();
+    // fn into_attributes(&self) -> Vec<Attribute> {
+    //     let mut attrs: Vec<Attribute> = self.attributes
+    //         .iter_attributes()
+    //         .map(|a| a).cloned()
+    //         .collect();
 
-        let mut state_attrs = self.state.into_attributes();
-        attrs.append(&mut state_attrs);
+    //     let mut state_attrs = self.state.into_attributes();
+    //     attrs.append(&mut state_attrs);
 
-        if let Some(Value::TextBuffer(_)) = self.attributes.get_attr_value("title::") {
-            attrs.push(self.attributes.get_attr("title::").expect("just checked").clone());
-        } else {
-            attrs.push(Attribute::new(self.id, "title::", Value::TextBuffer(self.title.to_string())));
-        }
+    //     if let Some(Value::TextBuffer(_)) = self.attributes.get_attr_value("title::") {
+    //         attrs.push(self.attributes.get_attr("title::").expect("just checked").clone());
+    //     } else {
+    //         attrs.push(Attribute::new(self.id, "title::", Value::TextBuffer(self.title.to_string())));
+    //     }
 
-        attrs
-    }
+    //     attrs
+    // }
 }

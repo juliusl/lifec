@@ -24,7 +24,6 @@ pub use event_graph::EventGraph;
 pub use node_editor::NodeEditor;
 pub use node_editor_graph::NodeEditorGraph;
 pub use runtime_editor::RuntimeEditor;
-pub use runtime_editor::SectionAttributes;
 pub use runtime_editor::Loader;
 pub use section::Section;
 pub use section::SectionExtension;
@@ -110,7 +109,6 @@ pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
         initial_runtime,
         move |e, w, d| {
             w.register::<Section<RtS>>();
-            w.register::<SectionAttributes>();
             w.register::<EventGraph>();
             w.register::<AttributeGraph>();
             w.insert(Loader::Empty);

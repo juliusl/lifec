@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use specs::storage::HashMapStorage;
 use specs::{Component, Entities, Join, ReadStorage, RunNow, System, WorldExt, WriteStorage};
 
-use super::{unique_title, SectionAttributes};
+use crate::AttributeGraph;
+
+use super::unique_title;
 
 #[derive(Default)]
 pub struct AttributeEditor {
@@ -71,21 +73,19 @@ impl App for AttributeEditor {
 }
 
 impl<'a> System<'a> for AttributeEditor {
-    type SystemData = (Entities<'a>, ReadStorage<'a, SectionAttributes>, WriteStorage<'a, AttributeComponent>);
+    type SystemData = (Entities<'a>, ReadStorage<'a, AttributeGraph>,  WriteStorage<'a, AttributeComponent>);
 
-    fn run(&mut self, (entities, section_attributes, mut attribute_components): Self::SystemData) {
+    fn run(&mut self, (entities, attributes, mut attribute_components): Self::SystemData) {
         for e in entities.join() {
-            match section_attributes.get(e) {
+            match attributes.get(e) {
                 Some(attributes) => {
-                    if let Some(true) = attributes.is_attr_checkbox("enable attribute editor") {
+                    if let Some(true) = attributes.is_enabled("enable attribute editor") {
                         if let None = self.entities.get(&e.id()) {
                             let entry = AttributeComponent {
                                 store: {
                                     let mut store = Store::default();
                                     attributes
-                                        .get_attrs()
-                                        .iter()
-                                        .cloned()
+                                        .iter_attributes()
                                         .map(|a| a.value())
                                         .for_each(|v| {
                                             store = store.node(v.clone());
@@ -95,8 +95,7 @@ impl<'a> System<'a> for AttributeEditor {
                                 references: {
                                     let mut set = BTreeSet::<(String, u64)>::default();
                                     attributes
-                                        .get_attrs()
-                                        .iter()
+                                        .iter_attributes()
                                         .filter_map(|a| {
                                             if let Value::Reference(r) = a.value() {
                                                 return Some((format!("ref {}", a), *r));

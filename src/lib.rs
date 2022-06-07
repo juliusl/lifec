@@ -7,7 +7,8 @@ use std::fmt::{Debug, Display};
 
 pub mod editor;
 pub mod plugins;
-pub mod state;
+
+mod state;
 pub use state::AttributeGraph;
 
 pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
@@ -15,7 +16,7 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
 
     /// try to save the current state to a String
     fn save(&self) -> Option<String> {
-        match serde_json::to_string(&self.into_attributes()) {
+        match serde_json::to_string(&self.attribute_graph()) {
             Ok(val) => Some(val),
             Err(_) => None,
         }
@@ -24,20 +25,32 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
     /// load should take the serialized form of this state
     /// and create a new instance of Self
     fn load(&self, init: impl AsRef<str>) -> Self {
-        if let Some(state) = serde_json::from_str::<Vec<Attribute>>(init.as_ref()).ok() {
-            Self::from_attributes(state)
+        if let Some(state) = serde_json::from_str::<AttributeGraph>(init.as_ref()).ok() {
+            Self::from_attribute_graph(state)
         } else {
             self.clone()
         }
     }
 
-    /// from_attributes loads runtime state from a vector of attributes
-    fn from_attributes(attributes: Vec<Attribute>) -> Self;
-
-    /// into_attributes converts current runtime state into a vector of attributes
-    fn into_attributes(&self) -> Vec<Attribute> {
-        vec![]
+    fn edit_attribute_graph(&mut self) -> &mut AttributeGraph {
+        todo!()
     }
+
+    fn attribute_graph(&self) -> &AttributeGraph {
+        todo!()
+    }
+
+    fn from_attribute_graph(graph: AttributeGraph) -> Self {
+        todo!()
+    }
+
+    // /// from_attributes loads runtime state from a vector of attributes
+    // fn from_attributes(attributes: Vec<Attribute>) -> Self;
+
+    // /// into_attributes converts current runtime state into a vector of attributes
+    // fn into_attributes(&self) -> Vec<Attribute> {
+    //     vec![]
+    // }
 
     /// process is a function that should take a string message
     /// and return the next version of Self
@@ -513,16 +526,16 @@ where
         }
     }
 
-    fn from_attributes(attrs: Vec<Attribute>) -> Self {
-        Self {
-            state: T::from_attributes(attrs),
-            args: vec![],
-        }
-    }
+    // fn from_attributes(attrs: Vec<Attribute>) -> Self {
+    //     Self {
+    //         state: T::from_attributes(attrs),
+    //         args: vec![],
+    //     }
+    // }
 
-    fn into_attributes(&self) -> Vec<Attribute> {
-        self.get_state().into_attributes()
-    }
+    // fn into_attributes(&self) -> Vec<Attribute> {
+    //     self.get_state().into_attributes()
+    // }
 }
 
 impl<T> Runtime<T>

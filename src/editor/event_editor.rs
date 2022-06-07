@@ -13,7 +13,7 @@ use specs::{
 
 use crate::{RuntimeState, AttributeGraph};
 
-use super::{event_graph::EventGraph, unique_title, Section, SectionAttributes};
+use super::{event_graph::EventGraph, unique_title, Section};
 
 #[derive(Default, Clone)]
 pub struct EventEditor {
@@ -33,14 +33,14 @@ impl EventEditor {
 impl<'a> System<'a> for EventEditor {
     type SystemData = (
         Entities<'a>,
-        ReadStorage<'a, SectionAttributes>,
+        ReadStorage<'a, AttributeGraph>,
         WriteStorage<'a, EventGraph>,
     );
 
     fn run(&mut self, (entities, attributes, mut event_graph): Self::SystemData) {
         for (e, attrs) in (&entities, attributes.maybe()).join() {
             if let Some(attrs) = attrs {
-                match attrs.is_attr_checkbox("enable event builder") {
+                match attrs.is_enabled("enable event builder") {
                     Some(true) => {
                         if let None = self.events.get(&e.id()) {
                             if let Some(graph) = event_graph.get_mut(e) {
@@ -119,18 +119,18 @@ impl RuntimeState for EventEditor {
         todo!()
     }
 
-    fn from_attributes(_: Vec<atlier::system::Attribute>) -> Self {
-       todo!()
-    }
+    // fn from_attributes(_: Vec<atlier::system::Attribute>) -> Self {
+    //    todo!()
+    // }
 
-    fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
-        let mut attrs = vec![];
-        for (id, g) in self.events.iter() {
-            attrs.append(&mut SectionAttributes::from(g.into_attributes()).with_parent_entity(*id).clone_attrs());
-        }
+    // fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
+    //     let mut attrs = vec![];
+    //     for (id, g) in self.events.iter() {
+    //         attrs.append(&mut SectionAttributes::from(g.into_attributes()).with_parent_entity(*id).clone_attrs());
+    //     }
         
-        attrs
-    }
+    //     attrs
+    // }
 }
 
 impl Extension for EventEditor {

@@ -1,19 +1,17 @@
 use imgui::{ChildWindow, CollapsingHeader, Window};
 use knot::store::Store;
-use serde::{Deserialize, Serialize};
 use specs::{
-    storage::DefaultVecStorage, storage::DenseVecStorage, Component, Entities, Join, Read,
+    storage::DefaultVecStorage, Component, Entities, Join, Read,
     ReadStorage, System, Write, WriteStorage,
 };
 use std::{
     collections::BTreeMap,
-    fmt::Display,
     ops::{Deref, DerefMut},
     time::Instant,
 };
 
 use super::{
-    event_graph::EventGraph, section::Section, unique_title, App, Attribute, EventComponent, Value,
+    event_graph::EventGraph, section::Section, unique_title, App, EventComponent, Value,
 };
 use crate::{Action, Runtime, RuntimeState, AttributeGraph};
 
@@ -96,198 +94,6 @@ impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
     }
 }
 
-#[derive(Default, Component, Clone, Serialize, Deserialize)]
-#[storage(DenseVecStorage)]
-pub struct SectionAttributes(Vec<Attribute>);
-
-impl From<Vec<Attribute>> for SectionAttributes {
-    fn from(attrs: Vec<Attribute>) -> Self {
-        Self(attrs)
-    }
-}
-
-impl Display for SectionAttributes {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "")
-    }
-}
-
-impl SectionAttributes {
-    pub fn with_parent_entity(&mut self, id: u32) -> Self {
-        self.update(move |next| {
-            for a in next.get_attrs_mut() {
-                a.set_id(id);
-            }
-        })
-    }
-
-    pub fn get_attrs(&self) -> Vec<&Attribute> {
-        self.0.iter().collect()
-    }
-
-    pub fn clone_attrs(&self) -> Vec<Attribute> {
-        self.0.iter().cloned().collect()
-    }
-
-    pub fn get_attr(&self, name: impl AsRef<str>) -> Option<&Attribute> {
-        let SectionAttributes(attributes) = self;
-
-        attributes.iter().find(|a| a.name() == name.as_ref())
-    }
-
-    pub fn get_attr_mut(&mut self, name: impl AsRef<str>) -> Option<&mut Attribute> {
-        let SectionAttributes(attributes) = self;
-
-        attributes.iter_mut().find(|a| a.name() == name.as_ref())
-    }
-
-    pub fn get_attr_value(&self, with_name: impl AsRef<str>) -> Option<&Value> {
-        self.get_attr(with_name).and_then(|a| Some(a.value()))
-    }
-
-    pub fn get_attr_value_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Value> {
-        self.get_attr_mut(with_name)
-            .and_then(|a| Some(a.get_value_mut()))
-    }
-
-    pub fn get_attrs_mut(&mut self) -> &mut Vec<Attribute> {
-        &mut self.0
-    }
-
-    pub fn is_attr_checkbox(&self, name: impl AsRef<str>) -> Option<bool> {
-        if let Some(Value::Bool(val)) = self.get_attr(name).and_then(|a| Some(a.value())) {
-            Some(*val)
-        } else {
-            None
-        }
-    }
-
-    pub fn with_attribute(&mut self, attr: Attribute) -> Self {
-        let attr = attr;
-        self.update(move |next| next.add_attribute(attr))
-    }
-
-    pub fn with_text(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) -> Self {
-        self.update(move |next| next.add_text_attr(name, init_value))
-    }
-
-    pub fn with_int(&mut self, name: impl AsRef<str>, init_value: i32) -> Self {
-        self.update(move |next| next.add_int_attr(name, init_value))
-    }
-
-    pub fn with_float(&mut self, name: impl AsRef<str>, init_value: f32) -> Self {
-        self.update(move |next| next.add_float_attr(name, init_value))
-    }
-
-    pub fn with_bool(&mut self, name: impl AsRef<str>, init_value: bool) -> Self {
-        self.update(move |next| next.add_bool_attr(name, init_value))
-    }
-
-    pub fn with_float_pair(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) -> Self {
-        self.update(move |next| next.add_float_pair_attr(name, init_value))
-    }
-
-    pub fn with_int_pair(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) -> Self {
-        self.update(move |next| next.add_int_pair_attr(name, init_value))
-    }
-
-    pub fn with_int_range(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) -> Self {
-        self.update(move |next| next.add_int_range_attr(name, init_value))
-    }
-
-    pub fn with_float_range(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) -> Self {
-        self.update(move |next| next.add_float_range_attr(name, init_value))
-    }
-
-    pub fn add_empty_attr(&mut self, name: impl AsRef<str>) {
-        self.add_attribute(Attribute::new(0, name.as_ref().to_string(), Value::Empty));
-    }
-
-    pub fn add_binary_attr(&mut self, name: impl AsRef<str>, init_value: impl Into<Vec<u8>>) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::BinaryVector(init_value.into()),
-        ));
-    }
-
-    pub fn add_text_attr(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::TextBuffer(init_value.as_ref().to_string()),
-        ));
-    }
-
-    pub fn add_int_attr(&mut self, name: impl AsRef<str>, init_value: i32) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::Int(init_value),
-        ));
-    }
-
-    pub fn add_float_attr(&mut self, name: impl AsRef<str>, init_value: f32) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::Float(init_value),
-        ));
-    }
-
-    pub fn add_bool_attr(&mut self, name: impl AsRef<str>, init_value: bool) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::Bool(init_value),
-        ));
-    }
-
-    pub fn add_float_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::FloatPair(init_value[0], init_value[1]),
-        ));
-    }
-
-    pub fn add_int_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::IntPair(init_value[0], init_value[1]),
-        ));
-    }
-
-    pub fn add_int_range_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::IntRange(init_value[0], init_value[1], init_value[2]),
-        ));
-    }
-
-    pub fn add_float_range_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::FloatRange(init_value[0], init_value[1], init_value[2]),
-        ));
-    }
-
-    pub fn add_attribute(&mut self, attr: Attribute) {
-        self.0.push(attr);
-    }
-
-    pub fn update(&mut self, func: impl FnOnce(&mut Self)) -> Self {
-        let next = self;
-
-        (func)(next);
-
-        next.to_owned()
-    }
-}
-
 impl<'a, S> System<'a> for RuntimeEditor<S>
 where
     S: RuntimeState + Component,
@@ -330,9 +136,7 @@ where
                 .enable_app_systems()
                 .enable_edit_attributes();
 
-                let section_attrs = SectionAttributes(section.into_attributes());
-
-                match loader.insert(next, Loader::LoadSection(section_attrs)) {
+                match loader.insert(next, Loader::LoadSection(section.attribute_graph().clone())) {
                     Ok(_) => {
                         self.sections.insert(next.id(), section);
 
@@ -355,7 +159,7 @@ where
                 None => {
                     match loader.insert(
                         e,
-                        Loader::LoadSection(SectionAttributes(s.into_attributes())),
+                        Loader::LoadSection(s.attribute_graph().clone()),
                     ) {
                         Ok(_) => {
                             println!("RuntimeEditor dispatched Loader for {:?}", e);
@@ -421,7 +225,7 @@ pub enum Dispatch {
 #[storage(DefaultVecStorage)]
 pub enum Loader {
     Empty,
-    LoadSection(SectionAttributes),
+    LoadSection(AttributeGraph),
 }
 
 impl Default for Loader {
@@ -446,7 +250,7 @@ where
         Write<'a, Dispatch>,
         WriteStorage<'a, Loader>,
         WriteStorage<'a, Section<S>>,
-        WriteStorage<'a, SectionAttributes>,
+        WriteStorage<'a, AttributeGraph>,
         WriteStorage<'a, EventGraph>,
     );
 
@@ -485,7 +289,7 @@ where
                     Some(_) => {
                         if let Some(section) = sections.get_mut(entity) {
                             println!("Existing section found, updating attributes");
-                            attributes.clone_attrs().iter().for_each(|a| {
+                            attributes.iter_attributes().for_each(|a| {
                                 section.attributes.copy_attribute(a);
                             });
 
@@ -497,13 +301,12 @@ where
                             "Section not found for {:?}, Generating section from attributes",
                             entity
                         );
-                        let attributes: Vec<Attribute> = attributes.clone_attrs();
-                        let initial = S::from_attributes(attributes.clone());
+                        let initial = S::from_attribute_graph(attributes.clone());
 
                         let mut section = Section::<S>::default();
                         section.state = initial;
 
-                        attributes.iter().for_each(|a| {
+                        attributes.iter_attributes().for_each(|a| {
                             section.attributes.copy_attribute(a);
                         });
 
@@ -548,7 +351,7 @@ where
                             }
 
                             match section_attributes
-                                .insert(e, SectionAttributes(section.into_attributes()))
+                                .insert(e, section.attribute_graph().clone())
                             {
                                 Ok(_) => {
                                     if let None = event_graph.get(e) {
@@ -640,7 +443,7 @@ where
 {
     pub fn apply_section(section: Section<S>, mut runtime: Runtime<S>) -> Self {
         // This will apply the sections current state and attributes to the current runtime
-        runtime.state = Some(S::from_attributes(section.into_attributes()));
+        runtime.state = Some(S::from_attribute_graph(section.attribute_graph().clone()));
         section.attributes.iter_attributes().for_each(|a| {
             runtime.attribute(a);
         });

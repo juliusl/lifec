@@ -3,11 +3,12 @@ use std::{
     fmt::Display,
 };
 
-use atlier::system::{App, Attribute, Value};
+use atlier::system::{App, Value};
 
 use crate::{
-    editor::{unique_title, Section, SectionAttributes},
-    RuntimeState, AttributeGraph,
+    editor::Section,
+    RuntimeState, 
+    AttributeGraph,
 };
 
 /// This trait is to organize different types of thunks
@@ -116,45 +117,45 @@ pub struct ThunkError;
 impl RuntimeState for ThunkContext {
     type Error = ThunkError;
 
-    fn from_attributes(attributes: Vec<Attribute>) -> Self {
-        let mut context = ThunkContext::default();
+    // fn from_attributes(attributes: Vec<Attribute>) -> Self {
+    //     let mut context = ThunkContext::default();
 
-        if let Some(Value::Symbol(symbol)) =
-            SectionAttributes::from(attributes.clone()).get_attr_value("symbol::")
-        {
-            context.symbol = symbol.to_string();
-        } else {
-            context.symbol = unique_title("anonymous");
-        }
+    //     if let Some(Value::Symbol(symbol)) =
+    //         SectionAttributes::from(attributes.clone()).get_attr_value("symbol::")
+    //     {
+    //         context.symbol = symbol.to_string();
+    //     } else {
+    //         context.symbol = unique_title("anonymous");
+    //     }
 
-        attributes.iter().cloned().for_each(|a| {
-            context
-                .values
-                .insert(a.name().to_string(), a.value().clone());
-        });
+    //     attributes.iter().cloned().for_each(|a| {
+    //         context
+    //             .values
+    //             .insert(a.name().to_string(), a.value().clone());
+    //     });
 
-        context
-    }
+    //     context
+    // }
 
-    fn into_attributes(&self) -> Vec<Attribute> {
-        let mut attributes = SectionAttributes::default();
+    // fn into_attributes(&self) -> Vec<Attribute> {
+    //     let mut attributes = SectionAttributes::default();
 
-        self.values.iter().clone().for_each(|(n, v)| {
-            attributes.add_attribute(Attribute::new(
-                0,
-                n.strip_prefix("node::").unwrap_or(n),
-                v.clone(),
-            ));
-        });
+    //     self.values.iter().clone().for_each(|(n, v)| {
+    //         attributes.add_attribute(Attribute::new(
+    //             0,
+    //             n.strip_prefix("node::").unwrap_or(n),
+    //             v.clone(),
+    //         ));
+    //     });
 
-        attributes
-            .with_attribute(Attribute::new(
-                0,
-                "symbol::",
-                Value::Symbol(self.symbol.to_string()),
-            ))
-            .clone_attrs()
-    }
+    //     attributes
+    //         .with_attribute(Attribute::new(
+    //             0,
+    //             "symbol::",
+    //             Value::Symbol(self.symbol.to_string()),
+    //         ))
+    //         .clone_attrs()
+    // }
 
     /// process
     fn process<S: AsRef<str> + ?Sized>(&self, _: &S) -> Result<Self, Self::Error> {
@@ -174,8 +175,8 @@ impl App for ThunkContext {
             |s, ui| {
                 let mut set = BTreeSet::new();
 
-                let mut attributes = s.state.into_attributes();
-                attributes.iter_mut()
+                let mut attributes = s.state.attribute_graph().clone();
+                attributes.iter_mut_attributes()
                     .filter(|a| {
                         !a.name().starts_with("opened::") && !a.name().starts_with("symbol::")
                     })
@@ -187,7 +188,7 @@ impl App for ThunkContext {
                     s.edit_attr(format!("{} [{}]", a.name(), s.title), a.name(), ui);
                 }
 
-                s.state = ThunkContext::from_attributes(attributes);
+                s.state = ThunkContext::from_attribute_graph(attributes);
             },
             self.clone(),
         );
@@ -200,14 +201,11 @@ impl App for ThunkContext {
 
 #[test]
 fn test_runtime_state() {
-    let state = ThunkContext::from_attributes(
-        SectionAttributes::default()
-            .with_attribute(Attribute::new(
-                0,
+    let state = ThunkContext::from_attribute_graph(
+        AttributeGraph::default()
+            .with(
                 "symbol::",
-                Value::Symbol("thunk::test::".to_string()),
-            ))
-            .clone_attrs(),
+                Value::Symbol("thunk::test::".to_string()))
     );
 
     assert_eq!(state.symbol, "thunk::test::");

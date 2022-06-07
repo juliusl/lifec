@@ -1,7 +1,7 @@
 use super::{
-    node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor, Section, SectionAttributes,
+    node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor, Section,
 };
-use crate::{editor::unique_title, plugins::Thunk, RuntimeState};
+use crate::{editor::unique_title, plugins::Thunk, RuntimeState, AttributeGraph};
 use atlier::system::{App, Attribute, Extension, Value};
 use imgui::{ChildWindow, MenuItem};
 use specs::{
@@ -76,7 +76,7 @@ where
 {
     type SystemData = (
         Entities<'a>,
-        ReadStorage<'a, SectionAttributes>,
+        ReadStorage<'a, AttributeGraph>,
         ReadStorage<'a, Section<S>>,
         WriteStorage<'a, Loader>,
         Read<'a, RuntimeEditor<S>>,
@@ -97,7 +97,7 @@ where
 
         entities.join().for_each(|e| {
             if let Some(attributes) = attributes.get(e) {
-                match attributes.is_attr_checkbox("enable node editor") {
+                match attributes.is_enabled("enable node editor") {
                     Some(true) => match self.editors.get_mut(&e.id()) {
                         None => {
                             let editor_context = self.imnodes.create_editor();
@@ -106,9 +106,10 @@ where
                             let mut editor =
                                 NodeEditorGraph::new(format!("{}", e.id()), editor_context, idgen);
 
+                            let mut attributes = attributes.clone();
+
                             for attr in attributes
-                                .clone_attrs()
-                                .iter_mut()
+                                .iter_mut_attributes()
                                 .filter(|a| a.name().starts_with("node::"))
                             {
                                 editor.add_node("", attr);
@@ -118,7 +119,7 @@ where
                                 editor.add_thunk(call, thunk.clone());
                             }
 
-                           editor.load_attribute_store(attributes);
+                           editor.load_attribute_store(&attributes);
 
                             self.editors.insert(e.id(), editor);
 
@@ -135,9 +136,7 @@ where
                         if let Some(section) = section {
                             match section_loader.insert(
                                 e,
-                                Loader::LoadSection(SectionAttributes::from(
-                                    section.into_attributes(),
-                                )),
+                                Loader::LoadSection(section.attribute_graph().clone()),
                             ) {
                                 Ok(_) => {
                                     println!("NodeEditor dispatched load section");
@@ -366,7 +365,7 @@ where
 
                                         if editor.is_debugging_enabled() {
                                             if ui.button("Dump runtime editor output") {
-                                                section.into_attributes().iter().for_each(|a| {
+                                                section.attribute_graph().iter_attributes().for_each(|a| {
                                                     println!("{}", a);
                                                 });
                                             }

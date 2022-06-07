@@ -8,12 +8,13 @@ use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::storage::HashMapStorage;
 use specs::{
-    Component, Entities, Join, ReadStorage, RunNow, System, WorldExt, Write, WriteStorage,
+    Component, Entities,  ReadStorage, RunNow, System, WorldExt, Write, WriteStorage, Join,
 };
 
 use crate::editor::{EventComponent, Loader};
 use crate::{
-    editor::{EventGraph, SectionAttributes},
+    editor::EventGraph,
+    AttributeGraph,
     RuntimeState,
 };
 
@@ -59,7 +60,8 @@ impl<'a> System<'a> for ProjectDispatcher {
                     println!("Project inserted graph {:?}", ent);
                 }
 
-                let attrs = doc.attributes.clone().with_parent_entity(ent.id());
+                let mut attrs = doc.attributes.clone();
+                attrs.set_parent_entity(ent);
 
                 if let Some(_) = loader.insert(ent, Loader::LoadSection(attrs)).ok() {
                     println!("Project inserted loader {:?}", ent);
@@ -96,7 +98,7 @@ impl Default for Dispatch {
 impl<'a> System<'a> for Project {
     type SystemData = (
         Entities<'a>,
-        ReadStorage<'a, SectionAttributes>,
+        ReadStorage<'a, AttributeGraph>,
         ReadStorage<'a, EventGraph>,
         WriteStorage<'a, Document>,
         Write<'a, Dispatch>,
@@ -114,7 +116,7 @@ impl<'a> System<'a> for Project {
         }
 
         for (e, a, g) in (&e, &attributes, &event_graph).join() {
-            match a.is_attr_checkbox("enable project") {
+            match a.is_enabled("enable project") {
                 Some(true) => {
                     if let None = write_documents.get(e) {
                         match write_documents.insert(e, Document::new(e.id(), a.clone(), g.clone()))
@@ -251,9 +253,9 @@ impl Project {
         }
     }
 
-    fn add_attribute(&mut self, attribute: Attribute) {
+    fn add_attribute(&mut self, attribute: &Attribute) {
         if let Some(document) = self.get_document_mut(attribute.id()) {
-            document.attributes.add_attribute(attribute);
+            document.attributes.copy_attribute(attribute);
         }
     }
 }
@@ -265,49 +267,49 @@ impl RuntimeState for Project {
         todo!()
     }
 
-    fn from_attributes(attrs: Vec<atlier::system::Attribute>) -> Self {
-        let mut project = Self::default();
+    // fn from_attributes(attrs: Vec<atlier::system::Attribute>) -> Self {
+    //     let mut project = Self::default();
 
-        for a in attrs.iter().filter(|a| a.name().starts_with("Event")) {
-            if let Value::BinaryVector(b) = a.value() {
-                if let Some(event) = ron::de::from_bytes::<EventComponent>(b).ok() {
-                    project.add_event_node(a.id(), event);
-                }
-            }
-        }
+    //     for a in attrs.iter().filter(|a| a.name().starts_with("Event")) {
+    //         if let Value::BinaryVector(b) = a.value() {
+    //             if let Some(event) = ron::de::from_bytes::<EventComponent>(b).ok() {
+    //                 project.add_event_node(a.id(), event);
+    //             }
+    //         }
+    //     }
 
-        attrs
-            .iter()
-            .filter(|a| !a.name().starts_with("Event"))
-            .for_each(|a| project.add_attribute(a.clone()));
+    //     attrs
+    //         .iter()
+    //         .filter(|a| !a.name().starts_with("Event"))
+    //         .for_each(|a| project.add_attribute(a.clone()));
 
-        project
-    }
+    //     project
+    // }
 
-    fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
-        let mut attrs = vec![];
-        for (e, doc) in self.documents.iter() {
-            if let Some(true) = doc.attributes.is_attr_checkbox("enable project") {
-                let mut events = doc.events.into_attributes();
-                events.iter_mut().for_each(|a| {
-                    a.set_id(*e);
-                });
+    // fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
+    //     let mut attrs = vec![];
+    //     for (e, doc) in self.documents.iter() {
+    //         if let Some(true) = doc.attributes.is_attr_checkbox("enable project") {
+    //             let mut events = doc.events.into_attributes();
+    //             events.iter_mut().for_each(|a| {
+    //                 a.set_id(*e);
+    //             });
 
-                attrs.append(&mut events);
+    //             attrs.append(&mut events);
 
-                doc.attributes
-                    .get_attrs()
-                    .iter()
-                    .cloned()
-                    .filter(|a| a.id() == *e)
-                    .for_each(|a| {
-                        attrs.push(a.clone());
-                    });
-            }
-        }
+    //             doc.attributes
+    //                 .get_attrs()
+    //                 .iter()
+    //                 .cloned()
+    //                 .filter(|a| a.id() == *e)
+    //                 .for_each(|a| {
+    //                     attrs.push(a.clone());
+    //                 });
+    //         }
+    //     }
 
-        attrs
-    }
+    //     attrs
+    // }
 
     fn merge_with(&self, other: &Self) -> Self {
         Self {
@@ -340,39 +342,25 @@ impl Extension for Project {
 #[derive(Default, Clone, Serialize, Deserialize, Component)]
 #[storage(HashMapStorage)]
 pub struct Document {
-    attributes: SectionAttributes,
+    attributes: AttributeGraph,
     events: EventGraph,
 }
 
 impl Document {
-    pub fn new(id: u32, attributes: SectionAttributes, events: EventGraph) -> Self {
-        let sanitized: Vec<Attribute> = attributes
-            .get_attrs()
-            .iter()
-            .cloned()
-            .filter(|a| a.id() == id)
-            .map(|a| a.to_owned())
-            .collect();
-
+    pub fn new(id: u32, attributes: AttributeGraph, events: EventGraph) -> Self {
         Self {
-            attributes: SectionAttributes::from(sanitized),
+            attributes,
             events,
         }
     }
 
     /// ensure all attributes are from the same parent id
     fn sanitize(&self, id: u32) -> Self {
-        let sanitized: Vec<Attribute> = self
-            .attributes
-            .get_attrs()
-            .iter()
-            .cloned()
-            .filter(|a| a.id() == id)
-            .map(|a| a.to_owned())
-            .collect();
+        let mut attributes = self.attributes.clone();
+        attributes.set_parent_entity_id(id); 
 
         Self {
-            attributes: SectionAttributes::from(sanitized),
+            attributes,
             events: self.events.clone(),
         }
     }
