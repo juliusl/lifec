@@ -113,15 +113,16 @@ impl Display for EventEditor {
 }
 
 impl From<AttributeGraph> for EventEditor {
-    fn from(attribute_graph: AttributeGraph) -> Self {
+    fn from(_: AttributeGraph) -> Self {
         todo!();
     }
 }
 
 impl RuntimeState for EventEditor {
     type Error = EventEditorError;
+    type State = AttributeGraph;
 
-    fn process(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
+    fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
         todo!()
     }
 
@@ -182,7 +183,7 @@ where
     S: RuntimeState,
 {
     fn into(self) -> Section<S> {
-        let section = Section::<S>::new(
+        let section = Section::new(
             self.label.to_string(),
             AttributeGraph::default()
                 .with_text("label", self.label.clone())

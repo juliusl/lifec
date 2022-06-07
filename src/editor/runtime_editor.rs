@@ -28,7 +28,10 @@ where
     pub dispatch_remove: Option<u32>,
 }
 
-impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
+impl<S> From<Runtime<S>> for RuntimeEditor<S> 
+where
+    S: RuntimeState
+{
     fn from(runtime: Runtime<S>) -> Self {
         let events = runtime
             .get_listeners()
@@ -136,7 +139,7 @@ where
                 .enable_app_systems()
                 .enable_edit_attributes();
 
-                match loader.insert(next, Loader::LoadSection(section.attribute_graph().clone())) {
+                match loader.insert(next, Loader::LoadSection(section.state().clone())) {
                     Ok(_) => {
                         self.sections.insert(next.id(), section);
 
@@ -159,7 +162,7 @@ where
                 None => {
                     match loader.insert(
                         e,
-                        Loader::LoadSection(s.attribute_graph().clone()),
+                        Loader::LoadSection(s.state().clone()),
                     ) {
                         Ok(_) => {
                             println!("RuntimeEditor dispatched Loader for {:?}", e);
@@ -351,7 +354,7 @@ where
                             }
 
                             match section_attributes
-                                .insert(e, section.attribute_graph().clone())
+                                .insert(e, section.state().clone())
                             {
                                 Ok(_) => {
                                     if let None = event_graph.get(e) {
@@ -443,7 +446,7 @@ where
 {
     pub fn apply_section(section: Section<S>, mut runtime: Runtime<S>) -> Self {
         // This will apply the sections current state and attributes to the current runtime
-        runtime.state = Some(S::from(section.attribute_graph().clone()));
+        runtime.state = Some(S::from(section.state().clone()));
         section.attributes.iter_attributes().for_each(|a| {
             runtime.attribute(a);
         });

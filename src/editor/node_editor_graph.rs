@@ -115,7 +115,7 @@ impl App for NodeEditorGraph {
                                             let mut thunk_context = ThunkContext::from(values.clone());
 
                                             if !self.pause_updating_graph {
-                                                thunk_context.attribute_graph_mut().with(
+                                                thunk_context.state_mut().as_mut().with(
                                                     "opened::".to_string(),
                                                     Value::Bool(true),
                                                 );
@@ -131,7 +131,7 @@ impl App for NodeEditorGraph {
                                                     .clone()
                                                     .expect("filtered only thunks with some");
 
-                                                thunk(thunk_context.attribute_graph_mut());
+                                                thunk(thunk_context.state_mut().as_mut());
                                             }
 
                                             ui.same_line();
@@ -142,7 +142,7 @@ impl App for NodeEditorGraph {
                                             if ui.button(format!("Refresh values [{}]", symbol)) {
                                                 values.clear_index();
                                             } else {
-                                                *values = thunk_context.attribute_graph().clone();
+                                                *values = thunk_context.state_mut().as_mut().clone();
                                             }
 
                                             ui.new_line();
@@ -529,7 +529,7 @@ impl NodeEditorGraph {
         let attribute_store = attributes.find_attr_value(format!("file::{}_attribute_store.out", self.title()));
         if let Some(Value::BinaryVector(attr_store)) = attribute_store {
             match ron::de::from_bytes::<Store<(i32, Attribute)>>(attr_store) {
-                Ok(store) => {
+                Ok(_) => {
                 
                 }
                 Err(_) => todo!(),
@@ -807,7 +807,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
                         *updating = Value::Reference(from);
                     }
                 }
-                (Value::Symbol(symbol), Value::Empty) => {
+                (Value::Symbol(_), Value::Empty) => {
                     if let Some(values) = &from_node.values {
                         let context = ThunkContext::from(values.clone());
 
@@ -831,7 +831,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
                     }
                 }
                 // symbol -> symbol, can share outputs
-                (Value::Symbol(other), Value::Symbol(symbol)) => {
+                (Value::Symbol(_), Value::Symbol(symbol)) => {
                     if symbol.starts_with("thunk::") {
                         let thunk = symbol[7..].to_string();
                         if let Some(thunk) = self.thunk_index.get(&thunk) {

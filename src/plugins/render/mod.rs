@@ -81,7 +81,7 @@ impl<'a> System<'a> for RenderSystem
             }
         }
 
-        for (key, next) in self.output.iter_mut() {
+        for (key, _) in self.output.iter_mut() {
             let entity = entities.entity(*key);
             if !entities.is_alive(entity) {
                

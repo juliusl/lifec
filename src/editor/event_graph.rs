@@ -65,15 +65,16 @@ impl Display for EventGraph {
 }
 
 impl From<AttributeGraph> for EventGraph {
-    fn from(attribute_graph: AttributeGraph) -> Self {
+    fn from(_: AttributeGraph) -> Self {
         todo!();
     }
 }
 
 impl RuntimeState for EventGraph {
     type Error = ();
+    type State = AttributeGraph;
 
-    fn process(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
+    fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
         Ok(self.clone())
     }
 }

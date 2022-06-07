@@ -1,8 +1,10 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Display};
 
 use atlier::system::{Attribute, Value};
 use serde::{Serialize, Deserialize};
 use specs::{Entity, Component, storage::HashMapStorage};
+
+use crate::RuntimeState;
 
 /// Attribute graph indexes attributes for an entity and provides methods for editing attributes
 #[derive(Debug, Default, Component, Clone, Hash, Serialize, Deserialize, PartialEq, PartialOrd)]
@@ -10,15 +12,6 @@ use specs::{Entity, Component, storage::HashMapStorage};
 pub struct AttributeGraph {
     entity: u32,
     index: BTreeMap<String, Attribute>,
-}
-
-impl From<Entity> for AttributeGraph {
-    fn from(entity: Entity) -> Self {
-        AttributeGraph {
-            entity: entity.id(),
-            index: BTreeMap::default(),
-        }
-    }
 }
 
 impl AttributeGraph {
@@ -388,4 +381,49 @@ fn test_attribute_graph() {
 
     assert!(test_graph.contains_attribute("test_value"));
     assert_eq!(test_graph.find_attr_value("test_value"), Some(&Value::Int(10)));
+}
+
+
+impl Display for AttributeGraph {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "")
+    }
+}
+
+impl AsRef<AttributeGraph> for AttributeGraph {
+    fn as_ref(&self) -> &AttributeGraph {
+        self
+    }
+}
+
+impl AsMut<AttributeGraph> for AttributeGraph {
+    fn as_mut(&mut self) -> &mut AttributeGraph {
+        self
+    }
+}
+
+impl From<Entity> for AttributeGraph {
+    fn from(entity: Entity) -> Self {
+        AttributeGraph {
+            entity: entity.id(),
+            index: BTreeMap::default(),
+        }
+    }
+}
+
+impl RuntimeState for AttributeGraph {
+    type Error = ();
+    type State = Self;
+
+    fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
+        todo!("dispatcher not implemented")
+    }
+
+    fn state(&self) -> &Self::State {
+        self
+    }
+
+    fn state_mut(&mut self) -> &mut Self::State {
+        self
+    }
 }

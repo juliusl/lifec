@@ -65,8 +65,8 @@ impl<S: RuntimeState> Section<S> {
             attributes,
         };
 
-        let state_attrs = initial_state.attribute_graph();
-        state_attrs.iter_attributes().for_each(|a| section.attributes.copy_attribute(a) );
+        let state_attrs = initial_state.state();
+        state_attrs.as_ref().iter_attributes().for_each(|a| section.attributes.copy_attribute(a) );
         section
     }
 
@@ -248,7 +248,10 @@ impl<S: RuntimeState> Section<S> {
     }
 }
 
-impl<S: RuntimeState + App> From<S> for Section<S> {
+impl<S> From<S> for Section<S> 
+    where 
+    S: RuntimeState + App,
+{
     fn from(initial: S) -> Self {
         Section {
             gen: 0,
@@ -265,7 +268,10 @@ impl<S: RuntimeState + App> From<S> for Section<S> {
     }
 }
 
-impl<S: RuntimeState> App for Section<S> {
+impl<S> App for Section<S> 
+where 
+    S: RuntimeState,
+{
     fn name() -> &'static str {
         "Section"
     }
@@ -387,7 +393,7 @@ impl<S> From<AttributeGraph> for Section<S>
 where
     S: RuntimeState
 {
-    fn from(attribute_graph: AttributeGraph) -> Self {
+    fn from(_: AttributeGraph) -> Self {
         todo!();
     }
 }
@@ -397,8 +403,9 @@ where
     S: RuntimeState,
 {
     type Error = ();
+    type State = AttributeGraph;
 
-    fn process(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
+    fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
         todo!()
     }
 

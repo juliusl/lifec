@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 
-use atlier::system::{App, Attribute, Extension, Value};
+use atlier::system::{App, Extension, Value};
 use imgui::Window;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
@@ -11,7 +11,7 @@ use specs::{
     Component, Entities,  ReadStorage, RunNow, System, WorldExt, Write, WriteStorage, Join,
 };
 
-use crate::editor::{EventComponent, Loader};
+use crate::editor::{Loader};
 use crate::{
     editor::EventGraph,
     AttributeGraph,
@@ -237,39 +237,40 @@ impl Display for Project {
 }
 
 impl Project {
-    fn get_document_mut(&mut self, id: u32) -> Option<&mut Document> {
-        if let None = self.documents.get(&id) {
-            self.documents.insert(id, Document::default());
-        }
+    // fn get_document_mut(&mut self, id: u32) -> Option<&mut Document> {
+    //     if let None = self.documents.get(&id) {
+    //         self.documents.insert(id, Document::default());
+    //     }
 
-        self.documents.get_mut(&id)
-    }
+    //     self.documents.get_mut(&id)
+    // }
 
-    fn add_event_node(&mut self, id: u32, event: EventComponent) {
-        if let Some(document) = self.get_document_mut(id) {
-            let EventGraph(store) = &document.events;
-            document.events = EventGraph(store.node(event));
-        }
-    }
+    // fn add_event_node(&mut self, id: u32, event: EventComponent) {
+    //     if let Some(document) = self.get_document_mut(id) {
+    //         let EventGraph(store) = &document.events;
+    //         document.events = EventGraph(store.node(event));
+    //     }
+    // }
 
-    fn add_attribute(&mut self, attribute: &Attribute) {
-        if let Some(document) = self.get_document_mut(attribute.id()) {
-            document.attributes.copy_attribute(attribute);
-        }
-    }
+    // fn add_attribute(&mut self, attribute: &Attribute) {
+    //     if let Some(document) = self.get_document_mut(attribute.id()) {
+    //         document.attributes.copy_attribute(attribute);
+    //     }
+    // }
 }
 
 impl From<AttributeGraph> for Project
 {
-    fn from(attribute_graph: AttributeGraph) -> Self {
+    fn from(_: AttributeGraph) -> Self {
         todo!();
     }
 }
 
 impl RuntimeState for Project {
     type Error = ProjectError;
+    type State = AttributeGraph;
 
-    fn process(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
+    fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
         todo!()
     }
 
@@ -353,7 +354,7 @@ pub struct Document {
 }
 
 impl Document {
-    pub fn new(id: u32, attributes: AttributeGraph, events: EventGraph) -> Self {
+    pub fn new(_: u32, attributes: AttributeGraph, events: EventGraph) -> Self {
         Self {
             attributes,
             events,

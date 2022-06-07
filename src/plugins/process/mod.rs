@@ -44,16 +44,16 @@ impl Thunk for Process {
     }
 
     fn call_with_context(context: &mut super::ThunkContext) {
-        let process = Self::from(context.attribute_graph().clone());
+        let process = Self::from(context.state().as_ref().clone());
 
-        match process.process(&process.command) {
+        match process.dispatch(&process.command) {
             Ok(output) => {
                 context.set_output("stdout", Value::BinaryVector(output.stdout));
                 context.set_returns(Value::Bool(true));
-                context.attribute_graph_mut().find_remove("error");
+                context.state_mut().as_mut().find_remove("error");
             }
             Err(e) => {
-                context.attribute_graph_mut().with(
+                context.state_mut().as_mut().with(
                     "error".to_string(),
                     Value::TextBuffer(format!("Error: {:?}", e)),
                 );
@@ -174,14 +174,14 @@ impl Process {
                 (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommand))) => {
                     if let Some(next) = section
                         .state
-                        .process(&format!("{}::{}", command, subcommand))
+                        .dispatch(&format!("{}::{}", command, subcommand))
                         .ok()
                     {
                         section.state = next;
                     }
                 }
                 (Some(Value::TextBuffer(command)), None) => {
-                    if let Some(next) = section.state.process(&&format!("{}::", command)).ok() {
+                    if let Some(next) = section.state.dispatch(&&format!("{}::", command)).ok() {
                         section.state = next;
                     }
                 }
@@ -282,15 +282,16 @@ pub struct ProcessExecutionError {}
 
 impl From<AttributeGraph> for Process
 {
-    fn from(attribute_graph: AttributeGraph) -> Self {
+    fn from(_: AttributeGraph) -> Self {
         todo!();
     }
 }
 
 impl RuntimeState for Process {
     type Error = ProcessExecutionError;
+    type State = AttributeGraph;
 
-    fn process(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> {
+    fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> {
         self.interpret_command(msg, Self::handle_output)
     }
 

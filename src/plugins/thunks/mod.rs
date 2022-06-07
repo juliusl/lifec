@@ -21,7 +21,7 @@ pub trait Thunk {
 
         Self::call_with_context(&mut context);
 
-        *values = context.attribute_graph().clone();
+        *values = context.state().as_ref().clone();
     }
 }
 
@@ -53,7 +53,8 @@ impl ThunkContext {
 
     pub fn node_title(&self) -> &String {
         if let Value::TextBuffer(node_title) = self
-            .attribute_graph()
+            .state()
+            .as_ref()
             .find_attr_value("node_title")
             .expect("thunk context has to be created with a node_title")
         {
@@ -65,7 +66,8 @@ impl ThunkContext {
 
     pub fn symbol(&self) -> &String {
         if let Value::Symbol(symbol) = self
-            .attribute_graph()
+            .state()
+            .as_ref()
             .find_attr_value("symbol")
             .expect("thunk context has to be created with a symbol")
         {
@@ -88,33 +90,37 @@ impl ThunkContext {
     }
 
     pub fn find_value(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.attribute_graph().find_attr_value(key)
+        self.state().as_ref().find_attr_value(key)
     }
 
     pub fn set_returns(&mut self, returns: Value) {
         let returns_key = &self.returns_key();
 
-        self.attribute_graph_mut()
+        self.state_mut()
+            .as_mut()
             .with(returns_key.to_string(), returns.clone());
     }
 
     pub fn returns(&self) -> Option<&Value> {
         let returns_key = &self.returns_key();
 
-        self.attribute_graph().find_attr_value(returns_key)
+        self.state().as_ref().find_attr_value(returns_key)
     }
 
     pub fn set_output(&mut self, output_key: impl AsRef<str>, output: Value) {
         let output_key = self.outputs_key(output_key);
 
-        self.attribute_graph_mut().with(output_key, output);
+        self.state_mut()
+            .as_mut()
+            .with(output_key, output);
     }
 
     pub fn get_outputs(&self) -> Vec<(String, &Value)> {
         let symbol = self.symbol().clone();
         let prefix = format!("{}::output::", symbol);
 
-        self.attribute_graph()
+        self.state()
+            .as_ref()
             .iter_attributes()
             .filter(|a| a.name().starts_with(&prefix))
             .map(|a| (a.name().to_string(), a.value()))
@@ -163,20 +169,33 @@ impl From<AttributeGraph> for ThunkContext {
     }
 }
 
+impl AsMut<AttributeGraph> for ThunkContext {
+    fn as_mut(&mut self) -> &mut AttributeGraph {
+        &mut self.0
+    }
+}
+
+impl AsRef<AttributeGraph> for ThunkContext {
+    fn as_ref(&self) -> &AttributeGraph {
+        &self.0
+    }
+}
+
 impl RuntimeState for ThunkContext {
     type Error = ThunkError;
+    type State = Self;
 
     /// process
-    fn process(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
+    fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
         todo!("not implemented")
     }
 
-    fn attribute_graph(&self) -> &AttributeGraph {
-        &self.0
+    fn state(&self) -> &Self {
+        self
     }
 
-    fn attribute_graph_mut(&mut self) -> &mut AttributeGraph {
-        &mut self.0
+    fn state_mut(&mut self) -> &mut Self {
+        self
     }
 }
 
@@ -192,8 +211,9 @@ impl App for ThunkContext {
             |s, ui| {
                 let mut set = BTreeSet::new();
 
-                let mut attributes = s.state.attribute_graph().clone();
+                let mut attributes = s.state.state().clone();
                 attributes
+                    .as_mut()
                     .iter_mut_attributes()
                     .filter(|a| {
                         !a.name().starts_with("opened::") && !a.name().starts_with("symbol::")

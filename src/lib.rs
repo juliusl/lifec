@@ -13,17 +13,18 @@ pub use state::AttributeGraph;
 
 pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + From<AttributeGraph> {
     type Error;
+    type State: AsRef<AttributeGraph> + AsMut<AttributeGraph>;
 
-    /// try to save the current state to a String
+    // /// try to save the current state to a String
     fn save(&self) -> Option<String> {
-        match serde_json::to_string(&self.attribute_graph()) {
+        match serde_json::to_string(self.state().as_ref()) {
             Ok(val) => Some(val),
             Err(_) => None,
         }
     }
 
-    /// load should take the serialized form of this state
-    /// and create a new instance of Self
+    // /// load should take the serialized form of this state
+    // /// and create a new instance of Self
     fn load(&self, init: impl AsRef<str>) -> Self {
         if let Some(attribute_graph) = serde_json::from_str::<AttributeGraph>(init.as_ref()).ok() {
             Self::from(attribute_graph)
@@ -32,17 +33,17 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + 
         }
     }
 
-    fn attribute_graph_mut(&mut self) -> &mut AttributeGraph {
-        todo!("runtime state did not implement attribute graph")
+    fn state_mut(&mut self) -> &mut Self::State {
+        todo!("state is not implemented")
     }
 
-    fn attribute_graph(&self) -> &AttributeGraph {
-        todo!("runtime state did not implement attribute graph")
+    fn state(&self) -> &Self::State {
+        todo!("state is not implemented")
     }
 
-    /// process is a function that should take a string message
+    /// dispatch is a function that should take a string message
     /// and return the next version of Self
-    fn process(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error>;
+    fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error>;
 
     /// process is a function that should take a string message
     /// and return the next version of Self
@@ -53,7 +54,7 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + 
     where
         Self: Clone + Default + RuntimeState,
     {
-        Self::process(&state.get_state(), msg)
+        Self::dispatch(&state.get_state(), msg)
     }
 
     /// merge_with specifies how to merge another instance of Self that has been modified externally
@@ -61,8 +62,9 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + 
     fn merge_with(&self, other: &Self) -> Self {
         let mut next = self.clone();
         
-        next.attribute_graph_mut()
-            .copy(other.attribute_graph());
+        next.state_mut()
+            .as_mut()
+            .copy(other.state().as_ref());
         
         next
     }
@@ -498,7 +500,7 @@ impl<S> From<AttributeGraph> for WithArgs<S>
 where
     S: RuntimeState
 {
-    fn from(attribute_graph: AttributeGraph) -> Self {
+    fn from(_: AttributeGraph) -> Self {
         todo!();
     }
 }
@@ -508,6 +510,7 @@ where
     S: RuntimeState,
 {
     type Error = <S as RuntimeState>::Error;
+    type State = AttributeGraph;
 
     fn load(&self, init: impl AsRef<str>) -> Self {
         Self {
@@ -516,8 +519,8 @@ where
         }
     }
 
-    fn process(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> {
-        let next = self.state.process(msg.as_ref());
+    fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> {
+        let next = self.state.dispatch(msg.as_ref());
 
         match next {
             Ok(next) => Ok(Self {
@@ -738,7 +741,7 @@ where
                             &msg,
                         )
                     } else {
-                        state.process(&msg)
+                        state.dispatch(&msg)
                     };
 
                     if let Ok(n) = process {

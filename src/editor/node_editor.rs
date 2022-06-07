@@ -136,7 +136,7 @@ where
                         if let Some(section) = section {
                             match section_loader.insert(
                                 e,
-                                Loader::LoadSection(section.attribute_graph().clone()),
+                                Loader::LoadSection(section.state().clone()),
                             ) {
                                 Ok(_) => {
                                     println!("NodeEditor dispatched load section");
@@ -365,7 +365,7 @@ where
 
                                         if editor.is_debugging_enabled() {
                                             if ui.button("Dump runtime editor output") {
-                                                section.attribute_graph().iter_attributes().for_each(|a| {
+                                                section.state().iter_attributes().for_each(|a| {
                                                     println!("{}", a);
                                                 });
                                             }
