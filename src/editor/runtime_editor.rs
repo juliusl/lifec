@@ -301,7 +301,7 @@ where
                             "Section not found for {:?}, Generating section from attributes",
                             entity
                         );
-                        let initial = S::from_attribute_graph(attributes.clone());
+                        let initial = S::from(attributes.clone());
 
                         let mut section = Section::<S>::default();
                         section.state = initial;
@@ -311,7 +311,7 @@ where
                         });
 
                         if let Some(Value::TextBuffer(title)) =
-                            section.clone().attributes.get_attr_value("title::")
+                            section.clone().attributes.find_attr_value("title::")
                         {
                             let section =
                                 section.with_title(title.to_string()).with_parent_entity(entity);
@@ -443,11 +443,11 @@ where
 {
     pub fn apply_section(section: Section<S>, mut runtime: Runtime<S>) -> Self {
         // This will apply the sections current state and attributes to the current runtime
-        runtime.state = Some(S::from_attribute_graph(section.attribute_graph().clone()));
+        runtime.state = Some(S::from(section.attribute_graph().clone()));
         section.attributes.iter_attributes().for_each(|a| {
             runtime.attribute(a);
         });
-        if let Some(Value::TextBuffer(event)) = section.attributes.get_attr_value("context::") {
+        if let Some(Value::TextBuffer(event)) = section.attributes.find_attr_value("context::") {
             runtime = runtime.parse_event(&event);
         }
 

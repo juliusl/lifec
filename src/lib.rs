@@ -11,7 +11,7 @@ pub mod plugins;
 mod state;
 pub use state::AttributeGraph;
 
-pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
+pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + From<AttributeGraph> {
     type Error;
 
     /// try to save the current state to a String
@@ -25,36 +25,24 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
     /// load should take the serialized form of this state
     /// and create a new instance of Self
     fn load(&self, init: impl AsRef<str>) -> Self {
-        if let Some(state) = serde_json::from_str::<AttributeGraph>(init.as_ref()).ok() {
-            Self::from_attribute_graph(state)
+        if let Some(attribute_graph) = serde_json::from_str::<AttributeGraph>(init.as_ref()).ok() {
+            Self::from(attribute_graph)
         } else {
             self.clone()
         }
     }
 
-    fn edit_attribute_graph(&mut self) -> &mut AttributeGraph {
-        todo!()
+    fn attribute_graph_mut(&mut self) -> &mut AttributeGraph {
+        todo!("runtime state did not implement attribute graph")
     }
 
     fn attribute_graph(&self) -> &AttributeGraph {
-        todo!()
+        todo!("runtime state did not implement attribute graph")
     }
-
-    fn from_attribute_graph(graph: AttributeGraph) -> Self {
-        todo!()
-    }
-
-    // /// from_attributes loads runtime state from a vector of attributes
-    // fn from_attributes(attributes: Vec<Attribute>) -> Self;
-
-    // /// into_attributes converts current runtime state into a vector of attributes
-    // fn into_attributes(&self) -> Vec<Attribute> {
-    //     vec![]
-    // }
 
     /// process is a function that should take a string message
     /// and return the next version of Self
-    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error>;
+    fn process(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error>;
 
     /// process is a function that should take a string message
     /// and return the next version of Self
@@ -70,8 +58,13 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display {
 
     /// merge_with specifies how to merge another instance of Self that has been modified externally
     /// this allows for only specific fields in state to be updated asynchronously
-    fn merge_with(&self, _: &Self) -> Self {
-        self.clone()
+    fn merge_with(&self, other: &Self) -> Self {
+        let mut next = self.clone();
+        
+        next.attribute_graph_mut()
+            .copy(other.attribute_graph());
+        
+        next
     }
 
     /// select decides which listener should be processed next
@@ -241,12 +234,12 @@ impl Into<String> for Event {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Listener<T>
+pub struct Listener<S>
 where
-    T: RuntimeState,
+    S: RuntimeState,
 {
     pub event: Event,
-    pub action: Action<T>,
+    pub action: Action<S>,
     pub next: Option<Event>,
     pub extensions: Extensions,
 }
@@ -259,23 +252,23 @@ pub struct Extensions {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct Runtime<T>
+pub struct Runtime<S>
 where
-    T: RuntimeState,
+    S: RuntimeState,
 {
-    listeners: Vec<Listener<T>>,
-    calls: BTreeMap<String, ThunkFunc<T>>,
-    state: Option<T>,
+    listeners: Vec<Listener<S>>,
+    calls: BTreeMap<String, ThunkFunc<S>>,
+    state: Option<S>,
     current: Option<Event>,
     attributes: AttributeGraph,
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct WithArgs<T>
+pub struct WithArgs<S>
 where
-    T: RuntimeState,
+    S: RuntimeState,
 {
-    state: T,
+    state: S,
     args: Vec<String>,
 }
 
@@ -369,12 +362,12 @@ where
 }
 
 #[derive(Clone)]
-pub enum ThunkFunc<T>
+pub enum ThunkFunc<S>
 where
-    T: RuntimeState,
+    S: RuntimeState,
 {
-    Default(fn(&T, Option<Event>) -> (T, String)),
-    WithArgs(fn(&WithArgs<T>, Option<Event>) -> (T, String)),
+    Default(fn(&S, Option<Event>) -> (S, String)),
+    WithArgs(fn(&WithArgs<S>, Option<Event>) -> (S, String)),
 }
 
 impl<T: Default> Default for ThunkFunc<T>
@@ -386,9 +379,9 @@ where
     }
 }
 
-impl<T> Debug for ThunkFunc<T>
+impl<S> Debug for ThunkFunc<S>
 where
-    T: RuntimeState,
+    S: RuntimeState,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -398,11 +391,11 @@ where
     }
 }
 
-impl<T> WithArgs<T>
+impl<S> WithArgs<S>
 where
-    T: RuntimeState,
+    S: RuntimeState,
 {
-    pub fn get_state(&self) -> T {
+    pub fn get_state(&self) -> S {
         self.state.clone()
     }
 
@@ -501,11 +494,20 @@ impl<T: RuntimeState> Display for WithArgs<T> {
     }
 }
 
-impl<T> RuntimeState for WithArgs<T>
+impl<S> From<AttributeGraph> for WithArgs<S>
 where
-    T: RuntimeState,
+    S: RuntimeState
 {
-    type Error = <T as RuntimeState>::Error;
+    fn from(attribute_graph: AttributeGraph) -> Self {
+        todo!();
+    }
+}
+
+impl<S> RuntimeState for WithArgs<S>
+where
+    S: RuntimeState,
+{
+    type Error = <S as RuntimeState>::Error;
 
     fn load(&self, init: impl AsRef<str>) -> Self {
         Self {
@@ -514,8 +516,8 @@ where
         }
     }
 
-    fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error> {
-        let next = self.state.process(msg);
+    fn process(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> {
+        let next = self.state.process(msg.as_ref());
 
         match next {
             Ok(next) => Ok(Self {
@@ -525,28 +527,17 @@ where
             Err(e) => Err(e),
         }
     }
-
-    // fn from_attributes(attrs: Vec<Attribute>) -> Self {
-    //     Self {
-    //         state: T::from_attributes(attrs),
-    //         args: vec![],
-    //     }
-    // }
-
-    // fn into_attributes(&self) -> Vec<Attribute> {
-    //     self.get_state().into_attributes()
-    // }
 }
 
-impl<T> Runtime<T>
+impl<S> Runtime<S>
 where
-    T: RuntimeState,
+    S: RuntimeState,
 {
     /// ensures that the runtime is returned after excuting a thunk with call_name, otherwise panic
     pub fn ensure_call(
         &self,
         call_name: impl AsRef<str>,
-        state: Option<T>,
+        state: Option<S>,
         args: Option<Vec<String>>,
     ) -> Self {
         if let None = self.calls.get(call_name.as_ref()) {
@@ -565,7 +556,7 @@ where
     pub fn after_call(
         &self,
         call_name: impl AsRef<str>,
-        state: Option<T>,
+        state: Option<S>,
         args: Option<Vec<String>>,
     ) -> Self {
         let mut clone = self.clone();
@@ -593,13 +584,13 @@ where
     }
 
     /// current gets the current state
-    pub fn current(&self) -> &Option<T> {
+    pub fn current(&self) -> &Option<S> {
         &self.state
     }
 
     /// init creates the default state to start the runtime with
-    pub fn init() -> T {
-        T::default()
+    pub fn init() -> S {
+        S::default()
     }
 
     pub fn reset(&mut self) {
@@ -619,7 +610,7 @@ where
             .collect();
     }
 
-    pub fn get_listeners(&self) -> Vec<Listener<T>> {
+    pub fn get_listeners(&self) -> Vec<Listener<S>> {
         self.listeners.clone()
     }
 
@@ -636,7 +627,7 @@ where
 
     /// on parses an event expression, and adds a new listener for that event
     /// this method returns an instance of the Listener for further configuration
-    pub fn on<S: AsRef<str> + ?Sized>(&mut self, event_expr: &S) -> &mut Listener<T> {
+    pub fn on(&mut self, event_expr: impl AsRef<str>) -> &mut Listener<S> {
         let mut lexer = Lifecycle::lexer(event_expr.as_ref());
 
         if let Some(Lifecycle::Event(e)) = lexer.next() {
@@ -652,10 +643,10 @@ where
         }
     }
 
-    pub fn with_call<S: AsRef<str> + ?Sized>(
+    pub fn with_call(
         &mut self,
-        call_name: &S,
-        thunk: fn(&T, Option<Event>) -> (T, String),
+        call_name: impl AsRef<str>,
+        thunk: fn(&S, Option<Event>) -> (S, String),
     ) -> Self {
         self.calls
             .insert(call_name.as_ref().to_string(), ThunkFunc::Default(thunk));
@@ -663,10 +654,10 @@ where
         self.clone()
     }
 
-    pub fn with_call_args<S: AsRef<str> + ?Sized>(
+    pub fn with_call_args(
         &mut self,
-        call_name: &S,
-        thunk: fn(&WithArgs<T>, Option<Event>) -> (T, String),
+        call_name: impl AsRef<str>,
+        thunk: fn(&WithArgs<S>, Option<Event>) -> (S, String),
     ) -> Self {
         self.calls
             .insert(call_name.as_ref().to_string(), ThunkFunc::WithArgs(thunk));
@@ -676,7 +667,7 @@ where
 
     /// start begins the runtime starting with the initial event expression
     /// the runtime will continue to execute until it reaches the { exit;; } event
-    pub fn start<S: AsRef<str> + ?Sized>(&mut self, init_expr: &S) {
+    pub fn start(&mut self, init_expr: impl AsRef<str>) {
         let mut processing = self.parse_event(init_expr);
 
         loop {
@@ -699,7 +690,7 @@ where
     }
 
     /// parse_event parses the event and sets it as the current context
-    pub fn parse_event<S: AsRef<str> + ?Sized>(&mut self, expr: &S) -> Self {
+    pub fn parse_event(&mut self, expr: impl AsRef<str>) -> Self {
         let mut lexer = Lifecycle::lexer(expr.as_ref());
 
         if let Some(Lifecycle::Event(e)) = lexer.next() {
@@ -710,7 +701,7 @@ where
     }
 
     /// gets the next listener that will be processed
-    pub fn next_listener(&self) -> Option<Listener<T>> {
+    pub fn next_listener(&self) -> Option<Listener<S>> {
         let state = self.prepare_state();
         if let Some(listener) = self
             .listeners
@@ -739,7 +730,7 @@ where
                 }
                 Action::Dispatch(msg) => {
                     let process = if l.extensions.args.len() > 0 {
-                        T::process_with_args(
+                        S::process_with_args(
                             WithArgs {
                                 state,
                                 args: l.extensions.get_args(),
@@ -817,7 +808,7 @@ where
         }
     }
 
-    fn prepare_state(&self) -> T {
+    fn prepare_state(&self) -> S {
         let mut state = self.state.clone();
 
         match &state {
@@ -828,7 +819,7 @@ where
         state.expect("state was just set")
     }
 
-    fn update(&mut self, next_state: T, next_event: String) {
+    fn update(&mut self, next_state: S, next_event: String) {
         let mut lex = Lifecycle::lexer(&next_event);
         match lex.next() {
             Some(Lifecycle::Event(event)) => {
@@ -849,7 +840,7 @@ where
     fn execute_call(
         &mut self,
         call_name: impl AsRef<str>,
-        state: T,
+        state: S,
         extensions: Option<Extensions>,
     ) {
         match self.calls.get(call_name.as_ref()) {
@@ -877,28 +868,28 @@ where
 pub struct RuntimeTestError;
 
 #[derive(Clone)]
-pub enum Action<T>
+pub enum Action<S>
 where
-    T: RuntimeState,
+    S: RuntimeState,
 {
     NoOp,
     Call(String),
     Dispatch(String),
-    Thunk(fn(&T, Option<Event>) -> (T, String)),
+    Thunk(fn(&S, Option<Event>) -> (S, String)),
 }
 
-impl<T> Default for Action<T>
+impl<S> Default for Action<S>
 where
-    T: RuntimeState,
+    S: RuntimeState,
 {
     fn default() -> Self {
         Self::NoOp
     }
 }
 
-impl<T> Debug for Action<T>
+impl<S> Debug for Action<S>
 where
-    T: RuntimeState,
+    S: RuntimeState,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

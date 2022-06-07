@@ -17,7 +17,7 @@ where
     pub editors: BTreeMap<u32, NodeEditorGraph>,
     sections: BTreeMap<u32, Section<S>>,
     runtime_editor: Option<RuntimeEditor<S>>,
-    thunks: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>,
+    thunks: BTreeMap<String, fn(&mut AttributeGraph)>,
 }
 
 impl<S> NodeEditor<S>
@@ -46,7 +46,7 @@ where
         self.add_thunk(T::symbol(), T::call);
     }
 
-    pub fn add_thunk(&mut self, name: impl AsRef<str>, thunk: fn(&mut BTreeMap<String, Value>)) {
+    pub fn add_thunk(&mut self, name: impl AsRef<str>, thunk: fn(&mut AttributeGraph)) {
         self.thunks.insert(name.as_ref().to_string(), thunk);
     }
 }

@@ -8,7 +8,7 @@ use knot::store::{Store, Visitor};
 use ron::ser::PrettyConfig;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::{plugins::ThunkContext, AttributeGraph};
+use crate::{plugins::ThunkContext, AttributeGraph, RuntimeState};
 
 #[derive(Clone)]
 pub struct NodeComponent {
@@ -18,8 +18,8 @@ pub struct NodeComponent {
     output_id: OutputPinId,
     attribute_id: AttributeId,
     attribute: Attribute,
-    thunk: Option<fn(&mut BTreeMap<String, Value>)>,
-    values: Option<BTreeMap<String, Value>>,
+    thunk: Option<fn(&mut AttributeGraph)>,
+    values: Option<AttributeGraph>,
 }
 
 impl NodeComponent {
@@ -46,18 +46,18 @@ impl NodeComponent {
     /// updates the current state of the node_component
     pub fn update(
         &mut self,
-        thunk: fn(&mut BTreeMap<String, Value>),
+        thunk: fn(&mut AttributeGraph),
         input_name: impl AsRef<str>,
         input: Value,
     ) {
         self.thunk = Some(thunk);
 
         if let None = self.values {
-            self.values = Some(BTreeMap::new());
+            self.values = Some(AttributeGraph::default());
         }
 
         if let Some(values) = self.values.as_mut() {
-            values.insert(input_name.as_ref().to_string(), input);
+            values.with(input_name.as_ref().to_string(), input);
         }
     }
 }
@@ -67,7 +67,7 @@ pub struct NodeEditorGraph {
     title: String,
     editor_context: Option<imnodes::EditorContext>,
     idgen: Option<imnodes::IdentifierGenerator>,
-    thunk_index: BTreeMap<String, fn(&mut BTreeMap<String, Value>)>,
+    thunk_index: BTreeMap<String, fn(&mut AttributeGraph)>,
     link_index: HashMap<LinkId, Link>,
     editing: Option<bool>,
     editing_graph_resources: Option<bool>,
@@ -112,11 +112,10 @@ impl App for NodeEditorGraph {
                                             .as_mut()
                                             .expect("filtered only values with some");
                                         if let Value::Symbol(symbol) = n.attribute.value() {
-                                            let mut thunk_context =
-                                                ThunkContext::new(&n.title, symbol, values.clone());
+                                            let mut thunk_context = ThunkContext::from(values.clone());
 
                                             if !self.pause_updating_graph {
-                                                thunk_context.values_mut().insert(
+                                                thunk_context.attribute_graph_mut().with(
                                                     "opened::".to_string(),
                                                     Value::Bool(true),
                                                 );
@@ -132,7 +131,7 @@ impl App for NodeEditorGraph {
                                                     .clone()
                                                     .expect("filtered only thunks with some");
 
-                                                thunk(thunk_context.values_mut());
+                                                thunk(thunk_context.attribute_graph_mut());
                                             }
 
                                             ui.same_line();
@@ -141,9 +140,9 @@ impl App for NodeEditorGraph {
                                             }
 
                                             if ui.button(format!("Refresh values [{}]", symbol)) {
-                                                values.clear();
+                                                values.clear_index();
                                             } else {
-                                                *values = thunk_context.values_mut().clone();
+                                                *values = thunk_context.attribute_graph().clone();
                                             }
 
                                             ui.new_line();
@@ -179,7 +178,7 @@ impl App for NodeEditorGraph {
                                         if let Some(values) = &n.values {
                                             ui.text("Current Values:");
                                             ui.new_line();
-                                            for t in values {
+                                            for t in values.iter_attributes().map(|a| a.value()) {
                                                 ui.text(format!("{:?}", t));
                                             }
                                         }
@@ -279,8 +278,7 @@ impl App for NodeEditorGraph {
                                                     thunk(values);
                                                 }
                                             });
-                                            let context =
-                                                ThunkContext::new(title, symbol, values.clone());
+                                            let context = ThunkContext::from(values.clone());
 
                                             let mut current_outputs = vec![];
                                             context.get_outputs().iter().cloned().for_each(
@@ -431,7 +429,7 @@ impl App for NodeEditorGraph {
                             if let Value::Symbol(_) = &n.attribute.value() {
                                 if let Some(n) = self.find_node_mut(to) {
                                     if let Some(values) = n.values.as_mut() {
-                                        values.clear();
+                                        values.clear_index();
                                     }
                                 }
                             }
@@ -449,7 +447,7 @@ impl App for NodeEditorGraph {
                             if let Value::Symbol(_) = &n.attribute.value() {
                                 if let Some(n) = self.find_node_mut(from) {
                                     if let Some(values) = n.values.as_mut() {
-                                        values.clear();
+                                        values.clear_index();
                                     }
                                 }
                             }
@@ -528,7 +526,7 @@ impl NodeEditorGraph {
     }
 
     pub fn load_attribute_store(&mut self, attributes: &AttributeGraph) {
-        let attribute_store = attributes.get_attr_value(format!("file::{}_attribute_store.out", self.title()));
+        let attribute_store = attributes.find_attr_value(format!("file::{}_attribute_store.out", self.title()));
         if let Some(Value::BinaryVector(attr_store)) = attribute_store {
             match ron::de::from_bytes::<Store<(i32, Attribute)>>(attr_store) {
                 Ok(store) => {
@@ -540,7 +538,7 @@ impl NodeEditorGraph {
     }
 
     /// add's a thunk to the graph
-    pub fn add_thunk(&mut self, name: impl AsRef<str>, thunk: fn(&mut BTreeMap<String, Value>)) {
+    pub fn add_thunk(&mut self, name: impl AsRef<str>, thunk: fn(&mut AttributeGraph)) {
         self.thunk_index.insert(name.as_ref().to_string(), thunk);
     }
 
@@ -634,7 +632,7 @@ impl NodeEditorGraph {
     }
 
     /// gets a mutable reference to the thunk index
-    pub fn thunk_index_mut(&mut self) -> &mut BTreeMap<String, fn(&mut BTreeMap<String, Value>)> {
+    pub fn thunk_index_mut(&mut self) -> &mut BTreeMap<String, fn(&mut AttributeGraph)> {
         &mut self.thunk_index
     }
 
@@ -811,7 +809,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
                 }
                 (Value::Symbol(symbol), Value::Empty) => {
                     if let Some(values) = &from_node.values {
-                        let context = ThunkContext::new(&from_node.title, symbol, values.clone());
+                        let context = ThunkContext::from(values.clone());
 
                         if let Some(output) = context.returns() {
                             let reference = output.to_ref();
@@ -841,7 +839,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
                             let input = from_node.clone().clone();
 
                             if let Some(values) = input.values {
-                                let thunk_context = ThunkContext::new(input.title, other, values);
+                                let thunk_context = ThunkContext::from(values);
                                 let inputs = thunk_context.get_outputs();
 
                                 if let Some(update) = self.find_node_mut(*t) {

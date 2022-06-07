@@ -14,8 +14,11 @@ use std::{
 use super::thunks::Thunk;
 use crate::parse_variables;
 use crate::{
+    AttributeGraph,
     editor::{Section, SectionExtension},
-    parse_flags, RuntimeState, WithArgs,
+    parse_flags, 
+    RuntimeState, 
+    WithArgs,
 };
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
@@ -41,16 +44,16 @@ impl Thunk for Process {
     }
 
     fn call_with_context(context: &mut super::ThunkContext) {
-        let process = Self::from_attribute_graph(context.attribute_graph().clone());
+        let process = Self::from(context.attribute_graph().clone());
 
         match process.process(&process.command) {
             Ok(output) => {
                 context.set_output("stdout", Value::BinaryVector(output.stdout));
                 context.set_returns(Value::Bool(true));
-                context.values_mut().remove("error");
+                context.attribute_graph_mut().find_remove("error");
             }
             Err(e) => {
-                context.values_mut().insert(
+                context.attribute_graph_mut().with(
                     "error".to_string(),
                     Value::TextBuffer(format!("Error: {:?}", e)),
                 );
@@ -165,8 +168,8 @@ impl Process {
 
         if ui.button("execute") {
             match (
-                section.attributes.get_attr_value("command"),
-                section.attributes.get_attr_value("subcommands"),
+                section.attributes.find_attr_value("command"),
+                section.attributes.find_attr_value("subcommands"),
             ) {
                 (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommand))) => {
                     if let Some(next) = section
@@ -277,10 +280,17 @@ impl App for Process {
 #[derive(Debug)]
 pub struct ProcessExecutionError {}
 
+impl From<AttributeGraph> for Process
+{
+    fn from(attribute_graph: AttributeGraph) -> Self {
+        todo!();
+    }
+}
+
 impl RuntimeState for Process {
     type Error = ProcessExecutionError;
 
-    fn process<'a, S: AsRef<str> + ?Sized>(&self, msg: &'a S) -> Result<Self, Self::Error> {
+    fn process(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> {
         self.interpret_command(msg, Self::handle_output)
     }
 

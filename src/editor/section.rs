@@ -84,7 +84,7 @@ impl<S: RuntimeState> Section<S> {
     }
 
     pub fn show_debug(&mut self, attr_name: impl AsRef<str>, ui: &imgui::Ui) {
-        if let Some(value) = self.attributes.get_attr(attr_name) {
+        if let Some(value) = self.attributes.find_attr(attr_name) {
             ui.label_text(
                 format!("Debug view of: {}, Entity: {}", value.name(), value.id()),
                 format!("{:?}", value),
@@ -93,11 +93,7 @@ impl<S: RuntimeState> Section<S> {
     }
 
     pub fn is_attr_checkbox(&self, with_name: impl AsRef<str>) -> Option<bool> {
-        if let Some(Value::Bool(value)) = self.attributes.get_attr(with_name).and_then(|a| Some(a.value())) {
-            Some(*value)
-        } else {
-            None
-        }
+        self.attributes.is_enabled(with_name)
     }
 
     pub fn modify_state_with_attr(
@@ -106,7 +102,7 @@ impl<S: RuntimeState> Section<S> {
         update: impl Fn(&Attribute, &mut S),
     ) {
         let clone = self.clone();
-        let attr = clone.attributes.get_attr(attr_name);
+        let attr = clone.attributes.find_attr(attr_name);
         if let Some(attr) = attr {
             let state = &mut self.state;
             update(attr, state);
@@ -139,7 +135,7 @@ impl<S: RuntimeState> Section<S> {
         attr_name: impl AsRef<str>,
         ui: &imgui::Ui,
     ) {
-        if let Some(Value::Float(width)) = self.attributes.get_attr_value("edit_width::") {
+        if let Some(Value::Float(width)) = self.attributes.find_attr_value("edit_width::") {
             ui.set_next_item_width(*width);
         } else {
             ui.set_next_item_width(130.0);
@@ -147,7 +143,7 @@ impl<S: RuntimeState> Section<S> {
 
         let label = format!("{} {}", label, self.id);
         let attr_name = attr_name.as_ref().to_string();
-        match self.attributes.get_attr_value_mut(&attr_name) {
+        match self.attributes.find_attr_value_mut(&attr_name) {
             Some(Value::TextBuffer(val)) => {
                 ui.input_text(label, val).build();
             }
@@ -180,7 +176,7 @@ impl<S: RuntimeState> Section<S> {
             }
             None => {}
             _ => {
-                match self.attributes.get_attr_mut(&attr_name) {
+                match self.attributes.find_attr_mut(&attr_name) {
                     Some(attr) => {
                         attr.show_editor(ui);
                     },
@@ -193,7 +189,7 @@ impl<S: RuntimeState> Section<S> {
     /// This method allows you to create a custom editor for your attribute,
     /// in case the built in methods are not enough
     pub fn edit_attr_custom(&mut self, attr_name: impl AsRef<str>, show: impl Fn(&mut Attribute)) {
-        if let Some(attr) = self.attributes.get_attr_mut(attr_name) {
+        if let Some(attr) = self.attributes.find_attr_mut(attr_name) {
             show(attr);
         }
     }
@@ -250,13 +246,6 @@ impl<S: RuntimeState> Section<S> {
     pub fn edit_attributes(&mut self) -> &mut AttributeGraph {
         &mut self.attributes
     }
-
-    // pub fn set_parent_entity(&mut self, id: u32) {
-    //     self.id = id;
-    //     for (_, a) in self.attributes.iter_mut() {
-    //         a.set_id(id);
-    //     }
-    // }
 }
 
 impl<S: RuntimeState + App> From<S> for Section<S> {
@@ -284,7 +273,7 @@ impl<S: RuntimeState> App for Section<S> {
     fn show_editor(&mut self, ui: &imgui::Ui) {
         if CollapsingHeader::new(&self.title)
             .default_open({
-                if let Some(Value::Bool(true)) = self.attributes.get_attr_value("opened::") {
+                if let Some(Value::Bool(true)) = self.attributes.find_attr_value("opened::") {
                     true
                 } else {
                     false || (self.id == 0)
@@ -328,16 +317,16 @@ impl<S: RuntimeState> App for Section<S> {
                 }
             }
             ui.unindent();
-            if let Some(Value::Bool(val)) = self.attributes.get_attr_value_mut("opened::") {
+            if let Some(Value::Bool(val)) = self.attributes.find_attr_value_mut("opened::") {
                 *val = true;
             }
         } else {
-            if let Some(Value::Bool(val)) = self.attributes.get_attr_value_mut("opened::") {
+            if let Some(Value::Bool(val)) = self.attributes.find_attr_value_mut("opened::") {
                 *val = false;
             }
         }
 
-        if let Some(Value::TextBuffer(title)) = self.attributes.get_attr_value("title::") {
+        if let Some(Value::TextBuffer(title)) = self.attributes.find_attr_value("title::") {
             self.title = title.clone();
         }
 
@@ -394,13 +383,22 @@ where
     }
 }
 
+impl<S> From<AttributeGraph> for Section<S> 
+where
+    S: RuntimeState
+{
+    fn from(attribute_graph: AttributeGraph) -> Self {
+        todo!();
+    }
+}
+
 impl<S> RuntimeState for Section<S>
 where
     S: RuntimeState,
 {
     type Error = ();
 
-    fn process<Str: AsRef<str> + ?Sized>(&self, _: &Str) -> Result<Self, Self::Error> {
+    fn process(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
         todo!()
     }
 

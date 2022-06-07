@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use specs::Component;
 use specs::storage::DefaultVecStorage;
 
-use crate::{RuntimeState};
+use crate::{AttributeGraph, RuntimeState};
 
 use super::EventComponent;
 
@@ -64,42 +64,16 @@ impl Display for EventGraph {
     }
 }
 
+impl From<AttributeGraph> for EventGraph {
+    fn from(attribute_graph: AttributeGraph) -> Self {
+        todo!();
+    }
+}
+
 impl RuntimeState for EventGraph {
     type Error = ();
 
-    // fn from_attributes(attributes: Vec<atlier::system::Attribute>) -> Self {
-    //     let mut store = Store::<EventComponent>::default();
-    //     for attr in attributes.iter() {
-    //         if let Value::BinaryVector(val) = attr.value() {
-    //             if let Some(n) = ron::de::from_bytes(val).ok() {
-    //                 store = store.node(n);
-    //             }
-    //         }
-    //     }
-    //     Self(store)
-    // }
-
-    // fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
-    //     let EventGraph(store) = self;
-
-    //     let mut attrs = vec![];
-    //     for (id, e) in store.nodes().iter().enumerate() {
-    //         let id = id as u32;
-    //         match ron::ser::to_string(e) {
-    //             Ok(s) => {
-    //                 let attr = Attribute::new(id, &e.label, atlier::system::Value::BinaryVector(s.as_bytes().to_vec()));
-    //                 attrs.push(attr);
-    //             },
-    //             Err(_) => {
-
-    //             },
-    //         }
-    //     }
-
-    //     attrs
-    // }
-
-    fn process<S: AsRef<str> + ?Sized>(&self, _: &S) -> Result<Self, Self::Error> {
+    fn process(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
         Ok(self.clone())
     }
 }

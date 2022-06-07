@@ -112,10 +112,16 @@ impl Display for EventEditor {
     }
 }
 
+impl From<AttributeGraph> for EventEditor {
+    fn from(attribute_graph: AttributeGraph) -> Self {
+        todo!();
+    }
+}
+
 impl RuntimeState for EventEditor {
     type Error = EventEditorError;
 
-    fn process<S: AsRef<str> + ?Sized>(&self, _: &S) -> Result<Self, Self::Error> {
+    fn process(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
         todo!()
     }
 
@@ -206,10 +212,10 @@ where
             Some(Value::TextBuffer(dispatch)),
             Some(Value::TextBuffer(call)),
         ) = (
-            s.attributes.get_attr_value("label"),
-            s.attributes.get_attr_value("on"),
-            s.attributes.get_attr_value("dispatch"),
-            s.attributes.get_attr_value("call"),
+            s.attributes.find_attr_value("label"),
+            s.attributes.find_attr_value("on"),
+            s.attributes.find_attr_value("dispatch"),
+            s.attributes.find_attr_value("call"),
         ) {
             let label = label.to_string();
             let on = on.to_string();

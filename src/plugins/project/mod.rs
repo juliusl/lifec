@@ -192,8 +192,7 @@ impl App for Project {
             self.documents.clone().iter().for_each(|(id, d)| {
                 if let Some(Value::TextBuffer(project_name)) = d
                     .attributes
-                    .get_attr("project::name::")
-                    .and_then(|a| Some(a.value()))
+                    .find_attr_value("project::name::")
                 {
                     if ui.button(format!("Save state to .json file {}", project_name)) {
                         match serde_json::to_string(&d.sanitize(*id)) {
@@ -260,10 +259,17 @@ impl Project {
     }
 }
 
+impl From<AttributeGraph> for Project
+{
+    fn from(attribute_graph: AttributeGraph) -> Self {
+        todo!();
+    }
+}
+
 impl RuntimeState for Project {
     type Error = ProjectError;
 
-    fn process<S: AsRef<str> + ?Sized>(&self, _: &S) -> Result<Self, Self::Error> {
+    fn process(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
         todo!()
     }
 
