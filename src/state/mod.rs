@@ -6,6 +6,9 @@ use specs::{Entity, Component, storage::HashMapStorage};
 
 use crate::RuntimeState;
 
+mod system;
+pub use system::AttributeSystem;
+
 /// Attribute graph indexes attributes for an entity and provides methods for editing attributes
 #[derive(Debug, Default, Component, Clone, Hash, Serialize, Deserialize, PartialEq, PartialOrd)]
 #[storage(HashMapStorage)]
@@ -134,7 +137,7 @@ impl AttributeGraph {
     /// Maybe returns a mutable value off an attribute with_name.
     pub fn find_attr_value_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Value> {
         self.find_attr_mut(with_name)
-            .and_then(|a| Some(a.get_value_mut()))
+            .and_then(|a| Some(a.value_mut()))
     }
 
     /// Maybe returns an attribute with_name.

@@ -312,10 +312,10 @@ where
                     }
                     ui.new_line();
                     for a in self.attributes.iter_mut_attributes() {
-                        a.edit(ui);
+                        a.edit_ui(ui);
                         ui.same_line();
                         if ui.button(format!("remove [{} {}]", a.name(), self.id)) {
-                            let value = a.get_value_mut();
+                            let value = a.value_mut();
                             *value = Value::Empty;
                         }
                         ui.new_line();

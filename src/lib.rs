@@ -43,7 +43,15 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + 
 
     /// dispatch is a function that should take a string message
     /// and return the next version of Self
-    fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error>;
+    fn dispatch(&self, _msg: impl AsRef<str>) -> Result<Self, Self::Error> {
+        todo!("dispatch is not implemented")
+    }
+
+    /// dispatch_mut is a function that should take a string message that can mutate state
+    /// and returns a result
+    fn dispatch_mut(&mut self, _msg: impl AsRef<str>) -> Result<(), Self::Error> {
+        todo!("dispatch_mut is not implemented")
+    }
 
     /// process is a function that should take a string message
     /// and return the next version of Self

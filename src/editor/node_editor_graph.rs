@@ -174,7 +174,7 @@ impl App for NodeEditorGraph {
                                         )
                                         .build();
 
-                                        n.attribute.edit(ui);
+                                        n.attribute.edit_ui(ui);
                                         if let Some(values) = &n.values {
                                             ui.text("Current Values:");
                                             ui.new_line();
@@ -252,7 +252,7 @@ impl App for NodeEditorGraph {
                                 {
                                     match self.value_store.get_at(r) {
                                         None => {
-                                            let resetting = attribute.get_value_mut();
+                                            let resetting = attribute.value_mut();
                                             *resetting = Value::Empty;
                                         }
                                         _ => {}
@@ -347,7 +347,7 @@ impl App for NodeEditorGraph {
                                             if let Some(editing) = self.editing {
                                                 ui.disabled(!editing, || {
                                                     ui.set_next_item_width(130.0);
-                                                    attribute.edit(ui);
+                                                    attribute.edit_ui(ui);
                                                 });
                                             }
                                         });
@@ -368,7 +368,7 @@ impl App for NodeEditorGraph {
                                             if let Some(editing) = self.editing {
                                                 ui.disabled(!editing, || {
                                                     let old = attribute.clone();
-                                                    attribute.edit(ui);
+                                                    attribute.edit_ui(ui);
 
                                                     if old != *attribute {
                                                         let new_value = attribute.value().clone();
@@ -417,11 +417,11 @@ impl App for NodeEditorGraph {
     
                                     if let (Some((v, _)), Some(n)) = (referenced_value, node) {
                                         let v = v.clone();
-                                        let updating = n.attribute.get_value_mut();
+                                        let updating = n.attribute.value_mut();
                                         *updating = v.clone();
                                     }
                                 } else if let Some(n) = self.find_node_mut(to) {
-                                    let updating = n.attribute.get_value_mut();
+                                    let updating = n.attribute.value_mut();
                                     *updating = Value::Empty;
                                 }
                             }
@@ -439,7 +439,7 @@ impl App for NodeEditorGraph {
                         if let Some(n) = self.find_node(from).cloned() {
                             if let Value::Reference(_) = &n.attribute.value() {
                                 if let Some(n) = self.find_node_mut(from) {
-                                    let updating = n.attribute.get_value_mut();
+                                    let updating = n.attribute.value_mut();
                                     *updating = Value::Empty
                                 }
                             }
@@ -506,7 +506,7 @@ impl NodeEditorGraph {
             match n.value() {
                 Value::Reference(r) => {
                     if let Some((v, _)) = self.value_store.get_at(&r) {
-                        let updating = n.get_value_mut();
+                        let updating = n.value_mut();
                         *updating = v.clone();
                     }
                 },
@@ -796,14 +796,14 @@ impl Visitor<NodeId> for NodeEditorGraph {
                 (Value::Reference(from), Value::Reference(_)) => {
                     let from = *from;
                     if let Some(update) = self.find_node_mut(*t) {
-                        let updating = update.attribute.get_value_mut();
+                        let updating = update.attribute.value_mut();
                         *updating = Value::Reference(from);
                     }
                 }
                 (Value::Reference(from), Value::Empty) => {
                     let from = *from;
                     if let Some(update) = self.find_node_mut(*t) {
-                        let updating = update.attribute.get_value_mut();
+                        let updating = update.attribute.value_mut();
                         *updating = Value::Reference(from);
                     }
                 }
@@ -814,7 +814,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
                         if let Some(output) = context.returns() {
                             let reference = output.to_ref();
                             if let Some(update) = self.find_node_mut(*t) {
-                                let updating = update.attribute.get_value_mut();
+                                let updating = update.attribute.value_mut();
                                 *updating = reference;
                             }
                         }
@@ -826,7 +826,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
                 (value, Value::Empty) => {
                     let reference = value.to_ref();
                     if let Some(update) = self.find_node_mut(*t) {
-                        let updating = update.attribute.get_value_mut();
+                        let updating = update.attribute.value_mut();
                         *updating = reference;
                     }
                 }
