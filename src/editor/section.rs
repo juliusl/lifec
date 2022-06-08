@@ -402,12 +402,8 @@ impl<S> RuntimeState for Section<S>
 where
     S: RuntimeState,
 {
-    type Error = ();
     type State = AttributeGraph;
 
-    fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
-        todo!()
-    }
 
     // fn from_attributes(attributes: Vec<Attribute>) -> Self {
     //     let mut next = Self::default();

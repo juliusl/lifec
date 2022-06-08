@@ -12,13 +12,9 @@ use std::{
 };
 
 use super::thunks::Thunk;
-use crate::parse_variables;
+use crate::RuntimeDispatcher;
 use crate::{
-    AttributeGraph,
-    editor::{Section, SectionExtension},
-    parse_flags, 
-    RuntimeState, 
-    WithArgs,
+    editor::{Section, SectionExtension}, AttributeGraph, RuntimeState, WithArgs,
 };
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
@@ -46,19 +42,19 @@ impl Thunk for Process {
     fn call_with_context(context: &mut super::ThunkContext) {
         let process = Self::from(context.state().as_ref().clone());
 
-        match process.dispatch(&process.command) {
-            Ok(output) => {
-                context.set_output("stdout", Value::BinaryVector(output.stdout));
-                context.set_returns(Value::Bool(true));
-                context.state_mut().as_mut().find_remove("error");
-            }
-            Err(e) => {
-                context.state_mut().as_mut().with(
-                    "error".to_string(),
-                    Value::TextBuffer(format!("Error: {:?}", e)),
-                );
-            }
-        }
+        // match process.dispatch(&process.command) {
+        //     Ok(output) => {
+        //         context.set_output("stdout", Value::BinaryVector(output.stdout));
+        //         context.set_returns(Value::Bool(true));
+        //         context.state_mut().as_mut().find_remove("error");
+        //     }
+        //     Err(e) => {
+        //         context.state_mut().as_mut().with(
+        //             "error".to_string(),
+        //             Value::TextBuffer(format!("Error: {:?}", e)),
+        //         );
+        //     }
+        // }
     }
 }
 
@@ -174,15 +170,21 @@ impl Process {
                 (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommand))) => {
                     if let Some(next) = section
                         .state
+                        .state()
                         .dispatch(&format!("{}::{}", command, subcommand))
                         .ok()
                     {
-                        section.state = next;
+                        section.state = Process::from(next);
                     }
                 }
                 (Some(Value::TextBuffer(command)), None) => {
-                    if let Some(next) = section.state.dispatch(&&format!("{}::", command)).ok() {
-                        section.state = next;
+                    if let Some(next) = section
+                        .state
+                        .state()
+                        .dispatch(&&format!("{}::", command))
+                        .ok()
+                    {
+                        section.state = Process::from(next);
                     }
                 }
                 _ => (),
@@ -280,37 +282,35 @@ impl App for Process {
 #[derive(Debug)]
 pub struct ProcessExecutionError {}
 
-impl From<AttributeGraph> for Process
-{
+impl From<AttributeGraph> for Process {
     fn from(_: AttributeGraph) -> Self {
         todo!();
     }
 }
 
 impl RuntimeState for Process {
-    type Error = ProcessExecutionError;
     type State = AttributeGraph;
 
-    fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> {
-        self.interpret_command(msg, Self::handle_output)
-    }
+    // fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> {
+    //     self.interpret_command(msg, Self::handle_output)
+    // }
 
-    fn process_with_args<S: AsRef<str> + ?Sized>(
-        state: WithArgs<Self>,
-        msg: &S,
-    ) -> Result<Self, Self::Error>
-    where
-        Self: Clone + Default + RuntimeState,
-    {
-        let process = state.get_state();
-        process.interpret_command(msg, move |mut p, command| {
-            p.flags = parse_flags(state.get_args().to_vec());
-            p.vars = parse_variables(state.get_args().to_vec());
+    // fn process_with_args<S: AsRef<str> + ?Sized>(
+    //     state: WithArgs<Self>,
+    //     msg: &S,
+    // ) -> Result<Self, Self::Error>
+    // where
+    //     Self: Clone + Default + RuntimeState,
+    // {
+    //     let process = state.get_state();
+    //     process.interpret_command(msg, move |mut p, command| {
+    //         p.flags = parse_flags(state.get_args().to_vec());
+    //         p.vars = parse_variables(state.get_args().to_vec());
 
-            let command = command.args(state.get_args());
-            p.handle_output(command)
-        })
-    }
+    //         let command = command.args(state.get_args());
+    //         p.handle_output(command)
+    //     })
+    // }
 
     // fn from_attributes(attrs: Vec<atlier::system::Attribute>) -> Self {
     //     let mut process = Self::default();

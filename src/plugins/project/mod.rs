@@ -267,12 +267,11 @@ impl From<AttributeGraph> for Project
 }
 
 impl RuntimeState for Project {
-    type Error = ProjectError;
     type State = AttributeGraph;
 
-    fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
-        todo!()
-    }
+    // fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
+    //     todo!()
+    // }
 
     // fn from_attributes(attrs: Vec<atlier::system::Attribute>) -> Self {
     //     let mut project = Self::default();

@@ -4,10 +4,11 @@ use atlier::system::{Attribute, Value};
 use serde::{Serialize, Deserialize};
 use specs::{Entity, Component, storage::HashMapStorage};
 
-use crate::RuntimeState;
+use crate::{RuntimeDispatcher, RuntimeState};
 
 mod system;
 pub use system::AttributeSystem;
+pub use system::AttributeStore;
 
 /// Attribute graph indexes attributes for an entity and provides methods for editing attributes
 #[derive(Debug, Default, Component, Clone, Hash, Serialize, Deserialize, PartialEq, PartialOrd)]
@@ -18,6 +19,10 @@ pub struct AttributeGraph {
 }
 
 impl AttributeGraph {
+    pub fn entity(&self) -> u32 {
+        self.entity
+    }
+
     /// Copies all the values from another graph
     pub fn copy(&mut self, other: &AttributeGraph) {
         other.iter_attributes().for_each(|a| {
@@ -415,12 +420,7 @@ impl From<Entity> for AttributeGraph {
 }
 
 impl RuntimeState for AttributeGraph {
-    type Error = ();
     type State = Self;
-
-    fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
-        todo!("dispatcher not implemented")
-    }
 
     fn state(&self) -> &Self::State {
         self
@@ -428,5 +428,15 @@ impl RuntimeState for AttributeGraph {
 
     fn state_mut(&mut self) -> &mut Self::State {
         self
+    }
+}
+
+impl RuntimeDispatcher for AttributeGraph {
+    type Error = ();
+
+    /// dispatch_mut is a function that should take a string message that can mutate state
+    /// and returns a result
+    fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {
+        todo!();
     }
 }

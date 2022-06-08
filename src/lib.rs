@@ -4,6 +4,10 @@ use parser::Lifecycle;
 use std::any::Any;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
+use std::marker::PhantomData;
+use specs::System;
+use specs::SystemData;
+use specs::World;
 
 pub mod editor;
 pub mod plugins;
@@ -11,9 +15,77 @@ pub mod plugins;
 mod state;
 pub use state::AttributeGraph;
 
-pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + From<AttributeGraph> {
+
+#[derive(Clone)]
+pub struct RuntimeSystem<D>
+    where
+        D: RuntimeDispatcher,
+{
+    data: Option<D>,
+}
+
+impl<D> Default for RuntimeSystem<D>
+where
+    D: RuntimeDispatcher {
+    fn default() -> Self {
+        Self {
+            data: None
+        }
+    }
+}
+
+
+impl<'a, D> System<'a> for RuntimeSystem<D>
+where
+    D: RuntimeDispatcher + SystemData<'a>,
+{
+    type SystemData = D;
+
+    fn setup(&mut self, world: &mut World) {
+        D::setup_world(world);
+    }
+
+    fn run(&mut self, mut data: Self::SystemData) {
+
+        // if let Some(current) = self.state.as_mut() {
+        //     if let Some(mut runtime) = data.dispatch_runtime::<S>(current) {
+        //         if runtime.can_continue() {
+        //             runtime.step();
+        //         }
+        //     }
+        // }
+    }
+}
+    
+pub trait RuntimeDispatcher: AsRef<AttributeGraph> + AsMut<AttributeGraph> 
+where
+    Self: Sized
+{
     type Error;
-    type State: AsRef<AttributeGraph> + AsMut<AttributeGraph>;
+
+    /// dispatch_mut is a function that should take a string message that can mutate state
+    /// and returns a result
+    fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error>;
+
+    /// dispatch is a function that should take a string message that can mutate state
+    /// and returns a result
+    fn dispatch(&self, _msg: impl AsRef<str>) -> Result<Self, Self::Error> {
+        todo!()
+    }
+
+    fn setup_world(_world: &mut World) {
+    }
+
+    fn dispatch_runtime<S>(&mut self, current: &mut S) -> Option<Runtime<S>>
+    where
+        S: RuntimeState
+    {
+        None
+    }
+}
+
+pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + From<AttributeGraph> {
+    type State: RuntimeDispatcher;
 
     // /// try to save the current state to a String
     fn save(&self) -> Option<String> {
@@ -39,30 +111,6 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + 
 
     fn state(&self) -> &Self::State {
         todo!("state is not implemented")
-    }
-
-    /// dispatch is a function that should take a string message
-    /// and return the next version of Self
-    fn dispatch(&self, _msg: impl AsRef<str>) -> Result<Self, Self::Error> {
-        todo!("dispatch is not implemented")
-    }
-
-    /// dispatch_mut is a function that should take a string message that can mutate state
-    /// and returns a result
-    fn dispatch_mut(&mut self, _msg: impl AsRef<str>) -> Result<(), Self::Error> {
-        todo!("dispatch_mut is not implemented")
-    }
-
-    /// process is a function that should take a string message
-    /// and return the next version of Self
-    fn process_with_args<S: AsRef<str> + ?Sized>(
-        state: WithArgs<Self>,
-        msg: &S,
-    ) -> Result<Self, Self::Error>
-    where
-        Self: Clone + Default + RuntimeState,
-    {
-        Self::dispatch(&state.get_state(), msg)
     }
 
     /// merge_with specifies how to merge another instance of Self that has been modified externally
@@ -310,7 +358,7 @@ impl Extensions {
     /// called by the runtime to execute the tests
     /// if None is returned that means this extension skipped running anything
     fn run_tests<T: Default + Clone + RuntimeState>(&self, action: Action<T>) -> Option<bool> {
-        if let Action::Thunk(thunk) = action {
+        if let Action::Thunk(ThunkFunc::Default(thunk)) = action {
             let mut pass = true;
 
             self.tests.iter().for_each(|(init, expected)| {
@@ -359,7 +407,7 @@ where
     /// and event context for processing. The function must return the next state, and the next event expression
     /// to transition to
     pub fn update(&mut self, thunk: fn(&T, Option<Event>) -> (T, String)) -> &mut Extensions {
-        self.action = Action::Thunk(thunk);
+        self.action = Action::Thunk(ThunkFunc::Default(thunk));
 
         &mut self.extensions
     }
@@ -378,6 +426,7 @@ where
 {
     Default(fn(&S, Option<Event>) -> (S, String)),
     WithArgs(fn(&WithArgs<S>, Option<Event>) -> (S, String)),
+    Mutable(fn(&mut S, Option<Event>) -> String),
 }
 
 impl<T: Default> Default for ThunkFunc<T>
@@ -397,6 +446,7 @@ where
         match self {
             ThunkFunc::Default(_) => f.debug_tuple("ThunkFunc::Default").finish(),
             ThunkFunc::WithArgs(_) => f.debug_tuple("ThunkFunc::WithArgs").finish(),
+            ThunkFunc::Mutable(_) => f.debug_tuple("ThunkFunc::Mutable").finish(),
         }
     }
 }
@@ -517,25 +567,12 @@ impl<S> RuntimeState for WithArgs<S>
 where
     S: RuntimeState,
 {
-    type Error = <S as RuntimeState>::Error;
     type State = AttributeGraph;
 
     fn load(&self, init: impl AsRef<str>) -> Self {
         Self {
             state: self.state.load(init),
             args: self.args.to_owned(),
-        }
-    }
-
-    fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> {
-        let next = self.state.dispatch(msg.as_ref());
-
-        match next {
-            Ok(next) => Ok(Self {
-                state: next,
-                args: self.args.to_owned(),
-            }),
-            Err(e) => Err(e),
         }
     }
 }
@@ -676,6 +713,15 @@ where
         self.clone()
     }
 
+    pub fn with_call_mut(
+        &mut self,
+        call_name: impl AsRef<str>,
+        thunk: fn(&mut S, Option<Event>) -> String
+    ) -> &mut Self {
+        self.calls.insert(call_name.as_ref().to_string(), ThunkFunc::Mutable(thunk));
+        self
+    }
+
     /// start begins the runtime starting with the initial event expression
     /// the runtime will continue to execute until it reaches the { exit;; } event
     pub fn start(&mut self, init_expr: impl AsRef<str>) {
@@ -735,29 +781,29 @@ where
                 Action::Call(name) => {
                     self.execute_call(name, state, Some(l.extensions));
                 }
-                Action::Thunk(thunk) => {
+                Action::Thunk(ThunkFunc::Default(thunk)) => {
                     let (next_s, next_e) = thunk(&state, self.current.clone());
                     self.update(next_s, next_e);
                 }
                 Action::Dispatch(msg) => {
-                    let process = if l.extensions.args.len() > 0 {
-                        S::process_with_args(
-                            WithArgs {
-                                state,
-                                args: l.extensions.get_args(),
-                            },
-                            &msg,
-                        )
-                    } else {
-                        state.dispatch(&msg)
-                    };
+                    // let process = if l.extensions.args.len() > 0 {
+                    //     S::process_with_args(
+                    //         WithArgs {
+                    //             state,
+                    //             args: l.extensions.get_args(),
+                    //         },
+                    //         &msg,
+                    //     )
+                    // } else {
+                    //     state.dispatch(&msg)
+                    // };
 
-                    if let Ok(n) = process {
-                        self.state = Some(n);
-                        if let Some(next) = &l.next {
-                            self.current = Some(next.clone());
-                        }
-                    }
+                    // if let Ok(n) = process {
+                    //     self.state = Some(n);
+                    //     if let Some(next) = &l.next {
+                    //         self.current = Some(next.clone());
+                    //     }
+                    // }
                 }
                 _ => {}
             }
@@ -784,10 +830,10 @@ where
 
             if let Action::Call(name) = action {
                 action = {
-                    if let Some(ThunkFunc::Default(thunk)) = self.calls.get(&name) {
-                        Action::Thunk(*thunk)
+                    if let Some(thunk) = self.calls.get(&name) {
+                        Action::Thunk(thunk.clone())
                     } else {
-                        Action::Thunk(|s, _| (s.clone(), "{ exit;; }".to_string()))
+                        Action::Thunk(ThunkFunc::Default(|s, _| (s.clone(), "{ exit;; }".to_string())))
                     }
                 }
             }
@@ -886,7 +932,7 @@ where
     NoOp,
     Call(String),
     Dispatch(String),
-    Thunk(fn(&S, Option<Event>) -> (S, String)),
+    Thunk(ThunkFunc<S>),
 }
 
 impl<S> Default for Action<S>

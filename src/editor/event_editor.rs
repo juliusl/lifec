@@ -119,13 +119,7 @@ impl From<AttributeGraph> for EventEditor {
 }
 
 impl RuntimeState for EventEditor {
-    type Error = EventEditorError;
     type State = AttributeGraph;
-
-    fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
-        todo!()
-    }
-
     // fn from_attributes(_: Vec<atlier::system::Attribute>) -> Self {
     //    todo!()
     // }

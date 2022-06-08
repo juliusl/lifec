@@ -71,10 +71,5 @@ impl From<AttributeGraph> for EventGraph {
 }
 
 impl RuntimeState for EventGraph {
-    type Error = ();
     type State = AttributeGraph;
-
-    fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
-        Ok(self.clone())
-    }
 }
