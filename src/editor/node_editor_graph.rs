@@ -22,6 +22,7 @@ pub struct NodeComponent {
     attribute: Attribute,
     thunk: Option<fn(&mut AttributeGraph)>,
     values: Option<AttributeGraph>,
+    tooltip: Option<String>,
 }
 
 impl NodeComponent {
@@ -236,6 +237,7 @@ impl App for NodeEditorGraph {
                                 attribute,
                                 thunk,
                                 values,
+                                tooltip,
                             } = node_component;
 
                             let title = title.as_str();
@@ -275,6 +277,11 @@ impl App for NodeEditorGraph {
                                                 let thunk_name = symbol[7..].to_string();
                                                 if ui.button(format!("{}", thunk_name)) {
                                                     thunk(values);
+                                                }
+                                                if ui.is_item_hovered() {
+                                                    if let Some(tooltip) = tooltip {
+                                                        ui.tooltip_text(tooltip);
+                                                    }
                                                 }
                                             });
 
@@ -542,7 +549,7 @@ impl NodeEditorGraph {
     }
 
     /// add's a node to the graph, use an empty title to infer the title from the attribute name
-    pub fn add_node(&mut self, title: impl AsRef<str>, attr: &mut Attribute) {
+    pub fn add_node(&mut self, title: impl AsRef<str>, attr: &mut Attribute, tooltip: Option<String>) {
         attr.commit();
 
         if let Some(idgen) = self.idgen.as_mut() {
@@ -564,6 +571,7 @@ impl NodeEditorGraph {
                 attribute: attr.clone(),
                 thunk: None,
                 values: None,
+                tooltip,
             });
         }
     }

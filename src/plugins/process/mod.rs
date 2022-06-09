@@ -1,4 +1,4 @@
-use atlier::system::Attribute;
+
 use atlier::system::{App, Value};
 use chrono::{DateTime, Local, Utc};
 use imgui::{CollapsingHeader, Ui};
@@ -16,7 +16,7 @@ use super::thunks::Thunk;
 use crate::RuntimeDispatcher;
 use crate::{
     editor::{Section, SectionExtension},
-    AttributeGraph, Runtime, RuntimeState,
+    AttributeGraph, RuntimeState,
 };
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
@@ -51,6 +51,10 @@ impl Thunk for Process {
         "process"
     }
 
+    fn description() -> &'static str {
+        "Executes a new command w/ an OS process."
+    }
+
     fn call_with_context(context: &mut super::ThunkContext) {
         let process = Self::from(context.as_ref().clone());
 
@@ -60,7 +64,22 @@ impl Thunk for Process {
             Ok(output) => {
                 context.write_output("stdout", Value::BinaryVector(output.stdout));
                 context.write_output("stderr", Value::BinaryVector(output.stderr));
-                context.write_output("code", Value::Int(output.code.unwrap_or(-1)));
+
+                if let Some(code) = output.code {
+                    context.write_output("code", Value::Int(code));
+                }
+
+                if let Some(local_ts) = output.timestamp_local {
+                    context.write_output("timestamp_local", Value::TextBuffer(local_ts));
+                }
+
+                if let Some(utc_ts) = output.timestamp_utc {
+                    context.write_output("timestamp_utc", Value::TextBuffer(utc_ts));
+                }
+
+                if let Some(elapsed) = output.elapsed {
+                    context.write_output("elapsed", Value::TextBuffer(elapsed));
+                }
                 context.set_return::<Process>(Value::Bool(true));
                 context.as_mut().find_remove("error");
             }

@@ -48,10 +48,21 @@ where
     }
 
     fn batch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {
-        for message in msg.as_ref().trim().split("\n").filter(|line| !line.is_empty()) {
+        for message in msg.as_ref().trim().split("\n").map(|line| line.trim()).filter(|line| !line.is_empty()) {
             self.dispatch_mut(message)?;
         }
     
+        Ok(())
+    }
+
+    /// Dispatch a batch of messages from a file.
+    fn from_file(&mut self, path: impl AsRef<str>) -> Result<(), Self::Error> {
+        use std::fs;
+
+        if let Some(initial_setup) = fs::read_to_string(path.as_ref()).ok() {
+            self.batch_mut(initial_setup)?;
+        }
+
         Ok(())
     }
 }

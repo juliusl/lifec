@@ -7,7 +7,7 @@ use imgui::{ChildWindow, MenuItem};
 use specs::{
     Component, Entities, Join, Read, ReadStorage, RunNow, System, WriteStorage
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 pub struct NodeEditor<S>
 where
@@ -18,6 +18,7 @@ where
     sections: BTreeMap<u32, Section<S>>,
     runtime_editor: Option<RuntimeEditor<S>>,
     thunks: BTreeMap<String, fn(&mut AttributeGraph)>,
+    thunk_toolips: HashMap<String, String>,
 }
 
 impl<S> NodeEditor<S>
@@ -30,6 +31,7 @@ where
             editors: BTreeMap::new(),
             sections: BTreeMap::new(),
             thunks: BTreeMap::new(),
+            thunk_toolips: HashMap::new(),
             runtime_editor: None,
         }
     }
@@ -44,10 +46,17 @@ where
         T: Thunk,
     {
         self.add_thunk(T::symbol(), T::call);
+        if !T::description().is_empty() {
+            self.add_thunk_tooltip(T::symbol(), T::description());
+        }
     }
 
     pub fn add_thunk(&mut self, name: impl AsRef<str>, thunk: fn(&mut AttributeGraph)) {
         self.thunks.insert(name.as_ref().to_string(), thunk);
+    }
+
+    pub fn add_thunk_tooltip(&mut self, name: impl AsRef<str>, tooltip_content: impl AsRef<str>) {
+        self.thunk_toolips.insert(name.as_ref().to_string(), tooltip_content.as_ref().to_string());
     }
 }
 
@@ -108,9 +117,8 @@ where
 
                             let mut attributes = attributes.clone();
 
-                            for attr in attributes.find_symbols_mut("node")
-                            {
-                                editor.add_node("", attr);
+                            for attr in attributes.find_symbols_mut("node") {
+                                editor.add_node("", attr, None);
                             }
 
                             for (call, thunk) in &self.thunks {
@@ -139,33 +147,11 @@ where
                                 Ok(_) => {
                                     println!("NodeEditor dispatched load section");
                                 }
-                                Err(_) => {}
+                                Err(err) => {
+                                    eprintln!("Could not dispatch load section {}", err);
+                                }
                             }
                         }
-                        // TODO: Save the attribute graph to storage
-                        // match attributes.is_attr_checkbox("allow node editor to change state on close") {
-                        //     Some(true) => {
-                        //         if let (
-                        //             Some(nodes),
-                        //             Some(_),
-                        //             Some(_)) =
-                        //             (nodes, editor_context, links)
-                        //         {
-                        //             if let Some(attributes) = write_attributes.get_mut(e) {
-                        //                 let mut_attrs = attributes.get_attrs_mut();
-                        //                 for n in nodes {
-                        //                     if let Some(attr) = mut_attrs.iter_mut().find(|a| a.name() == n.attribute.name()) {
-                        //                         let value = attr.get_value_mut();
-                        //                         *value = n.attribute.value().clone();
-                        //                     } else {
-                        //                         mut_attrs.push(n.attribute);
-                        //                     }
-                        //                 }
-                        //             }
-                        //         }
-                        //     },
-                        //     _ => {},
-                        // }
                     }
                     _ => (),
                 }
@@ -220,6 +206,7 @@ where
                                                 unique_title("node::text"),
                                                 Value::TextBuffer(String::default()),
                                             ),
+                                            None,
                                         );
 
                                         if let Some(n) = editor.nodes_mut().iter_mut().last() {
@@ -235,6 +222,7 @@ where
                                                 unique_title("node::float"),
                                                 Value::Float(0.0),
                                             ),
+                                            None,
                                         );
 
                                         if let Some(n) = editor.nodes_mut().iter_mut().last() {
@@ -250,6 +238,7 @@ where
                                                 unique_title("node::int"),
                                                 Value::Int(0),
                                             ),
+                                            None,
                                         );
 
                                         if let Some(n) = editor.nodes_mut().iter_mut().last() {
@@ -265,6 +254,7 @@ where
                                                 unique_title("node::bool"),
                                                 Value::Bool(false),
                                             ),
+                                            None,
                                         );
 
                                         if let Some(n) = editor.nodes_mut().iter_mut().last() {
@@ -287,10 +277,17 @@ where
                                                         key.to_string()
                                                     )),
                                                 ),
+                                                None,
                                             );
 
                                             if let Some(n) = editor.nodes_mut().iter_mut().last() {
                                                 n.move_node_to_grid_center();
+                                            }
+                                        }
+
+                                        if ui.is_item_hovered() {
+                                            if let Some(tooltip) = self.thunk_toolips.get(&key) {
+                                                ui.tooltip_text(tooltip);
                                             }
                                         }
                                     }
@@ -304,6 +301,7 @@ where
                                             unique_title("node::reference"),
                                             Value::Empty,
                                         ),
+                                        None,
                                     );
 
                                     if let Some(n) = editor.nodes_mut().iter_mut().last() {
@@ -355,11 +353,6 @@ where
                                     ui,
                                     || {
                                         section.show_editor(ui);
-
-                                        // TODO: Changes here won't have an affect because changes aren't being passed back
-                                        // let mut overview = Runtime::<S>::default();
-                                        // overview.state = Some(section.state.clone());
-                                        // RuntimeEditor::from(overview).show_current(ui);
 
                                         if editor.is_debugging_enabled() {
                                             if ui.button("Dump runtime editor output") {

@@ -1,0 +1,18 @@
+    ```
+    #
+    # Example of configuring node editor for Process type 
+    # 
+    define command      node
+    define subcommands  node
+
+    #
+    # Set initial values for edit fields
+    #
+    edit   command::node         command .TEXT cargo
+    edit   subcommands::node subcommands .TEXT build
+    
+    #
+    # Enable node editor for section (default closed)
+    #
+    add enable_node_editor .BOOL false
+    ```
