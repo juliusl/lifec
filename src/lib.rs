@@ -37,19 +37,18 @@ where
     }
 
     /// setup world registers components and creates entities the dispatcher requires 
-    fn setup_world(_world: &mut World) {
-    }
-
-    /// setup runtime is called to configure calls and listeners for the runtime
-    fn setup_runtime<S>(&mut self, _runtime: &mut Runtime<S>)
-    where
-        S: RuntimeState
+    fn setup_world(_world: &mut World) 
     {
     }
 }
 
 pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + From<AttributeGraph> {
     type Dispatcher: RuntimeDispatcher;
+
+    /// setup runtime is called to configure calls and listeners for the runtime
+    fn setup_runtime(&mut self, runtime: &mut Runtime<Self>) {
+        todo!("setup runtime is not implemented")
+    }
 
     // /// try to save the current state to a String
     fn save(&self) -> Option<String> {

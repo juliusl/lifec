@@ -481,17 +481,6 @@ impl RuntimeState for AttributeGraph {
 impl RuntimeDispatcher for AttributeGraph {
     type Error = AttributeGraphErrors;
 
-    fn setup_runtime<S>(&mut self, current: &mut crate::Runtime<S>)
-        where
-            S: RuntimeState 
-    {
-        current.with_call_mut("find", |runtime_state, _| {
-            let graph = runtime_state.state();
-            
-            todo!()
-        });
-    }
-
     /// dispatch_mut is a function that should take a string message that can mutate state
     /// and returns a result
     fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {

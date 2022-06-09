@@ -57,23 +57,6 @@ pub struct AttributeStore<'a> {
 impl<'a> RuntimeDispatcher for AttributeStore<'a> {
     type Error = ();
 
-    fn setup_runtime<S>(&mut self, current: &mut Runtime<S>)
-    where
-        S: RuntimeState,
-    {
-        for entity in self.entities.join() {
-            // define events active attributes
-            if self.attributes.contains(entity) {
-                define_for(entity, current, "load");
-                define_for(entity, current, "edit");
-                define_for(entity, current, "edit_reset");
-                define_for(entity, current, "edit_commit");
-                define_for(entity, current, "save");
-                define_for(entity, current, "remove");
-            }
-        }
-    }
-
     fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {
         let AttributeStore { entities, .. } = self;
 

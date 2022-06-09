@@ -303,15 +303,6 @@ impl AsRef<AttributeGraph> for Process {
 impl RuntimeDispatcher for Process {
     type Error = ProcessExecutionError;
 
-    fn setup_runtime<S>(&mut self, _runtime: &mut crate::Runtime<S>)
-        where
-            S: RuntimeState 
-    {
-        // _runtime.with_call("run", |p, _| {
-        //     p.
-        // })
-    }
-
     fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {
         match self.interpret_command(msg, Self::handle_output) {
             Ok(updated) => {
