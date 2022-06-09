@@ -492,6 +492,9 @@ impl RuntimeDispatcher for AttributeGraph {
                 AttributeGraphEvents::FindRemove => self.on_find_remove(event_lexer.remainder()),
                 AttributeGraphEvents::Import => self.on_import(event_lexer.remainder()),
                 AttributeGraphEvents::Copy => self.on_copy(event_lexer.remainder()),
+                AttributeGraphEvents::Define => self.on_define(event_lexer.remainder()),
+                AttributeGraphEvents::Commit => self.on_commit(event_lexer.remainder()),
+                AttributeGraphEvents::Edit => self.on_edit(event_lexer.remainder()),
                 AttributeGraphEvents::Error => Err(AttributeGraphErrors::UnknownEvent),
             },
             None => Err(AttributeGraphErrors::EmptyMessage),
@@ -501,6 +504,66 @@ impl RuntimeDispatcher for AttributeGraph {
 
 /// These are handlers for dispatched messages
 impl AttributeGraph {
+    fn on_edit(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
+        let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
+        match (element_lexer.next(), element_lexer.next(), element_lexer.next()) {
+            (Some(AttributeGraphElements::Symbol(name)), Some(AttributeGraphElements::Symbol(new_name)), Some(value)) => match value {
+                AttributeGraphElements::Text(value)
+                | AttributeGraphElements::Int(value)
+                | AttributeGraphElements::Bool(value)
+                | AttributeGraphElements::IntPair(value)
+                | AttributeGraphElements::IntRange(value)
+                | AttributeGraphElements::Float(value)
+                | AttributeGraphElements::FloatPair(value)
+                | AttributeGraphElements::FloatRange(value) => {
+                    if let Some(attr) = self.find_attr_mut(name) {
+                        attr.edit((new_name, value));
+                    }
+                    Ok(())
+                }
+                AttributeGraphElements::Empty => {
+                    if let Some(attr) = self.find_attr_mut(name) {
+                        attr.edit((new_name, Value::Empty));
+                    }
+                    Ok(())
+                }
+                AttributeGraphElements::Entity(_) => todo!("value type unknown"),
+                AttributeGraphElements::Symbol(_) => todo!("unrecognized element"),
+                AttributeGraphElements::Error => todo!("error parsing next value"),
+            },
+            _ => Err(AttributeGraphErrors::NotEnoughArguments),
+        }
+    }
+
+    fn on_commit(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
+        let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
+        match (element_lexer.next(), element_lexer.next()) {
+            (Some(AttributeGraphElements::Symbol(name)), Some(AttributeGraphElements::Symbol(symbol))) =>{
+                let symbol_attr_name = format!("{}::{}", name, symbol);
+                if let Some(transient) = self.clone().find_attr(symbol_attr_name).and_then(|a| a.transient()) {
+                    if let Some(to_edit) = self.find_attr_mut(name) {
+                        to_edit.edit(transient.clone());
+                        to_edit.commit();
+                    }
+                }
+
+                Ok(())
+            },
+            _ => Err(AttributeGraphErrors::NotEnoughArguments),
+        }
+    }
+
+    fn on_define(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
+        let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
+        match (element_lexer.next(), element_lexer.next()) {
+            (Some(AttributeGraphElements::Symbol(name)), Some(AttributeGraphElements::Symbol(symbol))) =>{
+                self.add_symbol(format!("{}::{}", name, symbol), format!("{}::", symbol));
+                Ok(())
+            },
+            _ => Err(AttributeGraphErrors::NotEnoughArguments),
+        }
+    }
+
     fn on_add(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
         match (element_lexer.next(), element_lexer.next()) {
@@ -609,16 +672,17 @@ fn test_attribute_graph_dispatcher() {
     let mut graph = AttributeGraph::from(0);
 
     let test_messages = r#"
-add test_attr             .TEXT testing text attr
-add test_attr_empty       .EMPTY
-add test_attr_bool        .BOOL true
-add test_attr_int         .INT 510982
-add test_attr_int_pair    .INT_PAIR 5000, 1200
-add test_attr_int_range   .INT_RANGE 500, 0, 1000
-add test_attr_float       .FLOAT 510982.12
-add test_attr_float_pair  .FLOAT_PAIR 5000.0, 1200.12
-add test_attr_float_range .FLOAT_RANGE 500.0, 0.0, 1000.0
-"#;
+    add test_attr             .TEXT testing text attr
+    add test_attr_empty       .EMPTY
+    add test_attr_bool        .BOOL true
+    add test_attr_int         .INT 510982
+    add test_attr_int_pair    .INT_PAIR 5000, 1200
+    add test_attr_int_range   .INT_RANGE 500, 0, 1000
+    add test_attr_float       .FLOAT 510982.12
+    add test_attr_float_pair  .FLOAT_PAIR 5000.0, 1200.12
+    add test_attr_float_range .FLOAT_RANGE 500.0, 0.0, 1000.0
+    define test_attr node
+    "#;
 
     for message in test_messages.trim().split("\n") {
         assert!(graph.dispatch_mut(message).is_ok());
@@ -633,16 +697,35 @@ add test_attr_float_range .FLOAT_RANGE 500.0, 0.0, 1000.0
     assert!(graph.contains_attribute("test_attr_float_range"));
     assert!(graph.contains_attribute("test_attr_empty"));
     assert!(graph.contains_attribute("test_attr_bool"));
+    assert!(graph.contains_attribute("test_attr::node"));
 
     // test graph state
     assert_eq!(
         Some(&Value::TextBuffer("testing text attr".to_string())),
         graph.find_attr_value("test_attr")
     );
+
+    // test edit/commit symbols 
+    let test_messages = r#"
+    edit test_attr::node test_attr .TEXT testing commit attr
+    commit test_attr node
+    "#;
+    
+    for message in test_messages.trim().split("\n") {
+        assert!(graph.dispatch_mut(message).is_ok());
+    }
+
+    assert!(graph.contains_attribute("test_attr"));
+    assert_eq!(
+        Some(&Value::TextBuffer("testing commit attr".to_string())),
+        graph.find_attr_value("test_attr")
+    );
+
     assert_eq!(
         Some(&Value::Bool(true)),
         graph.find_attr_value("test_attr_bool")
     );
+    
     assert_eq!(
         Some(&Value::Empty),
         graph.find_attr_value("test_attr_empty")
@@ -652,10 +735,12 @@ add test_attr_float_range .FLOAT_RANGE 500.0, 0.0, 1000.0
         Some(&Value::Int(510982)),
         graph.find_attr_value("test_attr_int")
     );
+    
     assert_eq!(
         Some(&Value::IntPair(5000, 1200)),
         graph.find_attr_value("test_attr_int_pair")
     );
+    
     assert_eq!(
         Some(&Value::IntRange(500, 0, 1000)),
         graph.find_attr_value("test_attr_int_range")
@@ -665,13 +750,20 @@ add test_attr_float_range .FLOAT_RANGE 500.0, 0.0, 1000.0
         Some(&Value::Float(510982.12)),
         graph.find_attr_value("test_attr_float")
     );
+    
     assert_eq!(
         Some(&Value::FloatPair(5000.0, 1200.12)),
         graph.find_attr_value("test_attr_float_pair")
     );
+    
     assert_eq!(
         Some(&Value::FloatRange(500.0, 0.0, 1000.0)),
         graph.find_attr_value("test_attr_float_range")
+    );
+
+    assert_eq!(
+        Some(&Value::Symbol("node::".to_string())),
+        graph.find_attr_value("test_attr::node")
     );
 
     // Test find_remove
@@ -682,6 +774,8 @@ add test_attr_float_range .FLOAT_RANGE 500.0, 0.0, 1000.0
     assert!(graph
         .dispatch_mut("import 10 test_attr .TEXT this value is imported")
         .is_ok());
+
+    // Find and validate the graph after it has been imported
     if let Some(imported) = graph.find_imported_graph(10) {
         assert!(imported.contains_attribute("test_attr"));
         assert_eq!(
@@ -733,7 +827,7 @@ pub enum AttributeGraphEvents {
     /// Finds and removes an attribute from the graph by attribute-name
     #[token("find_remove")]
     FindRemove,
-    /// Usage: import {`external entity id`} {`attribute-name`} {`value-type`} {`remaining as value`}
+    /// Usage: import {`external entity id`} {`attribute-name`} {`value-type token`} {`remaining is parsed corresponding to value-type token`}
     /// Example: import 10 test_attr .TEXT remaining text is text
     /// Imports an attribute to the graph, Types omitted from this event are symbol, reference, and binary-vector
     #[token("import")]
@@ -742,8 +836,31 @@ pub enum AttributeGraphEvents {
     /// Examples: copy 10 test_attr
     ///           copy 10
     /// Copies imported attribute/s to the graph. Types omitted from this event are symbol, reference, and binary-vector
+    /// Implementation requires that attributes are imported to the graph before copy message is handled
     #[token("copy")]
     Copy,
+    /// Usage: define {`attribute-name`} {`symbol-name`}
+    /// Examples: define test_attr node
+    /// Defines and add's a symbol for a specified attribute name
+    /// If the attribute doesn't already exist, it is not added.
+    /// The format of the name for the symbol attribute is {`attribute-name`}::{`symbol-name`}
+    /// The value of the symbol will be {`symbol-name`}::
+    #[token("define")]
+    Define,
+    /// Usage: commit {`attribute-name`} {`symbol-name`}
+    /// Examples: commit test_attr node
+    /// If a symbol has been defined for attribute, and the symbol attribute has a transient value,
+    /// commit will override the value with the transient value.
+    /// For example if some symbol called node is defined for test_attr. Then an attribute will exist with the name test_attr:node.
+    /// If some system edits the value of test_attr::node, then a transient value will exist for test_attr::node.
+    /// Dispatching commit will take that value and write to test_attr.
+    #[token("commit")]
+    Commit,
+    /// Usage: edit {`attribute-name`} {`new-attribute-name`} {`new-value-type`} {`remaining as value`}
+    /// Examples: edit test_attr test_attr2 .TEXT editing the value of test_attr
+    /// Set's the transient value for an attribute. Types omitted from this event are symbol, reference, and binary-vector.
+    #[token("edit")]
+    Edit,
     // Logos requires one token variant to handle errors,
     // it can be named anything you wish.
     #[error]
