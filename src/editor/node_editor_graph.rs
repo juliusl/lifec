@@ -8,7 +8,9 @@ use knot::store::{Store, Visitor};
 use ron::ser::PrettyConfig;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::{plugins::ThunkContext, AttributeGraph, RuntimeState};
+use crate::{AttributeGraph, plugins::ThunkContext};
+
+use super::unique_title;
 
 #[derive(Clone)]
 pub struct NodeComponent {
@@ -112,18 +114,17 @@ impl App for NodeEditorGraph {
                                             .as_mut()
                                             .expect("filtered only values with some");
                                         if let Value::Symbol(symbol) = n.attribute.value() {
-                                            let mut thunk_context = ThunkContext::from(values.clone());
 
-                                            if !self.pause_updating_graph {
-                                                thunk_context.state_mut().with(
-                                                    "opened::".to_string(),
-                                                    Value::Bool(true),
-                                                );
-                                            }
+                                            // if !self.pause_updating_graph {
+                                            //     thunk_context.state_mut().with(
+                                            //         "opened::".to_string(),
+                                            //         Value::Bool(true),
+                                            //     );
+                                            // }
 
-                                            ui.disabled(!self.pause_updating_graph, || {
-                                                thunk_context.show_editor(ui);
-                                            });
+                                            // ui.disabled(!self.pause_updating_graph, || {
+                                            //     thunk_context.show_editor(ui);
+                                            // });
 
                                             if ui.button(format!("Call [{}]", symbol)) {
                                                 let thunk = n
@@ -131,7 +132,7 @@ impl App for NodeEditorGraph {
                                                     .clone()
                                                     .expect("filtered only thunks with some");
 
-                                                thunk(thunk_context.state_mut());
+                                                thunk(values);
                                             }
 
                                             ui.same_line();
@@ -141,8 +142,6 @@ impl App for NodeEditorGraph {
 
                                             if ui.button(format!("Refresh values [{}]", symbol)) {
                                                 values.clear_index();
-                                            } else {
-                                                *values = thunk_context.state_mut().clone();
                                             }
 
                                             ui.new_line();
@@ -278,21 +277,21 @@ impl App for NodeEditorGraph {
                                                     thunk(values);
                                                 }
                                             });
-                                            let context = ThunkContext::from(values.clone());
 
                                             let mut current_outputs = vec![];
-                                            context.get_outputs().iter().cloned().for_each(
+                                            values.find_symbol_values("output").iter().for_each(
                                                 |(k, o)| {
                                                     current_outputs.push(k.to_string());
                                                     self.value_store = self.value_store.node(o.clone());
                                                 },
                                             );
 
-                                            if let Some(returns) = context.returns() {
-                                                current_outputs.push(context.returns_key());
-
-                                                self.value_store = self.value_store.node(returns.clone());
-                                            }
+                                            values.find_symbol_values("returns").iter().for_each(
+                                                |(k, o)| {
+                                                    current_outputs.push(k.to_string());
+                                                    self.value_store = self.value_store.node(o.clone());
+                                                },
+                                            );
 
                                             node_scope.add_output(
                                                 *output_id,
@@ -544,18 +543,20 @@ impl NodeEditorGraph {
 
     /// add's a node to the graph, use an empty title to infer the title from the attribute name
     pub fn add_node(&mut self, title: impl AsRef<str>, attr: &mut Attribute) {
+        attr.commit();
+
         if let Some(idgen) = self.idgen.as_mut() {
-
-            let mut title = title.as_ref();
-            if title.is_empty() {
-                title = &attr.name()[6..];
-            }
-
             self.value_store = self.value_store.node(attr.value().clone());
 
-            let title = title.to_string();
             self.nodes.push(NodeComponent {
-                title,
+                title: {
+                    let title = title.as_ref();
+                    if title.is_empty() {
+                        unique_title("node")
+                    } else {
+                        title.to_string()
+                    }
+                },
                 node_id: idgen.next_node(),
                 input_id: idgen.next_input_pin(),
                 output_id: idgen.next_output_pin(),
@@ -811,7 +812,7 @@ impl Visitor<NodeId> for NodeEditorGraph {
                     if let Some(values) = &from_node.values {
                         let context = ThunkContext::from(values.clone());
 
-                        if let Some(output) = context.returns() {
+                        if let Some((_, output)) = context.returns().first() {
                             let reference = output.to_ref();
                             if let Some(update) = self.find_node_mut(*t) {
                                 let updating = update.attribute.value_mut();
@@ -833,27 +834,27 @@ impl Visitor<NodeId> for NodeEditorGraph {
                 // symbol -> symbol, can share outputs
                 (Value::Symbol(_), Value::Symbol(symbol)) => {
                     if symbol.starts_with("thunk::") {
-                        let thunk = symbol[7..].to_string();
-                        if let Some(thunk) = self.thunk_index.get(&thunk) {
+                        let thunk_name = symbol[7..].to_string();
+                        if let Some(thunk) = self.thunk_index.get(&thunk_name) {
                             let thunk = thunk.clone();
                             let input = from_node.clone().clone();
 
                             if let Some(values) = input.values {
                                 let thunk_context = ThunkContext::from(values);
-                                let inputs = thunk_context.get_outputs();
+                                let inputs = thunk_context.outputs();
 
                                 if let Some(update) = self.find_node_mut(*t) {
                                     for (input_name, input) in inputs {
                                         update.update(thunk, input_name, input.to_owned())
                                     }
 
-                                    if let Some(returns) = thunk_context.returns() {
+                                    thunk_context.returns().iter().for_each(|(name, value)| {
                                         update.update(
                                             thunk,
-                                            thunk_context.returns_key(),
-                                            returns.clone(),
+                                            name,
+                                            value.clone(),
                                         );
-                                    }
+                                    });
                                 }
                             } else {
                                 return false;

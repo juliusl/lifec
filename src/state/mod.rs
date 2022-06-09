@@ -194,8 +194,9 @@ impl AttributeGraph {
                     id,
                     value: Value::Symbol(value),
                     ..
-                } = a {
-                    *id == self.entity && value == &symbol
+                } = a
+                {
+                    *id == self.entity && value.starts_with(&symbol)
                 } else {
                     false
                 }
@@ -215,13 +216,23 @@ impl AttributeGraph {
                     id,
                     value: Value::Symbol(value),
                     ..
-                } = a {
-                    *id == current_id && value == &symbol
+                } = a
+                {
+                    *id == current_id && value.starts_with(&symbol)
                 } else {
                     false
                 }
             })
             .map(|(_, a)| a)
+            .collect()
+    }
+
+    /// Returns a map of current symbol values, from symbol transients
+    pub fn find_symbol_values(&self, with_symbol: impl AsRef<str>) -> Vec<(String, Value)> {
+        self.find_symbols(with_symbol)
+            .iter()
+            .filter_map(|a| a.transient())
+            .cloned()
             .collect()
     }
 
@@ -543,7 +554,7 @@ impl RuntimeState for AttributeGraph {
             if let Some(msg) = e.and_then(|e| e.read_payload()) {
                 match s.dispatch(&msg) {
                     Ok(next) => (Some(next), "{ ok;; }".to_string()),
-                    Err(_) => (None, "{ error;; }".to_string())
+                    Err(_) => (None, "{ error;; }".to_string()),
                 }
             } else {
                 (None, "{ exit;; }".to_string())
@@ -942,6 +953,7 @@ fn test_attribute_graph_dispatcher() {
     )
 }
 
+#[derive(Debug)]
 pub enum AttributeGraphErrors {
     UnknownEvent,
     NotEnoughArguments,

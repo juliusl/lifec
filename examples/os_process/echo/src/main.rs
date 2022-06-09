@@ -1,52 +1,49 @@
-use lifec::plugins::{Process, Project, Thunk};
-use lifec::{editor::*, Runtime, AttributeGraph};
+use lifec::plugins::{Process, Thunk};
+use lifec::{editor::*, AttributeGraph, Runtime, RuntimeDispatcher, RuntimeState};
 
 fn main() {
-    let mut runtime = Runtime::<Process>::default().with_call("print_results", |s, _| {
-        let output = String::from_utf8(s.stdout.clone()).ok();
-
-        if let Some(output) = output {
-            println!("{}", output);
-        }
-
-        (s.clone(), "{ exit;; }".to_string())
-    });
-
-    let runtime = &mut runtime;
-    runtime
-        .on("{ setup;; }")
-        .dispatch("echo", "{ after_echo;; }")
-        .args(&["--o", "hello world"]);
-
-    runtime.on("{ after_echo;; }").call("print_results");
-
-    let mut runtime = runtime.ensure_call("print_results", None, None);
-
     let mut node_editor = NodeEditor::<Process>::new();
     node_editor.with_thunk::<Process>();
     node_editor.with_thunk::<Println>();
-    node_editor.with_thunk::<Broadcast>();
+    node_editor.with_thunk::<WriteFiles>();
 
-    // let mut event_editor = EventEditor::new();
-    // let mut attr_editor = AttributeEditor::new();
-    // let mut project = Project::default();
+    let mut cargo_build = Process::default();
 
+    let initial_setup = r#"
+    #
+    # Example of configuring node editor for Process type 
+    # 
+    define command      node
+    define subcommands  node
+    #
+    # Set initial values for edit fields
+    #
+    edit   command::node         command .TEXT cargo
+    edit   subcommands::node subcommands .TEXT build
+    #
+    # Enable node editor for section (default closed)
+    #
+    add enable_node_editor .BOOL false
+    "#;
+
+    cargo_build
+        .as_mut()
+        .batch_mut(initial_setup)
+        .expect("should be able to configure process state");
+
+    let mut runtime = Runtime::from(&mut cargo_build);
     let process_section = Section::new(
         <Process as App>::name(),
-        AttributeGraph::default()
-            .with_bool("enable node editor", false)
-            .with_text("node::command", "cargo")
-            .with_text("node::message", ""),
+        AttributeGraph::default(),
         <Process as SectionExtension<Process>>::show_extension,
-        Process::default(),
-    ).enable_app_systems();
+        cargo_build,
+    )
+    .enable_app_systems();
 
     open_editor_with(
         "OS Process",
         runtime.parse_event("{ setup;; }"),
-        vec![
-            process_section
-        ],
+        vec![process_section],
         |w| {
             EventEditor::configure_app_world(w);
             AttributeEditor::configure_app_world(w);
@@ -54,21 +51,65 @@ fn main() {
         },
         |_| {},
         move |w, ui| {
-            ui.show_demo_window(&mut true);
-
-            // let project = &mut project;
-            // project.extend_app_world(w, ui);
-
-            // let attr_editor = &mut attr_editor;
-            // attr_editor.extend_app_world(w, ui);
-
-            // let event_editor = &mut event_editor;
-            // event_editor.extend_app_world(w, ui);
+            // ui.show_demo_window(&mut true);
 
             let node_editor = &mut node_editor;
             node_editor.extend_app_world(w, ui);
+        },
+    );
+}
 
-            // ui.same_line();
+struct Println;
+
+impl Thunk for Println {
+    fn symbol() -> &'static str {
+        "println"
+    }
+
+    fn call_with_context(context: &mut lifec::plugins::ThunkContext) {
+        context
+            .as_ref()
+            .iter_attributes()
+            .map(|a| (a.name(), a.value()))
+            .for_each(|(name, value)| {
+                println!("{}: {}", name, value);
+            });
+
+        let dispatcher = context.as_mut();
+        dispatcher
+            .dispatch_mut("define println returns")
+            .expect("should be able to define returns symbol");
+        dispatcher
+            .dispatch_mut("edit println::returns println::returns .BOOL true")
+            .expect("should be able to edit the transient value");
+    }
+}
+
+struct WriteFiles;
+
+impl Thunk for WriteFiles {
+    fn symbol() -> &'static str {
+        "write_files"
+    }
+
+    fn call_with_context(context: &mut lifec::plugins::ThunkContext) {
+        context
+            .as_ref()
+            .iter_attributes()
+            .map(|a| (a.name(), a.value()))
+            .for_each(|(file_name, value)| {
+                if let Value::BinaryVector(content) = value {
+                    if let None = std::fs::write(file_name.replace("::", "."), content).ok() {
+                        eprintln!("did not write test.out");
+                    }
+                } else {
+                    eprintln!("skipping write file for: {:?}", (file_name, value));
+                }
+            });
+    }
+}
+
+// ui.same_line();
             // if ui.button("Compress state") {
             //     use compression::prelude::*;
             //     match std::fs::read(format!("{}.json", "projects")) {
@@ -105,36 +146,3 @@ fn main() {
             //         Err(_) => {}
             //     }
             // }
-        },
-    );
-}
-
-struct Println;
-
-impl Thunk for Println {
-    fn symbol() -> &'static str {
-        "println"
-    }
-
-    fn call_with_context(context: &mut lifec::plugins::ThunkContext) {
-        context.values_mut().iter().for_each(|(name, value)| {
-            println!("{}: {}", name, value); 
-        });
-
-        context.set_returns(Value::Bool(true))
-    }
-}
-
-struct Broadcast;
-
-impl Thunk for Broadcast {
-    fn symbol() -> &'static str {
-        "broadcast"
-    }
-
-    fn call_with_context(context: &mut lifec::plugins::ThunkContext) {
-        if let Some(message) = context.get_value("message") {
-            context.set_returns(message);
-        }
-    }
-}

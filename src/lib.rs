@@ -34,6 +34,26 @@ where
             Err(err) => Err(err),
         }
     }
+
+    fn batch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> 
+    where 
+        Self: Clone
+    {
+        let mut next = self.clone();
+        for message in msg.as_ref().trim().split("\n").filter(|line| !line.is_empty()) {
+             next = next.dispatch(message)?;
+        }
+    
+        Ok(next)
+    }
+
+    fn batch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {
+        for message in msg.as_ref().trim().split("\n").filter(|line| !line.is_empty()) {
+            self.dispatch_mut(message)?;
+        }
+    
+        Ok(())
+    }
 }
 
 pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + From<AttributeGraph> {

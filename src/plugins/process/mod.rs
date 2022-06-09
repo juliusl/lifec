@@ -1,3 +1,4 @@
+use atlier::system::Attribute;
 use atlier::system::{App, Value};
 use chrono::{DateTime, Local, Utc};
 use imgui::{CollapsingHeader, Ui};
@@ -14,7 +15,8 @@ use std::{
 use super::thunks::Thunk;
 use crate::RuntimeDispatcher;
 use crate::{
-    editor::{Section, SectionExtension}, AttributeGraph, RuntimeState, Runtime
+    editor::{Section, SectionExtension},
+    AttributeGraph, Runtime, RuntimeState,
 };
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
@@ -30,8 +32,18 @@ pub struct Process {
     pub elapsed: Option<String>,
     pub timestamp_utc: Option<String>,
     pub timestamp_local: Option<String>,
+    graph: AttributeGraph,
     #[serde(skip)]
     start_time: Option<DateTime<Utc>>,
+}
+
+impl Process {
+    pub fn new(command: impl AsRef<str>, subcommand: impl AsRef<str>) -> Self {
+        let mut new_process = Self::default();
+        new_process.command = command.as_ref().to_string();
+        new_process.subcommands = subcommand.as_ref().to_string();
+        new_process
+    }
 }
 
 impl Thunk for Process {
@@ -40,21 +52,25 @@ impl Thunk for Process {
     }
 
     fn call_with_context(context: &mut super::ThunkContext) {
-        let _ = Self::from(context.state().clone());
+        let process = Self::from(context.as_ref().clone());
 
-        // match process.dispatch(&process.command) {
-        //     Ok(output) => {
-        //         context.set_output("stdout", Value::BinaryVector(output.stdout));
-        //         context.set_returns(Value::Bool(true));
-        //         context.state_mut().as_mut().find_remove("error");
-        //     }
-        //     Err(e) => {
-        //         context.state_mut().as_mut().with(
-        //             "error".to_string(),
-        //             Value::TextBuffer(format!("Error: {:?}", e)),
-        //         );
-        //     }
-        // }
+        let command = format!("{}::{}", process.command, process.subcommands);
+
+        match process.dispatch(&command) {
+            Ok(output) => {
+                context.write_output("stdout", Value::BinaryVector(output.stdout));
+                context.write_output("stderr", Value::BinaryVector(output.stderr));
+                context.write_output("code", Value::Int(output.code.unwrap_or(-1)));
+                context.set_return::<Process>(Value::Bool(true));
+                context.as_mut().find_remove("error");
+            }
+            Err(e) => {
+                context.as_mut().with(
+                    "error".to_string(),
+                    Value::TextBuffer(format!("Error: {:?}", e)),
+                );
+            }
+        }
     }
 }
 
@@ -87,6 +103,7 @@ impl Process {
                 elapsed: None,
                 timestamp_local: None,
                 timestamp_utc: None,
+                graph: AttributeGraph::default(),
             };
 
             let mut command = Command::new(&command);
@@ -140,7 +157,7 @@ impl Process {
     }
 
     fn edit(section: &mut Section<Process>, ui: &Ui) {
-        section.edit_attr("Enable node editor", "enable node editor", ui);
+        section.edit_attr("Enable node editor", "enable_node_editor", ui);
 
         // Show the default view for this editor
         Process::show_editor(&mut section.state, ui);
@@ -170,21 +187,23 @@ impl Process {
                 (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommand))) => {
                     if let Some(next) = section
                         .state
-                        .dispatcher()
                         .dispatch(&format!("{}::{}", command, subcommand))
                         .ok()
                     {
-                        section.state = Process::from(next);
+                        section.state = next;
+                    } else {
+                        eprintln!("did not execute `{} {}`", command, subcommand);
                     }
                 }
                 (Some(Value::TextBuffer(command)), None) => {
                     if let Some(next) = section
                         .state
-                        .dispatcher()
                         .dispatch(&&format!("{}::", command))
                         .ok()
                     {
-                        section.state = Process::from(next);
+                        section.state = next;
+                    } else {
+                        eprintln!("did not execute `{}`", command);
                     }
                 }
                 _ => (),
@@ -283,20 +302,39 @@ impl App for Process {
 pub struct ProcessExecutionError {}
 
 impl From<AttributeGraph> for Process {
-    fn from(_: AttributeGraph) -> Self {
-        todo!();
+    fn from(g: AttributeGraph) -> Self {
+        if let (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommands))) = (
+            g.find_attr_value("command"),
+            g.find_attr_value("subcommands"),
+        ) {
+            Self::new(command, subcommands)
+        } else {
+            Self::default()
+        }
     }
 }
 
 impl AsMut<AttributeGraph> for Process {
     fn as_mut(&mut self) -> &mut AttributeGraph {
-        todo!()
+        &mut self.graph
     }
 }
 
 impl AsRef<AttributeGraph> for Process {
     fn as_ref(&self) -> &AttributeGraph {
-        todo!()
+        &self.graph
+    }
+}
+
+impl RuntimeState for Process {
+    type Dispatcher = AttributeGraph;
+
+    fn dispatcher(&self) -> &Self::Dispatcher {
+        &self.graph
+    }
+
+    fn dispatcher_mut(&mut self) -> &mut Self::Dispatcher {
+        &mut self.graph
     }
 }
 
@@ -311,51 +349,5 @@ impl RuntimeDispatcher for Process {
             },
             Err(err) => Err(err),
         }
-    }
-}
-
-impl RuntimeState for Process {
-    type Dispatcher = Self;
-
-    fn dispatcher(&self) -> &Self::Dispatcher {
-        self
-    }
-
-    fn dispatcher_mut(&mut self) -> &mut Self::Dispatcher {
-        self
-    }
-}
-
-#[derive(Clone, Default)]
-struct Process2(AttributeGraph); 
-
-impl From<AttributeGraph> for Process2 {
-    fn from(g: AttributeGraph) -> Self {
-        Self(g)
-    }
-}
-
-impl Display for Process2 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
-
-impl RuntimeState for Process2 {
-    type Dispatcher = AttributeGraph;
-
-    fn dispatcher(&self) -> &Self::Dispatcher {
-        &self.0
-    }
-
-    fn dispatcher_mut(&mut self) -> &mut Self::Dispatcher {
-        &mut self.0
-    }
-
-    fn setup_runtime(&mut self, runtime: &mut Runtime::<Self>) {
-        runtime.with_call_mut("interpret_command", |s, e| {
-            
-            "{ exit;; }".to_string()
-        });
     }
 }

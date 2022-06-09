@@ -97,7 +97,7 @@ where
 
         entities.join().for_each(|e| {
             if let Some(attributes) = attributes.get(e) {
-                match attributes.is_enabled("enable node editor") {
+                match attributes.is_enabled("enable_node_editor") {
                     Some(true) => match self.editors.get_mut(&e.id()) {
                         None => {
                             let editor_context = self.imnodes.create_editor();
@@ -108,9 +108,7 @@ where
 
                             let mut attributes = attributes.clone();
 
-                            for attr in attributes
-                                .iter_mut_attributes()
-                                .filter(|a| a.name().starts_with("node::"))
+                            for attr in attributes.find_symbols_mut("node")
                             {
                                 editor.add_node("", attr);
                             }
@@ -388,11 +386,11 @@ where
 
                         editor.show_editor(ui);
 
-                        // if let Some(section) = self.sections.get_mut(id) {
-                        //     editor.resolve_attributes().iter().for_each(|a| {
-                        //         section.attributes.copy_attribute(a);
-                        //     });
-                        // }
+                        if let Some(section) = self.sections.get_mut(id) {
+                            editor.resolve_attributes().iter().for_each(|a| {
+                                section.attributes.copy_attribute(a);
+                            });
+                        }
                     });
             }
         }
