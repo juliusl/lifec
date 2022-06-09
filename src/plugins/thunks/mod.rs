@@ -186,7 +186,7 @@ impl RuntimeDispatcher for ThunkContext {
 
     /// dispatch_mut is a function that should take a string message that can mutate state
     /// and returns a result
-    fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {
+    fn dispatch_mut(&mut self, _: impl AsRef<str>) -> Result<(), Self::Error> {
         todo!()
     }
 }

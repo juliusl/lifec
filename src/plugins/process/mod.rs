@@ -14,7 +14,7 @@ use std::{
 use super::thunks::Thunk;
 use crate::RuntimeDispatcher;
 use crate::{
-    editor::{Section, SectionExtension}, AttributeGraph, RuntimeState, WithArgs,
+    editor::{Section, SectionExtension}, AttributeGraph, RuntimeState, Runtime
 };
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
@@ -40,7 +40,7 @@ impl Thunk for Process {
     }
 
     fn call_with_context(context: &mut super::ThunkContext) {
-        let process = Self::from(context.state().clone());
+        let _ = Self::from(context.state().clone());
 
         // match process.dispatch(&process.command) {
         //     Ok(output) => {
@@ -323,5 +323,39 @@ impl RuntimeState for Process {
 
     fn dispatcher_mut(&mut self) -> &mut Self::Dispatcher {
         self
+    }
+}
+
+#[derive(Clone, Default)]
+struct Process2(AttributeGraph); 
+
+impl From<AttributeGraph> for Process2 {
+    fn from(g: AttributeGraph) -> Self {
+        Self(g)
+    }
+}
+
+impl Display for Process2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl RuntimeState for Process2 {
+    type Dispatcher = AttributeGraph;
+
+    fn dispatcher(&self) -> &Self::Dispatcher {
+        &self.0
+    }
+
+    fn dispatcher_mut(&mut self) -> &mut Self::Dispatcher {
+        &mut self.0
+    }
+
+    fn setup_runtime(&mut self, runtime: &mut Runtime::<Self>) {
+        runtime.with_call_mut("interpret_command", |s, e| {
+            
+            "{ exit;; }".to_string()
+        });
     }
 }

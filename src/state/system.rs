@@ -6,7 +6,7 @@ use specs::prelude::*;
 use specs::storage::DenseVecStorage;
 use specs::{Component, Entities, SystemData, World, WriteStorage};
 
-use crate::{AttributeGraph, Runtime, RuntimeDispatcher, RuntimeState};
+use crate::{AttributeGraph, RuntimeDispatcher, RuntimeState};
 
 #[derive(Debug, Default, Clone)]
 pub struct AttributeSystem(AttributeGraph);
@@ -297,20 +297,20 @@ impl<'a> AttributeStore<'a> {
 }
 
 /// defines an event handler that dispatches a message derived from `symbol` for `entity` 
-fn define_for<S: RuntimeState>(
-    entity: Entity, 
-    runtime: &mut Runtime<S>, 
-    symbol: impl AsRef<str>) {
-    let message = &format!("{} {}", symbol.as_ref(), entity.id());
-    let transition_expr = &format!("{{ after_{};; {}_id }}", symbol.as_ref(), entity.id());
+// fn define_for<S: RuntimeState>(
+//     entity: Entity, 
+//     runtime: &mut Runtime<S>, 
+//     symbol: impl AsRef<str>) {
+//     let message = &format!("{} {}", symbol.as_ref(), entity.id());
+//     let transition_expr = &format!("{{ after_{};; {}_id }}", symbol.as_ref(), entity.id());
     
-    runtime
-        .on(format!("{{ {};; {}_id }}", symbol.as_ref(), entity.id()))
-        .dispatch(
-            message,
-            transition_expr,
-        );
-}
+//     runtime
+//         .on(format!("{{ {};; {}_id }}", symbol.as_ref(), entity.id()))
+//         .dispatch(
+//             message,
+//             transition_expr,
+//         );
+// }
 
 #[derive(Component)]
 #[storage(DenseVecStorage)]

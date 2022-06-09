@@ -228,8 +228,6 @@ impl App for Project {
     }
 }
 
-pub struct ProjectError;
-
 impl Display for Project {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "")
