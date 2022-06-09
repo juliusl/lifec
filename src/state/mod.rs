@@ -164,7 +164,68 @@ impl AttributeGraph {
             .and_then(|a| Some(a))
     }
 
-    /// Finds a graph that has been imported by this graph
+    /// Finds and updates an attribute, also updates index key.
+    /// Returns true if update was called.
+    pub fn find_update_attr(
+        &mut self,
+        with_name: impl AsRef<str>,
+        update: impl FnOnce(&mut Attribute),
+    ) -> bool {
+        if let Some(attr) = self.find_attr_mut(with_name) {
+            let old_key = attr.to_string();
+            update(attr);
+
+            // it's possible that the name changed, remove/add the attribute to update the key
+            let attr = self.index.remove(&old_key).expect("just updated");
+            self.add_attribute(attr);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Finds an attribute by symbol that is owned by `self.entity`
+    pub fn find_symbols(&self, with_symbol: impl AsRef<str>) -> Vec<&Attribute> {
+        let symbol = format!("{}::", with_symbol.as_ref());
+        self.index
+            .iter()
+            .filter(|(_, a)| {
+                if let Attribute {
+                    id,
+                    value: Value::Symbol(value),
+                    ..
+                } = a {
+                    *id == self.entity && value == &symbol
+                } else {
+                    false
+                }
+            })
+            .map(|(_, a)| a)
+            .collect()
+    }
+
+    /// Finds a mut attribute by symbol that is owned by `self.entity`
+    pub fn find_symbols_mut(&mut self, with_symbol: impl AsRef<str>) -> Vec<&mut Attribute> {
+        let symbol = format!("{}::", with_symbol.as_ref());
+        let current_id = self.entity;
+        self.index
+            .iter_mut()
+            .filter(|(_, a)| {
+                if let Attribute {
+                    id,
+                    value: Value::Symbol(value),
+                    ..
+                } = a {
+                    *id == current_id && value == &symbol
+                } else {
+                    false
+                }
+            })
+            .map(|(_, a)| a)
+            .collect()
+    }
+
+    /// Finds a graph that has been imported by this graph.
     pub fn find_imported_graph(&self, id: u32) -> Option<Self> {
         let mut imported = Self::from(id);
 
@@ -476,6 +537,17 @@ impl RuntimeState for AttributeGraph {
     fn dispatcher_mut(&mut self) -> &mut Self::Dispatcher {
         self
     }
+
+    fn setup_runtime(&mut self, runtime: &mut crate::Runtime<Self>) {
+        runtime.with_call("dispatch", |s, _| {
+            match s.dispatch("msg") {
+                Ok(next) => (Some(next), "".to_string()),
+                Err(_) => {
+                    (None, "".to_string())
+                },
+            }
+        });
+    }
 }
 
 impl RuntimeDispatcher for AttributeGraph {
@@ -495,6 +567,7 @@ impl RuntimeDispatcher for AttributeGraph {
                 AttributeGraphEvents::Define => self.on_define(event_lexer.remainder()),
                 AttributeGraphEvents::Commit => self.on_commit(event_lexer.remainder()),
                 AttributeGraphEvents::Edit => self.on_edit(event_lexer.remainder()),
+                AttributeGraphEvents::Comment | AttributeGraphEvents::BlockDelimitter => Ok(()),
                 AttributeGraphEvents::Error => Err(AttributeGraphErrors::UnknownEvent),
             },
             None => Err(AttributeGraphErrors::EmptyMessage),
@@ -506,8 +579,16 @@ impl RuntimeDispatcher for AttributeGraph {
 impl AttributeGraph {
     fn on_edit(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
-        match (element_lexer.next(), element_lexer.next(), element_lexer.next()) {
-            (Some(AttributeGraphElements::Symbol(name)), Some(AttributeGraphElements::Symbol(new_name)), Some(value)) => match value {
+        match (
+            element_lexer.next(),
+            element_lexer.next(),
+            element_lexer.next(),
+        ) {
+            (
+                Some(AttributeGraphElements::Symbol(name)),
+                Some(AttributeGraphElements::Symbol(new_name)),
+                Some(value),
+            ) => match value {
                 AttributeGraphElements::Text(value)
                 | AttributeGraphElements::Int(value)
                 | AttributeGraphElements::Bool(value)
@@ -538,17 +619,30 @@ impl AttributeGraph {
     fn on_commit(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
         match (element_lexer.next(), element_lexer.next()) {
-            (Some(AttributeGraphElements::Symbol(name)), Some(AttributeGraphElements::Symbol(symbol))) =>{
+            (
+                Some(AttributeGraphElements::Symbol(name)),
+                Some(AttributeGraphElements::Symbol(symbol)),
+            ) => {
                 let symbol_attr_name = format!("{}::{}", name, symbol);
-                if let Some(transient) = self.clone().find_attr(symbol_attr_name).and_then(|a| a.transient()) {
-                    if let Some(to_edit) = self.find_attr_mut(name) {
+                if let Some(transient) = self
+                    .find_attr_mut(symbol_attr_name)
+                    .and_then(|a| a.take_transient())
+                    .and_then(|a| Some(a.clone()))
+                {
+                    // This method will also update the key if the name happens to change
+                    if !self.find_update_attr(name, |to_edit| {
                         to_edit.edit(transient.clone());
                         to_edit.commit();
+                    }) {
+                        // If the attribute didn't already exist, this will create a new attribute
+                        // with the name in the transient
+                        let (name, value) = transient;
+                        self.with(name, value.clone());
                     }
                 }
 
                 Ok(())
-            },
+            }
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
         }
     }
@@ -556,10 +650,13 @@ impl AttributeGraph {
     fn on_define(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
         match (element_lexer.next(), element_lexer.next()) {
-            (Some(AttributeGraphElements::Symbol(name)), Some(AttributeGraphElements::Symbol(symbol))) =>{
+            (
+                Some(AttributeGraphElements::Symbol(name)),
+                Some(AttributeGraphElements::Symbol(symbol)),
+            ) => {
                 self.add_symbol(format!("{}::{}", name, symbol), format!("{}::", symbol));
                 Ok(())
-            },
+            }
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
         }
     }
@@ -672,6 +769,7 @@ fn test_attribute_graph_dispatcher() {
     let mut graph = AttributeGraph::from(0);
 
     let test_messages = r#"
+    ```
     add test_attr             .TEXT testing text attr
     add test_attr_empty       .EMPTY
     add test_attr_bool        .BOOL true
@@ -681,7 +779,20 @@ fn test_attribute_graph_dispatcher() {
     add test_attr_float       .FLOAT 510982.12
     add test_attr_float_pair  .FLOAT_PAIR 5000.0, 1200.12
     add test_attr_float_range .FLOAT_RANGE 500.0, 0.0, 1000.0
+    import 10 test_attr       .TEXT this value is imported
     define test_attr node
+    #
+    # Note:
+    # Since `new_text_attr` doesn't already exist
+    # edit/commit will insert a new attribute into the graph
+    # This is useful when extending the graph.
+    #
+    define new_text_attr node
+    # Can define multiple symbols for the same attr
+    define new_text_attr edit
+    edit new_text_attr::node test_attr23 .TEXT adding a new text attribute
+    commit new_text_attr node
+    ```
     "#;
 
     for message in test_messages.trim().split("\n") {
@@ -698,6 +809,9 @@ fn test_attribute_graph_dispatcher() {
     assert!(graph.contains_attribute("test_attr_empty"));
     assert!(graph.contains_attribute("test_attr_bool"));
     assert!(graph.contains_attribute("test_attr::node"));
+    assert!(graph.contains_attribute("new_text_attr::node"));
+    assert!(!graph.contains_attribute("new_text_attr"));
+    assert!(graph.contains_attribute("test_attr23"));
 
     // test graph state
     assert_eq!(
@@ -705,12 +819,26 @@ fn test_attribute_graph_dispatcher() {
         graph.find_attr_value("test_attr")
     );
 
-    // test edit/commit symbols 
+    assert_eq!(
+        Some(&Value::TextBuffer(
+            "adding a new text attribute".to_string()
+        )),
+        graph.find_attr_value("test_attr23")
+    );
+
+    // test edit/commit symbols
     let test_messages = r#"
+    ```
+    #
+    # Note:
+    # Since test_attr already exists
+    # edit/commit will overwrite the existing value
+    #
     edit test_attr::node test_attr .TEXT testing commit attr
     commit test_attr node
+    ```
     "#;
-    
+
     for message in test_messages.trim().split("\n") {
         assert!(graph.dispatch_mut(message).is_ok());
     }
@@ -725,7 +853,7 @@ fn test_attribute_graph_dispatcher() {
         Some(&Value::Bool(true)),
         graph.find_attr_value("test_attr_bool")
     );
-    
+
     assert_eq!(
         Some(&Value::Empty),
         graph.find_attr_value("test_attr_empty")
@@ -735,12 +863,12 @@ fn test_attribute_graph_dispatcher() {
         Some(&Value::Int(510982)),
         graph.find_attr_value("test_attr_int")
     );
-    
+
     assert_eq!(
         Some(&Value::IntPair(5000, 1200)),
         graph.find_attr_value("test_attr_int_pair")
     );
-    
+
     assert_eq!(
         Some(&Value::IntRange(500, 0, 1000)),
         graph.find_attr_value("test_attr_int_range")
@@ -750,12 +878,12 @@ fn test_attribute_graph_dispatcher() {
         Some(&Value::Float(510982.12)),
         graph.find_attr_value("test_attr_float")
     );
-    
+
     assert_eq!(
         Some(&Value::FloatPair(5000.0, 1200.12)),
         graph.find_attr_value("test_attr_float_pair")
     );
-    
+
     assert_eq!(
         Some(&Value::FloatRange(500.0, 0.0, 1000.0)),
         graph.find_attr_value("test_attr_float_range")
@@ -769,11 +897,6 @@ fn test_attribute_graph_dispatcher() {
     // Test find_remove
     assert!(graph.dispatch_mut("find_remove test_attr").is_ok());
     assert!(!graph.contains_attribute("test_attr"));
-
-    // Test import/copy save/load
-    assert!(graph
-        .dispatch_mut("import 10 test_attr .TEXT this value is imported")
-        .is_ok());
 
     // Find and validate the graph after it has been imported
     if let Some(imported) = graph.find_imported_graph(10) {
@@ -805,6 +928,16 @@ fn test_attribute_graph_dispatcher() {
             .save()
             .expect("should be able to save an attribute graph")
     );
+
+    println!(
+        "# Symbols\n{}",
+        graph
+            .find_symbols("node")
+            .iter()
+            .map(|a| format!("{:?}", a))
+            .collect::<Vec<String>>()
+            .join("\n")
+    )
 }
 
 pub enum AttributeGraphErrors {
@@ -841,7 +974,7 @@ pub enum AttributeGraphEvents {
     Copy,
     /// Usage: define {`attribute-name`} {`symbol-name`}
     /// Examples: define test_attr node
-    /// Defines and add's a symbol for a specified attribute name
+    /// Defines and adds a symbol for a specified attribute name
     /// If the attribute doesn't already exist, it is not added.
     /// The format of the name for the symbol attribute is {`attribute-name`}::{`symbol-name`}
     /// The value of the symbol will be {`symbol-name`}::
@@ -850,10 +983,10 @@ pub enum AttributeGraphEvents {
     /// Usage: commit {`attribute-name`} {`symbol-name`}
     /// Examples: commit test_attr node
     /// If a symbol has been defined for attribute, and the symbol attribute has a transient value,
-    /// commit will override the value with the transient value.
+    /// commit will override the value with the transient value. If the attribute doesn't already exist it is added.
     /// For example if some symbol called node is defined for test_attr. Then an attribute will exist with the name test_attr:node.
     /// If some system edits the value of test_attr::node, then a transient value will exist for test_attr::node.
-    /// Dispatching commit will take that value and write to test_attr.
+    /// Dispatching commit will take the transient value and write to test_attr.
     #[token("commit")]
     Commit,
     /// Usage: edit {`attribute-name`} {`new-attribute-name`} {`new-value-type`} {`remaining as value`}
@@ -861,6 +994,15 @@ pub enum AttributeGraphEvents {
     /// Set's the transient value for an attribute. Types omitted from this event are symbol, reference, and binary-vector.
     #[token("edit")]
     Edit,
+    /// Usage: # Here is a helpful comment
+    #[token("#")]
+    Comment,
+    /// Usage:
+    /// ```
+    /// add test_attr .TEXT remaining text is the value
+    /// ```
+    #[token("```")]
+    BlockDelimitter,
     // Logos requires one token variant to handle errors,
     // it can be named anything you wish.
     #[error]
@@ -916,10 +1058,12 @@ pub enum AttributeGraphElements {
 }
 
 mod graph_lexer {
+    use std::str::FromStr;
+
     use atlier::system::Value;
     use logos::Lexer;
 
-    use super::{AttributeGraphElements, AttributeGraphEvents};
+    use super::AttributeGraphElements;
 
     pub fn from_entity(lexer: &mut Lexer<AttributeGraphElements>) -> Option<u32> {
         lexer.slice().parse().ok()
@@ -952,12 +1096,7 @@ mod graph_lexer {
     }
 
     pub fn from_int_pair(lexer: &mut Lexer<AttributeGraphElements>) -> Option<Value> {
-        let pair: Vec<i32> = lexer
-            .remainder()
-            .trim()
-            .split(",")
-            .filter_map(|i| i.trim().parse().ok())
-            .collect();
+        let pair = from_comma_sep::<i32>(lexer);
 
         match (pair.get(0), pair.get(1)) {
             (Some(f0), Some(f1)) => Some(Value::IntPair(*f0, *f1)),
@@ -966,12 +1105,7 @@ mod graph_lexer {
     }
 
     pub fn from_int_range(lexer: &mut Lexer<AttributeGraphElements>) -> Option<Value> {
-        let range: Vec<i32> = lexer
-            .remainder()
-            .trim()
-            .split(",")
-            .filter_map(|i| i.trim().parse().ok())
-            .collect();
+        let range = from_comma_sep::<i32>(lexer);
 
         match (range.get(0), range.get(1), range.get(2)) {
             (Some(f0), Some(f1), Some(f2)) => Some(Value::IntRange(*f0, *f1, *f2)),
@@ -988,13 +1122,7 @@ mod graph_lexer {
     }
 
     pub fn from_float_pair(lexer: &mut Lexer<AttributeGraphElements>) -> Option<Value> {
-        let pair: Vec<f32> = lexer
-            .remainder()
-            .trim()
-            .split(",")
-            .filter_map(|i| i.trim().parse().ok())
-            .collect();
-
+        let pair = from_comma_sep::<f32>(lexer);
         match (pair.get(0), pair.get(1)) {
             (Some(f0), Some(f1)) => Some(Value::FloatPair(*f0, *f1)),
             _ => None,
@@ -1002,16 +1130,23 @@ mod graph_lexer {
     }
 
     pub fn from_float_range(lexer: &mut Lexer<AttributeGraphElements>) -> Option<Value> {
-        let range: Vec<f32> = lexer
-            .remainder()
-            .trim()
-            .split(",")
-            .filter_map(|i| i.trim().parse().ok())
-            .collect();
+        let range = from_comma_sep::<f32>(lexer);
 
         match (range.get(0), range.get(1), range.get(2)) {
             (Some(f0), Some(f1), Some(f2)) => Some(Value::FloatRange(*f0, *f1, *f2)),
             _ => None,
         }
+    }
+
+    fn from_comma_sep<T>(lexer: &mut Lexer<AttributeGraphElements>) -> Vec<T>
+    where
+        T: FromStr,
+    {
+        lexer
+            .remainder()
+            .trim()
+            .split(",")
+            .filter_map(|i| i.trim().parse().ok())
+            .collect()
     }
 }

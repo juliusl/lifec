@@ -30,10 +30,6 @@ impl RuntimeState for AttributeSystem {
 impl<'a> System<'a> for AttributeSystem {
     type SystemData = AttributeStore<'a>;
 
-    fn setup(&mut self, world: &mut World) {
-        AttributeStore::setup_world(world);
-    }
-
     fn run(&mut self, _data: Self::SystemData) {
         // if let Some(mut runtime) = data.setup_runtime(self) {
         //     if runtime.can_continue() {

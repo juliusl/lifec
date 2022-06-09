@@ -4,7 +4,6 @@ use parser::Lifecycle;
 use std::any::Any;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
-use specs::World;
 
 pub mod editor;
 pub mod plugins;
@@ -35,11 +34,6 @@ where
             Err(err) => Err(err),
         }
     }
-
-    /// setup world registers components and creates entities the dispatcher requires 
-    fn setup_world(_world: &mut World) 
-    {
-    }
 }
 
 pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + From<AttributeGraph> {
@@ -47,7 +41,26 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + 
 
     /// setup runtime is called to configure calls and listeners for the runtime
     fn setup_runtime(&mut self, runtime: &mut Runtime<Self>) {
-        todo!("setup runtime is not implemented")
+        runtime.with_call("save", |s, _| {
+            s.save();
+
+            (None, "{ exit;; }".to_string())
+        });
+
+        runtime.with_call("load", |s, _| {
+            (Some(s.load("")), "{ exit;; }".to_string())
+        });
+
+        runtime.with_call_mut("dispatch_mut", |s, _| {
+            match s.dispatcher_mut().dispatch_mut("msg") {
+                Ok(_) => {
+                    "{ ok;; }".to_string()
+                },
+                Err(_) => {
+                    "{ error;; }".to_string()
+                }
+            }
+        });
     }
 
     // /// try to save the current state to a String
@@ -100,9 +113,7 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + 
 
     /// select decides which listener should be processed next
     fn select(&self, listener: Listener<Self>, current: &Event) -> bool {
-        listener.event.get_phase_lifecycle() == current.get_phase_lifecycle()
-            && listener.event.get_prefix_label() == current.get_prefix_label()
-            && listener.event.get_payload() == current.get_payload()
+        listener.event.get_phase_lifecycle() == current.get_phase_lifecycle() && listener.event.get_prefix_label() == current.get_prefix_label()
     }
 }
 
@@ -379,7 +390,7 @@ where
     /// update takes a function and creates a listener that will be passed the current state
     /// and event context for processing. The function must return the next state, and the next event expression
     /// to transition to
-    pub fn update(&mut self, thunk: fn(&T, Option<Event>) -> (T, String)) -> &mut Extensions {
+    pub fn update(&mut self, thunk: fn(&T, Option<Event>) -> (Option<T>, String)) -> &mut Extensions {
         self.action = Action::Thunk(ThunkFunc::Default(thunk));
 
         &mut self.extensions
@@ -397,8 +408,7 @@ pub enum ThunkFunc<S>
 where
     S: RuntimeState,
 {
-    Default(fn(&S, Option<Event>) -> (S, String)),
-    WithArgs(fn(&WithArgs<S>, Option<Event>) -> (S, String)),
+    Default(fn(&S, Option<Event>) -> (Option<S>, String)),
     Mutable(fn(&mut S, Option<Event>) -> String),
 }
 
@@ -407,7 +417,7 @@ where
     T: RuntimeState,
 {
     fn default() -> Self {
-        ThunkFunc::Default(|_, _| (T::default(), "{ exit;; }".to_string()))
+        ThunkFunc::Default(|_, _| (None, "{ exit;; }".to_string()))
     }
 }
 
@@ -418,7 +428,6 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ThunkFunc::Default(_) => f.debug_tuple("ThunkFunc::Default").finish(),
-            ThunkFunc::WithArgs(_) => f.debug_tuple("ThunkFunc::WithArgs").finish(),
             ThunkFunc::Mutable(_) => f.debug_tuple("ThunkFunc::Mutable").finish(),
         }
     }
@@ -667,21 +676,10 @@ where
     pub fn with_call(
         &mut self,
         call_name: impl AsRef<str>,
-        thunk: fn(&S, Option<Event>) -> (S, String),
+        thunk: fn(&S, Option<Event>) -> (Option<S>, String),
     ) -> Self {
         self.calls
             .insert(call_name.as_ref().to_string(), ThunkFunc::Default(thunk));
-
-        self.clone()
-    }
-
-    pub fn with_call_args(
-        &mut self,
-        call_name: impl AsRef<str>,
-        thunk: fn(&WithArgs<S>, Option<Event>) -> (S, String),
-    ) -> Self {
-        self.calls
-            .insert(call_name.as_ref().to_string(), ThunkFunc::WithArgs(thunk));
 
         self.clone()
     }
@@ -756,7 +754,9 @@ where
                 }
                 Action::Thunk(ThunkFunc::Default(thunk)) => {
                     let (next_s, next_e) = thunk(&state, self.current.clone());
-                    self.update(next_s, next_e);
+                    if let Some(next_s) = next_s {
+                        self.update(next_s, next_e);
+                    }
                 }
                 Action::Dispatch(_msg) => {
                     // let process = if l.extensions.args.len() > 0 {
@@ -806,7 +806,7 @@ where
                     if let Some(thunk) = self.calls.get(&name) {
                         Action::Thunk(thunk.clone())
                     } else {
-                        Action::Thunk(ThunkFunc::Default(|s, _| (s.clone(), "{ exit;; }".to_string())))
+                        Action::Thunk(ThunkFunc::Default(|s, _| (None, "{ exit;; }".to_string())))
                     }
                 }
             }
@@ -876,16 +876,7 @@ where
         match self.calls.get(call_name.as_ref()) {
             Some(ThunkFunc::Default(thunk)) => {
                 let (next_s, next_e) = thunk(&state, self.current.clone());
-                self.update(next_s, next_e);
-            }
-            Some(ThunkFunc::WithArgs(thunk)) => {
-                if let Some(extensions) = extensions {
-                    let with_args = WithArgs {
-                        state: state.clone(),
-                        args: extensions.get_args(),
-                    };
-
-                    let (next_s, next_e) = thunk(&with_args, self.current.clone());
+                if let Some(next_s) = next_s {
                     self.update(next_s, next_e);
                 }
             }
