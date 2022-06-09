@@ -104,8 +104,6 @@ impl App for EventEditor {
     }
 }
 
-pub struct EventEditorError;
-
 impl Display for EventEditor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Event Editor")
@@ -119,19 +117,7 @@ impl From<AttributeGraph> for EventEditor {
 }
 
 impl RuntimeState for EventEditor {
-    type State = AttributeGraph;
-    // fn from_attributes(_: Vec<atlier::system::Attribute>) -> Self {
-    //    todo!()
-    // }
-
-    // fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
-    //     let mut attrs = vec![];
-    //     for (id, g) in self.events.iter() {
-    //         attrs.append(&mut SectionAttributes::from(g.into_attributes()).with_parent_entity(*id).clone_attrs());
-    //     }
-        
-    //     attrs
-    // }
+    type Dispatcher = AttributeGraph;
 }
 
 impl Extension for EventEditor {
@@ -183,7 +169,8 @@ where
                 .with_text("label", self.label.clone())
                 .with_text("on", self.on.clone())
                 .with_text("dispatch", self.dispatch.clone())
-                .with_text("call", self.call.clone()),
+                .with_text("call", self.call.clone())
+                .to_owned(),
             |s, ui| {
                 s.edit_attr("edit the 'on' property", "on", ui);
                 s.edit_attr("edit the 'dispatch' property", "dispatch", ui);

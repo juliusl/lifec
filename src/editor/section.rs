@@ -66,7 +66,7 @@ impl<S: RuntimeState> Section<S> {
         };
 
         let state_attrs = initial_state.state();
-        state_attrs.as_ref().iter_attributes().for_each(|a| section.attributes.copy_attribute(a) );
+        state_attrs.iter_attributes().for_each(|a| section.attributes.copy_attribute(a) );
         section
     }
 
@@ -402,39 +402,14 @@ impl<S> RuntimeState for Section<S>
 where
     S: RuntimeState,
 {
-    type State = AttributeGraph;
+    type Dispatcher = AttributeGraph;
 
+    fn dispatcher(&self) -> &Self::Dispatcher {
+        &self.attributes
+    }
 
-    // fn from_attributes(attributes: Vec<Attribute>) -> Self {
-    //     let mut next = Self::default();
+    fn dispatcher_mut(&mut self) -> &mut Self::Dispatcher {
+        &mut self.attributes
+    }
 
-    //     let state = S::from_attributes(attributes.clone());
-    //     next.state = state;
-
-    //     let section = SectionAttributes::from(attributes);
-
-    //     if let Some(Value::TextBuffer(title)) = section.get_attr_value("title::") {
-    //         next.title = title.to_string(); 
-    //     }
-
-    //     next
-    // }
-
-    // fn into_attributes(&self) -> Vec<Attribute> {
-    //     let mut attrs: Vec<Attribute> = self.attributes
-    //         .iter_attributes()
-    //         .map(|a| a).cloned()
-    //         .collect();
-
-    //     let mut state_attrs = self.state.into_attributes();
-    //     attrs.append(&mut state_attrs);
-
-    //     if let Some(Value::TextBuffer(_)) = self.attributes.get_attr_value("title::") {
-    //         attrs.push(self.attributes.get_attr("title::").expect("just checked").clone());
-    //     } else {
-    //         attrs.push(Attribute::new(self.id, "title::", Value::TextBuffer(self.title.to_string())));
-    //     }
-
-    //     attrs
-    // }
 }

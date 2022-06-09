@@ -40,7 +40,7 @@ impl Thunk for Process {
     }
 
     fn call_with_context(context: &mut super::ThunkContext) {
-        let process = Self::from(context.state().as_ref().clone());
+        let process = Self::from(context.state().clone());
 
         // match process.dispatch(&process.command) {
         //     Ok(output) => {
@@ -170,7 +170,7 @@ impl Process {
                 (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommand))) => {
                     if let Some(next) = section
                         .state
-                        .state()
+                        .dispatcher()
                         .dispatch(&format!("{}::{}", command, subcommand))
                         .ok()
                     {
@@ -180,7 +180,7 @@ impl Process {
                 (Some(Value::TextBuffer(command)), None) => {
                     if let Some(next) = section
                         .state
-                        .state()
+                        .dispatcher()
                         .dispatch(&&format!("{}::", command))
                         .ok()
                     {
@@ -288,104 +288,49 @@ impl From<AttributeGraph> for Process {
     }
 }
 
+impl AsMut<AttributeGraph> for Process {
+    fn as_mut(&mut self) -> &mut AttributeGraph {
+        todo!()
+    }
+}
+
+impl AsRef<AttributeGraph> for Process {
+    fn as_ref(&self) -> &AttributeGraph {
+        todo!()
+    }
+}
+
+impl RuntimeDispatcher for Process {
+    type Error = ProcessExecutionError;
+
+    fn setup_runtime<S>(&mut self, _runtime: &mut crate::Runtime<S>)
+        where
+            S: RuntimeState 
+    {
+        // _runtime.with_call("run", |p, _| {
+        //     p.
+        // })
+    }
+
+    fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {
+        match self.interpret_command(msg, Self::handle_output) {
+            Ok(updated) => {
+                *self = updated;
+                Ok(())
+            },
+            Err(err) => Err(err),
+        }
+    }
+}
+
 impl RuntimeState for Process {
-    type State = AttributeGraph;
+    type Dispatcher = Self;
 
-    // fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> {
-    //     self.interpret_command(msg, Self::handle_output)
-    // }
+    fn dispatcher(&self) -> &Self::Dispatcher {
+        self
+    }
 
-    // fn process_with_args<S: AsRef<str> + ?Sized>(
-    //     state: WithArgs<Self>,
-    //     msg: &S,
-    // ) -> Result<Self, Self::Error>
-    // where
-    //     Self: Clone + Default + RuntimeState,
-    // {
-    //     let process = state.get_state();
-    //     process.interpret_command(msg, move |mut p, command| {
-    //         p.flags = parse_flags(state.get_args().to_vec());
-    //         p.vars = parse_variables(state.get_args().to_vec());
-
-    //         let command = command.args(state.get_args());
-    //         p.handle_output(command)
-    //     })
-    // }
-
-    // fn from_attributes(attrs: Vec<atlier::system::Attribute>) -> Self {
-    //     let mut process = Self::default();
-
-    //     let attributes = SectionAttributes::from(attrs);
-    //     if let Some(Value::TextBuffer(command)) = attributes.get_attr_value("command") {
-    //         process.command = command.to_string();
-    //     }
-
-    //     if let Some(Value::TextBuffer(subcommands)) = attributes.get_attr_value("subcommands") {
-    //         process.subcommands = subcommands.to_string();
-    //     }
-
-    //     if let Some(Value::BinaryVector(stdout)) = attributes.get_attr_value("stdout") {
-    //         process.stdout = stdout.clone();
-    //     }
-
-    //     if let Some(Value::BinaryVector(stderr)) = attributes.get_attr_value("stderr") {
-    //         process.stderr = stderr.clone();
-    //     }
-
-    //     attributes
-    //         .get_attrs()
-    //         .iter()
-    //         .filter(|a| a.name().starts_with("arg::-"))
-    //         .filter_map(|a| match a.value() {
-    //             Value::TextBuffer(value) => {
-    //                 let name = a.name()[5..].to_string();
-    //                 Some((name, value))
-    //             }
-    //             _ => None,
-    //         })
-    //         .for_each(|(name, value)| {
-    //             process.flags.insert(name, value.to_string());
-    //         });
-
-    //     attributes
-    //         .get_attrs()
-    //         .iter()
-    //         .filter(|a| a.name().starts_with("arg::$"))
-    //         .filter_map(|a| match a.value() {
-    //             Value::TextBuffer(value) => {
-    //                 let name = a.name()[5..].to_string();
-    //                 Some((name, value))
-    //             }
-    //             _ => None,
-    //         })
-    //         .for_each(|(name, value)| {
-    //             process.vars.insert(name, value.to_string());
-    //         });
-
-    //     process
-    // }
-
-    // fn into_attributes(&self) -> Vec<atlier::system::Attribute> {
-    //     let mut attributes = SectionAttributes::default()
-    //         .with_text("command", self.command.to_string())
-    //         .with_text("subcommands", self.subcommands.to_string());
-
-    //     if !self.stdout.is_empty() {
-    //         attributes.add_binary_attr("stdout", self.stdout.clone());
-    //     }
-
-    //     if !self.stderr.is_empty() {
-    //         attributes.add_binary_attr("stderr", self.stderr.clone());
-    //     }
-
-    //     for (flag, value) in self.flags.iter() {
-    //         attributes.add_text_attr(format!("arg::{}", flag), value);
-    //     }
-
-    //     for (var, value) in self.flags.iter() {
-    //         attributes.add_text_attr(format!("arg::{}", var), value);
-    //     }
-
-    //     attributes.clone_attrs()
-    // }
+    fn dispatcher_mut(&mut self) -> &mut Self::Dispatcher {
+        self
+    }
 }

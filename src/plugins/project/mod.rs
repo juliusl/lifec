@@ -267,7 +267,7 @@ impl From<AttributeGraph> for Project
 }
 
 impl RuntimeState for Project {
-    type State = AttributeGraph;
+    type Dispatcher = AttributeGraph;
 
     // fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
     //     todo!()

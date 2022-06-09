@@ -71,5 +71,5 @@ impl From<AttributeGraph> for EventGraph {
 }
 
 impl RuntimeState for EventGraph {
-    type State = AttributeGraph;
+    type Dispatcher = AttributeGraph;
 }

@@ -21,7 +21,7 @@ pub trait Thunk {
 
         Self::call_with_context(&mut context);
 
-        *values = context.state().as_ref().clone();
+        *values = context.state().clone();
     }
 }
 
@@ -41,19 +41,21 @@ impl ThunkContext {
         Self({
             let mut attribute_graph = AttributeGraph::default()
                 .with_text("node_title", node_title)
-                .with_symbol("symbol", symbol);
+                .with_symbol("symbol", symbol)
+                .to_owned();
+            let attribute_graph = &mut attribute_graph;
 
             for (name, value) in values {
                 attribute_graph.with(name, value);
             }
 
-            attribute_graph
+            attribute_graph.to_owned()
         })
     }
 
     pub fn node_title(&self) -> &String {
         if let Value::TextBuffer(node_title) = self
-            .state()
+            .dispatcher()
             .as_ref()
             .find_attr_value("node_title")
             .expect("thunk context has to be created with a node_title")
@@ -66,7 +68,7 @@ impl ThunkContext {
 
     pub fn symbol(&self) -> &String {
         if let Value::Symbol(symbol) = self
-            .state()
+            .dispatcher()
             .as_ref()
             .find_attr_value("symbol")
             .expect("thunk context has to be created with a symbol")
@@ -90,28 +92,27 @@ impl ThunkContext {
     }
 
     pub fn find_value(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.state().as_ref().find_attr_value(key)
+        self.state().find_attr_value(key)
     }
 
     pub fn set_returns(&mut self, returns: Value) {
         let returns_key = &self.returns_key();
 
         self.state_mut()
-            .as_mut()
             .with(returns_key.to_string(), returns.clone());
     }
 
     pub fn returns(&self) -> Option<&Value> {
         let returns_key = &self.returns_key();
 
-        self.state().as_ref().find_attr_value(returns_key)
+        self.state()
+            .find_attr_value(returns_key)
     }
 
     pub fn set_output(&mut self, output_key: impl AsRef<str>, output: Value) {
         let output_key = self.outputs_key(output_key);
 
         self.state_mut()
-            .as_mut()
             .with(output_key, output);
     }
 
@@ -120,7 +121,6 @@ impl ThunkContext {
         let prefix = format!("{}::output::", symbol);
 
         self.state()
-            .as_ref()
             .iter_attributes()
             .filter(|a| a.name().starts_with(&prefix))
             .map(|a| (a.name().to_string(), a.value()))
@@ -153,7 +153,7 @@ impl Display for ThunkContext {
 pub struct ThunkError;
 
 impl From<AttributeGraph> for ThunkContext {
-    fn from(attribute_graph: AttributeGraph) -> Self {
+    fn from(mut attribute_graph: AttributeGraph) -> Self {
         if attribute_graph.contains_attribute("node_title")
             && attribute_graph.contains_attribute("symbol")
         {
@@ -161,9 +161,9 @@ impl From<AttributeGraph> for ThunkContext {
         } else {
             Self(
                 attribute_graph
-                    .clone()
                     .with_text("node_title", unique_title("node"))
                     .with_symbol("symbol", unique_title("anonymous"))
+                    .to_owned()
             )
         }
     }
@@ -192,18 +192,13 @@ impl RuntimeDispatcher for ThunkContext {
 }
 
 impl RuntimeState for ThunkContext {
-    type State = Self;
+    type Dispatcher = Self;
 
-    // /// process
-    // fn dispatch(&self, _: impl AsRef<str>) -> Result<Self, Self::Error> {
-    //     todo!("not implemented")
-    // }
-
-    fn state(&self) -> &Self {
+    fn dispatcher(&self) -> &Self {
         self
     }
 
-    fn state_mut(&mut self) -> &mut Self {
+    fn dispatcher_mut(&mut self) -> &mut Self {
         self
     }
 }
@@ -220,7 +215,7 @@ impl App for ThunkContext {
             |s, ui| {
                 let mut set = BTreeSet::new();
 
-                let mut attributes = s.state.state().clone();
+                let mut attributes = s.state.dispatcher().clone();
                 attributes
                     .as_mut()
                     .iter_mut_attributes()
@@ -249,7 +244,7 @@ impl App for ThunkContext {
 #[test]
 fn test_runtime_state() {
     let state = ThunkContext::from(
-        AttributeGraph::default().with("symbol::", Value::Symbol("thunk::test::".to_string())),
+        AttributeGraph::default().with("symbol::", Value::Symbol("thunk::test::".to_string())).to_owned(),
     );
 
     assert_eq!(state.symbol(), "thunk::test::");

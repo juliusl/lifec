@@ -136,7 +136,7 @@ where
                         if let Some(section) = section {
                             match section_loader.insert(
                                 e,
-                                Loader::LoadSection(section.state().clone()),
+                                Loader::LoadSection(section.dispatcher().clone()),
                             ) {
                                 Ok(_) => {
                                     println!("NodeEditor dispatched load section");

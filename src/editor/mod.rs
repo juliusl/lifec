@@ -31,10 +31,7 @@ pub use section::SectionExtension;
 use crate::AttributeGraph;
 use crate::Runtime;
 use crate::RuntimeState;
-use crate::RuntimeSystem;
 use crate::plugins::Project;
-use crate::state::AttributeStore;
-use crate::state::AttributeSystem;
 
 use self::runtime_editor::RuntimeDispatcher;
 
@@ -120,7 +117,6 @@ pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
             Project::configure_app_world(w);
 
             d.add(RuntimeDispatcher::<RtS>::default(), "runtime_dispatcher", &["project_dispatcher"]);
-            d.add(AttributeSystem::default(), "", &[]);
 
             let mut store = Store::<EventComponent>::default();
             e.events.iter().cloned().for_each(|e| {

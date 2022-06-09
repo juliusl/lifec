@@ -9,7 +9,7 @@ use specs::{Component, Entities, SystemData, World, WriteStorage};
 use crate::{AttributeGraph, Runtime, RuntimeDispatcher, RuntimeState};
 
 #[derive(Debug, Default, Clone)]
-pub struct AttributeSystem;
+pub struct AttributeSystem(AttributeGraph);
 
 impl Display for AttributeSystem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -18,13 +18,13 @@ impl Display for AttributeSystem {
 }
 
 impl From<AttributeGraph> for AttributeSystem {
-    fn from(_g: AttributeGraph) -> Self {
-        Self::default()
+    fn from(g: AttributeGraph) -> Self {
+        Self(g)
     }
 }
 
 impl RuntimeState for AttributeSystem {
-    type State = AttributeGraph;
+    type Dispatcher = AttributeGraph;
 }
 
 impl<'a> System<'a> for AttributeSystem {
@@ -34,13 +34,13 @@ impl<'a> System<'a> for AttributeSystem {
         AttributeStore::setup_world(world);
     }
 
-    fn run(&mut self, mut data: Self::SystemData) {
-        if let Some(mut runtime) = data.dispatch_runtime(self) {
-            if runtime.can_continue() {
-                let next = runtime.step();
-                if let Some(_next) = next.current() {}
-            }
-        }
+    fn run(&mut self, _data: Self::SystemData) {
+        // if let Some(mut runtime) = data.setup_runtime(self) {
+        //     if runtime.can_continue() {
+        //         let next = runtime.step();
+        //         if let Some(_next) = next.current() {}
+        //     }
+        // }
     }
 }
 
@@ -51,6 +51,52 @@ pub struct AttributeStore<'a> {
     attributes: WriteStorage<'a, Attribute>,
     attributes_state: WriteStorage<'a, AttributeState>,
     graph: Write<'a, AttributeGraph>,
+}
+
+/// The runtime dispatcher for attribute store maintains state changes for attributes
+impl<'a> RuntimeDispatcher for AttributeStore<'a> {
+    type Error = ();
+
+    fn setup_runtime<S>(&mut self, current: &mut Runtime<S>)
+    where
+        S: RuntimeState,
+    {
+        for entity in self.entities.join() {
+            // define events active attributes
+            if self.attributes.contains(entity) {
+                define_for(entity, current, "load");
+                define_for(entity, current, "edit");
+                define_for(entity, current, "edit_reset");
+                define_for(entity, current, "edit_commit");
+                define_for(entity, current, "save");
+                define_for(entity, current, "remove");
+            }
+        }
+    }
+
+    fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {
+        let AttributeStore { entities, .. } = self;
+
+        let mut lexer = AttributeStoreEvents::lexer(msg.as_ref());
+        match lexer.next() {
+            Some(event) => match event {
+                AttributeStoreEvents::New(attr_name) => {
+                    let entity = entities.create();
+
+                    self.new_attribute(entity, attr_name);
+                }
+                AttributeStoreEvents::Load(entity_id) => self.load_attribute(entity_id),
+                AttributeStoreEvents::Edit(entity_id) => self.edit_attribute(entity_id),
+                AttributeStoreEvents::EditReset(entity_id) => self.edit_reset_attribute(entity_id),
+                AttributeStoreEvents::EditCommit(entity_id) => self.edit_commit_attribute(entity_id),
+                AttributeStoreEvents::Save(entity_id) => self.save_edited_attribute(entity_id),
+                AttributeStoreEvents::Remove(entity_id) => self.remove_attribute(entity_id),
+                AttributeStoreEvents::Error => {}
+            },
+            None => {}
+        };
+        Ok(())
+    }
 }
 
 impl<'a> AsMut<AttributeGraph> for AttributeStore<'a> {
@@ -271,65 +317,20 @@ impl<'a> AttributeStore<'a> {
     }
 }
 
-/// defines an event that dispatches a message derived from `symbol` for `entity` 
-fn define_for<S: RuntimeState>(entity: Entity, runtime: &mut Runtime<S>, symbol: impl AsRef<str>) {
+/// defines an event handler that dispatches a message derived from `symbol` for `entity` 
+fn define_for<S: RuntimeState>(
+    entity: Entity, 
+    runtime: &mut Runtime<S>, 
+    symbol: impl AsRef<str>) {
+    let message = &format!("{} {}", symbol.as_ref(), entity.id());
+    let transition_expr = &format!("{{ after_{};; {}_id }}", symbol.as_ref(), entity.id());
+    
     runtime
         .on(format!("{{ {};; {}_id }}", symbol.as_ref(), entity.id()))
         .dispatch(
-            &format!("{} {}", symbol.as_ref(), entity.id()),
-            &format!("{{ after_{};; {}_id }}", symbol.as_ref(), entity.id()),
+            message,
+            transition_expr,
         );
-}
-
-impl<'a> RuntimeDispatcher for AttributeStore<'a> {
-    type Error = ();
-
-    fn dispatch_runtime<S>(&mut self, current: &mut S) -> Option<Runtime<S>>
-    where
-        S: RuntimeState,
-    {
-        let mut runtime = Runtime::<S>::default();
-
-        runtime.state = Some(current.clone());
-
-        for entity in self.entities.join() {
-            // define events active attributes
-            if self.attributes.contains(entity) {
-                define_for(entity, &mut runtime, "load");
-                define_for(entity, &mut runtime, "edit");
-                define_for(entity, &mut runtime, "edit_reset");
-                define_for(entity, &mut runtime, "edit_commit");
-                define_for(entity, &mut runtime, "save");
-                define_for(entity, &mut runtime, "remove");
-            }
-        }
-
-        Some(runtime)
-    }
-
-    fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {
-        let AttributeStore { entities, .. } = self;
-
-        let mut lexer = AttributeEvents::lexer(msg.as_ref());
-        match lexer.next() {
-            Some(event) => match event {
-                AttributeEvents::New(attr_name) => {
-                    let entity = entities.create();
-
-                    self.new_attribute(entity, attr_name);
-                }
-                AttributeEvents::Load(entity_id) => self.load_attribute(entity_id),
-                AttributeEvents::Edit(entity_id) => self.edit_attribute(entity_id),
-                AttributeEvents::EditReset(entity_id) => self.edit_reset_attribute(entity_id),
-                AttributeEvents::EditCommit(entity_id) => self.edit_commit_attribute(entity_id),
-                AttributeEvents::Save(entity_id) => self.save_edited_attribute(entity_id),
-                AttributeEvents::Remove(entity_id) => self.remove_attribute(entity_id),
-                AttributeEvents::Error => {}
-            },
-            None => {}
-        };
-        Ok(())
-    }
 }
 
 #[derive(Component)]
@@ -347,27 +348,27 @@ impl From<&str> for AttributeExpression {
 }
 
 #[derive(Logos, Debug, Hash, Clone, PartialEq, PartialOrd)]
-pub enum AttributeEvents {
+pub enum AttributeStoreEvents {
     /// Usage: new <attribute name>
-    #[token("new", from_new_event)]
+    #[token("new", from_new_attribute_event)]
     New(String),
     /// Usage: load u32
-    #[token("load", from_attribute_event)]
+    #[token("load", from_attribute_store_event)]
     Load(u32),
     /// Usage: edit u32
-    #[token("edit", from_attribute_event)]
+    #[token("edit", from_attribute_store_event)]
     Edit(u32),
     /// Usage: edit_reset u32
-    #[token("edit_reset", from_attribute_event)]
+    #[token("edit_reset", from_attribute_store_event)]
     EditReset(u32),
     /// Usage: edit_commit u32
-    #[token("edit_commit", from_attribute_event)]
+    #[token("edit_commit", from_attribute_store_event)]
     EditCommit(u32),
     /// Usage: save u32
-    #[token("save", from_attribute_event)]
+    #[token("save", from_attribute_store_event)]
     Save(u32),
     /// Usage: remove u32
-    #[token("remove", from_attribute_event)]
+    #[token("remove", from_attribute_store_event)]
     Remove(u32),
     // Logos requires one token variant to handle errors,
     // it can be named anything you wish.
@@ -378,37 +379,37 @@ pub enum AttributeEvents {
     Error,
 }
 
-fn from_new_event(lex: &mut Lexer<AttributeEvents>) -> Option<String> {
+fn from_new_attribute_event(lex: &mut Lexer<AttributeStoreEvents>) -> Option<String> {
     let attr_name = lex.remainder().trim().to_lowercase();
     Some(attr_name)
 }
 
-fn from_attribute_event(lex: &mut Lexer<AttributeEvents>) -> Option<u32> {
+fn from_attribute_store_event(lex: &mut Lexer<AttributeStoreEvents>) -> Option<u32> {
     lex.remainder().trim().parse().ok()
 }
 
 #[test]
 fn test_attribute_events() {
-    let mut test_lex = AttributeEvents::lexer("new test_attribute");
+    let mut test_lex = AttributeStoreEvents::lexer("new test_attribute");
     assert_eq!(
-        Some(AttributeEvents::New("test_attribute".to_string())),
+        Some(AttributeStoreEvents::New("test_attribute".to_string())),
         test_lex.next()
     );
 
-    let mut test_lex = AttributeEvents::lexer("load 1");
-    assert_eq!(Some(AttributeEvents::Load(1)), test_lex.next());
+    let mut test_lex = AttributeStoreEvents::lexer("load 1");
+    assert_eq!(Some(AttributeStoreEvents::Load(1)), test_lex.next());
 
-    let mut test_lex = AttributeEvents::lexer("edit 300");
-    assert_eq!(Some(AttributeEvents::Edit(300)), test_lex.next());
+    let mut test_lex = AttributeStoreEvents::lexer("edit 300");
+    assert_eq!(Some(AttributeStoreEvents::Edit(300)), test_lex.next());
 
-    let mut test_lex = AttributeEvents::lexer("edit_reset 278");
-    assert_eq!(Some(AttributeEvents::EditReset(278)), test_lex.next());
+    let mut test_lex = AttributeStoreEvents::lexer("edit_reset 278");
+    assert_eq!(Some(AttributeStoreEvents::EditReset(278)), test_lex.next());
 
-    let mut test_lex = AttributeEvents::lexer("edit_commit 279");
-    assert_eq!(Some(AttributeEvents::EditCommit(279)), test_lex.next());
+    let mut test_lex = AttributeStoreEvents::lexer("edit_commit 279");
+    assert_eq!(Some(AttributeStoreEvents::EditCommit(279)), test_lex.next());
 
-    let mut test_lex = AttributeEvents::lexer("save 179");
-    assert_eq!(Some(AttributeEvents::Save(179)), test_lex.next());
+    let mut test_lex = AttributeStoreEvents::lexer("save 179");
+    assert_eq!(Some(AttributeStoreEvents::Save(179)), test_lex.next());
 }
 
 #[derive(Component, Logos, Debug, Hash, Clone, PartialEq, PartialOrd)]

@@ -125,7 +125,8 @@ where
                         .with_bool("enable event builder", false)
                         .with_bool("enable node editor", false)
                         .with_text("project::name::", unique_title("snapshot"))
-                        .with_bool("enable project", false),
+                        .with_bool("enable project", false)
+                        .to_owned(),
                     |s, ui| {
                         s.edit_attr("Enable Node Editor", "enable node editor", ui);
                         s.edit_attr("Enable Event Editor", "enable event builder", ui);
@@ -162,7 +163,7 @@ where
                 None => {
                     match loader.insert(
                         e,
-                        Loader::LoadSection(s.state().clone()),
+                        Loader::LoadSection(s.dispatcher().clone()),
                     ) {
                         Ok(_) => {
                             println!("RuntimeEditor dispatched Loader for {:?}", e);

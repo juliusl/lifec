@@ -4,9 +4,6 @@ use parser::Lifecycle;
 use std::any::Any;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
-use std::marker::PhantomData;
-use specs::System;
-use specs::SystemData;
 use specs::World;
 
 pub mod editor;
@@ -15,48 +12,6 @@ pub mod plugins;
 mod state;
 pub use state::AttributeGraph;
 
-
-#[derive(Clone)]
-pub struct RuntimeSystem<D>
-    where
-        D: RuntimeDispatcher,
-{
-    data: Option<D>,
-}
-
-impl<D> Default for RuntimeSystem<D>
-where
-    D: RuntimeDispatcher {
-    fn default() -> Self {
-        Self {
-            data: None
-        }
-    }
-}
-
-
-impl<'a, D> System<'a> for RuntimeSystem<D>
-where
-    D: RuntimeDispatcher + SystemData<'a>,
-{
-    type SystemData = D;
-
-    fn setup(&mut self, world: &mut World) {
-        D::setup_world(world);
-    }
-
-    fn run(&mut self, mut data: Self::SystemData) {
-
-        // if let Some(current) = self.state.as_mut() {
-        //     if let Some(mut runtime) = data.dispatch_runtime::<S>(current) {
-        //         if runtime.can_continue() {
-        //             runtime.step();
-        //         }
-        //     }
-        // }
-    }
-}
-    
 pub trait RuntimeDispatcher: AsRef<AttributeGraph> + AsMut<AttributeGraph> 
 where
     Self: Sized
@@ -67,36 +22,45 @@ where
     /// and returns a result
     fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error>;
 
-    /// dispatch is a function that should take a string message that can mutate state
-    /// and returns a result
-    fn dispatch(&self, _msg: impl AsRef<str>) -> Result<Self, Self::Error> {
-        todo!()
+    /// dispatch calls dispatch_mut on a clone of Self and returns the clone
+    fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> 
+    where
+        Self: Clone
+    {
+        let mut next = self.to_owned();
+        match next.dispatch_mut(msg) {
+            Ok(_) => {
+                Ok(next.to_owned())
+            },
+            Err(err) => Err(err),
+        }
     }
 
+    /// setup world registers components and creates entities the dispatcher requires 
     fn setup_world(_world: &mut World) {
     }
 
-    fn dispatch_runtime<S>(&mut self, current: &mut S) -> Option<Runtime<S>>
+    /// setup runtime is called to configure calls and listeners for the runtime
+    fn setup_runtime<S>(&mut self, _runtime: &mut Runtime<S>)
     where
         S: RuntimeState
     {
-        None
     }
 }
 
 pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + From<AttributeGraph> {
-    type State: RuntimeDispatcher;
+    type Dispatcher: RuntimeDispatcher;
 
     // /// try to save the current state to a String
     fn save(&self) -> Option<String> {
-        match serde_json::to_string(self.state().as_ref()) {
+        match serde_json::to_string(self.state()) {
             Ok(val) => Some(val),
             Err(_) => None,
         }
     }
 
-    // /// load should take the serialized form of this state
-    // /// and create a new instance of Self
+    /// load should take the serialized form of this state
+    /// and create a new instance of Self
     fn load(&self, init: impl AsRef<str>) -> Self {
         if let Some(attribute_graph) = serde_json::from_str::<AttributeGraph>(init.as_ref()).ok() {
             Self::from(attribute_graph)
@@ -105,22 +69,32 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + 
         }
     }
 
-    fn state_mut(&mut self) -> &mut Self::State {
-        todo!("state is not implemented")
+    /// Returns a mutable dispatcher for this runtime state
+    fn dispatcher_mut(&mut self) -> &mut Self::Dispatcher {
+        todo!("dispatcher is not implemented for runtime state")
     }
 
-    fn state(&self) -> &Self::State {
-        todo!("state is not implemented")
+    // Returns the dispatcher for this runtime state
+    fn dispatcher(&self) -> &Self::Dispatcher {
+        todo!("dispatcher is not implemented for runtime state")
     }
 
-    /// merge_with specifies how to merge another instance of Self that has been modified externally
-    /// this allows for only specific fields in state to be updated asynchronously
+    // Returns the current state from the dispatcher
+    fn state(&self) -> &AttributeGraph {
+        self.dispatcher().as_ref()
+    }
+
+    // Returns the current state as mutable from dispatcher
+    fn state_mut(&mut self) -> &mut AttributeGraph {
+        self.dispatcher_mut().as_mut()
+    }
+
+    /// merge_with merges a clone of self with other
     fn merge_with(&self, other: &Self) -> Self {
         let mut next = self.clone();
         
         next.state_mut()
-            .as_mut()
-            .copy(other.state().as_ref());
+            .copy(other.state());
         
         next
     }
@@ -567,7 +541,7 @@ impl<S> RuntimeState for WithArgs<S>
 where
     S: RuntimeState,
 {
-    type State = AttributeGraph;
+    type Dispatcher = AttributeGraph;
 
     fn load(&self, init: impl AsRef<str>) -> Self {
         Self {
@@ -785,7 +759,7 @@ where
                     let (next_s, next_e) = thunk(&state, self.current.clone());
                     self.update(next_s, next_e);
                 }
-                Action::Dispatch(msg) => {
+                Action::Dispatch(_msg) => {
                     // let process = if l.extensions.args.len() > 0 {
                     //     S::process_with_args(
                     //         WithArgs {

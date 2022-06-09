@@ -115,7 +115,7 @@ impl App for NodeEditorGraph {
                                             let mut thunk_context = ThunkContext::from(values.clone());
 
                                             if !self.pause_updating_graph {
-                                                thunk_context.state_mut().as_mut().with(
+                                                thunk_context.state_mut().with(
                                                     "opened::".to_string(),
                                                     Value::Bool(true),
                                                 );
@@ -131,7 +131,7 @@ impl App for NodeEditorGraph {
                                                     .clone()
                                                     .expect("filtered only thunks with some");
 
-                                                thunk(thunk_context.state_mut().as_mut());
+                                                thunk(thunk_context.state_mut());
                                             }
 
                                             ui.same_line();
@@ -142,7 +142,7 @@ impl App for NodeEditorGraph {
                                             if ui.button(format!("Refresh values [{}]", symbol)) {
                                                 values.clear_index();
                                             } else {
-                                                *values = thunk_context.state_mut().as_mut().clone();
+                                                *values = thunk_context.state_mut().clone();
                                             }
 
                                             ui.new_line();
