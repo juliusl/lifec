@@ -10,12 +10,13 @@ use std::{
     process::{Command, Output},
 };
 
-use super::thunks::Thunk;
 use crate::RuntimeDispatcher;
 use crate::{
-    editor::{Section, SectionExtension},
     AttributeGraph, RuntimeState,
 };
+
+use super::Plugin;
+use super::ThunkContext;
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
 #[storage(HashMapStorage)]
@@ -46,7 +47,7 @@ impl Process {
     }
 }
 
-impl Thunk for Process {
+impl Plugin<ThunkContext> for Process {
     fn symbol() -> &'static str {
         "process"
     }

@@ -1,10 +1,11 @@
+use crate::plugins::Plugin;
+
 use super::ThunkContext;
-use super::Thunk;
 use atlier::prelude::Value;
 
 pub struct Println;
 
-impl Thunk for Println {
+impl Plugin<ThunkContext> for Println {
     fn symbol() -> &'static str {
         "println"
     }

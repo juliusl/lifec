@@ -1,10 +1,11 @@
+use crate::plugins::Plugin;
+
 use super::ThunkContext;
-use super::Thunk;
 use atlier::prelude::Value;
 
 pub struct WriteFiles;
 
-impl Thunk for WriteFiles {
+impl Plugin<ThunkContext> for WriteFiles {
     fn symbol() -> &'static str {
         "write_files"
     }

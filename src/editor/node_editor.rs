@@ -1,7 +1,7 @@
 use super::{
     node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor, Section,
 };
-use crate::{editor::unique_title, plugins::Thunk, RuntimeState, AttributeGraph};
+use crate::{editor::unique_title, RuntimeState, AttributeGraph, plugins::{ThunkContext, Plugin}};
 use atlier::system::{App, Attribute, Extension, Value};
 use imgui::{ChildWindow, MenuItem};
 use specs::{
@@ -43,7 +43,7 @@ where
 {
     pub fn with_thunk<T>(&mut self)
     where
-        T: Thunk,
+        T: Plugin<ThunkContext>,
     {
         self.add_thunk(T::symbol(), T::call);
         if !T::description().is_empty() {

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use atlier::system::Value;
-use crate::{AttributeGraph, RuntimeState};
+use crate::{AttributeGraph};
 
 mod println;
 pub use println::Println;
@@ -8,26 +8,7 @@ pub use println::Println;
 mod write_files;
 pub use write_files::WriteFiles;
 
-pub trait Thunk {
-    /// Returns the symbol name for this thunk, to reference call by name
-    fn symbol() -> &'static str;
-
-    fn description() -> &'static str {
-        ""
-    }
-
-    /// Transforms attribute graph into a thunk context and calls call_with_context
-    /// Updates graph afterwards.
-    fn call(attributes: &mut AttributeGraph) {
-        let mut context = ThunkContext::from(attributes.clone());
-        let context = &mut context;
-        Self::call_with_context(context);
-
-        *attributes = attributes.merge_with(context.as_ref());
-    }
-
-    fn call_with_context(context: &mut ThunkContext);
-}
+use super::Plugin;
 
 /// ThunkContext provides common methods for updating the underlying state graph
 pub struct ThunkContext(AttributeGraph);
@@ -87,7 +68,7 @@ impl ThunkContext {
     // Set a transient return value for this context
     pub fn set_return<T>(&mut self, returns: Value)
     where
-        T: Thunk,
+        T:  Plugin<ThunkContext>,
     {
         let symbol = format!("{}::returns", T::symbol());
         self.as_mut()
@@ -101,7 +82,7 @@ impl ThunkContext {
     // Returns the transient return value for thunk type of T
     pub fn return_for<T>(&self) -> Option<&Value>
     where
-        T: Thunk,
+        T:  Plugin<ThunkContext>,
     {
         let symbol = format!("{}::returns", T::symbol());
         self.as_ref()

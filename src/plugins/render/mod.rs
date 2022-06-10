@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
+use ::imgui::Ui;
 use specs::{Component, System, Entities, WriteStorage, ReadStorage, Join};
 use specs::storage::DenseVecStorage;
 
@@ -34,6 +35,26 @@ impl Default for Render
 {
     fn default() -> Self {
         Self::Empty
+    }
+}
+
+pub struct RenderContext(AttributeGraph);
+
+impl AsRef<AttributeGraph> for RenderContext {
+    fn as_ref(&self) -> &AttributeGraph {
+        &self.0
+    }
+}
+
+impl AsMut<AttributeGraph> for RenderContext {
+    fn as_mut(&mut self) -> &mut AttributeGraph {
+        &mut self.0
+    }
+}
+
+impl From<AttributeGraph> for RenderContext {
+    fn from(graph: AttributeGraph) -> Self {
+        Self(graph)
     }
 }
 
