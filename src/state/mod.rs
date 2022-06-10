@@ -78,14 +78,20 @@ impl AttributeGraph {
                 imgui::Slider::new(label, *f_min, *f_max).build(ui, f);
             }
             None => {}
-            _ => match self.find_attr(&attr_name) {
+            _ => match self.clone().find_attr(&attr_name) {
                 Some(attr) => {
                     if !attr.is_stable() {
+                        // show's a preview
+                        if ui.button("commit") {
+                            self.find_update_attr(attr.name(), |a| a.commit());
+                        }
+                        ui.same_line();
                         ui.disabled(true, ||{
-                            let mut clone = attr.clone();
-                            clone.commit();
-                            clone.show_editor(ui);
+                            let mut preview = attr.clone();
+                            preview.commit();
+                            preview.show_editor(ui);
                         });
+                       
                     }
                 }
                 None => {}
@@ -152,19 +158,33 @@ impl AttributeGraph {
             ui.table_setup_column("Reference");
             ui.table_headers_row();
 
-            // TODO setup sorting
-            // if let Some(sorting) = ui.table_sort_specs_mut() {
-            //     if sorting.should_sort() {
-            //         self.iter_attributes().collect::<Vec<_>>().sort_by(|a, b| {
-            //            for spec in sorting.specs().iter() {
-            //                spec.column_idx();
-            //            }
-            //         });
-            //         sorting.set_sorted();
-            //     }
-            // }
+            let clone = self.clone();
+            let mut attrs: Vec<&Attribute> = clone.iter_attributes().collect();
 
-            for attr in self.clone().iter_attributes() {
+            if let Some(mut sorting) = ui.table_sort_specs_mut() {
+                attrs.sort_by(|a, b| {
+                    let mut order = a.cmp(b);
+                    for spec in sorting.specs().iter() {
+                       order = match spec.column_idx() {
+                           0 => a.name().cmp(b.name()),
+                           1 => a.value().cmp(b.value()),
+                           2 => a.is_stable().cmp(&b.is_stable()),
+                           3 => a.value().to_ref().cmp(&b.value().to_ref()),
+                           _ => a.cmp(b)
+                       };
+                       if let Some(dir) = spec.sort_direction() {
+                           match dir {
+                             imgui::TableSortDirection::Descending => order = order.reverse(),
+                             _ => {}
+                         }
+                       }
+                    }
+                    order
+                 });
+                 sorting.set_sorted();
+            }
+
+            for attr in attrs {
                 if ui.table_next_column() {
                     ui.text(attr.name());
                 }
@@ -342,9 +362,12 @@ impl AttributeGraph {
             update(attr);
 
             // it's possible that the name changed, remove/add the attribute to update the key
-            let attr = self.index.remove(&old_key).expect("just updated");
-            self.add_attribute(attr);
-            true
+            if let Some(attr) = self.index.remove(&old_key) {
+                self.add_attribute(attr);
+                true 
+            } else {
+                false
+            }
         } else {
             false
         }
