@@ -22,6 +22,12 @@ fn main() {
     )
     .enable_app_systems();
 
+    let mut cargo_build = Process::default();
+    cargo_build
+        .as_mut()
+        .from_file(".runmd")
+        .expect("could not load state");
+
     open_editor_with(
         "Demo",
         runtime.parse_event("{ setup;; }"),
@@ -34,6 +40,8 @@ fn main() {
             // ui.show_demo_window(&mut true);
             let node_editor = &mut node_editor;
             node_editor.extend_app_world(w, ui);
+
+            cargo_build.as_mut().edit_attr_table(ui);
         },
     );
 }

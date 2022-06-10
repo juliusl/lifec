@@ -99,7 +99,7 @@ impl ThunkContext {
     }
 
     // Returns the transient return value for thunk type of T
-    pub fn returns_for<T>(&self) -> Option<&Value>
+    pub fn return_for<T>(&self) -> Option<&Value>
     where
         T: Thunk,
     {

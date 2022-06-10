@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, fmt::Display};
-
+use atlier::system::App;
 use atlier::system::{Attribute, Value};
+use imgui::TableFlags;
 use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
@@ -22,8 +23,133 @@ pub struct AttributeGraph {
 }
 
 impl AttributeGraph {
+    /// returns the owning entity
     pub fn entity(&self) -> u32 {
         self.entity
+    }
+
+    /// This method allows you to edit an attribute from this section
+    /// You can use a label that is different from the actual attribute name
+    /// This allows attribute re-use
+    pub fn edit_attr(
+        &mut self,
+        label: impl AsRef<str> + Display,
+        attr_name: impl AsRef<str>,
+        ui: &imgui::Ui,
+    ) {
+        if let Some(Value::Float(width)) = self.find_attr_value("edit_width::") {
+            ui.set_next_item_width(*width);
+        } else {
+            ui.set_next_item_width(130.0);
+        }
+
+        let label = format!("{} {}", label, self.entity);
+        let attr_name = attr_name.as_ref().to_string();
+        match self.find_attr_value_mut(&attr_name) {
+            Some(Value::TextBuffer(val)) => {
+                ui.input_text(label, val).build();
+            }
+            Some(Value::Int(val)) => {
+                ui.input_int(label, val).build();
+            }
+            Some(Value::Float(val)) => {
+                ui.input_float(label, val).build();
+            }
+            Some(Value::Bool(val)) => {
+                ui.checkbox(label, val);
+            }
+            Some(Value::FloatPair(f1, f2)) => {
+                let clone = &mut [*f1, *f2];
+                ui.input_float2(label, clone).build();
+                *f1 = clone[0];
+                *f2 = clone[1];
+            }
+            Some(Value::IntPair(i1, i2)) => {
+                let clone = &mut [*i1, *i2];
+                ui.input_int2(label, clone).build();
+                *i1 = clone[0];
+                *i2 = clone[1];
+            }
+            Some(Value::IntRange(i, i_min, i_max)) => {
+                imgui::Slider::new(label, *i_min, *i_max).build(ui, i);
+            }
+            Some(Value::FloatRange(f, f_min, f_max)) => {
+                imgui::Slider::new(label, *f_min, *f_max).build(ui, f);
+            }
+            None => {}
+            _ => match self.find_attr(&attr_name) {
+                Some(attr) => {
+                    if !attr.is_stable() {
+                        ui.disabled(true, ||{
+                            let mut clone = attr.clone();
+                            clone.commit();
+                            clone.show_editor(ui);
+                        });
+                    }
+                }
+                None => {}
+            },
+        }
+    }
+
+    /// This method allows you to create a custom editor for your attribute,
+    /// in case the built in methods are not enough
+    pub fn edit_attr_custom(&mut self, attr_name: impl AsRef<str>, show: impl Fn(&mut Attribute)) {
+        if let Some(attr) = self.find_attr_mut(attr_name) {
+            show(attr);
+        }
+    }
+
+    /// This method shows an attribute table
+    pub fn edit_attr_table(&mut self, ui: &imgui::Ui) {
+        if let Some(token) = ui.begin_table_with_flags(
+            format!("Attribute Graph Table {}", self.entity),
+            4,
+            TableFlags::RESIZABLE | TableFlags::SORTABLE,
+        ) {
+            ui.table_setup_column("State");
+            ui.table_setup_column("Name");
+            ui.table_setup_column("Value");
+            ui.table_setup_column("Reference");
+            ui.table_headers_row();
+
+            // if let Some(sorting) = ui.table_sort_specs_mut() {
+            //     if sorting.should_sort() {
+            //         self.iter_attributes().collect::<Vec<_>>().sort_by(|a, b| {
+            //            for spec in sorting.specs().iter() {
+            //                spec.column_idx();
+            //            }
+            //         });
+            //         sorting.set_sorted();
+            //     }
+            // }
+
+            for attr in self.clone().iter_attributes() {
+                if ui.table_next_column() {
+                    if attr.is_stable() {
+                        ui.text("stable");
+                    } else {
+                        ui.text("transient");
+                    }
+                }
+
+                if ui.table_next_column() {
+                    ui.text(attr.name());
+                }
+
+                if ui.table_next_column() {
+                    self.edit_attr(attr.name(), attr.name(), ui);
+                }
+
+                if ui.table_next_column() {
+                    ui.text(attr.value().to_ref().to_string());
+                }
+
+                ui.table_next_row();
+            }
+
+            token.end();
+        }
     }
 
     /// Copies all the values from other graph

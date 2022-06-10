@@ -85,7 +85,7 @@ impl Thunk for Process {
             }
             Err(e) => {
                 context.as_mut().with(
-                    "error".to_string(),
+                    "error",
                     Value::TextBuffer(format!("Error: {:?}", e)),
                 );
             }
