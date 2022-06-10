@@ -17,7 +17,9 @@ fn main() {
     let process_section = Section::new(
         <Process as App>::name(),
         AttributeGraph::default(),
-        <Process as SectionExtension<Process>>::show_extension,
+        |s, ui| {
+            s.state.show_editor(ui);
+        },
         cargo_build,
     )
     .enable_app_systems();
@@ -40,6 +42,10 @@ fn main() {
             // ui.show_demo_window(&mut true);
             let node_editor = &mut node_editor;
             node_editor.extend_app_world(w, ui);
+
+            ui.main_menu_bar(|| {
+                cargo_build.as_mut().edit_attr_menu(ui);
+            });
 
             cargo_build.as_mut().edit_attr_table(ui);
         },

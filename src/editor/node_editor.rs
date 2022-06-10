@@ -198,6 +198,7 @@ where
                                 ui.separator();
 
                                 ui.menu("Attributes", || {
+
                                     if MenuItem::new("Add text attribute").build(ui) {
                                         editor.add_node(
                                             "",

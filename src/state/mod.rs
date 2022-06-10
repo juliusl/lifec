@@ -7,6 +7,7 @@ use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, Entity};
 
+use crate::editor::unique_title;
 use crate::{RuntimeDispatcher, RuntimeState};
 
 mod system;
@@ -100,6 +101,44 @@ impl AttributeGraph {
         }
     }
 
+    pub fn edit_attr_menu(&mut self, ui: &imgui::Ui) {
+        if let Some(token) = ui.begin_menu("Add new attribute") {
+            if imgui::MenuItem::new("Text").build(ui) {
+                self.add_text_attr(unique_title("text"), "");
+            }
+
+            if imgui::MenuItem::new("Bool").build(ui) {
+                self.add_bool_attr(unique_title("bool"), false);
+            }
+
+            if imgui::MenuItem::new("Int").build(ui) {
+                self.add_int_attr(unique_title("int"), 0);
+            }
+
+            if imgui::MenuItem::new("Int pair").build(ui) {
+                self.add_int_pair_attr(unique_title("int_pair"), &[0, 0]);
+            }
+
+            // if imgui::MenuItem::new("Int Slider") {
+            //     self.add_int_range_attr(unique_title("int_slider"), &[0, 0, 0]);
+            // }
+
+            if imgui::MenuItem::new("Float").build(ui) {
+                self.add_float_attr(unique_title("float"), 0.0);
+            }
+
+            if imgui::MenuItem::new("Float pair").build(ui) {
+                self.add_float_pair_attr(unique_title("float_pair"), &[0.0, 0.0]);
+            }
+            
+            if imgui::MenuItem::new("Empty").build(ui) {
+                self.add_empty_attr(unique_title("empty"));
+            }
+
+            token.end();
+        }
+    }
+
     /// This method shows an attribute table
     pub fn edit_attr_table(&mut self, ui: &imgui::Ui) {
         if let Some(token) = ui.begin_table_with_flags(
@@ -107,12 +146,13 @@ impl AttributeGraph {
             4,
             TableFlags::RESIZABLE | TableFlags::SORTABLE,
         ) {
-            ui.table_setup_column("State");
             ui.table_setup_column("Name");
             ui.table_setup_column("Value");
+            ui.table_setup_column("State");
             ui.table_setup_column("Reference");
             ui.table_headers_row();
 
+            // TODO setup sorting
             // if let Some(sorting) = ui.table_sort_specs_mut() {
             //     if sorting.should_sort() {
             //         self.iter_attributes().collect::<Vec<_>>().sort_by(|a, b| {
@@ -126,19 +166,19 @@ impl AttributeGraph {
 
             for attr in self.clone().iter_attributes() {
                 if ui.table_next_column() {
-                    if attr.is_stable() {
-                        ui.text("stable");
-                    } else {
-                        ui.text("transient");
-                    }
-                }
-
-                if ui.table_next_column() {
                     ui.text(attr.name());
                 }
 
                 if ui.table_next_column() {
                     self.edit_attr(attr.name(), attr.name(), ui);
+                }
+
+                if ui.table_next_column() {
+                    if attr.is_stable() {
+                        ui.text("stable");
+                    } else {
+                        ui.text("transient");
+                    }
                 }
 
                 if ui.table_next_column() {
