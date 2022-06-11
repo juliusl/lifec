@@ -258,7 +258,7 @@ impl<S> From<S> for Section<S>
             id: 0,
             title: unique_title(S::name().to_string()),
             show_editor: ShowEditor(|section, ui| {
-                S::show_editor(&mut section.state, ui);
+                section.attributes.edit_attr_table(ui);
             }),
             state: initial,
             enable_app_systems: false,

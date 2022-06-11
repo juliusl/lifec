@@ -173,9 +173,6 @@ impl Process {
     fn edit(&mut self, ui: &Ui) {
         self.as_mut().edit_attr("Enable node editor", "enable_node_editor", ui);
 
-        // Show the default view for this editor
-        self.show_editor(ui);
-
         ui.new_line();
         // Some tools to edit the process
         ui.text("Edit Process:");

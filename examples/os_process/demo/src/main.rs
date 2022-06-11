@@ -16,7 +16,7 @@ fn main() {
     let mut runtime = Runtime::from(&mut cargo_build);
     let process_section = Section::new(
         <Process as App>::name(),
-        AttributeGraph::default(),
+        cargo_build.as_ref().clone(),
         |s, ui| {
             s.state.show_editor(ui);
         },
