@@ -1,4 +1,3 @@
-use std::{collections::BTreeMap, fmt::Display};
 use atlier::system::App;
 use atlier::system::{Attribute, Value};
 use imgui::TableFlags;
@@ -6,6 +5,7 @@ use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, Entity};
+use std::{collections::BTreeMap, fmt::Display};
 
 use crate::editor::unique_title;
 use crate::{RuntimeDispatcher, RuntimeState};
@@ -27,6 +27,28 @@ impl AttributeGraph {
     /// returns the owning entity
     pub fn entity(&self) -> u32 {
         self.entity
+    }
+
+    pub fn define(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) {
+        let symbol_name = format!("{}::{}", name.as_ref(), symbol.as_ref());
+        let symbol_value = format!("{}::", symbol.as_ref());
+        self.add_symbol(&symbol_name, symbol_value);
+        self.find_attr_mut(symbol_name)
+            .expect("just added")
+            .edit((name.as_ref().to_string(), Value::Empty));
+    }
+
+    pub fn apply(&self, attr_name: impl AsRef<str>) -> Option<Self> {
+        let mut clone = self.clone();
+        if clone.apply_mut(attr_name) {
+            Some(clone)
+        } else {
+            None
+        }
+    }
+
+    pub fn apply_mut(&mut self, attr_name: impl AsRef<str>) -> bool {
+        self.find_update_attr(attr_name, |a| a.commit())
     }
 
     /// This method allows you to edit an attribute from this section
@@ -80,18 +102,21 @@ impl AttributeGraph {
             None => {}
             _ => match self.clone().find_attr(&attr_name) {
                 Some(attr) => {
+                    // If not stable, 
+                    // shows a preview and add's a button to apply the value if transient
                     if !attr.is_stable() {
-                        // show's a preview
-                        if ui.button("commit") {
-                            self.find_update_attr(attr.name(), |a| a.commit());
+                        if attr.transient().and_then(|(_, value)| Some(*value != Value::Empty)).unwrap_or(false) {
+                            if ui.button("apply") {
+                              self.apply_mut(attr.name());
+                            }
+                            ui.same_line();
                         }
-                        ui.same_line();
-                        ui.disabled(true, ||{
+
+                        ui.disabled(true, || {
                             let mut preview = attr.clone();
                             preview.commit();
                             preview.show_editor(ui);
                         });
-                       
                     }
                 }
                 None => {}
@@ -108,40 +133,44 @@ impl AttributeGraph {
     }
 
     pub fn edit_attr_menu(&mut self, ui: &imgui::Ui) {
-        if let Some(token) = ui.begin_menu("Add new attribute") {
-            if imgui::MenuItem::new("Text").build(ui) {
-                self.add_text_attr(unique_title("text"), "");
+        if let Some(token) = ui.begin_menu("Edit") {
+            if let Some(token) = ui.begin_menu("Add new attribute") {
+                if imgui::MenuItem::new("Text").build(ui) {
+                    self.add_text_attr(unique_title("text"), "");
+                }
+    
+                if imgui::MenuItem::new("Bool").build(ui) {
+                    self.add_bool_attr(unique_title("bool"), false);
+                }
+    
+                if imgui::MenuItem::new("Int").build(ui) {
+                    self.add_int_attr(unique_title("int"), 0);
+                }
+    
+                if imgui::MenuItem::new("Int pair").build(ui) {
+                    self.add_int_pair_attr(unique_title("int_pair"), &[0, 0]);
+                }
+    
+                // if imgui::MenuItem::new("Int Slider") {
+                //     self.add_int_range_attr(unique_title("int_slider"), &[0, 0, 0]);
+                // }
+    
+                if imgui::MenuItem::new("Float").build(ui) {
+                    self.add_float_attr(unique_title("float"), 0.0);
+                }
+    
+                if imgui::MenuItem::new("Float pair").build(ui) {
+                    self.add_float_pair_attr(unique_title("float_pair"), &[0.0, 0.0]);
+                }
+    
+                if imgui::MenuItem::new("Empty").build(ui) {
+                    self.add_empty_attr(unique_title("empty"));
+                }
+    
+                token.end();
             }
-
-            if imgui::MenuItem::new("Bool").build(ui) {
-                self.add_bool_attr(unique_title("bool"), false);
-            }
-
-            if imgui::MenuItem::new("Int").build(ui) {
-                self.add_int_attr(unique_title("int"), 0);
-            }
-
-            if imgui::MenuItem::new("Int pair").build(ui) {
-                self.add_int_pair_attr(unique_title("int_pair"), &[0, 0]);
-            }
-
-            // if imgui::MenuItem::new("Int Slider") {
-            //     self.add_int_range_attr(unique_title("int_slider"), &[0, 0, 0]);
-            // }
-
-            if imgui::MenuItem::new("Float").build(ui) {
-                self.add_float_attr(unique_title("float"), 0.0);
-            }
-
-            if imgui::MenuItem::new("Float pair").build(ui) {
-                self.add_float_pair_attr(unique_title("float_pair"), &[0.0, 0.0]);
-            }
-            
-            if imgui::MenuItem::new("Empty").build(ui) {
-                self.add_empty_attr(unique_title("empty"));
-            }
-
-            token.end();
+        
+            token.end()
         }
     }
 
@@ -165,23 +194,23 @@ impl AttributeGraph {
                 attrs.sort_by(|a, b| {
                     let mut order = a.cmp(b);
                     for spec in sorting.specs().iter() {
-                       order = match spec.column_idx() {
-                           0 => a.name().cmp(b.name()),
-                           1 => a.value().cmp(b.value()),
-                           2 => a.is_stable().cmp(&b.is_stable()),
-                           3 => a.value().to_ref().cmp(&b.value().to_ref()),
-                           _ => a.cmp(b)
-                       };
-                       if let Some(dir) = spec.sort_direction() {
-                           match dir {
-                             imgui::TableSortDirection::Descending => order = order.reverse(),
-                             _ => {}
-                         }
-                       }
+                        order = match spec.column_idx() {
+                            0 => a.name().cmp(b.name()),
+                            1 => a.value().cmp(b.value()),
+                            2 => a.is_stable().cmp(&b.is_stable()),
+                            3 => a.value().to_ref().cmp(&b.value().to_ref()),
+                            _ => a.cmp(b),
+                        };
+                        if let Some(dir) = spec.sort_direction() {
+                            match dir {
+                                imgui::TableSortDirection::Descending => order = order.reverse(),
+                                _ => {}
+                            }
+                        }
                     }
                     order
-                 });
-                 sorting.set_sorted();
+                });
+                sorting.set_sorted();
             }
 
             for attr in attrs {
@@ -197,7 +226,15 @@ impl AttributeGraph {
                     if attr.is_stable() {
                         ui.text("stable");
                     } else {
-                        ui.text("transient");
+                        if attr
+                            .transient()
+                            .and_then(|(_, v)| if let Value::Empty = v { None } else { Some(()) })
+                            .is_some()
+                        {
+                            ui.text("transient");
+                        } else {
+                            ui.text("defined");
+                        }
                     }
                 }
 
@@ -364,7 +401,7 @@ impl AttributeGraph {
             // it's possible that the name changed, remove/add the attribute to update the key
             if let Some(attr) = self.index.remove(&old_key) {
                 self.add_attribute(attr);
-                true 
+                true
             } else {
                 false
             }
@@ -856,7 +893,7 @@ impl AttributeGraph {
                 Some(AttributeGraphElements::Symbol(name)),
                 Some(AttributeGraphElements::Symbol(symbol)),
             ) => {
-                self.add_symbol(format!("{}::{}", name, symbol), format!("{}::", symbol));
+                self.define(name, symbol);
                 Ok(())
             }
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
