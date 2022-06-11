@@ -72,17 +72,23 @@ pub struct NodeEditorGraph {
     idgen: Option<imnodes::IdentifierGenerator>,
     thunk_index: BTreeMap<String, fn(&mut AttributeGraph)>,
     link_index: HashMap<LinkId, Link>,
-    editing: Option<bool>,
-    editing_graph_resources: Option<bool>,
-    filtering_attributes: Option<String>,
-    filtering_nodes: Option<String>,
-    preserve_thunk_reference_inputs: bool,
-    show_runtime_editor: bool,
-    pause_updating_graph: bool,
     value_store: Store<Value>,
     nodes: Vec<NodeComponent>,
     links: HashSet<Link>,
     attribute_store: Store<(i32, Attribute)>,
+    graph: AttributeGraph
+}
+
+impl AsRef<AttributeGraph> for NodeEditorGraph {
+    fn as_ref(&self) -> &AttributeGraph {
+        &self.graph
+    }
+}
+
+impl AsMut<AttributeGraph> for NodeEditorGraph {
+    fn as_mut(&mut self) -> &mut AttributeGraph {
+        &mut self.graph
+    }
 }
 
 impl App for NodeEditorGraph {
@@ -91,17 +97,22 @@ impl App for NodeEditorGraph {
     }
 
     fn show_editor(&mut self, ui: &imgui::Ui) {
+        let debugging = self.as_ref().is_enabled("editing_graph_resources");
+        let mut graph = self.graph.clone();
+
         if let Some(context) = self.editor_context.as_mut() {
-            if let Some(debugging) = self.editing_graph_resources.as_ref() {
-                if *debugging {
+            if let Some(debugging) = debugging {
+                if debugging {
                     ChildWindow::new("Debugger")
                         .size([400.0, 0.0])
                         .always_auto_resize(true)
                         .build(ui, || {
                             if ui.collapsing_header("Active thunks", TreeNodeFlags::empty()) {
-                                ui.checkbox("Pause graph updates", &mut self.pause_updating_graph);
-                                if ui.is_item_hovered() {
-                                    ui.tooltip_text("Pausing graph updates allows you to edit the thunk state. Useful for testing thunks w/o modifying existing values directly.");
+                                if let Some(Value::Bool(pause_updating_graph)) = graph.find_attr_value_mut("pause_updating_graph") {
+                                    ui.checkbox("Pause graph updates", pause_updating_graph);
+                                    if ui.is_item_hovered() {
+                                        ui.tooltip_text("Pausing graph updates allows you to edit the thunk state. Useful for testing thunks w/o modifying existing values directly.");
+                                    }
                                 }
 
                                 ui.new_line();
@@ -152,7 +163,7 @@ impl App for NodeEditorGraph {
                             }
 
                             if ui.collapsing_header("Active attributes", TreeNodeFlags::empty()) {
-                                if let Some(filter) = self.filtering_attributes.as_mut() {
+                                if let Some(Value::TextBuffer(filter)) = graph.find_attr_value_mut("filtering_attributes") {
                                     ui.input_text("Filter attributes", filter).build();
                                     ui.new_line();
                                 }
@@ -160,7 +171,7 @@ impl App for NodeEditorGraph {
                                 self.nodes
                                     .iter_mut()
                                     .filter(|n| {
-                                        if let Some(filter) = &self.filtering_attributes {
+                                        if let Some(Value::TextBuffer(filter)) = graph.find_attr_value("filtering_attributes") {
                                             format!("{}", n.attribute).contains(filter)
                                         } else {
                                             false
@@ -221,7 +232,7 @@ impl App for NodeEditorGraph {
                     self.nodes
                         .iter_mut()
                         .filter(|n| {
-                            if let Some(filtering_nodes) = &self.filtering_nodes {
+                            if let Some(Value::TextBuffer(filtering_nodes)) = graph.find_attr_value("filtering_nodes") {
                                 n.title.contains(filtering_nodes)
                             } else {
                                 true
@@ -350,7 +361,7 @@ impl App for NodeEditorGraph {
                                         );
 
                                         node_scope.attribute(*attribute_id, || {
-                                            if let Some(editing) = self.editing {
+                                            if let Some(editing) = graph.is_enabled("editing") {
                                                 ui.disabled(!editing, || {
                                                     ui.set_next_item_width(130.0);
                                                     attribute.edit_ui(ui);
@@ -371,7 +382,7 @@ impl App for NodeEditorGraph {
                                         node_scope.attribute(*attribute_id, || {
                                             ui.set_next_item_width(130.0);
 
-                                            if let Some(editing) = self.editing {
+                                            if let Some(editing) = graph.is_enabled("editing") {
                                                 ui.disabled(!editing, || {
                                                     let old = attribute.clone();
                                                     attribute.edit_ui(ui);
@@ -416,7 +427,7 @@ impl App for NodeEditorGraph {
                         let to = dropped_link.end_node;
                         if let Some(n) = self.find_node(to).cloned() {
                             if let Value::Reference(r) = &n.attribute.value() {
-                                if self.preserve_thunk_reference_inputs {
+                                if let Some(true) = graph.is_enabled("preserve_thunk_reference_inputs") {
                                     let referenced_value = &self.value_store.clone();
                                     let referenced_value = referenced_value.get_at(r);
                                     let node = self.find_node_mut(to);
@@ -468,6 +479,8 @@ impl App for NodeEditorGraph {
                 ntoken.end();
             }
         }
+    
+        *self.as_mut() = graph;
     }
 }
 
@@ -483,14 +496,8 @@ impl NodeEditorGraph {
             link_index: HashMap::new(),
             value_store: Store::default(),
             attribute_store: Store::default(),
-            editing_graph_resources: Some(false),
-            editing: Some(false),
-            filtering_attributes: Some(String::default()),
-            filtering_nodes: Some(String::default()),
-            preserve_thunk_reference_inputs: true,
-            pause_updating_graph: false,
-            show_runtime_editor: false,
             thunk_index: BTreeMap::new(),
+            graph: AttributeGraph::default(),
         }
     }
 
@@ -612,7 +619,7 @@ impl NodeEditorGraph {
 
     /// update resolves reference values
     pub fn update(&mut self) {
-        if self.pause_updating_graph {
+        if let Some(true) = self.as_ref().is_enabled("pause_updating_graph") {
             return;
         }
 
@@ -635,7 +642,7 @@ impl NodeEditorGraph {
             let _ = std::fs::write("node_editor.out", format!("{:?}", visited));
         }
 
-        if let Some(true) = self.editing {
+        if let Some(true) = self.as_ref().is_enabled("editing") {
             self.attribute_store = Store::default();
         }
     }
@@ -647,31 +654,36 @@ impl NodeEditorGraph {
 
     /// returns true if the runtime editor view is open
     pub fn is_runtime_editor_open(&self) -> bool {
-        self.show_runtime_editor
+        self.graph.is_enabled("is_runtime_editor_open").unwrap_or(false)
     }
 
     pub fn show_enable_graph_resource_view(&mut self, ui: &imgui::Ui) {
-        if let Some(debugging) = self.editing_graph_resources.as_mut() {
+        if let Some(Value::Bool(debugging)) = self.as_mut().find_attr_value_mut("editing_graph_resources") {
             ui.checkbox("Graph Resources", debugging);
         }
     }
 
     pub fn show_enable_runtime_editor_view(&mut self, ui: &imgui::Ui) {
-        ui.checkbox("Runtime Editor", &mut self.show_runtime_editor);
+        if let Some(Value::Bool(show_runtime_editor)) = self.as_mut().find_attr_value_mut("show_runtime_editor") {
+            ui.checkbox("Runtime Editor", show_runtime_editor);
+        }
     }
 
     pub fn show_enable_edit_attributes_option(&mut self, ui: &imgui::Ui) {
-        if let Some(readonly) = self.editing.as_mut() {
+        if let Some(Value::Bool(readonly)) = self.as_mut().find_attr_value_mut("editing") {
             ui.checkbox("Enable attribute editing", readonly);
         }
     }
 
     pub fn show_preserve_thunk_reference_inputs(&mut self, ui: &imgui::Ui) {
-        ui.checkbox("Preserve thunk reference inputs", &mut self.preserve_thunk_reference_inputs);
+        if let Some(Value::Bool(preserve_thunk_reference_inputs)) = self.as_mut().find_attr_value_mut("preserve_thunk_reference_inputs") {
+            
+        ui.checkbox("Preserve thunk reference inputs", preserve_thunk_reference_inputs);
+        }
     }
 
     pub fn is_debugging_enabled(&mut self) -> bool {
-        self.editing_graph_resources.unwrap_or(false)
+        self.as_ref().is_enabled("editing_graph_resources").unwrap_or(false)
     }
 
     /// rearrange all linked nodes
