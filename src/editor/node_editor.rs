@@ -1,12 +1,13 @@
-use super::{
-    node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor, Section,
+use super::{node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor, Section};
+use crate::{
+    editor::unique_title,
+    plugins::{Plugin, ThunkContext},
+    AttributeGraph, RuntimeState,
 };
-use crate::{editor::unique_title, RuntimeState, AttributeGraph, plugins::{ThunkContext, Plugin}};
 use atlier::system::{App, Attribute, Extension, Value};
-use imgui::{ChildWindow, MenuItem};
-use specs::{
-    Component, Entities, Join, Read, ReadStorage, RunNow, System, WriteStorage
-};
+use imgui::{ChildWindow, MenuItem, Ui};
+use imnodes::editor;
+use specs::{Component, Entities, Join, Read, ReadStorage, RunNow, System, WriteStorage};
 use std::collections::{BTreeMap, HashMap};
 
 pub struct NodeEditor<S>
@@ -35,6 +36,25 @@ where
             runtime_editor: None,
         }
     }
+
+    pub fn new_editor<'a, 'ui>(&mut self) -> impl FnMut(&mut AttributeGraph, &Ui<'ui>) {
+        let mut context = self.imnodes.create_editor();
+        move |g, ui| {
+            let context = &mut context;
+            let mut idgen = context.new_identifier_generator();
+
+            editor(context, |mut editor_scope| {
+                for node in g.find_symbols_mut("node") {
+                    editor_scope.add_node(idgen.next_node(), |mut node_scope| {
+                        node_scope.attribute(idgen.next_attribute(), || {
+                            ui.text("test");
+                            node.edit_ui(ui);
+                        });
+                    });
+                }
+            });
+        }
+    }
 }
 
 impl<S> NodeEditor<S>
@@ -56,7 +76,10 @@ where
     }
 
     pub fn add_thunk_tooltip(&mut self, name: impl AsRef<str>, tooltip_content: impl AsRef<str>) {
-        self.thunk_toolips.insert(name.as_ref().to_string(), tooltip_content.as_ref().to_string());
+        self.thunk_toolips.insert(
+            name.as_ref().to_string(),
+            tooltip_content.as_ref().to_string(),
+        );
     }
 }
 
@@ -69,9 +92,7 @@ where
         self.show_editor(ui);
     }
 
-    fn configure_app_world(_: &mut specs::World) {
-        
-    }
+    fn configure_app_world(_: &mut specs::World) {}
 
     fn configure_app_systems(_: &mut specs::DispatcherBuilder) {
         // We call the system in extend_app_world directly because we need to be able to render
@@ -125,12 +146,13 @@ where
                                 editor.add_thunk(call, thunk.clone());
                             }
 
-                           editor.load_attribute_store(&attributes);
+                            editor.load_attribute_store(&attributes);
 
                             self.editors.insert(e.id(), editor);
 
                             if let Some(section) = sections.get(e) {
-                                self.sections.insert(e.id(), section.clone().enable_edit_attributes());
+                                self.sections
+                                    .insert(e.id(), section.clone().enable_edit_attributes());
                             }
                         }
                         Some(editor) => editor.update(),
@@ -140,10 +162,9 @@ where
                         let section = self.sections.remove(&e.id());
 
                         if let Some(section) = section {
-                            match section_loader.insert(
-                                e,
-                                Loader::LoadSection(section.dispatcher().clone()),
-                            ) {
+                            match section_loader
+                                .insert(e, Loader::LoadSection(section.dispatcher().clone()))
+                            {
                                 Ok(_) => {
                                     println!("NodeEditor dispatched load section");
                                 }
@@ -198,7 +219,6 @@ where
                                 ui.separator();
 
                                 ui.menu("Attributes", || {
-
                                     if MenuItem::new("Add text attribute").build(ui) {
                                         editor.add_node(
                                             "",
@@ -361,14 +381,19 @@ where
                                                     println!("{}", a);
                                                 });
                                             }
-    
+
                                             if ui.button("Save attribute store") {
-                                                section.attributes.copy_attribute(&editor.save_attribute_store(*id));
+                                                section.attributes.copy_attribute(
+                                                    &editor.save_attribute_store(*id),
+                                                );
                                             }
 
                                             section.edit_attr(
                                                 "Attribute Store",
-                                                format!("file::{}_attribute_store.out", editor.title()),
+                                                format!(
+                                                    "file::{}_attribute_store.out",
+                                                    editor.title()
+                                                ),
                                                 ui,
                                             );
                                         }

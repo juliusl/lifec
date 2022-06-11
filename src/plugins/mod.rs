@@ -1,3 +1,7 @@
+mod nodes;
+pub use nodes::Node;
+pub use nodes::NodeContext;
+
 mod process;
 pub use process::Process;
 
@@ -11,7 +15,9 @@ pub use thunks::Println;
 pub use thunks::WriteFiles;
 
 mod render;
+pub use render::RenderComponent;
 pub use render::Render;
+pub use render::RenderFn;
 
 use crate::AttributeGraph;
 

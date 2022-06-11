@@ -1,5 +1,11 @@
-use lifec::plugins::{Process, Println, WriteFiles};
+use std::sync::Once;
+
+use lifec::plugins::{
+    self, Println, Process, NodeContext, RenderComponent, RenderNodeInput, RenderNodeAttribute, RenderNodeOutput,
+    WriteFiles, Render,
+};
 use lifec::{editor::*, AttributeGraph, Runtime, RuntimeDispatcher};
+use lifec::plugins::Node;
 
 fn main() {
     let mut node_editor = NodeEditor::<Process>::new();
@@ -30,63 +36,85 @@ fn main() {
         .from_file(".runmd")
         .expect("could not load state");
 
+    let node = Node::new();
+
     open_editor_with(
         "Demo",
         runtime.parse_event("{ setup;; }"),
         vec![process_section],
-        |w| {
+        move |w| {
             NodeEditor::<Process>::configure_app_world(w);
+
+            w.register::<RenderComponent>();
+            w.register::<NodeContext>();
+            w.register::<RenderNodeAttribute>();
+            w.register::<RenderNodeOutput>();
+            w.register::<RenderNodeInput>();
+
+            let mut demo = AttributeGraph::default();
+            if demo.from_file("demo.runmd").is_ok() {
+                w.create_entity()
+                    .with(demo)
+                    .with(RenderComponent(|g, ui| {
+                        g.edit_attr_table(ui);
+                    }))
+                    .with(NodeContext::default())
+                    .with(RenderNodeAttribute::new(|g, ui| {
+                        ui.text("node attr");
+                    }))
+                    .with(RenderNodeOutput::new(|g, ui| {
+                        ui.text("node output");
+                    }))
+                    .build();
+            }
         },
         |_| {},
-        move |w, ui| {
+         move |w, ui| {
             // ui.show_demo_window(&mut true);
+
             let node_editor = &mut node_editor;
             node_editor.extend_app_world(w, ui);
 
-            ui.main_menu_bar(|| {
-                cargo_build.as_mut().edit_attr_menu(ui);
-            });
+            // render.run(w);
 
-            cargo_build.as_mut().edit_attr_table(ui);
         },
     );
 }
 
+// ui.same_line();
+// if ui.button("Compress state") {
+//     use compression::prelude::*;
+//     match std::fs::read(format!("{}.json", "projects")) {
+//         Ok(serialized) => {
+//             let compressed = serialized
+//                 .encode(&mut BZip2Encoder::new(9), Action::Finish)
+//                 .collect::<Result<Vec<_>, _>>()
+//                 .unwrap();
+
+//             if let Some(_) = std::fs::write("projects.json.bzip2", compressed).ok() {
+//                 println!("compressed");
+//             }
+//         }
+//         Err(_) => {}
+//     }
+// }
 
 // ui.same_line();
-            // if ui.button("Compress state") {
-            //     use compression::prelude::*;
-            //     match std::fs::read(format!("{}.json", "projects")) {
-            //         Ok(serialized) => {
-            //             let compressed = serialized
-            //                 .encode(&mut BZip2Encoder::new(9), Action::Finish)
-            //                 .collect::<Result<Vec<_>, _>>()
-            //                 .unwrap();
+// if ui.button("Decompress state") {
+//     use compression::prelude::*;
+//     match std::fs::read(format!("{}.json.bzip2", "projects")) {
+//         Ok(compressed) => {
+//             let decompressed = compressed
+//                 .decode(&mut BZip2Decoder::new())
+//                 .collect::<Result<Vec<_>, _>>()
+//                 .unwrap();
 
-            //             if let Some(_) = std::fs::write("projects.json.bzip2", compressed).ok() {
-            //                 println!("compressed");
-            //             }
-            //         }
-            //         Err(_) => {}
-            //     }
-            // }
-
-            // ui.same_line();
-            // if ui.button("Decompress state") {
-            //     use compression::prelude::*;
-            //     match std::fs::read(format!("{}.json.bzip2", "projects")) {
-            //         Ok(compressed) => {
-            //             let decompressed = compressed
-            //                 .decode(&mut BZip2Decoder::new())
-            //                 .collect::<Result<Vec<_>, _>>()
-            //                 .unwrap();
-
-            //             if let Some(_) =
-            //                 std::fs::write("projects.json.bzip2.json", decompressed).ok()
-            //             {
-            //                 println!("decompressed");
-            //             }
-            //         }
-            //         Err(_) => {}
-            //     }
-            // }
+//             if let Some(_) =
+//                 std::fs::write("projects.json.bzip2.json", decompressed).ok()
+//             {
+//                 println!("decompressed");
+//             }
+//         }
+//         Err(_) => {}
+//     }
+// }

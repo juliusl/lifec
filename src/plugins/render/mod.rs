@@ -1,113 +1,40 @@
-use std::collections::{BTreeMap, HashMap};
 
-use specs::{Component, System, Entities, WriteStorage, ReadStorage, Join};
+use imgui::Ui;
 use specs::storage::DenseVecStorage;
+use specs::{Component, System, Entities, WriteStorage, Join, RunNow};
 
 use crate::AttributeGraph;
 
-mod imgui {
-    pub use imgui::Ui;
-    use specs::Component;
-    use specs::storage::DenseVecStorage;
+pub type RenderFn = fn(&mut AttributeGraph, &Ui);
 
-    use crate::AttributeGraph;
-
-    pub type RenderFn = fn(&mut AttributeGraph, &Ui);
-
-    #[derive(Clone, Component)]
-    #[storage(DenseVecStorage)]
-    pub struct RenderComponent(pub RenderFn);
-}
-pub use self::imgui::RenderFn;
-pub use self::imgui::RenderComponent;
-
-/// Render is a struct wrapper over a render function for imgui
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
-pub enum Render{
-        Empty,
-        Func(RenderFn),
-        Output(Option<AttributeGraph>),
-}
+pub struct RenderComponent(pub RenderFn);
 
-impl Default for Render
-{
-    fn default() -> Self {
-        Self::Empty
-    }
-}
 
-pub struct RenderContext(AttributeGraph);
+pub struct Render<'a, 'ui>(pub &'a Ui<'ui>);
 
-impl AsRef<AttributeGraph> for RenderContext {
-    fn as_ref(&self) -> &AttributeGraph {
-        &self.0
-    }
-}
-
-impl AsMut<AttributeGraph> for RenderContext {
-    fn as_mut(&mut self) -> &mut AttributeGraph {
-        &mut self.0
-    }
-}
-
-impl From<AttributeGraph> for RenderContext {
-    fn from(graph: AttributeGraph) -> Self {
-        Self(graph)
-    }
-}
-
-pub struct RenderSystem 
-{    
-    funcs: BTreeMap<u32, Render>,
-    output: HashMap<u32, AttributeGraph>
-}
-
-impl<'a> System<'a> for RenderSystem 
+impl<'a, 'ui> System<'a> for Render<'a, 'ui> 
 {
     type SystemData = (
-        Entities<'a>,
-        ReadStorage<'a, RenderComponent>,
-        WriteStorage<'a, Render>,
+        Entities<'a>, 
+        WriteStorage<'a, AttributeGraph>, 
+        WriteStorage<'a, RenderComponent>
     );
 
-    fn run(&mut self, (entities, render_component, mut render_output): Self::SystemData) {
-        for (e, RenderComponent(render)) in (&entities, &render_component).join() {
-            if let None = self.funcs.get(&e.id()) {
-                self.funcs.insert(e.id(), Render::Func(render.clone()));
+    fn run(&mut self, (entities, mut graphs, mut render_components): Self::SystemData) {
+        for e in entities.join() {
+            if let (Some(graph), Some(RenderComponent(render))) = (graphs.get_mut(e), render_components.get_mut(e)) {
+                 render(graph, self.0);
             }
         }
-
-        for (key, next) in self.output.iter() {
-            let entity = entities.entity(*key); 
-            if entities.is_alive(entity) {
-                match render_output.get(entity) {
-                    None | Some(Render::Empty) | Some(Render::Output(None))  => {
-                        match render_output.insert(entity, Render::Output(Some(next.clone()))) {
-                            Ok(_) => todo!(),
-                            Err(_) => todo!(),
-                        }
-                    }
-                    Some(Render::Output(Some(current))) => {
-                        if next != current {
-                            render_output.remove(entity);
-                        }
-                    }
-                    _ => (),
-                }
-            } else {
-                let to_remove = &entity.id();
-                self.funcs.remove(to_remove);
-            }
-        }
-
-        for (key, _) in self.output.iter_mut() {
-            let entity = entities.entity(*key);
-            if !entities.is_alive(entity) {
-               
-            }
-        }
-
-        todo!()
     }
+}
+
+
+impl<'a, 'ui> Render<'a, 'ui> 
+{
+    pub fn run(&mut self, app_world: &'a specs::World) {
+        self.run_now(app_world);
+     }
 }

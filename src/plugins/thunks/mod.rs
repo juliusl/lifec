@@ -47,13 +47,9 @@ impl ThunkContext {
 
     // Write a transient output value for this context
     pub fn write_output(&mut self, output_name: impl AsRef<str>, output: Value) {
-        let symbol = format!("{}::output", output_name.as_ref());
         self.as_mut()
-            .with(&symbol, Value::Symbol("output::".to_string()));
-        self.as_mut()
-            .find_attr_mut(&symbol)
-            .expect("just added")
-            .edit((symbol, output));
+            .define(output_name, "output")
+            .edit_as(output);
     }
 
     // Returns all transient return values from this context
@@ -70,13 +66,9 @@ impl ThunkContext {
     where
         T:  Plugin<ThunkContext>,
     {
-        let symbol = format!("{}::returns", T::symbol());
         self.as_mut()
-            .with(&symbol, Value::Symbol("returns::".to_string()));
-        self.as_mut()
-            .find_attr_mut(&symbol)
-            .expect("just added")
-            .edit((symbol, returns));
+            .define(T::symbol(), "returns")
+            .edit_as(returns);
     }
 
     // Returns the transient return value for thunk type of T

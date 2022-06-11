@@ -30,13 +30,14 @@ impl AttributeGraph {
     }
 
     /// Define a symbol attribute.
-    pub fn define(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) {
+    pub fn define(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) -> &mut Attribute {
         let symbol_name = format!("{}::{}", name.as_ref(), symbol.as_ref());
         let symbol_value = format!("{}::", symbol.as_ref());
         self.add_symbol(&symbol_name, symbol_value);
-        self.find_attr_mut(symbol_name)
-            .expect("just added")
-            .edit((name.as_ref().to_string(), Value::Empty));
+        
+        let defined = self.find_attr_mut(symbol_name).expect("just added");
+        defined.edit((name.as_ref().to_string(), Value::Empty));
+        defined
     }
 
     /// Clones the graph and commits a transient attribute with attr_name.
