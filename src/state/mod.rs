@@ -29,6 +29,7 @@ impl AttributeGraph {
         self.entity
     }
 
+    /// Define a symbol attribute.
     pub fn define(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) {
         let symbol_name = format!("{}::{}", name.as_ref(), symbol.as_ref());
         let symbol_value = format!("{}::", symbol.as_ref());
@@ -38,6 +39,7 @@ impl AttributeGraph {
             .edit((name.as_ref().to_string(), Value::Empty));
     }
 
+    /// Clones the graph and commits a transient attribute with attr_name.
     pub fn apply(&self, attr_name: impl AsRef<str>) -> Option<Self> {
         let mut clone = self.clone();
         if clone.apply_mut(attr_name) {
@@ -47,6 +49,7 @@ impl AttributeGraph {
         }
     }
 
+    /// Commit's a transient attribute with attr_name.
     pub fn apply_mut(&mut self, attr_name: impl AsRef<str>) -> bool {
         self.find_update_attr(attr_name, |a| a.commit())
     }
