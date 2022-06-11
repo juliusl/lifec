@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, HashMap};
 
-use ::imgui::Ui;
 use specs::{Component, System, Entities, WriteStorage, ReadStorage, Join};
 use specs::storage::DenseVecStorage;
 

@@ -804,7 +804,7 @@ impl RuntimeDispatcher for AttributeGraph {
                 AttributeGraphEvents::Import => self.on_import(event_lexer.remainder()),
                 AttributeGraphEvents::Copy => self.on_copy(event_lexer.remainder()),
                 AttributeGraphEvents::Define => self.on_define(event_lexer.remainder()),
-                AttributeGraphEvents::Commit => self.on_commit(event_lexer.remainder()),
+                AttributeGraphEvents::Apply => self.on_apply(event_lexer.remainder()),
                 AttributeGraphEvents::Edit => self.on_edit(event_lexer.remainder()),
                 AttributeGraphEvents::Comment | AttributeGraphEvents::BlockDelimitter => Ok(()),
                 AttributeGraphEvents::Error => Err(AttributeGraphErrors::UnknownEvent),
@@ -851,11 +851,45 @@ impl AttributeGraph {
                 AttributeGraphElements::Symbol(_) => todo!("unrecognized element"),
                 AttributeGraphElements::Error => todo!("error parsing next value"),
             },
+            (
+                Some(AttributeGraphElements::Symbol(name)),
+                Some(value),
+                _,
+            ) =>  match value {
+                AttributeGraphElements::Text(value)
+                | AttributeGraphElements::Int(value)
+                | AttributeGraphElements::Bool(value)
+                | AttributeGraphElements::IntPair(value)
+                | AttributeGraphElements::IntRange(value)
+                | AttributeGraphElements::Float(value)
+                | AttributeGraphElements::FloatPair(value)
+                | AttributeGraphElements::FloatRange(value) => {
+                    if let Some(attr) = self.find_attr_mut(&name) {
+                        let parts: Vec<&str> = name.split("::").collect();
+                        if let Some(name) = parts.first() {
+                            attr.edit((name.to_string(), value));
+                        }
+                    }
+                    Ok(())
+                }
+                AttributeGraphElements::Empty => {
+                    if let Some(attr) = self.find_attr_mut(&name) {
+                        let parts: Vec<&str> = name.split("::").collect();
+                        if let Some(name) = parts.first() {
+                            attr.edit((name.to_string(), Value::Empty));
+                        }
+                    }
+                    Ok(())
+                }
+                AttributeGraphElements::Entity(_) => todo!("value type unknown"),
+                AttributeGraphElements::Symbol(_) => todo!("unrecognized element"),
+                AttributeGraphElements::Error => todo!("error parsing next value"),
+            },
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
         }
     }
 
-    fn on_commit(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
+    fn on_apply(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
         match (element_lexer.next(), element_lexer.next()) {
             (
@@ -1030,7 +1064,7 @@ fn test_attribute_graph_dispatcher() {
     # Can define multiple symbols for the same attr
     define new_text_attr edit
     edit new_text_attr::node test_attr23 .TEXT adding a new text attribute
-    commit new_text_attr node
+    apply new_text_attr node
     ```
     "#;
 
@@ -1071,10 +1105,10 @@ fn test_attribute_graph_dispatcher() {
     #
     # Note:
     # Since test_attr already exists
-    # edit/commit will overwrite the existing value
+    # edit/apply will overwrite the existing value
     #
-    edit test_attr::node test_attr .TEXT testing commit attr
-    commit test_attr node
+    edit test_attr::node test_attr .TEXT testing apply attr
+    apply test_attr node
     ```
     "#;
 
@@ -1084,7 +1118,7 @@ fn test_attribute_graph_dispatcher() {
 
     assert!(graph.contains_attribute("test_attr"));
     assert_eq!(
-        Some(&Value::TextBuffer("testing commit attr".to_string())),
+        Some(&Value::TextBuffer("testing apply attr".to_string())),
         graph.find_attr_value("test_attr")
     );
 
@@ -1220,15 +1254,15 @@ pub enum AttributeGraphEvents {
     /// The value of the symbol will be {`symbol-name`}::
     #[token("define")]
     Define,
-    /// Usage: commit {`attribute-name`} {`symbol-name`}
-    /// Examples: commit test_attr node
+    /// Usage: apply {`attribute-name`} {`symbol-name`}
+    /// Examples: apply test_attr node
     /// If a symbol has been defined for attribute, and the symbol attribute has a transient value,
-    /// commit will override the value with the transient value. If the attribute doesn't already exist it is added.
+    /// apply will override the value with the transient value. If the attribute doesn't already exist it is added.
     /// For example if some symbol called node is defined for test_attr. Then an attribute will exist with the name test_attr:node.
     /// If some system edits the value of test_attr::node, then a transient value will exist for test_attr::node.
-    /// Dispatching commit will take the transient value and write to test_attr.
-    #[token("commit")]
-    Commit,
+    /// Dispatching apply will take the transient value and write to test_attr.
+    #[token("apply")]
+    Apply,
     /// Usage: edit {`attribute-name`} {`new-attribute-name`} {`new-value-type`} {`remaining as value`}
     /// Examples: edit test_attr test_attr2 .TEXT editing the value of test_attr
     /// Set's the transient value for an attribute. Types omitted from this event are symbol, reference, and binary-vector.
