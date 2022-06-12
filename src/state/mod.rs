@@ -5,6 +5,9 @@ use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, Entity};
+use std::collections::BTreeSet;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hasher, Hash};
 use std::{collections::BTreeMap, fmt::Display};
 
 use crate::editor::unique_title;
@@ -24,6 +27,15 @@ pub struct AttributeGraph {
 }
 
 impl AttributeGraph {
+    /// Returns the current hash_code of the graph
+    pub fn hash_code(&self) -> u64 {
+        let mut hasher = DefaultHasher::default();
+
+        self.hash(&mut hasher);
+
+        hasher.finish()
+    }
+
     /// returns the owning entity
     pub fn entity(&self) -> u32 {
         self.entity
@@ -110,7 +122,7 @@ impl AttributeGraph {
                     // shows a preview and add's a button to apply the value if transient
                     if !attr.is_stable() {
                         if attr.transient().and_then(|(_, value)| Some(*value != Value::Empty)).unwrap_or(false) {
-                            if ui.button("apply") {
+                            if ui.button(format!("apply {}", attr.id())) {
                               self.apply_mut(attr.name());
                             }
                             ui.same_line();
@@ -182,9 +194,10 @@ impl AttributeGraph {
     pub fn edit_attr_table(&mut self, ui: &imgui::Ui) {
         if let Some(token) = ui.begin_table_with_flags(
             format!("Attribute Graph Table {}", self.entity),
-            4,
+            5,
             TableFlags::RESIZABLE | TableFlags::SORTABLE,
         ) {
+            ui.table_setup_column("Key");
             ui.table_setup_column("Name");
             ui.table_setup_column("Value");
             ui.table_setup_column("State");
@@ -199,10 +212,10 @@ impl AttributeGraph {
                     let mut order = a.cmp(b);
                     for spec in sorting.specs().iter() {
                         order = match spec.column_idx() {
-                            0 => a.name().cmp(b.name()),
-                            1 => a.value().cmp(b.value()),
-                            2 => a.is_stable().cmp(&b.is_stable()),
-                            3 => a.value().to_ref().cmp(&b.value().to_ref()),
+                            1 => a.name().cmp(b.name()),
+                            2 => a.value().cmp(b.value()),
+                            3 => a.is_stable().cmp(&b.is_stable()),
+                            4 => a.value().to_ref().cmp(&b.value().to_ref()),
                             _ => a.cmp(b),
                         };
                         if let Some(dir) = spec.sort_direction() {
@@ -218,6 +231,10 @@ impl AttributeGraph {
             }
 
             for attr in attrs {
+                if ui.table_next_column() {
+                    ui.text(attr.to_string());
+                }
+
                 if ui.table_next_column() {
                     ui.text(attr.name());
                 }
@@ -282,13 +299,13 @@ impl AttributeGraph {
     }
 
     /// Updates the parent entity id of the graph.
-    pub fn set_parent_entity(&mut self, parent: Entity) {
-        self.set_parent_entity_id(parent.id());
+    pub fn set_parent_entity(&mut self, parent: Entity, all: bool) {
+        self.set_parent_entity_id(parent.id(), all);
     }
 
     /// Sets the current parent entity id.
     /// The parent entity id is used when adding attributes to the graph.
-    pub fn set_parent_entity_id(&mut self, entity_id: u32) {
+    pub fn set_parent_entity_id(&mut self, entity_id: u32, all: bool) {
         // Update only attributes that the current parent owns
         // attributes that have a different id are only in the collection as references
         let current = self.clone();
@@ -296,12 +313,9 @@ impl AttributeGraph {
 
         current
             .iter_attributes()
-            .filter(|a| a.id() == current_id)
+            .filter(|a| a.id() == current_id || all)
             .for_each(|a| {
-                if let Some(mut a) = self.remove(&a) {
-                    a.set_id(entity_id);
-                    self.add_attribute(a);
-                }
+                self.find_update_attr(a.name(), |a| a.set_id(entity_id));
             });
 
         // Finally update the id
@@ -321,6 +335,10 @@ impl AttributeGraph {
 
     /// Copies an attribute and add's it as being owned by the parent entity.
     pub fn copy_attribute(&mut self, external_attribute: &Attribute) {
+        if self.entity == external_attribute.id {
+            return;
+        }
+
         let mut copy = external_attribute.clone();
         copy.set_id(self.entity);
 

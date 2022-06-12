@@ -234,12 +234,12 @@ impl<S: RuntimeState> Section<S> {
     }
 
     pub fn with_parent_entity(&mut self, entity: Entity) -> &mut Self {
-        self.edit_attributes().set_parent_entity(entity);
+        self.edit_attributes().set_parent_entity(entity, true);
         self
     }
 
     pub fn with_parent_entity_id(&mut self, entity_id: u32) -> &mut Self {
-        self.edit_attributes().set_parent_entity_id(entity_id);
+        self.edit_attributes().set_parent_entity_id(entity_id, true);
         self
     }
 

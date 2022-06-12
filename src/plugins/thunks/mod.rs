@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 use atlier::system::Value;
+use specs::Component;
+use specs::storage::DenseVecStorage;
 use crate::{AttributeGraph};
 
 mod println;
@@ -7,10 +9,13 @@ pub use println::Println;
 
 mod write_files;
 pub use write_files::WriteFiles;
+pub use write_files::add_entity;
 
 use super::Plugin;
 
 /// ThunkContext provides common methods for updating the underlying state graph
+#[derive(Component, Default, Clone)]
+#[storage(DenseVecStorage)]
 pub struct ThunkContext(AttributeGraph);
 
 impl From<AttributeGraph> for ThunkContext {

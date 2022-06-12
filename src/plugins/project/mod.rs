@@ -61,7 +61,7 @@ impl<'a> System<'a> for ProjectDispatcher {
                 }
 
                 let mut attrs = doc.attributes.clone();
-                attrs.set_parent_entity(ent);
+                attrs.set_parent_entity(ent, true);
 
                 if let Some(_) = loader.insert(ent, Loader::LoadSection(attrs)).ok() {
                     println!("Project inserted loader {:?}", ent);
@@ -361,7 +361,7 @@ impl Document {
     /// ensure all attributes are from the same parent id
     fn sanitize(&self, id: u32) -> Self {
         let mut attributes = self.attributes.clone();
-        attributes.set_parent_entity_id(id); 
+        attributes.set_parent_entity_id(id, true); 
 
         Self {
             attributes,

@@ -6,43 +6,86 @@ mod process;
 pub use process::Process;
 
 mod project;
-pub use project::Project;
 pub use project::Document;
+pub use project::Project;
 
 mod thunks;
-pub use thunks::ThunkContext;
+use specs::Entities;
+use specs::Join;
+use specs::System;
+use specs::WriteStorage;
 pub use thunks::Println;
+pub use thunks::ThunkContext;
 pub use thunks::WriteFiles;
+pub use thunks::add_entity;
 
 mod render;
-pub use render::RenderComponent;
 pub use render::Render;
-pub use render::RenderFn;
+pub use render::Display;
+pub use render::Edit;
 
 use crate::AttributeGraph;
 
-pub trait Plugin<T> 
+pub trait Plugin<T>
 where
-    T: AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph>
+    T: AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph>,
 {
-  /// Returns the symbol name for this thunk, to reference call by name
-  fn symbol() -> &'static str;
+    /// Returns the symbol name representing this plugin
+    fn symbol() -> &'static str;
+
+    /// Returns a short string description for this plugin
+    fn description() -> &'static str {
+        ""
+    }
+
+    /// Transforms attribute graph into a thunk context and calls call_with_context
+    /// Updates graph afterwards.
+    fn call(attributes: &mut AttributeGraph) {
+        use crate::RuntimeState;
+
+        let mut context = T::from(attributes.clone());
+        let context = &mut context;
+        Self::call_with_context(context);
+
+        let next = attributes.merge_with(context.as_ref()); 
+        if next.hash_code() != attributes.hash_code() {
+            *attributes = next;
+        }
+    }
+
+    /// composes a sequence of calling the plugin, and then passing the result of that to the engine
+    fn on_update(attributes: &mut AttributeGraph, mut engine: impl Engine) {
+        engine.next_mut(attributes);
+        engine.exit(&attributes);
+    }
+
+    /// implement call_with_context to allow for static extensions of attribute graph
+    fn call_with_context(context: &mut T);
+}
+
+/// An engine is a sequence of at least 2 events
+pub trait Engine {
+    /// next_mut is called after attributes has been updated
+    fn next_mut(&mut self, attributes: &mut AttributeGraph);
+
     
-  fn description() -> &'static str {
-      ""
-  }
+    /// exit is always called, regardless if attributes has been updated 
+    fn exit(&mut self, attributes: &AttributeGraph);
+}
 
-  /// Transforms attribute graph into a thunk context and calls call_with_context
-  /// Updates graph afterwards.
-  fn call(attributes: &mut AttributeGraph) {
-      use crate::RuntimeState;
-    
-      let mut context = T::from(attributes.clone());
-      let context = &mut context;
-      Self::call_with_context(context);
+pub struct AttributeGraphSync; 
 
-      *attributes = attributes.merge_with(context.as_ref());
-  }
+impl<'a> System<'a> for AttributeGraphSync {
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, AttributeGraph>,
+    );
 
-  fn call_with_context(context: &mut T);
+    fn run(&mut self, (entities, mut graphs): Self::SystemData) {
+        for (e, g) in (&entities, &mut graphs).join() {
+            if g.entity() != e.id() {
+                g.set_parent_entity(e, true);
+            }
+        }
+    }
 }

@@ -110,7 +110,6 @@ pub fn open_editor_with<RtS, WorldInitF, SysInitF, Ext>(
         move |e, w, d| {
             w.register::<Section<RtS>>();
             w.register::<EventGraph>();
-            w.register::<AttributeGraph>();
             w.insert(Loader::Empty);
 
             Project::configure_app_systems(d);

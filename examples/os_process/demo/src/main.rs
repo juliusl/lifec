@@ -1,11 +1,11 @@
 use std::sync::Once;
 
 use lifec::plugins::{
-    self, Println, Process, NodeContext, RenderComponent, RenderNodeInput, RenderNodeAttribute, RenderNodeOutput,
-    WriteFiles, Render,
+    self, Println, Process,
+    add_entity,
+    WriteFiles, Render, ThunkContext, AttributeGraphSync,
 };
 use lifec::{editor::*, AttributeGraph, Runtime, RuntimeDispatcher};
-use lifec::plugins::Node;
 
 fn main() {
     let mut node_editor = NodeEditor::<Process>::new();
@@ -36,7 +36,6 @@ fn main() {
         .from_file(".runmd")
         .expect("could not load state");
 
-    let node = Node::new();
 
     open_editor_with(
         "Demo",
@@ -45,38 +44,21 @@ fn main() {
         move |w| {
             NodeEditor::<Process>::configure_app_world(w);
 
-            w.register::<RenderComponent>();
-            w.register::<NodeContext>();
-            w.register::<RenderNodeAttribute>();
-            w.register::<RenderNodeOutput>();
-            w.register::<RenderNodeInput>();
-
             let mut demo = AttributeGraph::default();
             if demo.from_file("demo.runmd").is_ok() {
-                w.create_entity()
-                    .with(demo)
-                    .with(RenderComponent(|g, ui| {
-                        g.edit_attr_table(ui);
-                    }))
-                    .with(NodeContext::default())
-                    .with(RenderNodeAttribute::new(|g, ui| {
-                        ui.text("node attr");
-                    }))
-                    .with(RenderNodeOutput::new(|g, ui| {
-                        ui.text("node output");
-                    }))
-                    .build();
+                add_entity(demo, w);
             }
         },
-        |_| {},
+        |d| {
+            d.add(AttributeGraphSync{}, "attribute_graph_sync", &[]);
+        },
          move |w, ui| {
             // ui.show_demo_window(&mut true);
+            // let node_editor = &mut node_editor;
+            // node_editor.extend_app_world(w, ui);
 
-            let node_editor = &mut node_editor;
-            node_editor.extend_app_world(w, ui);
-
-            // render.run(w);
-
+            let mut render = Render::<ThunkContext, WriteFiles>::new(ui);
+            render.render_now(w);
         },
     );
 }
