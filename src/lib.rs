@@ -149,7 +149,7 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + 
         let mut next = self.clone();
         
         next.state_mut()
-            .copy(other.state());
+            .merge(other.state());
         
         next
     }

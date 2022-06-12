@@ -1,13 +1,12 @@
-use crate::plugins::{self, Edit, Display};
+use crate::plugins::{Edit, Display};
 use crate::{plugins::Plugin, AttributeGraph};
 
 use super::ThunkContext;
 use atlier::prelude::Value;
-use atlier::system::Attribute;
 use specs::{WorldExt, Builder, World, Component};
 use specs::storage::DenseVecStorage;
 
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Default)]
 #[storage(DenseVecStorage)]
 pub struct WriteFiles;
 
@@ -37,11 +36,12 @@ impl Plugin<ThunkContext> for WriteFiles {
             });
 
         // returns current directory
-        // if let Some(dir) = std::env::current_dir().ok() {
-        //     let dir = dir.display().to_string();
+        if let Some(dir) = std::env::current_dir().ok() {
+            let dir = dir.display().to_string();
 
-        //     context.set_return::<WriteFiles>(Value::TextBuffer(dir));
-        // }
+            println!("Setting parent dir {}", dir);
+            context.set_return::<WriteFiles>(Value::TextBuffer(dir));
+        }
     }
 }
 
@@ -49,15 +49,17 @@ pub fn add_entity(initial: AttributeGraph, w: &mut World) {
     w.register::<AttributeGraph>();
     w.register::<WriteFiles>();
     w.register::<ThunkContext>();
-    w.register::<Edit>();
-    w.register::<Display>();
+    w.register::<Edit<ThunkContext>>();
+    w.register::<Display<ThunkContext>>();
 
     w.create_entity()
-     .with(initial)
-     .maybe_with(Some(WriteFiles{}))
-     .maybe_with(Some(ThunkContext(AttributeGraph::default())))
-     .maybe_with(Some(Edit(|g, ui| {
-         g.edit_attr_table(ui);
-     })))
-     .build();
+        .with(initial)
+        .maybe_with(Some(ThunkContext(AttributeGraph::default())))
+        .maybe_with(Some(Edit::<ThunkContext>(|_, g, ui| {
+            if ui.button("write all files") {
+                WriteFiles::call(g);
+            }
+            g.edit_attr_table(ui);
+        })))
+        .build();
 }

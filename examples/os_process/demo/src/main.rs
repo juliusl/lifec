@@ -1,7 +1,4 @@
-use std::sync::Once;
-
-use lifec::plugins::{
-    self, Println, Process,
+use lifec::plugins::{Println, Process,
     add_entity,
     WriteFiles, Render, ThunkContext, AttributeGraphSync,
 };
@@ -54,10 +51,10 @@ fn main() {
         },
          move |w, ui| {
             // ui.show_demo_window(&mut true);
-            // let node_editor = &mut node_editor;
-            // node_editor.extend_app_world(w, ui);
+            let node_editor = &mut node_editor;
+            node_editor.extend_app_world(w, ui);
 
-            let mut render = Render::<ThunkContext, WriteFiles>::new(ui);
+            let mut render = Render::<ThunkContext>::new(ui);
             render.render_now(w);
         },
     );

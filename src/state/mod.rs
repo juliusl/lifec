@@ -284,6 +284,21 @@ impl AttributeGraph {
         })
     }
 
+    pub fn merge(&mut self, other: &AttributeGraph) {
+        for attr in other.iter_attributes().cloned() {
+            if !self.index.contains_key(&attr.to_string()) {
+                self.index.insert(attr.to_string(), attr.clone());
+            } else {
+                let name = &attr.name();
+                self.find_update_attr(name, |existing| {
+                    if existing.value() != attr.value() {
+                        *existing.value_mut() = attr.value().clone();
+                    }
+                });
+            }
+        }
+    }
+
     /// Returns true if the graph has an attribute w/ name
     pub fn contains_attribute(&self, with_name: impl AsRef<str>) -> bool {
         self.find_attr(with_name).is_some()
@@ -335,10 +350,6 @@ impl AttributeGraph {
 
     /// Copies an attribute and add's it as being owned by the parent entity.
     pub fn copy_attribute(&mut self, external_attribute: &Attribute) {
-        if self.entity == external_attribute.id {
-            return;
-        }
-
         let mut copy = external_attribute.clone();
         copy.set_id(self.entity);
 

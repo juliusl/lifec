@@ -14,15 +14,15 @@ use specs::Entities;
 use specs::Join;
 use specs::System;
 use specs::WriteStorage;
+pub use thunks::add_entity;
 pub use thunks::Println;
 pub use thunks::ThunkContext;
 pub use thunks::WriteFiles;
-pub use thunks::add_entity;
 
 mod render;
-pub use render::Render;
 pub use render::Display;
 pub use render::Edit;
+pub use render::Render;
 
 use crate::AttributeGraph;
 
@@ -47,16 +47,7 @@ where
         let context = &mut context;
         Self::call_with_context(context);
 
-        let next = attributes.merge_with(context.as_ref()); 
-        if next.hash_code() != attributes.hash_code() {
-            *attributes = next;
-        }
-    }
-
-    /// composes a sequence of calling the plugin, and then passing the result of that to the engine
-    fn on_update(attributes: &mut AttributeGraph, mut engine: impl Engine) {
-        engine.next_mut(attributes);
-        engine.exit(&attributes);
+        *attributes = attributes.merge_with(context.as_ref());
     }
 
     /// implement call_with_context to allow for static extensions of attribute graph
@@ -68,18 +59,14 @@ pub trait Engine {
     /// next_mut is called after attributes has been updated
     fn next_mut(&mut self, attributes: &mut AttributeGraph);
 
-    
-    /// exit is always called, regardless if attributes has been updated 
+    /// exit is always called, regardless if attributes has been updated
     fn exit(&mut self, attributes: &AttributeGraph);
 }
 
-pub struct AttributeGraphSync; 
+pub struct AttributeGraphSync;
 
 impl<'a> System<'a> for AttributeGraphSync {
-    type SystemData = (
-        Entities<'a>,
-        WriteStorage<'a, AttributeGraph>,
-    );
+    type SystemData = (Entities<'a>, WriteStorage<'a, AttributeGraph>);
 
     fn run(&mut self, (entities, mut graphs): Self::SystemData) {
         for (e, g) in (&entities, &mut graphs).join() {
