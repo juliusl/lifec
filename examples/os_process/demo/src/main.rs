@@ -1,5 +1,5 @@
 use lifec::plugins::{Println, Process,
-    add_entity,
+    demo_write_files,
     WriteFiles, Render, ThunkContext, AttributeGraphSync,
 };
 use lifec::{editor::*, AttributeGraph, Runtime, RuntimeDispatcher};
@@ -41,9 +41,8 @@ fn main() {
         move |w| {
             NodeEditor::<Process>::configure_app_world(w);
 
-            let mut demo = AttributeGraph::default();
-            if demo.from_file("demo.runmd").is_ok() {
-                add_entity(demo, w);
+            if let Some(demo) = AttributeGraph::load_from_file("demo.runmd") {
+                demo_write_files(demo, w);
             }
         },
         |d| {

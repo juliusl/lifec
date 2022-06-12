@@ -1,10 +1,11 @@
-use crate::plugins::{Edit, Display};
+use crate::plugins::{Display, Edit};
 use crate::{plugins::Plugin, AttributeGraph};
 
 use super::ThunkContext;
 use atlier::prelude::Value;
-use specs::{WorldExt, Builder, World, Component};
+use imgui::Window;
 use specs::storage::DenseVecStorage;
+use specs::{Builder, Component, World, WorldExt};
 
 #[derive(Component, Clone, Default)]
 #[storage(DenseVecStorage)]
@@ -40,12 +41,13 @@ impl Plugin<ThunkContext> for WriteFiles {
             let dir = dir.display().to_string();
 
             println!("Setting parent dir {}", dir);
-            context.set_return::<WriteFiles>(Value::TextBuffer(dir));
+            context.write_output("parent_dir", Value::TextBuffer(dir));
         }
     }
 }
 
-pub fn add_entity(initial: AttributeGraph, w: &mut World) {
+
+pub fn demo_write_files(initial: AttributeGraph, w: &mut World) {
     w.register::<AttributeGraph>();
     w.register::<WriteFiles>();
     w.register::<ThunkContext>();
@@ -54,12 +56,17 @@ pub fn add_entity(initial: AttributeGraph, w: &mut World) {
 
     w.create_entity()
         .with(initial)
-        .maybe_with(Some(ThunkContext(AttributeGraph::default())))
-        .maybe_with(Some(Edit::<ThunkContext>(|_, g, ui| {
-            if ui.button("write all files") {
-                WriteFiles::call(g);
-            }
-            g.edit_attr_table(ui);
+        .maybe_with(Some(ThunkContext(
+            AttributeGraph::load_from_file(".runmd").unwrap_or_default(),
+        )))
+        .maybe_with(Some(Edit::<ThunkContext>(|initial, g, ui| {
+            Window::new("demo").build(ui, || {
+                if ui.button("write all files") {
+                    WriteFiles::call(g);
+                }
+                initial.as_mut().edit_attr_table(ui);
+                g.edit_attr_table(ui);
+            });
         })))
         .build();
 }

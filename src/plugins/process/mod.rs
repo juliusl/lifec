@@ -87,7 +87,7 @@ impl Plugin<ThunkContext> for Process {
                     if let Some(elapsed) = output.elapsed {
                         context.write_output("elapsed", Value::TextBuffer(elapsed));
                     }
-                    context.set_return::<Process>(Value::Bool(true));
+                    context.set_return::<Process>("called", Value::Bool(true));
                     context.as_mut().find_remove("error");
                 }
                 Err(e) => {

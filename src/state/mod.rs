@@ -27,6 +27,17 @@ pub struct AttributeGraph {
 }
 
 impl AttributeGraph {
+    /// loads an attribute graph from file
+    pub fn load_from_file(path: impl AsRef<str>) -> Option<Self> {
+        let mut loading = AttributeGraph::default();
+
+        if loading.from_file(path).is_ok() {
+            Some(loading)
+        } else {
+            None
+        }
+    }
+
     /// Returns the current hash_code of the graph
     pub fn hash_code(&self) -> u64 {
         let mut hasher = DefaultHasher::default();
@@ -197,11 +208,11 @@ impl AttributeGraph {
             5,
             TableFlags::RESIZABLE | TableFlags::SORTABLE,
         ) {
-            ui.table_setup_column("Key");
             ui.table_setup_column("Name");
             ui.table_setup_column("Value");
             ui.table_setup_column("State");
             ui.table_setup_column("Reference");
+            ui.table_setup_column("Key");
             ui.table_headers_row();
 
             let clone = self.clone();
@@ -212,10 +223,11 @@ impl AttributeGraph {
                     let mut order = a.cmp(b);
                     for spec in sorting.specs().iter() {
                         order = match spec.column_idx() {
-                            1 => a.name().cmp(b.name()),
-                            2 => a.value().cmp(b.value()),
-                            3 => a.is_stable().cmp(&b.is_stable()),
-                            4 => a.value().to_ref().cmp(&b.value().to_ref()),
+                            0 => a.name().cmp(b.name()),
+                            1 => a.value().cmp(b.value()),
+                            2 => a.is_stable().cmp(&b.is_stable()),
+                            3 => a.value().to_ref().cmp(&b.value().to_ref()),
+                            4 => a.to_string().cmp(&b.to_string()),
                             _ => a.cmp(b),
                         };
                         if let Some(dir) = spec.sort_direction() {
@@ -231,10 +243,6 @@ impl AttributeGraph {
             }
 
             for attr in attrs {
-                if ui.table_next_column() {
-                    ui.text(attr.to_string());
-                }
-
                 if ui.table_next_column() {
                     ui.text(attr.name());
                 }
@@ -261,6 +269,10 @@ impl AttributeGraph {
 
                 if ui.table_next_column() {
                     ui.text(attr.value().to_ref().to_string());
+                }
+
+                if ui.table_next_column() {
+                    ui.text(attr.to_string());
                 }
 
                 ui.table_next_row();

@@ -14,7 +14,7 @@ use specs::Entities;
 use specs::Join;
 use specs::System;
 use specs::WriteStorage;
-pub use thunks::add_entity;
+pub use thunks::demo_write_files;
 pub use thunks::Println;
 pub use thunks::ThunkContext;
 pub use thunks::WriteFiles;

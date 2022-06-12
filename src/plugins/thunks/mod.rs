@@ -1,15 +1,16 @@
-use std::collections::BTreeMap;
+use crate::AttributeGraph;
+use crate::RuntimeDispatcher;
 use atlier::system::Value;
-use specs::Component;
 use specs::storage::DenseVecStorage;
-use crate::{AttributeGraph};
+use specs::Component;
+use std::collections::BTreeMap;
 
 mod println;
 pub use println::Println;
 
 mod write_files;
+pub use write_files::demo_write_files;
 pub use write_files::WriteFiles;
-pub use write_files::add_entity;
 
 use super::Plugin;
 
@@ -52,9 +53,20 @@ impl ThunkContext {
 
     // Write a transient output value for this context
     pub fn write_output(&mut self, output_name: impl AsRef<str>, output: Value) {
-        self.as_mut()
-            .define(output_name, "output")
-            .edit_as(output);
+        if let Some(_) = self
+            .as_mut()
+            .batch_mut(format!(
+                r#"
+                define {0} output
+                edit {0}::output .EMPTY
+                "#,
+                output_name.as_ref()
+            ))
+            .ok()
+        {
+            self.as_mut()
+                .find_update_attr(format!("{}::output", output_name.as_ref()), |a| a.edit_as(output));
+        }
     }
 
     // Returns all transient return values from this context
@@ -65,21 +77,33 @@ impl ThunkContext {
             .filter_map(|a| a.transient())
             .collect()
     }
-    
+
     // Set a transient return value for this context
-    pub fn set_return<T>(&mut self, returns: Value)
+    pub fn set_return<T>(&mut self, name: &str, returns: Value)
     where
-        T:  Plugin<ThunkContext>,
+        T: Plugin<ThunkContext>,
     {
-        self.as_mut()
-            .define(T::symbol(), "returns")
-            .edit_as(returns);
+        if let Some(_) = self
+            .as_mut()
+            .batch_mut(format!(
+                r#"
+                define {0} returns
+                edit {0}::returns {1} .EMPTY
+                "#,
+                T::symbol(),
+                name
+            ))
+            .ok()
+        {
+            self.as_mut()
+                .find_update_attr(format!("{}::returns", T::symbol()), |a| a.edit_as(returns));
+        }
     }
 
     // Returns the transient return value for thunk type of T
     pub fn return_for<T>(&self) -> Option<&Value>
     where
-        T:  Plugin<ThunkContext>,
+        T: Plugin<ThunkContext>,
     {
         let symbol = format!("{}::returns", T::symbol());
         self.as_ref()
