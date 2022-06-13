@@ -81,20 +81,6 @@ pub struct Node {
     display: HashMap<NodeContext, Display<NodeContext>>,
 }
 
-impl Node {
-    pub fn add_node_from(path: impl AsRef<str>, world: &mut World, init: impl Fn(EntityBuilder) -> Entity) -> Option<Entity> {
-        if let Some(node) = AttributeGraph::load_from_file(path) {
-            let context = NodeContext::from(node);
-
-            let entity = world.create_entity().with(context);
-
-            Some(init(entity))
-        } else {
-            None
-        }
-    }
-}
-
 impl Default for Node {
     fn default() -> Self {
         Self::new()
@@ -113,7 +99,7 @@ impl Plugin<NodeContext> for Node {
     }
 
     fn call_with_context(_: &mut NodeContext) {
-        //
+        // No-OP
     }
 }
 

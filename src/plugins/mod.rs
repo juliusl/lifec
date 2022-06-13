@@ -1,6 +1,4 @@
 mod nodes;
-use atlier::system::Extension;
-use imgui::Ui;
 pub use nodes::Node;
 pub use nodes::NodeContext;
 
@@ -14,7 +12,6 @@ pub use project::Project;
 mod thunks;
 use specs::Builder;
 use specs::Component;
-use specs::DispatcherBuilder;
 use specs::Entities;
 use specs::Entity;
 use specs::EntityBuilder;
@@ -41,7 +38,7 @@ use crate::AttributeGraph;
 
 pub trait Plugin<T>
 where
-    T: AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph> + Component,
+    T: AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph> + Component + Send + Sync,
 {
     /// Returns the symbol name representing this plugin
     fn symbol() -> &'static str;
@@ -64,6 +61,19 @@ where
         Self::call_with_context(context);
 
         *attributes = attributes.merge_with(context.as_ref());
+    }
+
+    /// parses entity from .runmd from path
+    fn parse_entity(path: impl AsRef<str>, world: &mut World, init: impl Fn(EntityBuilder) -> Entity) -> Option<Entity> {
+        if let Some(node) = AttributeGraph::load_from_file(path) {
+            let context = T::from(node);
+
+            let entity = world.create_entity().with(context);
+
+            Some(init(entity))
+        } else {
+            None
+        }
     }
 }
 
