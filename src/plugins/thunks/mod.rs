@@ -9,8 +9,12 @@ mod println;
 pub use println::Println;
 
 mod write_files;
-pub use write_files::demo_write_files;
 pub use write_files::WriteFiles;
+
+pub mod demo {
+    use super::write_files::demo;
+    pub use demo::WriteFilesDemo;
+}
 
 use super::Plugin;
 

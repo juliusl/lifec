@@ -11,7 +11,7 @@ use std::{
 };
 
 use super::{
-    event_graph::EventGraph, section::Section, unique_title, App, EventComponent, Value,
+     unique_title, App, Value,
 };
 use crate::{Action, Runtime, RuntimeState, AttributeGraph};
 
@@ -21,81 +21,18 @@ where
     S: RuntimeState,
 {
     pub runtime: Runtime<S>,
-    pub events: Vec<EventComponent>,
-    pub sections: BTreeMap<u32, Section<S>>,
     pub running: (Option<bool>, Option<Instant>, Option<Instant>),
     pub dispatch_snapshot: Option<()>,
     pub dispatch_remove: Option<u32>,
 }
 
-impl<S> From<Runtime<S>> for RuntimeEditor<S> 
+impl<S> RuntimeEditor<S> 
 where
-    S: RuntimeState
-{
-    fn from(runtime: Runtime<S>) -> Self {
-        let events = runtime
-            .get_listeners()
-            .iter()
-            .enumerate()
-            .filter_map(|(id, l)| match (&l.action, &l.next) {
-                (Action::Dispatch(msg), Some(transition)) => Some(EventComponent {
-                    label: format!("Event {}", id),
-                    on: l.event.to_string(),
-                    dispatch: msg.to_string(),
-                    call: String::default(),
-                    transitions: vec![transition.to_string()],
-                    // flags: parse_flags(l.extensions.get_args()),
-                    // variales: parse_variables(l.extensions.get_args()),
-                }),
-                (Action::Call(call), _) => Some(EventComponent {
-                    label: format!("Event {}", id),
-                    on: l.event.to_string(),
-                    call: call.to_string(),
-                    dispatch: String::default(),
-                    transitions: l
-                        .extensions
-                        .tests
-                        .iter()
-                        .map(|(_, t)| t.to_owned())
-                        .collect(),
-                    //     flags: parse_flags(l.extensions.get_args()),
-                    //     variales: parse_variables(l.extensions.get_args()),
-                }),
-                _ => None,
-            })
-            .collect();
-
-        let mut sections: BTreeMap<u32, Section<S>> = BTreeMap::new();
-        let sections = &mut sections;
-        runtime.attributes.iter_attributes().for_each(|a| {
-            if let Some(section) = sections.get_mut(&a.id()) {
-                section.attributes.copy_attribute(a);
-            } else {
-                let mut section = Section::<S>::default();
-                let section = section
-                    .with_parent_entity_id(a.id())
-                    .with_attribute(a)
-                    .with_title(format!("Runtime Entity {}", a.id()));
-                let section = section.to_owned();
-                sections.insert(
-                    a.id(),
-                    section,
-                );
-            }
-        });
-
-        let sections = sections.clone();
-        let next = Self {
-            runtime,
-            events,
-            sections,
-            running: (None, None, None),
-            dispatch_snapshot: None,
-            dispatch_remove: None,
-        };
-        next
+    S: RuntimeState {
+        pub fn new(runtime: Runtime<S>) -> Self {
+            Self { runtime, running: (None, None, None), dispatch_remove: None, dispatch_snapshot: None }
+        }
     }
-}
 
 impl<'a, S> System<'a> for RuntimeEditor<S>
 where
@@ -103,7 +40,6 @@ where
 {
     type SystemData = (
         Entities<'a>,
-        ReadStorage<'a, Section<S>>,
         WriteStorage<'a, Loader>,
         Write<'a, RuntimeEditor<S>>,
         Write<'a, Dispatch>,
@@ -113,89 +49,11 @@ where
     /// This system coordinates updates to those sections, as well as initialization
     fn run(
         &mut self,
-        (entities, read_sections, mut loader, mut runtime_editor, mut dispatcher): Self::SystemData,
+        (entities,  mut loader, mut runtime_editor, mut dispatcher): Self::SystemData,
     ) {
-        if let Some(_) = self.dispatch_snapshot.take() {
-            if let Some(state) = &self.runtime.state {
-                let next = entities.create();
-                let section = Section::new(
-                    unique_title(format!("{}", self.runtime.context())),
-                    AttributeGraph::from(next)
-                        .with_text("context::", format!("{}", self.runtime.context()))
-                        .with_bool("enable event builder", false)
-                        .with_bool("enable node editor", false)
-                        .with_text("project::name::", unique_title("snapshot"))
-                        .with_bool("enable project", false)
-                        .to_owned(),
-                    |s, ui| {
-                        s.edit_attr("Enable Node Editor", "enable node editor", ui);
-                        s.edit_attr("Enable Event Editor", "enable event builder", ui);
-                        s.edit_attr("Enable project", "enable project", ui);
-                        if let Some(true) = s.is_attr_checkbox("enable project") {
-                            s.edit_attr("Project name", "project::name::", ui);
-                        }
-                    },
-                    state.clone(),
-                )
-                .enable_app_systems()
-                .enable_edit_attributes();
 
-                match loader.insert(next, Loader::LoadSection(section.state().clone())) {
-                    Ok(_) => {
-                        self.sections.insert(next.id(), section);
 
-                        println!("RuntimeEditor dispatching Loader for Snapshot {:?}", next);
-                    }
-                    Err(_) => {}
-                }
-            }
-        }
-
-        if let Some(to_remove) = self.dispatch_remove.take() {
-            let msg = dispatcher.deref_mut();
-            self.sections.remove(&to_remove);
-            *msg = Dispatch::RemoveSnapshot(to_remove);
-            return;
-        }
-
-        for (e, s) in (&entities, &read_sections).join() {
-            match self.sections.get(&e.id()) {
-                None => {
-                    match loader.insert(
-                        e,
-                        Loader::LoadSection(s.dispatcher().clone()),
-                    ) {
-                        Ok(_) => {
-                            println!("RuntimeEditor dispatched Loader for {:?}", e);
-                        }
-                        Err(_) => {}
-                    }
-                }
-                Some(section) => {
-                    let Section {
-                        gen,
-                        enable_app_systems,
-                        ..
-                    } = section;
-
-                    if *enable_app_systems && *gen != s.get_gen() {
-                        self.sections.insert(e.id(), s.clone());
-                    }
-                }
-            }
-        }
-
-        for section in read_sections.join() {
-            if let None = self.sections.get(&section.get_parent_entity()) {
-                println!(
-                    "RuntimeEditor inserting section under snapshots {}",
-                    section.get_parent_entity()
-                );
-                self.sections
-                    .insert(section.get_parent_entity(), section.clone());
-            }
-        }
-
+      
         let runtime_editor = runtime_editor.deref_mut();
         *runtime_editor = self.clone();
     }
@@ -253,9 +111,7 @@ where
         Read<'a, RuntimeEditor<S>>,
         Write<'a, Dispatch>,
         WriteStorage<'a, Loader>,
-        WriteStorage<'a, Section<S>>,
         WriteStorage<'a, AttributeGraph>,
-        WriteStorage<'a, EventGraph>,
     );
 
     fn run(
@@ -265,9 +121,7 @@ where
             runtime_editor,
             mut msg,
             mut loader,
-            mut sections,
             mut section_attributes,
-            mut event_graph,
         ): Self::SystemData,
     ) {
         if let Dispatch::RemoveSnapshot(id) = msg.deref() {
@@ -276,9 +130,7 @@ where
                 Ok(_) => {
                     let msg = msg.deref_mut();
                     *msg = Dispatch::Empty;
-                    sections.remove(to_remove);
                     section_attributes.remove(to_remove);
-                    event_graph.remove(to_remove);
                     return;
                 }
                 Err(err) => eprintln!("RuntimeDispatcher Error {}", err),
@@ -289,52 +141,6 @@ where
             if let Some(Loader::LoadSection(attributes)) = loader.get(entity) {
                 println!("Load section for {:?}", entity);
 
-                match sections.get(entity) {
-                    Some(_) => {
-                        if let Some(section) = sections.get_mut(entity) {
-                            println!("Existing section found, updating attributes");
-                            attributes.iter_attributes().for_each(|a| {
-                                section.attributes.copy_attribute(a);
-                            });
-
-                            section.next_gen();
-                        }
-                    }
-                    None => {
-                        println!(
-                            "Section not found for {:?}, Generating section from attributes",
-                            entity
-                        );
-                        let initial = S::from(attributes.clone());
-
-                        let mut section = Section::<S>::default();
-                        section.state = initial;
-
-                        attributes.iter_attributes().for_each(|a| {
-                            section.attributes.copy_attribute(a);
-                        });
-
-                        if let Some(Value::TextBuffer(title)) =
-                            section.clone().attributes.find_attr_value("title::")
-                        {
-                            let section =
-                                section.with_title(title.to_string()).with_parent_entity(entity);
-
-                            match sections.insert(entity, section.clone()) {
-                                Ok(_) => {
-                                    println!(
-                                        "RuntimeDispatcher added Section {:?}, {}",
-                                        entity, &section.title
-                                    );
-                                }
-                                Err(err) => {
-                                    println!("section could not be loaded {}", err);
-                                }
-                            }
-                        }
-                    }
-                }
-
                 if let Some(v) = loader.get_mut(entity) {
                     *v = Loader::Empty;
                 }
@@ -342,44 +148,7 @@ where
             }
         }
 
-        self.runtime = Some(runtime_editor.clone());
-        if let Some(runtime) = &self.runtime {
-            for e in entities.join() {
-                if let Some(section) = runtime.sections.get(&e.id()) {
-                    match sections.insert(e, section.clone()) {
-                        Ok(_) => {
-                            let mut section = section.clone();
-                            let section = section.with_parent_entity(e);
-                            if let Some(state) = runtime.runtime.current() {
-                                section.state = state.clone();
-                            }
-
-                            match section_attributes
-                                .insert(e, section.state().clone())
-                            {
-                                Ok(_) => {
-                                    if let None = event_graph.get(e) {
-                                        let mut store = Store::<EventComponent>::default();
-                                        runtime.events.iter().cloned().for_each(|e| {
-                                            store = store.node(e);
-                                        });
-                                        match event_graph.insert(e, EventGraph(store)) {
-                                            Ok(v) => {
-                                                println!("inserting graph for {:?}", e);
-                                                println!("{:?}", v);
-                                            }
-                                            Err(_) => {}
-                                        }
-                                    }
-                                }
-                                Err(err) => eprintln!("RuntimeDispatcher Error {}", err),
-                            }
-                        }
-                        Err(err) => eprintln!("RuntimeDispatcher Error {}", err),
-                    }
-                }
-            }
-        }
+     
     }
 }
 
@@ -390,8 +159,6 @@ where
     fn default() -> Self {
         Self {
             runtime: Default::default(),
-            events: Default::default(),
-            sections: Default::default(),
             running: (None, None, None),
             dispatch_snapshot: None,
             dispatch_remove: None,
@@ -422,8 +189,6 @@ where
                             return;
                         }
                         ui.new_line();
-
-                        self.show_snapshots(ui);
                     }
                 });
                 ui.same_line();
@@ -445,18 +210,6 @@ impl<S> RuntimeEditor<S>
 where
     S: RuntimeState + Component,
 {
-    pub fn apply_section(section: Section<S>, mut runtime: Runtime<S>) -> Self {
-        // This will apply the sections current state and attributes to the current runtime
-        runtime.state = Some(S::from(section.state().clone()));
-        section.attributes.iter_attributes().for_each(|a| {
-            runtime.attribute(a);
-        });
-        if let Some(Value::TextBuffer(event)) = section.attributes.find_attr_value("context::") {
-            runtime = runtime.parse_event(&event);
-        }
-
-        RuntimeEditor::from(runtime)
-    }
 
     pub fn show_current(&mut self, ui: &imgui::Ui) {
         match self.running {
@@ -547,32 +300,6 @@ where
                     ui.text(format!("{}", a));
                 });
             }
-        }
-    }
-
-    pub fn show_snapshots(&mut self, ui: &imgui::Ui) {
-        let current_runtime = self.runtime.clone();
-        for (id, section) in self.sections.iter_mut() {
-            ui.text(format!("{}: ", id));
-            ui.same_line();
-            ui.indent();
-
-            section.show_editor(ui);
-            if ui.button(format!("Apply {}", section.title)) {
-                let applied = Self::apply_section(section.clone(), current_runtime);
-                self.runtime = applied.runtime.clone();
-
-                return;
-            }
-
-            ui.same_line();
-            if ui.button(format!("Remove {}", section.title)) {
-                self.dispatch_remove = Some(*id);
-                return;
-            }
-            ui.new_line();
-            ui.separator();
-            ui.unindent();
         }
     }
 }

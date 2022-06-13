@@ -1,62 +1,28 @@
-use lifec::plugins::{Println, Process,
-    demo_write_files,
-    WriteFiles, Render, ThunkContext, AttributeGraphSync,
-};
-use lifec::{editor::*, AttributeGraph, Runtime, RuntimeDispatcher};
+use lifec::plugins::{demos::WriteFilesDemo, Node};
+use lifec::{editor::*};
 
 fn main() {
-    let mut node_editor = NodeEditor::<Process>::new();
-    node_editor.with_thunk::<Process>();
-    node_editor.with_thunk::<Println>();
-    node_editor.with_thunk::<WriteFiles>();
+    // let mut node_editor = NodeEditor::<Process>::new();
+    // node_editor.with_thunk::<Process>();
+    // node_editor.with_thunk::<Println>();
+    // node_editor.with_thunk::<WriteFiles>();
 
-    let mut cargo_build = Process::default();
-    cargo_build
-        .as_mut()
-        .from_file(".runmd")
-        .expect("could not load state");
+    // let mut cargo_build = Process::default();
+    // cargo_build
+    //     .as_mut()
+    //     .from_file(".runmd")
+    //     .expect("could not load state");
 
-    let mut runtime = Runtime::from(&mut cargo_build);
-    let process_section = Section::new(
-        <Process as App>::name(),
-        cargo_build.as_ref().clone(),
-        |s, ui| {
-            s.state.show_editor(ui);
+    open(
+        "demo",
+        move |world, dispatcher| {
+            Node::configure_app_systems(dispatcher);
+            Node::configure_app_world(world);
+            WriteFilesDemo::configure_app_world(world);
+            WriteFilesDemo::configure_app_systems(dispatcher);
         },
-        cargo_build,
+        WriteFilesDemo {},
     )
-    .enable_app_systems();
-
-    let mut cargo_build = Process::default();
-    cargo_build
-        .as_mut()
-        .from_file(".runmd")
-        .expect("could not load state");
-
-
-    open_editor_with(
-        "Demo",
-        runtime.parse_event("{ setup;; }"),
-        vec![process_section],
-        move |w| {
-            NodeEditor::<Process>::configure_app_world(w);
-
-            if let Some(demo) = AttributeGraph::load_from_file("demo.runmd") {
-                demo_write_files(demo, w);
-            }
-        },
-        |d| {
-            d.add(AttributeGraphSync{}, "attribute_graph_sync", &[]);
-        },
-         move |w, ui| {
-            // ui.show_demo_window(&mut true);
-            let node_editor = &mut node_editor;
-            node_editor.extend_app_world(w, ui);
-
-            let mut render = Render::<ThunkContext>::new(ui);
-            render.render_now(w);
-        },
-    );
 }
 
 // ui.same_line();

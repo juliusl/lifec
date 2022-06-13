@@ -1,11 +1,11 @@
-use super::{node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor, Section};
+use super::{node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor};
 use crate::{
     editor::unique_title,
     plugins::{Plugin, ThunkContext},
     AttributeGraph, RuntimeState,
 };
 use atlier::system::{App, Attribute, Extension, Value};
-use imgui::{ChildWindow, MenuItem, Ui};
+use imgui::{MenuItem, Ui};
 use imnodes::editor;
 use specs::{Component, Entities, Join, Read, ReadStorage, RunNow, System, WriteStorage};
 use std::collections::{BTreeMap, HashMap};
@@ -16,7 +16,6 @@ where
 {
     pub imnodes: imnodes::Context,
     pub editors: BTreeMap<u32, NodeEditorGraph>,
-    sections: BTreeMap<u32, Section<S>>,
     runtime_editor: Option<RuntimeEditor<S>>,
     thunks: BTreeMap<String, fn(&mut AttributeGraph)>,
     thunk_toolips: HashMap<String, String>,
@@ -30,7 +29,6 @@ where
         Self {
             imnodes: imnodes::Context::new(),
             editors: BTreeMap::new(),
-            sections: BTreeMap::new(),
             thunks: BTreeMap::new(),
             thunk_toolips: HashMap::new(),
             runtime_editor: None,
@@ -83,11 +81,11 @@ where
     }
 }
 
-impl<S> Extension for NodeEditor<S>
+impl<'a, 'ui, S> Extension<'a, 'ui> for NodeEditor<S>
 where
     S: RuntimeState + Component,
 {
-    fn extend_app_world(&mut self, world: &specs::World, ui: &imgui::Ui) {
+    fn on_ui(&mut self, world: &specs::World, ui: &imgui::Ui) {
         self.run_now(world);
         self.show_editor(ui);
     }
@@ -107,7 +105,6 @@ where
     type SystemData = (
         Entities<'a>,
         ReadStorage<'a, AttributeGraph>,
-        ReadStorage<'a, Section<S>>,
         WriteStorage<'a, Loader>,
         Read<'a, RuntimeEditor<S>>,
     );
@@ -119,7 +116,7 @@ where
     /// system
     fn run(
         &mut self,
-        (entities, attributes, sections, mut section_loader, runtime): Self::SystemData,
+        (entities, attributes, mut _section_loader, runtime): Self::SystemData,
     ) {
         if let None = self.runtime_editor {
             self.runtime_editor = Some(runtime.clone());
@@ -149,30 +146,13 @@ where
                             editor.load_attribute_store(&attributes);
 
                             self.editors.insert(e.id(), editor);
-
-                            if let Some(section) = sections.get(e) {
-                                self.sections
-                                    .insert(e.id(), section.clone().enable_edit_attributes());
-                            }
                         }
                         Some(editor) => editor.update(),
                     },
                     Some(false) => {
                         self.editors.remove(&e.id());
-                        let section = self.sections.remove(&e.id());
 
-                        if let Some(section) = section {
-                            match section_loader
-                                .insert(e, Loader::LoadSection(section.dispatcher().clone()))
-                            {
-                                Ok(_) => {
-                                    println!("NodeEditor dispatched load section");
-                                }
-                                Err(err) => {
-                                    eprintln!("Could not dispatch load section {}", err);
-                                }
-                            }
-                        }
+                    
                     }
                     _ => (),
                 }
@@ -366,50 +346,9 @@ where
                             });
                         });
 
-                        if let (Some(_), Some(section)) =
-                            (self.runtime_editor.as_mut(), self.sections.get_mut(id))
-                        {
-                            if editor.is_runtime_editor_open() {
-                                ChildWindow::new("Runtime editor").size([500.0, 0.0]).build(
-                                    ui,
-                                    || {
-                                        section.show_editor(ui);
-
-                                        if editor.is_debugging_enabled() {
-                                            if ui.button("Dump runtime editor output") {
-                                                section.state().iter_attributes().for_each(|a| {
-                                                    println!("{}", a);
-                                                });
-                                            }
-
-                                            if ui.button("Save attribute store") {
-                                                section.attributes.copy_attribute(
-                                                    &editor.save_attribute_store(*id),
-                                                );
-                                            }
-
-                                            section.edit_attr(
-                                                "Attribute Store",
-                                                format!(
-                                                    "file::{}_attribute_store.out",
-                                                    editor.title()
-                                                ),
-                                                ui,
-                                            );
-                                        }
-                                    },
-                                );
-                                ui.same_line();
-                            }
-                        }
-
                         editor.show_editor(ui);
 
-                        if let Some(section) = self.sections.get_mut(id) {
-                            editor.resolve_attributes().iter().for_each(|a| {
-                                section.attributes.copy_attribute(a);
-                            });
-                        }
+              
                     });
             }
         }

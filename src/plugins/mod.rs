@@ -14,10 +14,13 @@ use specs::Entities;
 use specs::Join;
 use specs::System;
 use specs::WriteStorage;
-pub use thunks::demo_write_files;
 pub use thunks::Println;
 pub use thunks::ThunkContext;
 pub use thunks::WriteFiles;
+
+pub mod demos {
+    pub use super::thunks::demo::*;
+}
 
 mod render;
 pub use render::Display;
@@ -63,6 +66,7 @@ pub trait Engine {
     fn exit(&mut self, attributes: &AttributeGraph);
 }
 
+/// Ensure attribute graph id is synced to its parent entity
 pub struct AttributeGraphSync;
 
 impl<'a> System<'a> for AttributeGraphSync {

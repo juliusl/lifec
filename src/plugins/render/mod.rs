@@ -4,23 +4,24 @@ use specs::storage::DenseVecStorage;
 use specs::{
     Component, Join, ReadStorage, RunNow, System, World, WriteStorage,
 };
-
 use crate::AttributeGraph;
+use super::Engine;
 
-use super::{Engine, Plugin};
-
+/// For rendering a ui frame that can mutate state
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
 pub struct Edit<Context>(pub fn(&mut Context, &mut AttributeGraph, &Ui)) 
 where
     Context: Component;
 
+/// For rendering a ui frame that is read-only
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
 pub struct Display<Context>(pub fn(&Context, &AttributeGraph, &Ui)) 
 where
     Context: Component;
 
+/// The render system is to interface entities with specs systems
 pub struct Render<'a, 'ui, Context>(
     &'a Ui<'ui>,
     Option<Context>,
@@ -34,16 +35,26 @@ impl<'a, 'ui, Context> Render<'a, 'ui, Context>
 where
     Context: Component + Clone + AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph>
 {
-    pub fn new(ui: &'a imgui::Ui<'ui>) -> Self {
+    /// next_frame prepares the the system for the next frame
+    pub fn next_frame(ui: &'a imgui::Ui<'ui>) -> Self {
         Self(ui, None, None, None)
     }
 
-    pub fn render_now(&mut self, world: &'a World) {
+    /// since render needs to happen on the ui thread, this method is to call the system
+    /// directly since it can't be handled by the specs dispatcher
+    pub fn render_now(&mut self, world: &World) {
         self.run_now(world);
+    }
+
+    /// starts the render engine with graph
+    pub fn render_graph(&mut self, graph: &mut AttributeGraph, context: Context, edit: Option<Edit<Context>>, display: Option<Display<Context>>) {
+        let mut engine = Self(self.0, Some(context), edit, display);
+        engine.next_mut(graph);
+        engine.exit(graph);
     }
 }
 
-impl<'a, 'ui, Context> Engine for Render<'a, 'ui, Context>
+impl<'a,'ui, Context> Engine for Render<'a, 'ui, Context>
 where
     Context: Component + Clone + AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph>
 {
@@ -60,7 +71,7 @@ where
     }
 }
 
-impl<'a, 'ui, Context> System<'a> for Render<'a, 'ui, Context>
+impl<'a, Context> System<'a> for Render<'_, '_, Context>
 where
     Context: Component + Clone + AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph>
 {
@@ -84,9 +95,9 @@ where
             let edit = e.and_then(|e| Some(e.clone()));
             let display = d.and_then(|d| Some(d.clone()));
 
-            let mut engine = Self(self.0, context, edit, display);
-            engine.next_mut(g);
-            engine.exit(g);
+            if let Some(context) = context {
+                self.render_graph(g, context, edit, display);
+            }
         }
     }
 }

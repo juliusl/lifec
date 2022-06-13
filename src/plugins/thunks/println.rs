@@ -23,6 +23,6 @@ impl Plugin<ThunkContext> for Println {
                 println!("{}: {}", name, value);
             });
 
-        context.set_return::<Println>("", Value::Bool(true));
+        context.set_return::<Println>("printed", Value::Bool(true));
     }
 }

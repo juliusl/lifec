@@ -33,14 +33,14 @@ impl AttributeEditor {
     }
 }
 
-impl Extension for AttributeEditor {
+impl<'a, 'ui> Extension<'a, 'ui> for AttributeEditor {
     fn configure_app_world(w: &mut specs::World) {
         w.register::<AttributeComponent>();
     }
 
     fn configure_app_systems(_: &mut specs::DispatcherBuilder) {}
 
-    fn extend_app_world(&mut self, app_world: &specs::World, ui: &imgui::Ui) {
+    fn on_ui(&mut self, app_world: &specs::World, ui: &imgui::Ui) {
         self.run_now(app_world);
         self.show_editor(ui);
     }

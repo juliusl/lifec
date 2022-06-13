@@ -13,7 +13,6 @@ use specs::{
 
 use crate::editor::{Loader};
 use crate::{
-    editor::EventGraph,
     AttributeGraph,
     RuntimeState,
 };
@@ -33,13 +32,12 @@ impl<'a> System<'a> for ProjectDispatcher {
         Entities<'a>,
         Write<'a, Dispatch>,
         WriteStorage<'a, Loader>,
-        WriteStorage<'a, EventGraph>,
         WriteStorage<'a, Document>,
     );
 
     fn run(
         &mut self,
-        (entities, mut dispatcher, mut loader, mut event_graphs, mut documents): Self::SystemData,
+        (entities, mut dispatcher, mut loader, mut documents): Self::SystemData,
     ) {
         match dispatcher.deref() {
             Dispatch::Empty => {}
@@ -55,10 +53,6 @@ impl<'a> System<'a> for ProjectDispatcher {
                 }
 
                 let ent = entities.create();
-
-                if let Some(_) = event_graphs.insert(ent, doc.events.clone()).ok() {
-                    println!("Project inserted graph {:?}", ent);
-                }
 
                 let mut attrs = doc.attributes.clone();
                 attrs.set_parent_entity(ent, true);
@@ -99,14 +93,13 @@ impl<'a> System<'a> for Project {
     type SystemData = (
         Entities<'a>,
         ReadStorage<'a, AttributeGraph>,
-        ReadStorage<'a, EventGraph>,
         WriteStorage<'a, Document>,
         Write<'a, Dispatch>,
     );
 
     fn run(
         &mut self,
-        (e, attributes, event_graph, mut write_documents, mut dispatcher): Self::SystemData,
+        (e, attributes, mut write_documents, mut dispatcher): Self::SystemData,
     ) {
         if let Some(()) = self.dispatch_load_project.take() {
             let dispatch = dispatcher.deref_mut();
@@ -115,17 +108,17 @@ impl<'a> System<'a> for Project {
             return;
         }
 
-        for (e, a, g) in (&e, &attributes, &event_graph).join() {
+        for (e, a) in (&e, &attributes).join() {
             match a.is_enabled("enable project") {
                 Some(true) => {
                     if let None = write_documents.get(e) {
-                        match write_documents.insert(e, Document::new(e.id(), a.clone(), g.clone()))
+                        match write_documents.insert(e, Document::new(e.id(), a.clone()))
                         {
                             Ok(_) => {
                                 if let None = self.documents.get(&e.id()) {
                                     self.documents.insert(
                                         e.id(),
-                                        Document::new(e.id(), a.clone(), g.clone()),
+                                        Document::new(e.id(), a.clone()),
                                     );
                                 }
                             }
@@ -135,11 +128,9 @@ impl<'a> System<'a> for Project {
 
                     if let Some(doc) = self.documents.get_mut(&e.id()) {
                         doc.attributes = a.clone();
-                        doc.events = g.clone();
 
                         if let Some(doc) = write_documents.get_mut(e) {
                             doc.attributes = a.clone();
-                            doc.events = g.clone();
                         }
                     }
                 }
@@ -323,7 +314,7 @@ impl RuntimeState for Project {
     }
 }
 
-impl Extension for Project {
+impl<'a, 'ui> Extension<'a, 'ui> for Project {
     fn configure_app_world(world: &mut specs::World) {
         world.register::<Document>();
         world.insert(Dispatch::Empty);
@@ -337,7 +328,7 @@ impl Extension for Project {
         );
     }
 
-    fn extend_app_world(&mut self, app_world: &specs::World, ui: &imgui::Ui) {
+    fn on_ui(&mut self, app_world: &specs::World, ui: &'a imgui::Ui<'ui>) {
         self.run_now(app_world);
         self.show_editor(ui);
     }
@@ -347,14 +338,12 @@ impl Extension for Project {
 #[storage(HashMapStorage)]
 pub struct Document {
     attributes: AttributeGraph,
-    events: EventGraph,
 }
 
 impl Document {
-    pub fn new(_: u32, attributes: AttributeGraph, events: EventGraph) -> Self {
+    pub fn new(_: u32, attributes: AttributeGraph) -> Self {
         Self {
             attributes,
-            events,
         }
     }
 
@@ -365,7 +354,6 @@ impl Document {
 
         Self {
             attributes,
-            events: self.events.clone(),
         }
     }
 }

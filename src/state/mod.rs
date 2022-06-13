@@ -5,7 +5,6 @@ use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, Entity};
-use std::collections::BTreeSet;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hasher, Hash};
 use std::{collections::BTreeMap, fmt::Display};
@@ -24,6 +23,16 @@ pub use system::AttributeSystem;
 pub struct AttributeGraph {
     entity: u32,
     index: BTreeMap<String, Attribute>,
+}
+
+impl App for AttributeGraph {
+    fn name() -> &'static str {
+        "Attribute Graph"
+    }
+
+    fn show_editor(&mut self, ui: &imgui::Ui) {
+        self.edit_attr_table(ui);
+    }
 }
 
 impl AttributeGraph {
@@ -320,6 +329,16 @@ impl AttributeGraph {
     pub fn is_enabled(&self, with_name: impl AsRef<str>) -> Option<bool> {
         if let Some(Value::Bool(val)) = self.find_attr_value(with_name) {
             Some(*val)
+        } else {
+            None
+        }
+    }
+
+    /// Returns some bool if an attribute with_name exists and is a symbol,
+    /// true if the symbol value starts with_symbol
+    pub fn is_defined(&self, with_name: impl AsRef<str>, with_symbol: impl AsRef<str>) -> Option<bool> {
+        if let Some(Value::Symbol(val)) = self.find_attr_value(with_name) {
+            Some(val.starts_with(with_symbol.as_ref()))
         } else {
             None
         }
