@@ -314,7 +314,7 @@ impl RuntimeState for Project {
     }
 }
 
-impl<'a, 'ui> Extension<'a, 'ui> for Project {
+impl Extension for Project {
     fn configure_app_world(world: &mut specs::World) {
         world.register::<Document>();
         world.insert(Dispatch::Empty);
@@ -328,10 +328,22 @@ impl<'a, 'ui> Extension<'a, 'ui> for Project {
         );
     }
 
-    fn on_ui(&mut self, app_world: &specs::World, ui: &'a imgui::Ui<'ui>) {
-        self.run_now(app_world);
-        self.show_editor(ui);
+    fn on_ui(&mut self, app_world: &specs::World, ui: &imgui::Ui) {
+        todo!()
     }
+
+    // fn on_ui<'a: 'b, 'b, 'ui>(&'a mut self, app_world: &specs::World, ui: &'b imgui::Ui<'ui>) {
+    //     todo!()
+    // }
+
+    // fn on_ui<'a, 'b: 'b, 'ui>(&'a mut self, app_world: &specs::World, ui: &'b imgui::Ui<'ui>) {
+    //     todo!()
+    // }
+
+    // fn on_ui(&mut self, app_world: &specs::World, ui: &imgui::Ui) {
+    //     self.run_now(app_world);
+    //     self.show_editor(ui);
+    // }
 }
 
 #[derive(Default, Clone, Serialize, Deserialize, Component)]

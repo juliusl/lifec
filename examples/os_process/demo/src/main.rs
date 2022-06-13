@@ -1,28 +1,13 @@
-use lifec::plugins::{demos::WriteFilesDemo, Node};
-use lifec::{editor::*};
+use lifec::plugins::demos::NodeDemo;
+use lifec::plugins::{Node, self};
+use lifec::{editor::*, AttributeGraph};
 
 fn main() {
-    // let mut node_editor = NodeEditor::<Process>::new();
-    // node_editor.with_thunk::<Process>();
-    // node_editor.with_thunk::<Println>();
-    // node_editor.with_thunk::<WriteFiles>();
-
-    // let mut cargo_build = Process::default();
-    // cargo_build
-    //     .as_mut()
-    //     .from_file(".runmd")
-    //     .expect("could not load state");
-
     open(
         "demo",
-        move |_app, world, dispatcher| {
-            Node::configure_app_systems(dispatcher);
-            Node::configure_app_world(world);
-            WriteFilesDemo::configure_app_world(world);
-            WriteFilesDemo::configure_app_systems(dispatcher);
-        },
-        WriteFilesDemo {},
-    )
+        RuntimeEditor::<AttributeGraph>::default(),
+        NodeDemo::default(),
+    );
 }
 
 // ui.same_line();

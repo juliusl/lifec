@@ -3,9 +3,9 @@ mod node_editor;
 mod node_editor_graph;
 mod runtime_editor;
 
-use atlier::system::start_editor;
+use atlier::system::start_editor_from;
 use rand::Rng;
-use specs::{prelude::*, Component};
+use specs::prelude::*;
 pub use specs::prelude::WorldExt;
 pub use specs::prelude::Builder;
 
@@ -20,48 +20,25 @@ pub use runtime_editor::RuntimeEditor;
 pub use runtime_editor::Loader;
 
 use crate::AttributeGraph;
-use crate::Runtime;
 
 /// open a runtime editor for an attribute graph, and extension
-pub fn open(
-    title: &str, 
-    extend: impl FnOnce(&mut RuntimeEditor<AttributeGraph>, &mut World, &mut DispatcherBuilder) + Clone  + 'static, 
-    mut extension: impl for<'a, 'ui> Extension<'a, 'ui> + 'static
-) 
-{
-    start_runtime_editor(
-        title,
-        Runtime::<AttributeGraph>::default(),
-        move |app, world, dispatcher| { 
-            extend(app, world, dispatcher);
-        },
-        move |app_world, ui| {
-            let extension = &mut extension;
-            extension.on_ui(app_world, ui);
-        }
-    )
-}
-
-/// Starts a runtime editor for some runtime state S
-pub fn start_runtime_editor<S, F, Ext>(
+pub fn open<A, E>(
     title: &str,
-    initial_runtime: Runtime<S>,
-    extension: F,
-    on_ui: Ext,
-) where
-    S: crate::RuntimeState + Component + App,
-    F: FnOnce(&mut RuntimeEditor<S>, &mut World, &mut DispatcherBuilder) + Clone  + 'static, 
-    Ext: 'static + FnMut(&World, &imgui::Ui),
+    app: A,
+    extension: E
+) 
+where
+    A: App + Clone + for<'c> System<'c>,
+    E: Extension + 'static
 {
-    let &[width, height] = S::window_size();
+    let &[width, height] = AttributeGraph::window_size();
 
-    start_editor(
+    start_editor_from(
         title,
         width.into(),
         height.into(),
-        RuntimeEditor::<S>::new(initial_runtime),
-        extension,
-        on_ui,
+        app,
+        extension
     )
 }
 

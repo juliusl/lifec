@@ -81,7 +81,7 @@ where
     }
 }
 
-impl<'a, 'ui, S> Extension<'a, 'ui> for NodeEditor<S>
+impl<S> Extension for NodeEditor<S>
 where
     S: RuntimeState + Component,
 {

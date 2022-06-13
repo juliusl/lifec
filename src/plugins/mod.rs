@@ -1,4 +1,6 @@
 mod nodes;
+use atlier::system::Extension;
+use imgui::Ui;
 pub use nodes::Node;
 pub use nodes::NodeContext;
 
@@ -10,9 +12,16 @@ pub use project::Document;
 pub use project::Project;
 
 mod thunks;
+use specs::Builder;
+use specs::Component;
+use specs::DispatcherBuilder;
 use specs::Entities;
+use specs::Entity;
+use specs::EntityBuilder;
 use specs::Join;
 use specs::System;
+use specs::World;
+use specs::WorldExt;
 use specs::WriteStorage;
 pub use thunks::Println;
 pub use thunks::ThunkContext;
@@ -20,6 +29,7 @@ pub use thunks::WriteFiles;
 
 pub mod demos {
     pub use super::thunks::demo::*;
+    pub use super::nodes::demo::*;
 }
 
 mod render;
@@ -31,10 +41,13 @@ use crate::AttributeGraph;
 
 pub trait Plugin<T>
 where
-    T: AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph>,
+    T: AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph> + Component,
 {
     /// Returns the symbol name representing this plugin
     fn symbol() -> &'static str;
+
+    /// implement call_with_context to allow for static extensions of attribute graph
+    fn call_with_context(context: &mut T);
 
     /// Returns a short string description for this plugin
     fn description() -> &'static str {
@@ -52,9 +65,6 @@ where
 
         *attributes = attributes.merge_with(context.as_ref());
     }
-
-    /// implement call_with_context to allow for static extensions of attribute graph
-    fn call_with_context(context: &mut T);
 }
 
 /// An engine is a sequence of at least 2 events

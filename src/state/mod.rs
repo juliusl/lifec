@@ -428,6 +428,17 @@ impl AttributeGraph {
         self.find_attr(with_name).and_then(|a| Some(a.value()))
     }
 
+    /// Finds a text value of an attribute
+    pub fn find_text(&self, with_name: impl AsRef<str>) -> Option<String> {
+        self.find_attr_value(with_name).and_then(|n| {
+            if let Value::TextBuffer(text) = n {
+                Some(text.to_string())
+            } else {
+                None
+            }
+        })
+    }
+
     /// Finds the mut value of an attribute by name that is owned by `self.entity`.
     pub fn find_attr_value_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Value> {
         self.find_attr_mut(with_name)

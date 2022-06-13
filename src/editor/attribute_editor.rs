@@ -33,7 +33,7 @@ impl AttributeEditor {
     }
 }
 
-impl<'a, 'ui> Extension<'a, 'ui> for AttributeEditor {
+impl Extension for AttributeEditor {
     fn configure_app_world(w: &mut specs::World) {
         w.register::<AttributeComponent>();
     }

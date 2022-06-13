@@ -62,9 +62,10 @@ pub mod demo {
 
     use super::WriteFiles;
 
+    #[derive(Default)]
     pub struct WriteFilesDemo;
 
-    impl<'a, 'ui> Extension<'a, 'ui> for WriteFilesDemo {
+    impl Extension for WriteFilesDemo {
         fn configure_app_world(world: &mut specs::World) {
             world.register::<AttributeGraph>();
             world.register::<WriteFiles>();
@@ -95,6 +96,7 @@ pub mod demo {
 
         fn configure_app_systems(_: &mut specs::DispatcherBuilder) {
         }
+
 
         fn on_ui(&mut self, app_world: &specs::World, ui: &imgui::Ui) {
             let mut render = Render::<ThunkContext>::next_frame(ui);
