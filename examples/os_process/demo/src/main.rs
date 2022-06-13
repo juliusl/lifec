@@ -15,7 +15,7 @@ fn main() {
 
     open(
         "demo",
-        move |world, dispatcher| {
+        move |_app, world, dispatcher| {
             Node::configure_app_systems(dispatcher);
             Node::configure_app_world(world);
             WriteFilesDemo::configure_app_world(world);

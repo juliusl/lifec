@@ -22,6 +22,27 @@ pub use runtime_editor::Loader;
 use crate::AttributeGraph;
 use crate::Runtime;
 
+/// open a runtime editor for an attribute graph, and extension
+pub fn open(
+    title: &str, 
+    extend: impl FnOnce(&mut RuntimeEditor<AttributeGraph>, &mut World, &mut DispatcherBuilder) + Clone  + 'static, 
+    mut extension: impl for<'a, 'ui> Extension<'a, 'ui> + 'static
+) 
+{
+    start_runtime_editor(
+        title,
+        Runtime::<AttributeGraph>::default(),
+        move |app, world, dispatcher| { 
+            extend(app, world, dispatcher);
+        },
+        move |app_world, ui| {
+            let extension = &mut extension;
+            extension.on_ui(app_world, ui);
+        }
+    )
+}
+
+/// Starts a runtime editor for some runtime state S
 pub fn start_runtime_editor<S, F, Ext>(
     title: &str,
     initial_runtime: Runtime<S>,
@@ -29,7 +50,7 @@ pub fn start_runtime_editor<S, F, Ext>(
     on_ui: Ext,
 ) where
     S: crate::RuntimeState + Component + App,
-    F: 'static + Clone + Fn(&mut RuntimeEditor<S>, &mut World, &mut DispatcherBuilder),
+    F: FnOnce(&mut RuntimeEditor<S>, &mut World, &mut DispatcherBuilder) + Clone  + 'static, 
     Ext: 'static + FnMut(&World, &imgui::Ui),
 {
     let &[width, height] = S::window_size();
@@ -41,30 +62,6 @@ pub fn start_runtime_editor<S, F, Ext>(
         RuntimeEditor::<S>::new(initial_runtime),
         extension,
         on_ui,
-    )
-}
-
-
-pub fn open(
-    title: &str, 
-    extend: impl FnOnce(&mut World, &mut DispatcherBuilder) + Clone  + 'static, 
-    mut extension: impl for<'a, 'ui> Extension<'a, 'ui> + 'static
-) 
-{
-    let &[width, height] = AttributeGraph::window_size();
-
-    start_editor(
-        title,
-        width.into(),
-        height.into(),
-        RuntimeEditor::<AttributeGraph>::default(),
-        move |_, world, dispatcher| {
-           extend(world, dispatcher);
-        },
-        move |app_world, ui| {
-            let extension = &mut extension;
-            extension.on_ui(app_world, ui);
-        }
     )
 }
 
