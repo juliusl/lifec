@@ -39,7 +39,7 @@ impl AttributeGraph {
         if loading.from_file(&path).is_ok() {
             let loaded = loading.define("src", "file");
             loaded.edit_as(Value::TextBuffer(path.as_ref().to_string()));
-            
+
             Some(loading)
         } else {
             None
@@ -496,7 +496,8 @@ impl AttributeGraph {
     /// Finds the parent block if the graph has been in block mode
     pub fn find_last_block(&mut self) -> Option<Attribute> {
         let clone = self.clone();
-        let last_block = clone.iter_attributes()
+        let last_block = clone
+            .iter_attributes()
             .find(|attr| attr.name() == "last::block")
             .and_then(|a| Some(a));
 
@@ -621,7 +622,10 @@ impl AttributeGraph {
     }
 
     /// find only imported symbols with transient values
-    pub fn find_imported_symbol_values(&self, with_symbol: impl AsRef<str>) -> Vec<(String, Value)>{
+    pub fn find_imported_symbol_values(
+        &self,
+        with_symbol: impl AsRef<str>,
+    ) -> Vec<(String, Value)> {
         self.find_imported_symbols(with_symbol)
             .iter()
             .filter_map(|a| a.transient())
@@ -631,18 +635,25 @@ impl AttributeGraph {
 
     /// find all blocks by symbol name
     pub fn find_blocks(&self, symbol_name: impl AsRef<str>) -> Vec<Self> {
-        self.find_imported_symbol_values(symbol_name).iter().filter_map(|(_, value)| {
-            if let Value::Int(block_id) = value {
-                self.find_imported_graph(*block_id as u32)
-            } else {
-                None 
-            }
-        }).collect()
+        self.find_imported_symbol_values(symbol_name)
+            .iter()
+            .filter_map(|(_, value)| {
+                if let Value::Int(block_id) = value {
+                    self.find_imported_graph(*block_id as u32)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// finds the block_id for with the corresponding block name
-    pub fn find_block_id(&self, with_name: impl AsRef<str>, symbol_name: impl AsRef<str>) -> Option<u32> {
-        let symbol = format!("{}::", symbol_name.as_ref()); 
+    pub fn find_block_id(
+        &self,
+        with_name: impl AsRef<str>,
+        symbol_name: impl AsRef<str>,
+    ) -> Option<u32> {
+        let symbol = format!("{}::", symbol_name.as_ref());
         let symbol_name = format!("{}::{}", with_name.as_ref(), symbol_name.as_ref());
         self.index
             .iter()
@@ -661,9 +672,34 @@ impl AttributeGraph {
                 } else {
                     None
                 }
-            }).and_then(|id| {
-                Some(*id as u32)
             })
+            .and_then(|id| Some(*id as u32))
+    }
+
+    /// finds the block for with the corresponding block name
+    pub fn find_block(
+        &self,
+        with_name: impl AsRef<str>,
+        symbol_name: impl AsRef<str>,
+    ) -> Option<Self> {
+        let symbol = format!("{}::", symbol_name.as_ref());
+        let symbol_name = format!("{}::{}", with_name.as_ref(), symbol_name.as_ref());
+        self.index.iter().find_map(|(_, a)| {
+            if let Attribute {
+                value: Value::Symbol(value),
+                transient: Some((name, Value::Int(block_id))),
+                ..
+            } = a
+            {
+                if value.starts_with(&symbol) && name == &symbol_name {
+                    self.find_imported_graph(*block_id as u32)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
     }
 
     /// Returns self with an empty attribute w/ name.
@@ -1004,13 +1040,12 @@ impl RuntimeDispatcher for AttributeGraph {
 
 /// These are handlers for dispatched messages
 impl AttributeGraph {
-
     fn next_block(&mut self, with_name: impl AsRef<str>, symbol_name: impl AsRef<str>) -> u32 {
         if let None = self.find_parent_block() {
             let parent_entity = self.entity() as i32;
-            
+
             self.define("parent", "block")
-                .edit_as( Value::Int(parent_entity)); 
+                .edit_as(Value::Int(parent_entity));
         }
 
         if let Some(mut last_block) = self.find_last_block() {
@@ -1029,7 +1064,7 @@ impl AttributeGraph {
     }
 
     fn end_block_mode(&mut self) {
-        let last_block_id = self.entity.clone();                
+        let last_block_id = self.entity.clone();
         if let Some(parent_block) = self.find_parent_block() {
             if let Some((_, Value::Int(parent_entity))) = parent_block.transient() {
                 self.entity = *parent_entity as u32;
@@ -1048,7 +1083,7 @@ impl AttributeGraph {
                 Some(AttributeGraphElements::Symbol(block_name)),
                 Some(AttributeGraphElements::Symbol(block_symbol)),
             ) => {
-                let block_id = self.next_block( &block_name, &block_symbol); 
+                let block_id = self.next_block(&block_name, &block_symbol);
 
                 self.define(block_name, block_symbol)
                     .edit_as(Value::Int(block_id as i32));
@@ -1080,7 +1115,8 @@ impl AttributeGraph {
                 | AttributeGraphElements::IntRange(value)
                 | AttributeGraphElements::Float(value)
                 | AttributeGraphElements::FloatPair(value)
-                | AttributeGraphElements::FloatRange(value) => {
+                | AttributeGraphElements::FloatRange(value)
+                | AttributeGraphElements::BinaryVector(value) => {
                     if let Some(attr) = self.find_attr_mut(name) {
                         attr.edit((new_name, value));
                     }
@@ -1104,7 +1140,8 @@ impl AttributeGraph {
                 | AttributeGraphElements::IntRange(value)
                 | AttributeGraphElements::Float(value)
                 | AttributeGraphElements::FloatPair(value)
-                | AttributeGraphElements::FloatRange(value) => {
+                | AttributeGraphElements::FloatRange(value)
+                | AttributeGraphElements::BinaryVector(value) => {
                     if let Some(attr) = self.find_attr_mut(&name) {
                         let parts: Vec<&str> = name.split("::").collect();
                         if let Some(name) = parts.first() {
@@ -1186,7 +1223,8 @@ impl AttributeGraph {
                 | AttributeGraphElements::IntRange(value)
                 | AttributeGraphElements::Float(value)
                 | AttributeGraphElements::FloatPair(value)
-                | AttributeGraphElements::FloatRange(value) => {
+                | AttributeGraphElements::FloatRange(value) 
+                | AttributeGraphElements::BinaryVector(value)=> {
                     self.with(name, value);
                     Ok(())
                 }
@@ -1236,7 +1274,8 @@ impl AttributeGraph {
                 | AttributeGraphElements::IntRange(value)
                 | AttributeGraphElements::Float(value)
                 | AttributeGraphElements::FloatPair(value)
-                | AttributeGraphElements::FloatRange(value) => {
+                | AttributeGraphElements::FloatRange(value)
+                | AttributeGraphElements::BinaryVector(value) => {
                     self.import_attribute(&Attribute::new(entity, name, value));
                     Ok(())
                 }
@@ -1280,7 +1319,7 @@ impl AttributeGraph {
 
 #[test]
 fn test_attribute_graph_block_dispatcher() {
-    let mut graph = AttributeGraph::from(0); 
+    let mut graph = AttributeGraph::from(0);
 
     let test = r#"
     ```
@@ -1339,6 +1378,7 @@ fn test_attribute_graph_block_dispatcher() {
 
     println!("{}", graph.save().expect(""));
     assert_eq!(Some(1), graph.find_block_id("demo", "node"));
+    assert!(graph.find_block("demo3", "node").and_then(|a| Some(a.entity() == 3)).expect("should return the correct block"))
 }
 
 #[test]
@@ -1517,6 +1557,21 @@ fn test_attribute_graph_dispatcher() {
     )
 }
 
+#[test]
+fn test_binary_vec_parse() {
+    let mut graph = AttributeGraph::from(0);
+    let test_message = format!("add test_bin .BINARY_VECTOR {}", base64::encode(b"test values"));
+
+    println!("{}", test_message);
+    assert!(graph.dispatch_mut(test_message).is_ok());
+    
+    if let Some(Value::BinaryVector(test_bin)) = graph.find_attr_value("test_bin") {
+        if let Some(test) = base64::decode(test_bin).ok().and_then(|t| String::from_utf8(t).ok()) {
+            assert_eq!(test, "test values".to_string());
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum AttributeGraphErrors {
     UnknownEvent,
@@ -1617,6 +1672,9 @@ pub enum AttributeGraphElements {
     /// float range element parses remaining as 3 comma delimitted f32's
     #[token(".FLOAT_RANGE", graph_lexer::from_float_range)]
     FloatRange(Value),
+    /// binary vector element parses remaining as 3 comma delimitted f32's
+    #[token(".BINARY_VECTOR", graph_lexer::from_binary_vector_base64)]
+    BinaryVector(Value),
     /// empty element parses
     #[token(".EMPTY")]
     Empty,
@@ -1713,6 +1771,13 @@ mod graph_lexer {
         match (range.get(0), range.get(1), range.get(2)) {
             (Some(f0), Some(f1), Some(f2)) => Some(Value::FloatRange(*f0, *f1, *f2)),
             _ => None,
+        }
+    }    
+    
+    pub fn from_binary_vector_base64(lexer: &mut Lexer<AttributeGraphElements>) -> Option<Value> {
+        match base64::decode(lexer.remainder().trim()) {
+            Ok(content) => Some(Value::BinaryVector(content)),
+            Err(_) => None,
         }
     }
 
