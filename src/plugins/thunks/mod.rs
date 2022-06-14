@@ -18,7 +18,8 @@ pub mod demo {
 
 use super::Plugin;
 
-/// ThunkContext provides common methods for updating the underlying state graph
+/// ThunkContext provides common methods for updating the underlying state graph,
+/// in the context of a thunk.
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext(AttributeGraph);

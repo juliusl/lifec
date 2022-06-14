@@ -11,7 +11,6 @@ use specs::{
     Component, Entities,  ReadStorage, RunNow, System, WorldExt, Write, WriteStorage, Join,
 };
 
-use crate::editor::{Loader};
 use crate::{
     AttributeGraph,
     RuntimeState,
@@ -31,13 +30,12 @@ impl<'a> System<'a> for ProjectDispatcher {
     type SystemData = (
         Entities<'a>,
         Write<'a, Dispatch>,
-        WriteStorage<'a, Loader>,
         WriteStorage<'a, Document>,
     );
 
     fn run(
         &mut self,
-        (entities, mut dispatcher, mut loader, mut documents): Self::SystemData,
+        (entities, mut dispatcher,  mut documents): Self::SystemData,
     ) {
         match dispatcher.deref() {
             Dispatch::Empty => {}
@@ -56,10 +54,6 @@ impl<'a> System<'a> for ProjectDispatcher {
 
                 let mut attrs = doc.attributes.clone();
                 attrs.set_parent_entity(ent, true);
-
-                if let Some(_) = loader.insert(ent, Loader::LoadSection(attrs)).ok() {
-                    println!("Project inserted loader {:?}", ent);
-                }
 
                 match documents.insert(ent, doc.clone()) {
                     Ok(_) => {

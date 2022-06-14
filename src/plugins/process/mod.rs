@@ -1,22 +1,12 @@
-use atlier::system::{App, Value};
+use atlier::system::{Value, Extension};
 use chrono::{DateTime, Local, Utc};
-use imgui::{CollapsingHeader, Ui};
-use serde::Deserialize;
-use serde::Serialize;
-use specs::Component;
-use specs::HashMapStorage;
+use serde::{Deserialize, Serialize};
+use specs::{Component, HashMapStorage, WorldExt};
 use std::{
-    fmt::Display,
-    process::{Command, Output},
+    process::{Command, Output}, fmt::Display,
 };
-
-use crate::RuntimeDispatcher;
-use crate::{
-    AttributeGraph, RuntimeState,
-};
-
-use super::Plugin;
-use super::ThunkContext;
+use crate::{RuntimeDispatcher, AttributeGraph, RuntimeState};
+use super::{Plugin, ThunkContext, Edit};
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
 #[storage(HashMapStorage)]
@@ -47,6 +37,20 @@ impl Process {
     }
 }
 
+impl Extension for Process {
+    fn configure_app_world(world: &mut specs::World) {
+        world.register::<ThunkContext>();
+        world.register::<Edit<ThunkContext>>();
+        world.register::<crate::plugins::Display<ThunkContext>>();
+    }
+
+    fn configure_app_systems(_: &mut specs::DispatcherBuilder) {
+    }
+
+    fn on_ui(&mut self, _app_world: &specs::World, _ui: &imgui::Ui<'_>) {
+    }
+}
+
 impl Plugin<ThunkContext> for Process {
     fn symbol() -> &'static str {
         "process"
@@ -58,17 +62,22 @@ impl Plugin<ThunkContext> for Process {
 
     fn call_with_context(context: &mut super::ThunkContext) {
         let process = Self::from(context.as_ref().clone());
-
         if let Some(command) = process.command() {
             match process.dispatch(command) {
                 Ok(mut output) => {
                     output.stdout = output.stdout.and_then(|o| {
-                        context.write_output("stdout", Value::BinaryVector(o));
+                        context.write_output(
+                            "stdout", 
+                            Value::BinaryVector(o)
+                        );
                         None
                     });
 
                     output.stderr = output.stderr.and_then(|o| {
-                        context.write_output("stderr", Value::BinaryVector(o));
+                        context.write_output(
+                            "stderr", 
+                            Value::BinaryVector(o)
+                        );
                         None
                     });
 
@@ -77,17 +86,30 @@ impl Plugin<ThunkContext> for Process {
                     }
 
                     if let Some(local_ts) = output.timestamp_local {
-                        context.write_output("timestamp_local", Value::TextBuffer(local_ts));
+                        context.write_output(
+                            "timestamp_local", 
+                            Value::TextBuffer(local_ts));
                     }
 
                     if let Some(utc_ts) = output.timestamp_utc {
-                        context.write_output("timestamp_utc", Value::TextBuffer(utc_ts));
+                        context.write_output(
+                            "timestamp_utc", 
+                            Value::TextBuffer(utc_ts)
+                        );
                     }
 
                     if let Some(elapsed) = output.elapsed {
-                        context.write_output("elapsed", Value::TextBuffer(elapsed));
+                        context.write_output(
+                            "elapsed", 
+                            Value::TextBuffer(elapsed)
+                        );
                     }
-                    context.set_return::<Process>("called", Value::Bool(true));
+
+                    context.set_return::<Process>(
+                        "called", 
+                        Value::Bool(true)
+                    );
+
                     context.as_mut().find_remove("error");
                 }
                 Err(e) => {
@@ -148,12 +170,11 @@ impl Process {
             }
         }
 
-        let output = command.output().ok();
         if let Some(Output {
             status,
             stdout,
             stderr,
-        }) = output
+        }) = command.output().ok()
         {
             self.stdout = Some(stdout);
             self.stderr = Some(stderr);
@@ -169,52 +190,6 @@ impl Process {
             Err(ProcessExecutionError {})
         }
     }
-
-    fn edit(&mut self, ui: &Ui) {
-        self.as_mut().edit_attr("Enable node editor", "enable_node_editor", ui);
-
-        ui.new_line();
-        // Some tools to edit the process
-        ui.text("Edit Process:");
-        ui.new_line();
-        self.as_mut().edit_attr(
-            "edit the process command",
-            "command",
-            ui,
-        );
-        self.as_mut().edit_attr(
-            "edit process subcommands",
-            "subcommands",
-            ui,
-        );
-
-        if ui.button("execute") {
-            match (
-                self.as_ref().find_attr_value("command"),
-                self.as_ref().find_attr_value("subcommands"),
-            ) {
-                (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommand))) => {
-                    if let Some(next) = self
-                        .as_ref()
-                        .dispatch(&format!("{}::{}", command, subcommand))
-                        .ok()
-                    {
-                        self.graph = next;
-                    } else {
-                        eprintln!("did not execute `{} {}`", command, subcommand);
-                    }
-                }
-                (Some(Value::TextBuffer(command)), None) => {
-                    if let Some(next) = self.as_ref().dispatch(&&format!("{}::", command)).ok() {
-                        self.graph = next;
-                    } else {
-                        eprintln!("did not execute `{}`", command);
-                    }
-                }
-                _ => (),
-            }
-        }
-    }
 }
 
 impl Display for Process {
@@ -222,35 +197,6 @@ impl Display for Process {
         writeln!(f, "code: {:?}", self.code)
     }
 }
-
-impl App for Process {
-    fn name() -> &'static str {
-        "Process (Start/Configure OS Processes)"
-    }
-
-    fn show_editor(&mut self, ui: &imgui::Ui) {
-        if let Some(Value::TextBuffer(command)) = self.graph.find_attr_value("command"){
-            ui.label_text("Command", command);
-        }
-
-        if let Some(Value::TextBuffer(command)) = self.graph.find_attr_value("subcommands"){
-            ui.label_text("Subcommand", command);
-        }
-
-        let flags = self.graph.find_symbol_values("flag");
-
-        if !flags.is_empty() {
-            if CollapsingHeader::new("Arguments").begin(ui) {
-                flags.iter().for_each(|arg_entry| {
-                    ui.text(format!("{:?}", arg_entry));
-                });
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct ProcessExecutionError {}
 
 impl From<AttributeGraph> for Process {
     fn from(graph: AttributeGraph) -> Self {
@@ -281,6 +227,9 @@ impl RuntimeState for Process {
         &mut self.graph
     }
 }
+
+#[derive(Debug)]
+pub struct ProcessExecutionError {}
 
 impl RuntimeDispatcher for Process {
     type Error = ProcessExecutionError;

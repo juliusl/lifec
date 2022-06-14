@@ -1,3 +1,5 @@
+use crate::editor::unique_title;
+use crate::{RuntimeDispatcher, RuntimeState};
 use atlier::system::App;
 use atlier::system::{Attribute, Value};
 use imgui::TableFlags;
@@ -6,15 +8,9 @@ use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, Entity};
 use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hasher, Hash};
+use std::fs;
+use std::hash::{Hash, Hasher};
 use std::{collections::BTreeMap, fmt::Display};
-
-use crate::editor::unique_title;
-use crate::{RuntimeDispatcher, RuntimeState};
-
-mod system;
-pub use system::AttributeStore;
-pub use system::AttributeSystem;
 
 /// Attribute graph is a component that indexes attributes for an entity
 /// It is designed to be a general purpose enough to be the common element of runtime state storage
@@ -40,7 +36,10 @@ impl AttributeGraph {
     pub fn load_from_file(path: impl AsRef<str>) -> Option<Self> {
         let mut loading = AttributeGraph::default();
 
-        if loading.from_file(path).is_ok() {
+        if loading.from_file(&path).is_ok() {
+            let loaded = loading.define("src", "file");
+            loaded.edit_as(Value::TextBuffer(path.as_ref().to_string()));
+            
             Some(loading)
         } else {
             None
@@ -66,7 +65,7 @@ impl AttributeGraph {
         let symbol_name = format!("{}::{}", name.as_ref(), symbol.as_ref());
         let symbol_value = format!("{}::", symbol.as_ref());
         self.add_symbol(&symbol_name, symbol_value);
-        
+
         let defined = self.find_attr_mut(symbol_name).expect("just added");
         defined.edit((name.as_ref().to_string(), Value::Empty));
         defined
@@ -96,7 +95,7 @@ impl AttributeGraph {
         attr_name: impl AsRef<str>,
         ui: &imgui::Ui,
     ) {
-        if let Some(Value::Float(width)) = self.find_attr_value("edit_width::") {
+        if let Some(Value::Float(width)) = self.find_attr_value("edit_width") {
             ui.set_next_item_width(*width);
         } else {
             ui.set_next_item_width(130.0);
@@ -138,16 +137,19 @@ impl AttributeGraph {
             None => {}
             _ => match self.clone().find_attr(&attr_name) {
                 Some(attr) => {
-                    // If not stable, 
+                    // If not stable,
                     // shows a preview and add's a button to apply the value if transient
                     if !attr.is_stable() {
-                        if attr.transient().and_then(|(_, value)| Some(*value != Value::Empty)).unwrap_or(false) {
+                        if attr
+                            .transient()
+                            .and_then(|(_, value)| Some(*value != Value::Empty))
+                            .unwrap_or(false)
+                        {
                             if ui.button(format!("apply {}", attr.id())) {
-                              self.apply_mut(attr.name());
+                                self.apply_mut(attr.name());
                             }
                             ui.same_line();
                         }
-
                         ui.disabled(true, || {
                             let mut preview = attr.clone();
                             preview.commit();
@@ -169,43 +171,61 @@ impl AttributeGraph {
     }
 
     pub fn edit_attr_menu(&mut self, ui: &imgui::Ui) {
+        if let Some(token) = ui.begin_menu("File") {
+            let file_name = format!("{}.ron", self.hash_code());
+
+            if imgui::MenuItem::new(format!("Save to {}", file_name)).build(ui) {
+                if fs::write(&file_name, self.save().unwrap_or_default()).is_ok() {
+                    println!("Saved output to {}", file_name);
+                }
+            }
+            token.end()
+        }
+
         if let Some(token) = ui.begin_menu("Edit") {
             if let Some(token) = ui.begin_menu("Add new attribute") {
                 if imgui::MenuItem::new("Text").build(ui) {
                     self.add_text_attr(unique_title("text"), "");
                 }
-    
+
                 if imgui::MenuItem::new("Bool").build(ui) {
                     self.add_bool_attr(unique_title("bool"), false);
                 }
-    
+
                 if imgui::MenuItem::new("Int").build(ui) {
                     self.add_int_attr(unique_title("int"), 0);
                 }
-    
+
                 if imgui::MenuItem::new("Int pair").build(ui) {
                     self.add_int_pair_attr(unique_title("int_pair"), &[0, 0]);
                 }
-    
-                // if imgui::MenuItem::new("Int Slider") {
-                //     self.add_int_range_attr(unique_title("int_slider"), &[0, 0, 0]);
-                // }
-    
+
                 if imgui::MenuItem::new("Float").build(ui) {
                     self.add_float_attr(unique_title("float"), 0.0);
                 }
-    
+
                 if imgui::MenuItem::new("Float pair").build(ui) {
                     self.add_float_pair_attr(unique_title("float_pair"), &[0.0, 0.0]);
                 }
-    
+
                 if imgui::MenuItem::new("Empty").build(ui) {
                     self.add_empty_attr(unique_title("empty"));
                 }
-    
+
                 token.end();
             }
-        
+
+            ui.separator();
+            if let Some(token) = ui.begin_menu("Remove attribute..") {
+                for attr in self.clone().iter_attributes() {
+                    if imgui::MenuItem::new(format!("{}", attr)).build(ui) {
+                        self.remove(attr);
+                    }
+                }
+
+                token.end();
+            }
+
             token.end()
         }
     }
@@ -336,7 +356,11 @@ impl AttributeGraph {
 
     /// Returns some bool if an attribute with_name exists and is a symbol,
     /// true if the symbol value starts with_symbol
-    pub fn is_defined(&self, with_name: impl AsRef<str>, with_symbol: impl AsRef<str>) -> Option<bool> {
+    pub fn is_defined(
+        &self,
+        with_name: impl AsRef<str>,
+        with_symbol: impl AsRef<str>,
+    ) -> Option<bool> {
         if let Some(Value::Symbol(val)) = self.find_attr_value(with_name) {
             Some(val.starts_with(with_symbol.as_ref()))
         } else {
@@ -462,6 +486,27 @@ impl AttributeGraph {
             .and_then(|a| Some(a))
     }
 
+    /// Finds the parent block if the graph has been in block mode
+    pub fn find_parent_block(&mut self) -> Option<&mut Attribute> {
+        self.iter_mut_attributes()
+            .find(|attr| attr.name() == "parent::block")
+            .and_then(|a| Some(a))
+    }
+
+    /// Finds the parent block if the graph has been in block mode
+    pub fn find_last_block(&mut self) -> Option<Attribute> {
+        let clone = self.clone();
+        let last_block = clone.iter_attributes()
+            .find(|attr| attr.name() == "last::block")
+            .and_then(|a| Some(a));
+
+        if let Some(last_block) = last_block {
+            self.remove(last_block)
+        } else {
+            None
+        }
+    }
+
     /// Finds and updates an attribute, also updates index key.
     /// Returns true if update was called.
     pub fn find_update_attr(
@@ -552,6 +597,47 @@ impl AttributeGraph {
         } else {
             Some(imported)
         }
+    }
+
+    /// find only imported symbols by name
+    pub fn find_imported_symbols(&self, with_symbol: impl AsRef<str>) -> Vec<&Attribute> {
+        let symbol = format!("{}::", with_symbol.as_ref());
+        self.index
+            .iter()
+            .filter(|(_, a)| {
+                if let Attribute {
+                    id,
+                    value: Value::Symbol(value),
+                    ..
+                } = a
+                {
+                    *id != self.entity && value.starts_with(&symbol)
+                } else {
+                    false
+                }
+            })
+            .map(|(_, a)| a)
+            .collect()
+    }
+
+    /// find only imported symbols with transient values
+    pub fn find_imported_symbol_values(&self, with_symbol: impl AsRef<str>) -> Vec<(String, Value)>{
+        self.find_imported_symbols(with_symbol)
+            .iter()
+            .filter_map(|a| a.transient())
+            .cloned()
+            .collect()
+    }
+
+    /// find all blocks by symbol name
+    pub fn find_blocks(&self, symbol_name: impl AsRef<str>) -> Vec<Self> {
+        self.find_imported_symbol_values(symbol_name).iter().filter_map(|(_, value)| {
+            if let Value::Int(block_id) = value {
+                self.find_imported_graph(*block_id as u32)
+            } else {
+                None 
+            }
+        }).collect()
     }
 
     /// Returns self with an empty attribute w/ name.
@@ -881,7 +967,8 @@ impl RuntimeDispatcher for AttributeGraph {
                 AttributeGraphEvents::Define => self.on_define(event_lexer.remainder()),
                 AttributeGraphEvents::Apply => self.on_apply(event_lexer.remainder()),
                 AttributeGraphEvents::Edit => self.on_edit(event_lexer.remainder()),
-                AttributeGraphEvents::Comment | AttributeGraphEvents::BlockDelimitter => Ok(()),
+                AttributeGraphEvents::BlockDelimitter => self.on_block(event_lexer.remainder()),
+                AttributeGraphEvents::Comment => Ok(()),
                 AttributeGraphEvents::Error => Err(AttributeGraphErrors::UnknownEvent),
             },
             None => Err(AttributeGraphErrors::EmptyMessage),
@@ -891,6 +978,58 @@ impl RuntimeDispatcher for AttributeGraph {
 
 /// These are handlers for dispatched messages
 impl AttributeGraph {
+
+    fn next_block(&mut self) -> u32 {
+        if let None = self.find_parent_block() {
+            let parent_entity = self.entity() as i32;
+            
+            self.define("parent", "block")
+                .edit_as( Value::Int(parent_entity)); 
+        }
+
+        if let Some(mut last_block) = self.find_last_block() {
+            if let Some((_, Value::Int(last_block_id))) = last_block.take_transient() {
+                self.entity = last_block_id as u32;
+            }
+        }
+
+        self.entity += 1;
+        self.entity
+    }
+
+    fn end_block_mode(&mut self) {
+        let last_block_id = self.entity.clone();                
+        if let Some(parent_block) = self.find_parent_block() {
+            if let Some((_, Value::Int(parent_entity))) = parent_block.transient() {
+                self.entity = *parent_entity as u32;
+
+                self.define("last", "block")
+                    .edit_as(Value::Int(last_block_id as i32));
+            }
+        }
+    }
+
+    fn on_block(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
+        let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
+
+        match (element_lexer.next(), element_lexer.next()) {
+            (
+                Some(AttributeGraphElements::Symbol(block_name)),
+                Some(AttributeGraphElements::Symbol(block_symbol)),
+            ) => {
+                let block_id = self.next_block(); 
+
+                self.define(block_name, block_symbol)
+                    .edit_as(Value::Int(block_id as i32));
+            }
+            _ => {
+                self.end_block_mode();
+            }
+        }
+
+        Ok(())
+    }
+
     fn on_edit(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
         match (
@@ -926,11 +1065,7 @@ impl AttributeGraph {
                 AttributeGraphElements::Symbol(_) => todo!("unrecognized element"),
                 AttributeGraphElements::Error => todo!("error parsing next value"),
             },
-            (
-                Some(AttributeGraphElements::Symbol(name)),
-                Some(value),
-                _,
-            ) =>  match value {
+            (Some(AttributeGraphElements::Symbol(name)), Some(value), _) => match value {
                 AttributeGraphElements::Text(value)
                 | AttributeGraphElements::Int(value)
                 | AttributeGraphElements::Bool(value)
@@ -1110,6 +1245,44 @@ impl AttributeGraph {
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
         }
     }
+}
+
+#[test]
+fn test_attribute_graph_block_dispatcher() {
+    let mut graph = AttributeGraph::from(0); 
+
+    let test = r#"
+    ```
+    ```
+    "#;
+
+    assert!(graph.batch_mut(test).is_ok());
+    assert_eq!(graph.entity, 0);
+
+    let test = r#"
+    ``` demo node
+    add demo_node_title .TEXT hello demo node
+    ``` demo2 node
+    add demo_node_title .TEXT hello demo ndoe 2
+    ```
+    "#;
+
+    assert!(graph.batch_mut(test).is_ok());
+    assert_eq!(graph.entity, 0);
+
+    let test = r#"
+    ``` demo node
+    add demo_node_title .TEXT hello demo node
+    ``` demo2 node
+    add demo_node_title .TEXT hello demo ndoe 2
+    ```
+    "#;
+
+    assert!(graph.batch_mut(test).is_ok());
+    assert_eq!(graph.entity, 0);
+    assert_eq!(graph.find_blocks("node").len(), 4);
+
+    println!("{}", graph.save().expect(""));
 }
 
 #[test]

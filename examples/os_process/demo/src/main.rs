@@ -1,13 +1,14 @@
 use lifec::plugins::demos::NodeDemo;
-use lifec::plugins::{Node, self};
-use lifec::{editor::*, AttributeGraph};
+use lifec::{editor::*, AttributeGraph, Runtime};
 
 fn main() {
-    open(
-        "demo",
-        RuntimeEditor::<AttributeGraph>::default(),
-        NodeDemo::default(),
-    );
+    if let Some(file) = AttributeGraph::load_from_file(".runmd") {
+        open(
+            "demo",
+            RuntimeEditor::new(Runtime::from(file)),
+            NodeDemo::default(),
+        );
+    }
 }
 
 // ui.same_line();

@@ -17,7 +17,6 @@ pub use attribute_editor::AttributeEditor;
 pub use node_editor::NodeEditor;
 pub use node_editor_graph::NodeEditorGraph;
 pub use runtime_editor::RuntimeEditor;
-pub use runtime_editor::Loader;
 
 use crate::AttributeGraph;
 

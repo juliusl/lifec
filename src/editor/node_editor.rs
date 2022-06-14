@@ -1,4 +1,4 @@
-use super::{node_editor_graph::NodeEditorGraph, Loader, RuntimeEditor};
+use super::{node_editor_graph::NodeEditorGraph, RuntimeEditor};
 use crate::{
     editor::unique_title,
     plugins::{Plugin, ThunkContext},
@@ -105,7 +105,6 @@ where
     type SystemData = (
         Entities<'a>,
         ReadStorage<'a, AttributeGraph>,
-        WriteStorage<'a, Loader>,
         Read<'a, RuntimeEditor<S>>,
     );
     /// This system initializes a node editor when it detects
@@ -116,7 +115,7 @@ where
     /// system
     fn run(
         &mut self,
-        (entities, attributes, mut _section_loader, runtime): Self::SystemData,
+        (entities, attributes, runtime): Self::SystemData,
     ) {
         if let None = self.runtime_editor {
             self.runtime_editor = Some(runtime.clone());

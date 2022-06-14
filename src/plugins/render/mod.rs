@@ -9,7 +9,7 @@ use specs::{Component, Join, ReadStorage, RunNow, System, World, WriteStorage};
 /// For rendering a ui frame that can mutate state
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
-pub struct Edit<Context>(pub fn(&mut Context, &mut AttributeGraph, &Ui))
+pub struct Edit<Context>(pub fn(&Context, &mut AttributeGraph, &Ui))
 where
     Context: Component;
 

@@ -63,7 +63,8 @@ where
         *attributes = attributes.merge_with(context.as_ref());
     }
 
-    /// parses entity from .runmd from path
+    /// Parses entity from a .runmd file and add's T as a component from the parsed graph.
+    /// Calls init to complete building the entity.
     fn parse_entity(path: impl AsRef<str>, world: &mut World, init: impl Fn(EntityBuilder) -> Entity) -> Option<Entity> {
         if let Some(node) = AttributeGraph::load_from_file(path) {
             let context = T::from(node);

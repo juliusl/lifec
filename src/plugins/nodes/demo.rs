@@ -5,8 +5,14 @@ use crate::plugins::{Node, Plugin, Edit, Display, ThunkContext, WriteFiles, demo
 
 use super::NodeContext;
 
-#[derive(Default)]
+/// Starts a demo of the node editor
 pub struct NodeDemo(Node);
+
+impl Default for NodeDemo {
+    fn default() -> Self {
+        Self(Node::new())
+    }
+}
 
 impl Extension for NodeDemo {
     fn configure_app_world(world: &mut specs::World) {
@@ -21,7 +27,8 @@ impl Extension for NodeDemo {
                     ui.text("hello");
                 });
 
-            e.maybe_with(Some(display)).build()
+            e.maybe_with(Some(display))
+             .build()
         });
 
         WriteFiles::parse_entity("println.runmd", world, |e|{
@@ -31,7 +38,8 @@ impl Extension for NodeDemo {
                 }
             );
 
-            e.maybe_with(Some(edit)).build()
+            e.maybe_with(Some(edit))
+             .build()
         });
 
         WriteFilesDemo::configure_app_world(world);
@@ -43,8 +51,11 @@ impl Extension for NodeDemo {
     }
 
     fn on_ui(&mut self, app_world: &specs::World, ui: &imgui::Ui<'_>) {
+        // Starts the node editor
         self.0.on_ui(app_world, ui);
 
-        WriteFilesDemo::default().on_ui(app_world, ui);
+        // Since write files demo is stateless, it doesn't need to maintain state between frames
+        WriteFilesDemo::default()
+            .on_ui(app_world, ui);
     }
 }

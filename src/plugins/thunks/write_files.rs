@@ -86,7 +86,10 @@ pub mod demo {
                         if ui.button("write all files") {
                             WriteFiles::call(g);
                         }
-                        initial.as_mut().edit_attr_table(ui);
+                        initial.clone()
+                            .as_mut()
+                            .edit_attr_table(ui);
+                            
                         g.edit_attr_table(ui);
                     });
                 })))

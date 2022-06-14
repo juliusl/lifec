@@ -72,9 +72,9 @@ pub struct NodeEditorGraph {
     idgen: Option<imnodes::IdentifierGenerator>,
     thunk_index: BTreeMap<String, fn(&mut AttributeGraph)>,
     link_index: HashMap<LinkId, Link>,
+    links: HashSet<Link>,
     value_store: Store<Value>,
     nodes: Vec<NodeComponent>,
-    links: HashSet<Link>,
     attribute_store: Store<(i32, Attribute)>,
     graph: AttributeGraph
 }

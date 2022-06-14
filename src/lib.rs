@@ -407,6 +407,18 @@ where
     attributes: AttributeGraph,
 }
 
+impl<S> From<S> for Runtime<S> 
+where
+    S: RuntimeState
+{
+    fn from(state: S) -> Self {
+        Self {
+            state: Some(state),
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct WithArgs<S>
 where
