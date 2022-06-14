@@ -1,0 +1,16 @@
+
+``` demo node
+add node_title .TEXT really cool
+add input_label .TEXT coolness
+add output_label .TEXT really coolness
+add enable_input .BOOL true
+add enable_attribute .BOOL true
+add enable_output .BOOL true
+``` demo node
+add node_title .TEXT really cool node3
+add input_label .TEXT coolness2
+add output_label .TEXT really coolness
+add enable_input .BOOL true
+add enable_attribute .BOOL true
+add enable_output .BOOL true
+```

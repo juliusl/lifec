@@ -1,12 +1,12 @@
 use super::{Display, Edit, Plugin, Render};
 use crate::AttributeGraph;
 use atlier::system::{Extension, Value};
-use imgui::{ChildWindow, Condition, Window};
+use imgui::{Condition, Window};
 use imnodes::{
     editor, AttributeFlag, AttributeId, CoordinateSystem, InputPinId, Link, LinkId, NodeId,
     OutputPinId,
 };
-use specs::storage::{DenseVecStorage, GenericWriteStorage};
+use specs::storage::DenseVecStorage;
 use specs::{
     Component, Entities, Entity, Join, ReadStorage, RunNow, System, World, WorldExt, WriteStorage,
 };
@@ -352,7 +352,7 @@ impl<'a> System<'a> for NodeSync {
                             added.insert(original, entity);
                             match displays.insert(
                                 entity,
-                                Display(|c, g, ui| {
+                                Display(|c, _, ui| {
                                     ui.text(format!(
                                         "{:?}",
                                         c.node_id.and_then(|n| Some(

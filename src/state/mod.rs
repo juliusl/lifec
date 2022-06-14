@@ -66,8 +66,8 @@ impl AttributeGraph {
         let symbol_value = format!("{}::", symbol.as_ref());
         self.add_symbol(&symbol_name, symbol_value);
 
-        let defined = self.find_attr_mut(symbol_name).expect("just added");
-        defined.edit((name.as_ref().to_string(), Value::Empty));
+        let defined = self.find_attr_mut(&symbol_name).expect("just added");
+        defined.edit_as(Value::Empty);
         defined
     }
 
@@ -640,6 +640,32 @@ impl AttributeGraph {
         }).collect()
     }
 
+    /// finds the block_id for with the corresponding block name
+    pub fn find_block_id(&self, with_name: impl AsRef<str>, symbol_name: impl AsRef<str>) -> Option<u32> {
+        let symbol = format!("{}::", symbol_name.as_ref()); 
+        let symbol_name = format!("{}::{}", with_name.as_ref(), symbol_name.as_ref());
+        self.index
+            .iter()
+            .find_map(|(_, a)| {
+                if let Attribute {
+                    value: Value::Symbol(value),
+                    transient: Some((name, Value::Int(block_id))),
+                    ..
+                } = a
+                {
+                    if value.starts_with(&symbol) && name == &symbol_name {
+                        Some(block_id)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }).and_then(|id| {
+                Some(*id as u32)
+            })
+    }
+
     /// Returns self with an empty attribute w/ name.
     pub fn with_empty(&mut self, name: impl AsRef<str>) -> &mut Self {
         self.with(name, Value::Empty)
@@ -979,7 +1005,7 @@ impl RuntimeDispatcher for AttributeGraph {
 /// These are handlers for dispatched messages
 impl AttributeGraph {
 
-    fn next_block(&mut self) -> u32 {
+    fn next_block(&mut self, with_name: impl AsRef<str>, symbol_name: impl AsRef<str>) -> u32 {
         if let None = self.find_parent_block() {
             let parent_entity = self.entity() as i32;
             
@@ -993,7 +1019,12 @@ impl AttributeGraph {
             }
         }
 
-        self.entity += 1;
+        if let Some(block_id) = self.find_block_id(with_name, symbol_name) {
+            self.entity = block_id;
+        } else {
+            self.entity += 1;
+        }
+
         self.entity
     }
 
@@ -1017,7 +1048,7 @@ impl AttributeGraph {
                 Some(AttributeGraphElements::Symbol(block_name)),
                 Some(AttributeGraphElements::Symbol(block_symbol)),
             ) => {
-                let block_id = self.next_block(); 
+                let block_id = self.next_block( &block_name, &block_symbol); 
 
                 self.define(block_name, block_symbol)
                     .edit_as(Value::Int(block_id as i32));
@@ -1280,9 +1311,34 @@ fn test_attribute_graph_block_dispatcher() {
 
     assert!(graph.batch_mut(test).is_ok());
     assert_eq!(graph.entity, 0);
+    assert_eq!(graph.find_blocks("node").len(), 2);
+
+    let test = r#"
+    ``` demo node
+    add demo_node_title .TEXT hello demo node
+    ``` demo2 node
+    add demo_node_title .TEXT hello demo ndoe 2
+    ```
+    "#;
+
+    assert!(graph.batch_mut(test).is_ok());
+    assert_eq!(graph.entity, 0);
+    assert_eq!(graph.find_blocks("node").len(), 2);
+
+    let test = r#"
+    ``` demo3 node
+    add demo_node_title .TEXT hello demo node
+    ``` demo4 node
+    add demo_node_title .TEXT hello demo ndoe 2
+    ```
+    "#;
+
+    assert!(graph.batch_mut(test).is_ok());
+    assert_eq!(graph.entity, 0);
     assert_eq!(graph.find_blocks("node").len(), 4);
 
     println!("{}", graph.save().expect(""));
+    assert_eq!(Some(1), graph.find_block_id("demo", "node"));
 }
 
 #[test]

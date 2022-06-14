@@ -23,7 +23,7 @@ impl Extension for NodeDemo {
         Node::configure_app_world(world);
         Node::parse_entity(".runmd", world, |e|{
             let display = Display::<NodeContext>(
-                |c, g, ui|{
+                |_, _, ui|{
                     ui.text("hello");
                 });
 
@@ -33,7 +33,7 @@ impl Extension for NodeDemo {
 
         WriteFiles::parse_entity("println.runmd", world, |e|{
             let edit = Edit::<ThunkContext>(
-                |c, g, ui| {
+                |_, g, ui| {
                     g.edit_attr_table(ui);
                 }
             );

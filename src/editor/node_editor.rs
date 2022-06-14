@@ -7,7 +7,7 @@ use crate::{
 use atlier::system::{App, Attribute, Extension, Value};
 use imgui::{MenuItem, Ui};
 use imnodes::editor;
-use specs::{Component, Entities, Join, Read, ReadStorage, RunNow, System, WriteStorage};
+use specs::{Component, Entities, Join, Read, ReadStorage, RunNow, System};
 use std::collections::{BTreeMap, HashMap};
 
 pub struct NodeEditor<S>

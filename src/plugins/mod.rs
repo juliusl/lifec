@@ -5,10 +5,6 @@ pub use nodes::NodeContext;
 mod process;
 pub use process::Process;
 
-mod project;
-pub use project::Document;
-pub use project::Project;
-
 mod thunks;
 use specs::Builder;
 use specs::Component;
