@@ -1,12 +1,15 @@
 use atlier::system::{Value, Extension};
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
-use specs::{Component, HashMapStorage, WorldExt};
+use specs::{Component, HashMapStorage, WorldExt, Builder};
 use std::{
     process::{Command, Output}, fmt::Display,
 };
 use crate::{RuntimeDispatcher, AttributeGraph, RuntimeState};
 use super::{Plugin, ThunkContext, Edit};
+
+mod echo;
+pub use echo::Echo;
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
 #[storage(HashMapStorage)]
@@ -38,7 +41,22 @@ impl Extension for Process {
     fn configure_app_world(world: &mut specs::World) {
         world.register::<ThunkContext>();
         world.register::<Edit<ThunkContext>>();
-        world.register::<crate::plugins::Display<ThunkContext>>();
+        world.register::<Process>();
+        world.register::<Edit<Process>>();
+    
+        if let Some(graph) = AttributeGraph::load_from_file("process.runmd") {
+            for process in graph.find_blocks("process") {
+                world.create_entity()
+                    .with(Process::from(process))
+                    .maybe_with(Some(Edit::<ThunkContext>(|_, _, _| {
+
+                    })))
+                    .maybe_with(Some(Edit::<Process>(|_, _, _| {
+                        
+                    })))
+                    .build();
+            }
+        }
     }
 
     fn configure_app_systems(_: &mut specs::DispatcherBuilder) {
@@ -60,7 +78,7 @@ impl Plugin<ThunkContext> for Process {
     fn call_with_context(context: &mut super::ThunkContext) {
         let process = Self::from(context.as_ref().clone());
         if let Some(command) = process.command() {
-            match process.dispatch(command) {
+            match process.interpret_command(command, Process::handle_output) {
                 Ok(mut output) => {
                     output.stdout = output.stdout.and_then(|o| {
                         context.write_output(
@@ -197,7 +215,9 @@ impl Display for Process {
 
 impl From<AttributeGraph> for Process {
     fn from(graph: AttributeGraph) -> Self {
-        Self { graph, stdout: None, stderr: None, code: None, elapsed: None, timestamp_utc: None, timestamp_local: None, start_time: None }
+        Self { graph, 
+            ..Default::default()
+        }
     }
 }
 

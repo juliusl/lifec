@@ -159,7 +159,6 @@ impl Extension for Node {
 
     fn on_ui(&mut self, app_world: &World, ui: &imgui::Ui) {
         let mut frame = Render::<NodeContext>::next_frame(ui);
-
         self.run_now(app_world);
 
         let mut size = [800.0, 600.0];
@@ -315,6 +314,7 @@ impl<'a> System<'a> for Node {
                 }
             }
         }
+
         if let Some(config) = AttributeGraph::load_from_file("node.runmd") {
             if config.hash_code() != self.graph.hash_code() {
                 self.graph = config;

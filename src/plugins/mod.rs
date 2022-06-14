@@ -1,4 +1,5 @@
 mod nodes;
+use atlier::system::Extension;
 pub use nodes::Node;
 pub use nodes::NodeContext;
 

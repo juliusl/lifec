@@ -1089,6 +1089,14 @@ impl AttributeGraph {
         }
     }
 
+    fn start_block_mode(&mut self, block_name: impl AsRef<str>, block_symbol: impl AsRef<str>) {
+        let block_id = self.next_block(&block_name, &block_symbol);
+
+        let block = self.define(block_name, &block_symbol);
+        *block.value_mut() = Value::Symbol(format!("{}::{}", block_symbol.as_ref(), "block"));
+        block.edit_as(Value::Int(block_id as i32));
+    }
+
     fn on_block(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
 
@@ -1097,17 +1105,12 @@ impl AttributeGraph {
                 Some(AttributeGraphElements::Symbol(block_name)),
                 Some(AttributeGraphElements::Symbol(block_symbol)),
             ) => {
-                let block_id = self.next_block(&block_name, &block_symbol);
-
-                let block = self.define(block_name, &block_symbol);
-                *block.value_mut() = Value::Symbol(format!("{}::{}", block_symbol, "block"));
-                block.edit_as(Value::Int(block_id as i32));
+                self.start_block_mode(block_name, block_symbol);
             }
             _ => {
                 self.end_block_mode();
             }
         }
-
         Ok(())
     }
 
