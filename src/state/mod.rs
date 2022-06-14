@@ -1,16 +1,11 @@
-use crate::editor::unique_title;
-use crate::{RuntimeDispatcher, RuntimeState};
-use atlier::system::App;
-use atlier::system::{Attribute, Value};
+use crate::{editor::unique_title, RuntimeDispatcher, RuntimeState};
+use atlier::system::{App, Attribute, Value};
 use imgui::TableFlags;
 use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, Entity};
-use std::collections::hash_map::DefaultHasher;
-use std::fs;
-use std::hash::{Hash, Hasher};
-use std::{collections::BTreeMap, fmt::Display};
+use std::{collections::{hash_map::DefaultHasher, BTreeMap}, fs, hash::{Hash, Hasher}, fmt::Display};
 
 /// Attribute graph is a component that indexes attributes for an entity
 /// It is designed to be a general purpose enough to be the common element of runtime state storage
@@ -19,16 +14,6 @@ use std::{collections::BTreeMap, fmt::Display};
 pub struct AttributeGraph {
     entity: u32,
     index: BTreeMap<String, Attribute>,
-}
-
-impl App for AttributeGraph {
-    fn name() -> &'static str {
-        "Attribute Graph"
-    }
-
-    fn show_editor(&mut self, ui: &imgui::Ui) {
-        self.edit_attr_table(ui);
-    }
 }
 
 impl AttributeGraph {
@@ -179,6 +164,20 @@ impl AttributeGraph {
                     println!("Saved output to {}", file_name);
                 }
             }
+
+            if let Some(file_source) = self.clone().find_attr("src::file").and_then(|a| a.transient()).and_then(|(_, v)| {
+                if let Value::TextBuffer(file_source) = v {
+                    Some(file_source)
+                } else {
+                    None 
+                }
+            }) {
+                if imgui::MenuItem::new(format!("Reload source {}", &file_source)).build(ui) {
+                    if self.from_file(&file_source).is_ok() {
+                        println!("Reloaded {}", &file_source);
+                    }
+                }
+            }
             token.end()
         }
 
@@ -277,7 +276,11 @@ impl AttributeGraph {
                 }
 
                 if ui.table_next_column() {
-                    self.edit_attr(attr.name(), attr.name(), ui);
+                    if attr.id() != self.entity() {
+                        ui.text(format!("imported {}", attr.id()));
+                    } else {
+                        self.edit_attr(attr.name(), attr.name(), ui);
+                    }
                 }
 
                 if ui.table_next_column() {
@@ -664,7 +667,7 @@ impl AttributeGraph {
                     ..
                 } = a
                 {
-                    if value.starts_with(&symbol) && name == &symbol_name {
+                    if value.starts_with(&symbol) && value.ends_with("block") && name == &symbol_name {
                         Some(block_id)
                     } else {
                         None
@@ -682,24 +685,35 @@ impl AttributeGraph {
         with_name: impl AsRef<str>,
         symbol_name: impl AsRef<str>,
     ) -> Option<Self> {
-        let symbol = format!("{}::", symbol_name.as_ref());
-        let symbol_name = format!("{}::{}", with_name.as_ref(), symbol_name.as_ref());
-        self.index.iter().find_map(|(_, a)| {
-            if let Attribute {
-                value: Value::Symbol(value),
-                transient: Some((name, Value::Int(block_id))),
-                ..
-            } = a
-            {
-                if value.starts_with(&symbol) && name == &symbol_name {
-                    self.find_imported_graph(*block_id as u32)
+        self.find_block_id(with_name, symbol_name)
+            .and_then(|id| self.find_imported_graph(id))
+    }
+
+    /// iterates each block in the graph
+    pub fn iter_blocks(&self) -> impl Iterator<Item = Self> + '_ {
+        self.index
+            .iter()
+            .filter_map(|(_, a)| {
+                if let Attribute {
+                    name,
+                    value: Value::Symbol(_),
+                    transient: Some((transient_name, Value::Int(_))),
+                    ..
+                } = a {
+                    if name == transient_name {
+                        let parts: Vec<&str> = name.split("::").collect();
+                        if let (Some(name), Some(symbol)) = (parts.get(0), parts.get(1)) {
+                            self.find_block(name, symbol)
+                        } else {
+                            None
+                        }
+                    }  else {
+                        None
+                    }
                 } else {
                     None
                 }
-            } else {
-                None
-            }
-        })
+        }).into_iter()
     }
 
     /// Returns self with an empty attribute w/ name.
@@ -1085,8 +1099,9 @@ impl AttributeGraph {
             ) => {
                 let block_id = self.next_block(&block_name, &block_symbol);
 
-                self.define(block_name, block_symbol)
-                    .edit_as(Value::Int(block_id as i32));
+                let block = self.define(block_name, &block_symbol);
+                *block.value_mut() = Value::Symbol(format!("{}::{}", block_symbol, "block"));
+                block.edit_as(Value::Int(block_id as i32));
             }
             _ => {
                 self.end_block_mode();
@@ -1378,7 +1393,24 @@ fn test_attribute_graph_block_dispatcher() {
 
     println!("{}", graph.save().expect(""));
     assert_eq!(Some(1), graph.find_block_id("demo", "node"));
-    assert!(graph.find_block("demo3", "node").and_then(|a| Some(a.entity() == 3)).expect("should return the correct block"))
+    assert!(graph.find_block("demo3", "node").and_then(|a| Some(a.entity() == 3)).expect("should return the correct block"));
+    
+    let test = r#"
+    ``` demo3 node2
+    add demo_node_title .TEXT hello demo node
+    ``` demo4 node3
+    add demo_node_title .TEXT hello demo ndoe 2
+    ```
+    "#;
+
+    assert!(graph.batch_mut(test).is_ok());
+    assert_eq!(graph.entity, 0);
+    assert_eq!(graph.iter_blocks().count(), 6);
+
+    println!("printing all blocks");
+    for b in graph.iter_blocks() {
+        println!("{}", b.save().expect(""));
+    }
 }
 
 #[test]

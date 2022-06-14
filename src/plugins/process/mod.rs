@@ -25,12 +25,9 @@ pub struct Process {
 impl Process {
     fn command(&self) -> Option<String> {
         let command = self.graph.find_attr_value("command");
-        let subcommands = self.graph.find_attr_value("subcommands");
 
-        if let (Some(Value::TextBuffer(command)), Some(Value::TextBuffer(subcommands))) =
-            (command, subcommands)
-        {
-            Some(format!("{}::{}", command, subcommands))
+        if let Some(Value::TextBuffer(command)) = command {
+            Some(command.to_string())
         } else {
             None
         }

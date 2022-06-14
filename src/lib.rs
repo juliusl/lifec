@@ -409,11 +409,13 @@ where
 
 impl<S> From<S> for Runtime<S> 
 where
-    S: RuntimeState
+    S: RuntimeState + AsRef<AttributeGraph>
 {
     fn from(state: S) -> Self {
+        let attributes = state.as_ref().clone();
         Self {
             state: Some(state),
+            attributes,
             ..Default::default()
         }
     }
