@@ -1,11 +1,11 @@
 use atlier::system::{Value, Extension};
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
-use specs::{Component, HashMapStorage, WorldExt, Builder};
+use specs::{Component, HashMapStorage, WorldExt, Builder, World};
 use std::{
     process::{Command, Output}, fmt::Display,
 };
-use crate::{RuntimeDispatcher, AttributeGraph, RuntimeState};
+use crate::{RuntimeDispatcher, AttributeGraph, RuntimeState, Runtime};
 use super::{Plugin, ThunkContext, Edit};
 
 mod echo;
@@ -52,7 +52,7 @@ impl Extension for Process {
 
                     })))
                     .maybe_with(Some(Edit::<Process>(|_, _, _| {
-                        
+
                     })))
                     .build();
             }

@@ -73,12 +73,8 @@ pub mod demo {
             world.register::<Edit<ThunkContext>>();
             world.register::<Display<ThunkContext>>();
 
-
-            if let Some(demo) = AttributeGraph::load_from_file("demo.runmd") {
-                world
-                .create_entity()
-                .with(demo)
-                .maybe_with(Some(ThunkContext::from(
+            WriteFiles::parse_entity("demo.runmd", world, |e| {
+                e.maybe_with(Some(ThunkContext::from(
                     AttributeGraph::load_from_file(".runmd").unwrap_or_default(),
                 )))
                 .maybe_with(Some(Edit::<ThunkContext>(|initial, g, ui| {
@@ -93,8 +89,8 @@ pub mod demo {
                         g.edit_attr_table(ui);
                     });
                 })))
-                .build();
-            }
+                .build()
+            });
         }
 
         fn configure_app_systems(_: &mut specs::DispatcherBuilder) {
