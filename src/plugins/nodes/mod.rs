@@ -1,5 +1,5 @@
-use super::{Display, Edit, Plugin, Render, Engine};
-use crate::AttributeGraph;
+use super::{Display, Edit, Engine, Plugin, Render};
+use crate::{AttributeGraph, RuntimeState};
 use atlier::system::{Extension, Value};
 use imgui::{Condition, Window};
 use imnodes::{
@@ -106,19 +106,43 @@ impl Node {
 
     /// Create the link object between two node contexts
     pub fn link(from: NodeContext, to: NodeContext) -> Option<Link> {
-        if let (
-            Some(start_node), 
-            Some(start_pin), 
-            Some(end_node), 
-            Some(end_pin)
-        ) = (from.node_id, from.output_pin_id, to.node_id, to.input_pin_id) {
+        if let (Some(start_node), Some(start_pin), Some(end_node), Some(end_pin)) = (
+            from.node_id,
+            from.output_pin_id,
+            to.node_id,
+            to.input_pin_id,
+        ) {
             Some(Link {
                 start_node,
                 end_node,
                 start_pin,
                 end_pin,
-                craeated_from_snap: false 
+                craeated_from_snap: false,
             })
+        } else {
+            None
+        }
+    }
+
+    /// Reverse lookup node_contexts from link
+    pub fn reverse_lookup(&self, link: &Link) -> Option<(&NodeContext, &NodeContext)> {
+        let Link {
+            start_node,
+            end_node,
+            ..
+        } = link;
+
+        let start = self
+            .contexts
+            .iter()
+            .find(|c| c.node_id == Some(*start_node));
+        let end = self
+            .contexts
+            .iter()
+            .find(|c| c.node_id == Some(*end_node));
+
+        if let (Some(from), Some(to)) = (start, end) {
+            Some((from, to))
         } else {
             None
         }
@@ -233,11 +257,7 @@ impl Extension for Node {
                             if let Some(attribute_id) = &context.attribute_id {
                                 node_scope.attribute(*attribute_id, || {
                                     // If the entity has an edit/display, it's shown in this block
-                                    frame.on_render(
-                                        &mut context,
-                                        edit.clone(),
-                                        display.clone(),
-                                    );
+                                    frame.on_render(&mut context, edit.clone(), display.clone());
                                 });
                             }
 
@@ -285,11 +305,19 @@ impl Extension for Node {
 
 impl Engine for Node {
     fn next_mut(&mut self, _: &mut AttributeGraph) {
-        // TODO find/add any links 
+        // TODO find/add any links
     }
 
     fn exit(&mut self, _: &AttributeGraph) {
-        // No-op
+        for (_, link) in self.link_index.iter() {
+            if let Some((from, to)) = self.reverse_lookup(link) {
+                let (from, to) = (from.as_ref().entity(), to.as_ref().entity());
+                let from = from as i32;
+                let to = to as i32;
+                self.graph.with_int_pair("last_link", &[from, to]);
+                println!("{}", self.graph.save().unwrap());
+            }
+        }
     }
 }
 
@@ -339,7 +367,6 @@ impl<'a> System<'a> for Node {
                     self.contexts.insert(context.clone());
                 }
             }
-
 
             self.on_event(context);
         }

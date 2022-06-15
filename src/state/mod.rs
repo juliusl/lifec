@@ -649,7 +649,11 @@ impl AttributeGraph {
 
     /// find all blocks by symbol name
     pub fn find_blocks(&self, symbol_name: impl AsRef<str>) -> Vec<Self> {
-        self.find_imported_symbol_values(symbol_name)
+        let mut clone = self.clone();
+        clone.entity = 0; // set to 0 to bring it back up to the root
+
+        clone
+            .find_imported_symbol_values(symbol_name)
             .iter()
             .filter_map(|(_, value)| {
                 if let Value::Int(block_id) = value {
@@ -710,12 +714,12 @@ impl AttributeGraph {
             .filter_map(|(_, a)| {
                 if let Attribute {
                     name,
-                    value: Value::Symbol(_),
+                    value: Value::Symbol(maybe_block_symbol),
                     transient: Some((transient_name, Value::Int(_))),
                     ..
                 } = a
                 {
-                    if name == transient_name {
+                    if name == transient_name && maybe_block_symbol.ends_with("::block") {
                         let parts: Vec<&str> = name.split("::").collect();
                         if let (Some(name), Some(symbol)) = (parts.get(0), parts.get(1)) {
                             self.find_block(name, symbol)
@@ -730,6 +734,18 @@ impl AttributeGraph {
                 }
             })
             .into_iter()
+    }
+
+    pub fn find_blocks_for(&self, block_name: impl AsRef<str>) -> impl Iterator<Item = Self> + '_ {
+        let block_name = block_name.as_ref().to_string();
+        self.iter_blocks().filter(move |b| {
+            if let Some(filtered) = b.find_text("block_name").and_then(|b| Some(b.as_str() == block_name)) {
+                filtered
+            } else {
+                false 
+            }
+        })
+        .into_iter()
     }
 
     /// Returns self with an empty attribute w/ name.
@@ -952,10 +968,7 @@ impl AttributeGraph {
                     {
                         let current = self.entity as i32;
                         self.define(attr_name, "link")
-                            .edit_as(Value::IntPair(
-                                block.entity as i32, 
-                                current
-                            ));
+                            .edit_as(Value::IntPair(block.entity as i32, current));
                     }
                 } else {
                     // If there isn't a transient value currently, do we skip?, could mean it isn't being published?
@@ -974,10 +987,7 @@ impl AttributeGraph {
                         a.edit_as(attr.value().clone());
                     }) {
                         self.define(attr_name, "link")
-                            .edit_as(Value::IntPair(
-                                current as i32, 
-                                block.entity as i32
-                            ));
+                            .edit_as(Value::IntPair(current as i32, block.entity as i32));
                     }
                     self.entity = current;
                 }
@@ -1180,7 +1190,8 @@ impl AttributeGraph {
         block.commit();
         block.edit_as(Value::Int(block_id as i32));
 
-        self.with_text("block_name", block_name);
+        self.with_text("block_name", block_name)
+            .with_text("block_symbol", block_symbol);
     }
 
     fn on_block(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
@@ -1297,6 +1308,14 @@ impl AttributeGraph {
                 }
 
                 Ok(())
+            }
+            (Some(AttributeGraphElements::Symbol(attr_name)), _) => {
+                if self.find_update_attr(attr_name, |a| a.commit()) {
+                    Ok(())
+                } else {
+                    // todo
+                    Ok(())
+                }
             }
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
         }
@@ -1424,6 +1443,7 @@ impl AttributeGraph {
         // Example
         // from block_name block_symbol attr_name -> transient attribute
         // from block_name block_symbol attr_name #expect
+        // from block_symbol attr_name
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
 
         match (
@@ -1437,6 +1457,15 @@ impl AttributeGraph {
                 Some(AttributeGraphElements::Symbol(attr_name)),
             ) => {
                 self.from_block(block_name, block_symbol, attr_name);
+            }
+            (
+                Some(AttributeGraphElements::Symbol(block_symbol)),
+                Some(AttributeGraphElements::Symbol(attr_name)),
+                _,
+            ) => {
+                if let Some(block_name) = self.find_text("block_name") {
+                    self.from_block(block_name, block_symbol, attr_name);
+                }
             }
             _ => {}
         }
@@ -1537,27 +1566,29 @@ fn test_attribute_graph_block_dispatcher() {
     add demo_node_title .TEXT testing to_demo node
     to node demo_node_title
     to node2 demo_node_title
+    publish demo_node_title
+    ``` demo4 window
+    add demo_node_title .EMPTY
+    from node6 demo_node_title
+    apply demo_node_title
     ```
     "#;
 
     assert!(graph.batch_mut(test).is_ok());
     assert_eq!(graph.entity, 0);
-    assert_eq!(graph.iter_blocks().count(), 7);
-
+    assert_eq!(graph.iter_blocks().count(), 8);
     println!("printing all blocks");
     for b in graph.iter_blocks() {
         println!("{}", b.save().expect(""));
     }
 
     let check_from = graph.clone().find_block("demo4", "node3").expect("exists");
-
     println!("{:?}", check_from);
 
     let check_from = check_from
         .find_attr("demo_node_title")
         .expect("exists")
         .transient();
-
     assert_eq!(
         Some(&(
             "demo_node_title".to_string(),
@@ -1574,7 +1605,6 @@ fn test_attribute_graph_block_dispatcher() {
         .find_attr("demo_node_title")
         .expect("exists")
         .transient();
-
     assert_eq!(
         Some(&(
             "demo_node_title".to_string(),
@@ -1582,6 +1612,23 @@ fn test_attribute_graph_block_dispatcher() {
         )),
         check_to
     );
+
+    let check_from_other = graph.clone()
+        .find_block("demo4", "window")
+        .expect("exists");        
+    println!("{:?}", check_from_other);
+
+    let check_from_other = check_from_other.find_attr_value("demo_node_title");
+    assert_eq!(
+        Some(&Value::TextBuffer("testing to_demo node".to_string())),
+        check_from_other
+    );
+
+    for demo4_block in graph.find_blocks_for("demo4") {
+        println!("{:?}", demo4_block.find_text("block_name"));
+        println!("{:?}", demo4_block.find_text("block_symbol"));
+        println!("{:?}", demo4_block);
+    }
 }
 
 #[test]

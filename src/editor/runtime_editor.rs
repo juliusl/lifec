@@ -72,7 +72,14 @@ where
 
                     if ui.collapsing_header("blocks", TreeNodeFlags::empty()) {
                         for mut block in graph.iter_blocks() {
-                            if ui.collapsing_header(format!("block {}, {}", block.entity(), block.hash_code()), TreeNodeFlags::empty()) {
+                            let block_name = block
+                                .find_text("block_name")
+                                .unwrap_or("unknown".to_string());
+                            let block_symbol = block.
+                                find_text("block_symbol")
+                                .unwrap_or("unknown".to_string());
+
+                            if ui.collapsing_header(format!("{} {}, {}", block_name, block_symbol, block.hash_code()), TreeNodeFlags::empty()) {
                                 block.edit_attr_table(ui);
                             }
                         }
