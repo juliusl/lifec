@@ -1,4 +1,4 @@
-use super::{Display, Edit, Plugin, Render};
+use super::{Display, Edit, Plugin, Render, Engine};
 use crate::AttributeGraph;
 use atlier::system::{Extension, Value};
 use imgui::{Condition, Window};
@@ -102,6 +102,26 @@ pub struct Node {
 impl Node {
     pub fn new() -> Self {
         Self::from(imnodes::Context::new())
+    }
+
+    /// Create the link object between two node contexts
+    pub fn link(from: NodeContext, to: NodeContext) -> Option<Link> {
+        if let (
+            Some(start_node), 
+            Some(start_pin), 
+            Some(end_node), 
+            Some(end_pin)
+        ) = (from.node_id, from.output_pin_id, to.node_id, to.input_pin_id) {
+            Some(Link {
+                start_node,
+                end_node,
+                start_pin,
+                end_pin,
+                craeated_from_snap: false 
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -213,7 +233,7 @@ impl Extension for Node {
                             if let Some(attribute_id) = &context.attribute_id {
                                 node_scope.attribute(*attribute_id, || {
                                     // If the entity has an edit/display, it's shown in this block
-                                    frame.render_context(
+                                    frame.on_render(
                                         &mut context,
                                         edit.clone(),
                                         display.clone(),
@@ -263,6 +283,16 @@ impl Extension for Node {
     }
 }
 
+impl Engine for Node {
+    fn next_mut(&mut self, _: &mut AttributeGraph) {
+        // TODO find/add any links 
+    }
+
+    fn exit(&mut self, _: &AttributeGraph) {
+        // No-op
+    }
+}
+
 impl<'a> System<'a> for Node {
     type SystemData = (
         WriteStorage<'a, NodeContext>,
@@ -309,6 +339,9 @@ impl<'a> System<'a> for Node {
                     self.contexts.insert(context.clone());
                 }
             }
+
+
+            self.on_event(context);
         }
 
         if let Some(config) = AttributeGraph::load_from_file("node.runmd") {

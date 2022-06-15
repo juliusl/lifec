@@ -51,8 +51,8 @@ where
         self.run_now(world);
     }
 
-    /// starts the render engine with graph
-    pub fn render_context(
+    /// handles the render event
+    pub fn on_render(
         &mut self,
         context: &mut Context,
         edit: Option<Edit<Context>>,
@@ -146,7 +146,7 @@ where
             let display = d.and_then(|d| Some(d.clone()));
 
             if let Some(mut context) = context {
-                self.render_context(&mut context, edit, display);
+                self.on_render(&mut context, edit, display);
                 graph.merge(context.as_ref());
             }
         }
