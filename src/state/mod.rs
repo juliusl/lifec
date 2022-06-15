@@ -945,12 +945,17 @@ impl AttributeGraph {
         attr_name: impl AsRef<str>,
     ) {
         if let Some(block) = self.find_block(block_name, block_symbol) {
-            if let Some(attr_value) = block.find_attr(attr_name) {
+            if let Some(attr_value) = block.find_attr(&attr_name) {
                 if let Some((name, value)) = attr_value.transient() {
                     if self
                         .find_update_attr(name, |attr| attr.edit((name.to_string(), value.clone())))
                     {
-                        // todo
+                        let current = self.entity as i32;
+                        self.define(attr_name, "link")
+                            .edit_as(Value::IntPair(
+                                block.entity as i32, 
+                                current
+                            ));
                     }
                 } else {
                     // If there isn't a transient value currently, do we skip?, could mean it isn't being published?
@@ -965,10 +970,14 @@ impl AttributeGraph {
                 if let Some(attr) = self.clone().find_attr(&attr_name) {
                     let current = self.entity;
                     self.entity = block.entity;
-                    if self.find_update_attr(attr_name, |a| {
+                    if self.find_update_attr(&attr_name, |a| {
                         a.edit_as(attr.value().clone());
                     }) {
-                        // todo
+                        self.define(attr_name, "link")
+                            .edit_as(Value::IntPair(
+                                current as i32, 
+                                block.entity as i32
+                            ));
                     }
                     self.entity = current;
                 }
@@ -1559,6 +1568,7 @@ fn test_attribute_graph_block_dispatcher() {
 
     let check_to = graph.clone().find_block("demo4", "node").expect("exists");
     println!("{:?}", check_to);
+    println!("{:?}", check_to.find_symbol_values("link"));
 
     let check_to = check_to
         .find_attr("demo_node_title")
