@@ -1044,6 +1044,8 @@ impl RuntimeDispatcher for AttributeGraph {
                 AttributeGraphEvents::Define => self.on_define(event_lexer.remainder()),
                 AttributeGraphEvents::Apply => self.on_apply(event_lexer.remainder()),
                 AttributeGraphEvents::Edit => self.on_edit(event_lexer.remainder()),
+                AttributeGraphEvents::From => self.on_from(event_lexer.remainder()),
+                AttributeGraphEvents::To => self.on_to(event_lexer.remainder()),
                 AttributeGraphEvents::BlockDelimitter => self.on_block(event_lexer.remainder()),
                 AttributeGraphEvents::Comment => Ok(()),
                 AttributeGraphEvents::Error => Err(AttributeGraphErrors::UnknownEvent),
@@ -1334,6 +1336,46 @@ impl AttributeGraph {
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
         }
     }
+
+    fn on_from(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
+        // Example 
+        // from block_name block_symbol attr_name -> transient attribute
+        // from block_name block_symbol attr_name #expect 
+        let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
+
+        match (element_lexer.next(), element_lexer.next(), element_lexer.next()) {
+            (Some(AttributeGraphElements::Symbol(block_name)), Some(AttributeGraphElements::Symbol(block_symbol)), Some(AttributeGraphElements::Symbol(attr_name))) => {
+               if let Some(block) = self.find_block(block_name, block_symbol) {
+                    if let Some(attr_value) = block.find_attr(attr_name) {
+                        if let Some((name, value)) = attr_value.transient() {
+                            if !self.find_update_attr(name, |attr| attr.edit((name.to_string(), value.clone()))) {
+                                // if it didn't already exist, add it?
+                            }
+                        } else {
+                            // If there isn't a transient value currently, do we skip?, could mean it isn't being published?
+                        }
+                    }
+               }
+            },
+            _ => {
+
+            }
+        }
+        Ok(())
+    }
+
+    fn on_to(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
+        if let Some(true) = self.is_enabled("block_mode") {
+            let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
+            // get the current block_name
+            // example 
+            // to block_symbol attr_name 
+            // from #block block_name block_symbol? 
+            // 
+        }
+        Ok(())
+    }
+
 }
 
 #[test]
@@ -1402,8 +1444,10 @@ fn test_attribute_graph_block_dispatcher() {
     let test = r#"
     ``` demo3 node2
     add demo_node_title .TEXT hello demo node
+    edit demo_node_title .TEXT testing
     ``` demo4 node3
     add demo_node_title .TEXT hello demo ndoe 2
+    from demo3 node2 demo_node_title
     ```
     "#;
 
@@ -1415,6 +1459,19 @@ fn test_attribute_graph_block_dispatcher() {
     for b in graph.iter_blocks() {
         println!("{}", b.save().expect(""));
     }
+
+    let check_from = graph
+        .clone()
+        .find_block("demo4", "node3")
+        .expect("exists");
+
+    println!("{:?}", check_from);
+
+    let check_from = check_from.find_attr("demo_node_title")
+        .expect("exists")
+        .transient();
+
+    assert_eq!(Some(&("demo_node_title".to_string(), Value::TextBuffer("testing".to_string()))), check_from);
 }
 
 #[test]
@@ -1663,6 +1720,10 @@ pub enum AttributeGraphEvents {
     /// Set's the transient value for an attribute. Types omitted from this event are symbol, reference, and binary-vector.
     #[token("edit")]
     Edit,
+    #[token("from")]
+    From,
+    #[token("to")]
+    To,
     /// Usage: # Here is a helpful comment
     #[token("#")]
     Comment,
