@@ -212,13 +212,9 @@ impl Extension for Node {
 
                             if let Some(attribute_id) = &context.attribute_id {
                                 node_scope.attribute(*attribute_id, || {
-                                    let config = context.clone();
-                                    let graph = context.as_mut();
-
                                     // If the entity has an edit/display, it's shown in this block
-                                    frame.render_graph(
-                                        graph,
-                                        config,
+                                    frame.render_context(
+                                        &mut context,
                                         edit.clone(),
                                         display.clone(),
                                     );

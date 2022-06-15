@@ -1,5 +1,4 @@
 mod nodes;
-use atlier::system::Extension;
 pub use nodes::Node;
 pub use nodes::NodeContext;
 
@@ -72,6 +71,15 @@ where
         } else {
             None
         }
+    }
+
+    fn on_event(&mut self, context: &mut T) 
+        where 
+            Self: Engine + Sized
+    {
+        let attributes = context.as_mut();
+        self.next_mut(attributes);
+        self.exit(&attributes);
     }
 }
 

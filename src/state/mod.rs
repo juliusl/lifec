@@ -328,6 +328,7 @@ impl AttributeGraph {
         })
     }
 
+    /// merge the values from the other graph
     pub fn merge(&mut self, other: &AttributeGraph) {
         for attr in other.iter_attributes().cloned() {
             if !self.index.contains_key(&attr.to_string()) {

@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use super::Engine;
+use super::{Engine, Plugin};
 use crate::AttributeGraph;
 use imgui::Ui;
 use specs::storage::DenseVecStorage;
@@ -24,7 +24,6 @@ where
 /// The render system is to interface entities with specs systems
 pub struct Render<'ui, Context>(
     RefCell<Option<&'ui Ui<'ui>>>,
-    Option<Context>,
     Option<Edit<Context>>,
     Option<Display<Context>>,
 )
@@ -33,12 +32,17 @@ where
 
 impl<'ui, Context> Render<'ui, Context>
 where
-    Context:
-        Component + Clone + AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph>,
+    Context: Component
+        + Clone
+        + AsRef<AttributeGraph>
+        + AsMut<AttributeGraph>
+        + From<AttributeGraph>
+        + Send
+        + Sync,
 {
     /// next_frame prepares the the system for the next frame
     pub fn next_frame(ui: &'ui imgui::Ui<'ui>) -> Self {
-        Self(RefCell::new(Some(ui)), None, None, None)
+        Self(RefCell::new(Some(ui)), None, None)
     }
 
     /// since render needs to happen on the ui thread, this method is to call the system
@@ -48,19 +52,23 @@ where
     }
 
     /// starts the render engine with graph
-    pub fn render_graph(
+    pub fn render_context(
         &mut self,
-        graph: &mut AttributeGraph,
-        context: Context,
+        context: &mut Context,
         edit: Option<Edit<Context>>,
         display: Option<Display<Context>>,
-    ) {
-        self.1 = Some(context);
-        self.2 = edit;
-        self.3 = display;
+    ) where
+        Self: Plugin<Context>,
+    {
+        self.1 = edit;
+        self.2 = display;
+        self.on_event(context);
+    }
 
-        self.next_mut(graph);
-        self.exit(graph);
+    pub fn frame(&self, render: impl FnOnce(&Ui)) {
+        if let Some(ui) = &self.0.borrow().and_then(|ui| Some(ui)) {
+            render(ui);
+        }
     }
 }
 
@@ -70,26 +78,52 @@ where
         Component + Clone + AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph>,
 {
     fn next_mut(&mut self, attributes: &mut AttributeGraph) {
-        if let Render(ui, Some(context), Some(Edit(edit)), ..) = self {
-            if let Some(ui) = ui.borrow().and_then(|ui| Some(ui)) { 
-                edit(context, attributes, ui);
+        let context = Context::from(attributes.clone());
+
+        if let Render(ui, Some(Edit(edit)), ..) = self {
+            if let Some(ui) = ui.borrow().and_then(|ui| Some(ui)) {
+                edit(&context, attributes, ui);
             }
         }
     }
 
     fn exit(&mut self, attributes: &AttributeGraph) {
-        if let Render(ui, Some(context), .., Some(Display(display))) = self {
-            if let Some(ui) = ui.borrow().and_then(|ui| Some(ui)) { 
-                display(context, attributes, ui);            
+        let context = Context::from(attributes.clone());
+
+        if let Render(ui, .., Some(Display(display))) = self {
+            if let Some(ui) = ui.borrow().and_then(|ui| Some(ui)) {
+                display(&context, attributes, ui);
             }
         }
     }
 }
 
+impl<Context> Plugin<Context> for Render<'_, Context>
+where
+    Context: Component
+        + Clone
+        + AsRef<AttributeGraph>
+        + AsMut<AttributeGraph>
+        + From<AttributeGraph>
+        + Sync
+        + Send,
+{
+    fn symbol() -> &'static str {
+        "render"
+    }
+
+    fn call_with_context(_: &mut Context) {}
+}
+
 impl<'a, Context> System<'a> for Render<'_, Context>
 where
-    Context:
-        Component + Clone + AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph>,
+    Context: Component
+        + Clone
+        + AsRef<AttributeGraph>
+        + AsMut<AttributeGraph>
+        + From<AttributeGraph>
+        + Send
+        + Sync,
 {
     type SystemData = (
         WriteStorage<'a, AttributeGraph>,
@@ -99,7 +133,7 @@ where
     );
 
     fn run(&mut self, (mut graphs, context, edits, displays): Self::SystemData) {
-        for (g, c, e, d) in (
+        for (graph, c, e, d) in (
             &mut graphs,
             context.maybe(),
             edits.maybe(),
@@ -111,10 +145,10 @@ where
             let edit = e.and_then(|e| Some(e.clone()));
             let display = d.and_then(|d| Some(d.clone()));
 
-            if let Some(context) = context {
-                self.render_graph(g, context, edit, display);
+            if let Some(mut context) = context {
+                self.render_context(&mut context, edit, display);
+                graph.merge(context.as_ref());
             }
         }
     }
 }
-
