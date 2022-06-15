@@ -5,7 +5,12 @@ use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, Entity};
-use std::{collections::{hash_map::DefaultHasher, BTreeMap}, fs, hash::{Hash, Hasher}, fmt::Display};
+use std::{
+    collections::{hash_map::DefaultHasher, BTreeMap},
+    fmt::Display,
+    fs,
+    hash::{Hash, Hasher},
+};
 
 /// Attribute graph is a component that indexes attributes for an entity
 /// It is designed to be a general purpose enough to be the common element of runtime state storage
@@ -165,13 +170,18 @@ impl AttributeGraph {
                 }
             }
 
-            if let Some(file_source) = self.clone().find_attr("src::file").and_then(|a| a.transient()).and_then(|(_, v)| {
-                if let Value::TextBuffer(file_source) = v {
-                    Some(file_source)
-                } else {
-                    None 
-                }
-            }) {
+            if let Some(file_source) = self
+                .clone()
+                .find_attr("src::file")
+                .and_then(|a| a.transient())
+                .and_then(|(_, v)| {
+                    if let Value::TextBuffer(file_source) = v {
+                        Some(file_source)
+                    } else {
+                        None
+                    }
+                })
+            {
                 if imgui::MenuItem::new(format!("Reload source {}", &file_source)).build(ui) {
                     if self.from_file(&file_source).is_ok() {
                         println!("Reloaded {}", &file_source);
@@ -668,7 +678,10 @@ impl AttributeGraph {
                     ..
                 } = a
                 {
-                    if value.starts_with(&symbol) && value.ends_with("block") && name == &symbol_name {
+                    if value.starts_with(&symbol)
+                        && value.ends_with("block")
+                        && name == &symbol_name
+                    {
                         Some(block_id)
                     } else {
                         None
@@ -700,7 +713,8 @@ impl AttributeGraph {
                     value: Value::Symbol(_),
                     transient: Some((transient_name, Value::Int(_))),
                     ..
-                } = a {
+                } = a
+                {
                     if name == transient_name {
                         let parts: Vec<&str> = name.split("::").collect();
                         if let (Some(name), Some(symbol)) = (parts.get(0), parts.get(1)) {
@@ -708,13 +722,14 @@ impl AttributeGraph {
                         } else {
                             None
                         }
-                    }  else {
+                    } else {
                         None
                     }
                 } else {
                     None
                 }
-        }).into_iter()
+            })
+            .into_iter()
     }
 
     /// Returns self with an empty attribute w/ name.
@@ -923,6 +938,44 @@ impl AttributeGraph {
         ));
     }
 
+    pub fn from_block(
+        &mut self,
+        block_name: impl AsRef<str>,
+        block_symbol: impl AsRef<str>,
+        attr_name: impl AsRef<str>,
+    ) {
+        if let Some(block) = self.find_block(block_name, block_symbol) {
+            if let Some(attr_value) = block.find_attr(attr_name) {
+                if let Some((name, value)) = attr_value.transient() {
+                    if self
+                        .find_update_attr(name, |attr| attr.edit((name.to_string(), value.clone())))
+                    {
+                        // todo
+                    }
+                } else {
+                    // If there isn't a transient value currently, do we skip?, could mean it isn't being published?
+                }
+            }
+        }
+    }
+
+    pub fn to_block(&mut self, block_symbol: impl AsRef<str>, attr_name: impl AsRef<str>) {
+        if let Some(block_name) = self.find_text("block_name") {
+            if let Some(block) = &self.find_block(block_name, block_symbol) {
+                if let Some(attr) = self.clone().find_attr(&attr_name) {
+                    let current = self.entity;
+                    self.entity = block.entity;
+                    if self.find_update_attr(attr_name, |a| {
+                        a.edit_as(attr.value().clone());
+                    }) {
+                        // todo
+                    }
+                    self.entity = current;
+                }
+            }
+        }
+    }
+
     fn add_attribute(&mut self, attr: Attribute) {
         self.index.insert(attr.to_string(), attr);
     }
@@ -1058,7 +1111,6 @@ impl RuntimeDispatcher for AttributeGraph {
 
 /// These are handlers for dispatched messages
 impl AttributeGraph {
-
     fn on_publish(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
 
@@ -1066,13 +1118,9 @@ impl AttributeGraph {
             Some(AttributeGraphElements::Symbol(attr_name)) => {
                 self.find_update_attr(attr_name, |a| a.edit_self());
                 Ok(())
-            },
-            Some(_) => {
-                Err(AttributeGraphErrors::WrongArugment)
             }
-            None => {
-                Err(AttributeGraphErrors::NotEnoughArguments)
-            }
+            Some(_) => Err(AttributeGraphErrors::WrongArugment),
+            None => Err(AttributeGraphErrors::NotEnoughArguments),
         }
     }
 
@@ -1115,7 +1163,12 @@ impl AttributeGraph {
         let block_id = self.next_block(&block_name, &block_symbol);
 
         let block = self.define(&block_name, &block_symbol);
-        *block.value_mut() = Value::Symbol(format!("{}::{}", block_symbol.as_ref(), "block"));
+        block.edit_as(Value::Symbol(format!(
+            "{}::{}",
+            block_symbol.as_ref(),
+            "block"
+        )));
+        block.commit();
         block.edit_as(Value::Int(block_id as i32));
 
         self.with_text("block_name", block_name);
@@ -1265,8 +1318,8 @@ impl AttributeGraph {
                 | AttributeGraphElements::IntRange(value)
                 | AttributeGraphElements::Float(value)
                 | AttributeGraphElements::FloatPair(value)
-                | AttributeGraphElements::FloatRange(value) 
-                | AttributeGraphElements::BinaryVector(value)=> {
+                | AttributeGraphElements::FloatRange(value)
+                | AttributeGraphElements::BinaryVector(value) => {
                     self.with(name, value);
                     Ok(())
                 }
@@ -1359,63 +1412,43 @@ impl AttributeGraph {
     }
 
     fn on_from(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
-        // Example 
+        // Example
         // from block_name block_symbol attr_name -> transient attribute
-        // from block_name block_symbol attr_name #expect 
+        // from block_name block_symbol attr_name #expect
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
 
-        match (element_lexer.next(), element_lexer.next(), element_lexer.next()) {
-            (Some(AttributeGraphElements::Symbol(block_name)), Some(AttributeGraphElements::Symbol(block_symbol)), Some(AttributeGraphElements::Symbol(attr_name))) => {
-               if let Some(block) = self.find_block(block_name, block_symbol) {
-                    if let Some(attr_value) = block.find_attr(attr_name) {
-                        if let Some((name, value)) = attr_value.transient() {
-                            if !self.find_update_attr(name, |attr| attr.edit((name.to_string(), value.clone()))) {
-                                // if it didn't already exist, add it?
-                            }
-                        } else {
-                            // If there isn't a transient value currently, do we skip?, could mean it isn't being published?
-                        }
-                    }
-               }
-            },
-            _ => {
-
+        match (
+            element_lexer.next(),
+            element_lexer.next(),
+            element_lexer.next(),
+        ) {
+            (
+                Some(AttributeGraphElements::Symbol(block_name)),
+                Some(AttributeGraphElements::Symbol(block_symbol)),
+                Some(AttributeGraphElements::Symbol(attr_name)),
+            ) => {
+                self.from_block(block_name, block_symbol, attr_name);
             }
+            _ => {}
         }
         Ok(())
     }
 
     fn on_to(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
-        if let Some(block_name) = self.find_text("block_name") {
-            let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
+        let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
 
-            match (element_lexer.next(), element_lexer.next()) {
-                (Some(AttributeGraphElements::Symbol(block_symbol)), Some(AttributeGraphElements::Symbol(attr_name))) => {
-                    if let Some(block) = &self.find_block(block_name, block_symbol) {
-                        if let Some(attr) = self.clone().find_attr(&attr_name) {
-                            let current = self.entity;
-                            self.entity = block.entity;
-                            self.find_update_attr(attr_name, |a| {
-                                a.edit_as(attr.value().clone());
-                            });
-                            self.entity = current; 
-                        }
-                    }
-
-                    Ok(())
-                },
-                (Some(_), Some(_)) => {
-                    Err(AttributeGraphErrors::WrongArugment)
-                }
-                _ => {
-                    todo!()
-                }
+        match (element_lexer.next(), element_lexer.next()) {
+            (
+                Some(AttributeGraphElements::Symbol(block_symbol)),
+                Some(AttributeGraphElements::Symbol(attr_name)),
+            ) => {
+                self.to_block(block_symbol, attr_name);
+                Ok(())
             }
-        } else {
-            Ok(())
+            (Some(_), Some(_)) => Err(AttributeGraphErrors::WrongArugment),
+            _ => Ok(()),
         }
     }
-
 }
 
 #[test]
@@ -1479,8 +1512,11 @@ fn test_attribute_graph_block_dispatcher() {
 
     println!("{}", graph.save().expect(""));
     assert_eq!(Some(1), graph.find_block_id("demo", "node"));
-    assert!(graph.find_block("demo3", "node").and_then(|a| Some(a.entity() == 3)).expect("should return the correct block"));
-    
+    assert!(graph
+        .find_block("demo3", "node")
+        .and_then(|a| Some(a.entity() == 3))
+        .expect("should return the correct block"));
+
     let test = r#"
     ``` demo3 node2
     add demo_node_title .TEXT hello demo node
@@ -1504,18 +1540,22 @@ fn test_attribute_graph_block_dispatcher() {
         println!("{}", b.save().expect(""));
     }
 
-    let check_from = graph
-        .clone()
-        .find_block("demo4", "node3")
-        .expect("exists");
+    let check_from = graph.clone().find_block("demo4", "node3").expect("exists");
 
     println!("{:?}", check_from);
 
-    let check_from = check_from.find_attr("demo_node_title")
+    let check_from = check_from
+        .find_attr("demo_node_title")
         .expect("exists")
         .transient();
 
-    assert_eq!(Some(&("demo_node_title".to_string(), Value::TextBuffer("hello demo node".to_string()))), check_from);
+    assert_eq!(
+        Some(&(
+            "demo_node_title".to_string(),
+            Value::TextBuffer("hello demo node".to_string())
+        )),
+        check_from
+    );
 
     let check_to = graph.clone().find_block("demo4", "node").expect("exists");
     println!("{:?}", check_to);
@@ -1525,8 +1565,13 @@ fn test_attribute_graph_block_dispatcher() {
         .expect("exists")
         .transient();
 
-    assert_eq!(Some(&("demo_node_title".to_string(), Value::TextBuffer("testing to_demo node".to_string()))), check_to);
-
+    assert_eq!(
+        Some(&(
+            "demo_node_title".to_string(),
+            Value::TextBuffer("testing to_demo node".to_string())
+        )),
+        check_to
+    );
 }
 
 #[test]
@@ -1708,13 +1753,19 @@ fn test_attribute_graph_dispatcher() {
 #[test]
 fn test_binary_vec_parse() {
     let mut graph = AttributeGraph::from(0);
-    let test_message = format!("add test_bin .BINARY_VECTOR {}", base64::encode(b"test values"));
+    let test_message = format!(
+        "add test_bin .BINARY_VECTOR {}",
+        base64::encode(b"test values")
+    );
 
     println!("{}", test_message);
     assert!(graph.dispatch_mut(test_message).is_ok());
-    
+
     if let Some(Value::BinaryVector(test_bin)) = graph.find_attr_value("test_bin") {
-        if let Some(test) = base64::decode(test_bin).ok().and_then(|t| String::from_utf8(t).ok()) {
+        if let Some(test) = base64::decode(test_bin)
+            .ok()
+            .and_then(|t| String::from_utf8(t).ok())
+        {
             assert_eq!(test, "test values".to_string());
         }
     }
@@ -1927,8 +1978,8 @@ mod graph_lexer {
             (Some(f0), Some(f1), Some(f2)) => Some(Value::FloatRange(*f0, *f1, *f2)),
             _ => None,
         }
-    }    
-    
+    }
+
     pub fn from_binary_vector_base64(lexer: &mut Lexer<AttributeGraphElements>) -> Option<Value> {
         match base64::decode(lexer.remainder().trim()) {
             Ok(content) => Some(Value::BinaryVector(content)),
