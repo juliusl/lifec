@@ -1046,6 +1046,7 @@ impl RuntimeDispatcher for AttributeGraph {
                 AttributeGraphEvents::Edit => self.on_edit(event_lexer.remainder()),
                 AttributeGraphEvents::From => self.on_from(event_lexer.remainder()),
                 AttributeGraphEvents::To => self.on_to(event_lexer.remainder()),
+                AttributeGraphEvents::Publish => self.on_publish(event_lexer.remainder()),
                 AttributeGraphEvents::BlockDelimitter => self.on_block(event_lexer.remainder()),
                 AttributeGraphEvents::Comment => Ok(()),
                 AttributeGraphEvents::Error => Err(AttributeGraphErrors::UnknownEvent),
@@ -1057,6 +1058,24 @@ impl RuntimeDispatcher for AttributeGraph {
 
 /// These are handlers for dispatched messages
 impl AttributeGraph {
+
+    fn on_publish(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
+        let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
+
+        match element_lexer.next() {
+            Some(AttributeGraphElements::Symbol(attr_name)) => {
+                self.find_update_attr(attr_name, |a| a.edit_self());
+                Ok(())
+            },
+            Some(_) => {
+                Err(AttributeGraphErrors::WrongArugment)
+            }
+            None => {
+                Err(AttributeGraphErrors::NotEnoughArguments)
+            }
+        }
+    }
+
     fn next_block(&mut self, with_name: impl AsRef<str>, symbol_name: impl AsRef<str>) -> u32 {
         if let None = self.find_parent_block() {
             let parent_entity = self.entity() as i32;
@@ -1095,9 +1114,11 @@ impl AttributeGraph {
     fn start_block_mode(&mut self, block_name: impl AsRef<str>, block_symbol: impl AsRef<str>) {
         let block_id = self.next_block(&block_name, &block_symbol);
 
-        let block = self.define(block_name, &block_symbol);
+        let block = self.define(&block_name, &block_symbol);
         *block.value_mut() = Value::Symbol(format!("{}::{}", block_symbol.as_ref(), "block"));
         block.edit_as(Value::Int(block_id as i32));
+
+        self.with_text("block_name", block_name);
     }
 
     fn on_block(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
@@ -1365,15 +1386,34 @@ impl AttributeGraph {
     }
 
     fn on_to(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
-        if let Some(true) = self.is_enabled("block_mode") {
+        if let Some(block_name) = self.find_text("block_name") {
             let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
-            // get the current block_name
-            // example 
-            // to block_symbol attr_name 
-            // from #block block_name block_symbol? 
-            // 
+
+            match (element_lexer.next(), element_lexer.next()) {
+                (Some(AttributeGraphElements::Symbol(block_symbol)), Some(AttributeGraphElements::Symbol(attr_name))) => {
+                    if let Some(block) = &self.find_block(block_name, block_symbol) {
+                        if let Some(attr) = self.clone().find_attr(&attr_name) {
+                            let current = self.entity;
+                            self.entity = block.entity;
+                            self.find_update_attr(attr_name, |a| {
+                                a.edit_as(attr.value().clone());
+                            });
+                            self.entity = current; 
+                        }
+                    }
+
+                    Ok(())
+                },
+                (Some(_), Some(_)) => {
+                    Err(AttributeGraphErrors::WrongArugment)
+                }
+                _ => {
+                    todo!()
+                }
+            }
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
 }
@@ -1444,16 +1484,20 @@ fn test_attribute_graph_block_dispatcher() {
     let test = r#"
     ``` demo3 node2
     add demo_node_title .TEXT hello demo node
-    edit demo_node_title .TEXT testing
+    publish demo_node_title
     ``` demo4 node3
     add demo_node_title .TEXT hello demo ndoe 2
     from demo3 node2 demo_node_title
+    ``` demo4 node6
+    add demo_node_title .TEXT testing to_demo node
+    to node demo_node_title
+    to node2 demo_node_title
     ```
     "#;
 
     assert!(graph.batch_mut(test).is_ok());
     assert_eq!(graph.entity, 0);
-    assert_eq!(graph.iter_blocks().count(), 6);
+    assert_eq!(graph.iter_blocks().count(), 7);
 
     println!("printing all blocks");
     for b in graph.iter_blocks() {
@@ -1471,7 +1515,18 @@ fn test_attribute_graph_block_dispatcher() {
         .expect("exists")
         .transient();
 
-    assert_eq!(Some(&("demo_node_title".to_string(), Value::TextBuffer("testing".to_string()))), check_from);
+    assert_eq!(Some(&("demo_node_title".to_string(), Value::TextBuffer("hello demo node".to_string()))), check_from);
+
+    let check_to = graph.clone().find_block("demo4", "node").expect("exists");
+    println!("{:?}", check_to);
+
+    let check_to = check_to
+        .find_attr("demo_node_title")
+        .expect("exists")
+        .transient();
+
+    assert_eq!(Some(&("demo_node_title".to_string(), Value::TextBuffer("testing to_demo node".to_string()))), check_to);
+
 }
 
 #[test]
@@ -1669,6 +1724,7 @@ fn test_binary_vec_parse() {
 pub enum AttributeGraphErrors {
     UnknownEvent,
     NotEnoughArguments,
+    WrongArugment,
     IncorrectMessageFormat,
     CannotImportEmptyAttribute,
     EmptyMessage,
@@ -1724,6 +1780,8 @@ pub enum AttributeGraphEvents {
     From,
     #[token("to")]
     To,
+    #[token("publish")]
+    Publish,
     /// Usage: # Here is a helpful comment
     #[token("#")]
     Comment,
