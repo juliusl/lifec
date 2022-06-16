@@ -8,13 +8,15 @@ use super::NodeContext;
 /// Starts a demo of the node editor
 pub struct NodeDemo(Node);
 
-impl Default for NodeDemo {
+impl Default for NodeDemo
+{
     fn default() -> Self {
         Self(Node::new())
     }
 }
 
-impl Extension for NodeDemo {
+impl Extension for NodeDemo
+{
     fn configure_app_world(world: &mut specs::World) {
         world.register::<ThunkContext>();
         world.register::<WriteFiles>();

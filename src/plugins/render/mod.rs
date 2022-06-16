@@ -2,8 +2,7 @@ use std::cell::RefCell;
 
 use super::{Engine, Plugin};
 use crate::AttributeGraph;
-use atlier::system::Value;
-use imgui::{Ui, Condition, Window};
+use imgui::Ui;
 use specs::storage::DenseVecStorage;
 use specs::{Component, Join, ReadStorage, RunNow, System, World, WriteStorage};
 

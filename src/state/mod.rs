@@ -22,6 +22,24 @@ pub struct AttributeGraph {
 }
 
 impl AttributeGraph {
+    /// iterates through all missing values
+    pub fn values_missing(&self) -> impl Iterator<Item = &Attribute> {
+        self.iter_attributes()
+            .filter(|a| a.id() == self.entity())
+            .filter_map(|a| match a.value() {
+                Value::Empty => Some(a),
+                _ => None,
+            })
+            .into_iter()
+    }
+
+    /// returns true of all attributes are stable
+    pub fn is_stable(&self) -> bool {
+        self.iter_attributes()
+            .filter(|a| a.id() == self.entity())
+            .all(|a| a.is_stable())
+    }
+
     /// loads an attribute graph from file
     pub fn load_from_file(path: impl AsRef<str>) -> Option<Self> {
         let mut loading = AttributeGraph::default();
@@ -74,6 +92,40 @@ impl AttributeGraph {
     /// Commit's a transient attribute with attr_name.
     pub fn apply_mut(&mut self, attr_name: impl AsRef<str>) -> bool {
         self.find_update_attr(attr_name, |a| a.commit())
+    }
+
+    /// using self as source, include a sibling block given the context
+    pub fn include_block(&self, mut context: impl AsRef<AttributeGraph> + AsMut<AttributeGraph>, symbol_name: impl AsRef<str>) {
+        if let Some(block_name) = context.as_ref().find_text("block_name") {
+            if let Some(form) = self.find_block(block_name, symbol_name) {
+                context.as_mut().merge(&form);
+            }
+        }
+    }
+
+    /// if a block_name is set, finds the form block and displays an edit form
+    pub fn edit_form_block(
+        &self,
+        ui: &imgui::Ui 
+    ) -> Option<AttributeGraph> {
+        if let Some(block_name) = self.find_text("block_name") {
+            ui.text(&block_name);
+            if let Some(mut block) = self.find_block(block_name, "form") {
+                for attr in block.iter_mut_attributes() {
+                    match attr.value() {
+                        Value::Symbol(symbol) => {
+                            if !symbol.ends_with("block") {
+                                attr.edit_value(ui);
+                            }
+                        },
+                        _ => attr.edit_value(ui)
+                    }
+                }
+                return Some(block);
+            }
+        }
+
+        None 
     }
 
     /// This method allows you to edit an attribute from this section

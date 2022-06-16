@@ -1,7 +1,7 @@
 use super::{Display, Edit, Engine, Plugin, Render};
 use crate::{AttributeGraph, RuntimeState};
 use atlier::system::{Extension, Value};
-use imgui::{Condition, Window};
+use imgui::{Condition, Window, Ui};
 use imnodes::{
     editor, AttributeFlag, AttributeId, CoordinateSystem, InputPinId, Link, LinkId, NodeId,
     OutputPinId,
@@ -29,22 +29,77 @@ pub struct NodeContext {
 impl Eq for NodeContext {}
 
 impl NodeContext {
+    pub fn node_pos(&self) -> Option<(&f32, &f32)> {
+        self.as_ref()
+            .find_attr_value("node_pos")
+            .and_then(|a| match a {
+                Value::FloatPair(x, y) => Some((x, y)),
+                _ => None,
+            })
+    }
+
+    pub fn node_pos_next(&self) -> Option<(&f32, &f32)> {
+        self.as_ref()
+            .find_attr("node_pos")
+            .and_then(|a| a.transient())
+            .and_then(|(_, a)| match a {
+                Value::FloatPair(x, y) => Some((x, y)),
+                _ => None,
+            })
+    }
+
+    pub fn set_next_pos(&mut self, x: f32, y: f32) {
+        self.as_mut()
+            .find_update_attr("node_pos", |a| a.edit_as(Value::FloatPair(x, y)));
+    }
+
+    pub fn emit_current_pos(&mut self, x: f32, y: f32) {
+        self.as_mut().find_update_attr("node_pos", |a| {
+            a.edit_as(Value::FloatPair(x, y));
+            a.commit();
+        });
+    }
+
     /// Enable input for this node.
     /// In the UI this is the input pin.
     pub fn enable_input(&mut self) {
-        self.as_mut().with_bool("enable_input", true);
+        self.input_enabled(true);
+    }
+
+    pub fn disable_input(&mut self) {
+        self.input_enabled(false);
     }
 
     /// Enable output component for this node.
     /// In the UI this is the output pin.
     pub fn enable_output(&mut self) {
-        self.as_mut().with_bool("enable_output", true);
+        self.output_enabled(true);
+    }
+
+    pub fn disable_output(&mut self) {
+        self.output_enabled(false);
     }
 
     /// Enable attribute component for this node.
     /// In the UI this will enable rendering the attribute render component.
     pub fn enable_attribute(&mut self) {
-        self.as_mut().with_bool("enable_attribute", true);
+        self.attribute_enabled(true);
+    }
+
+    pub fn disable_attribute(&mut self) {
+        self.attribute_enabled(false);
+    }
+
+    pub fn input_enabled(&mut self, enable: bool) {
+        self.as_mut().with_bool("enable_input", enable);
+    }
+
+    pub fn output_enabled(&mut self, enable: bool) {
+        self.as_mut().with_bool("enable_output", enable);
+    }
+
+    pub fn attribute_enabled(&mut self, enable: bool) {
+        self.as_mut().with_bool("enable_attribute", enable);
     }
 
     /// Returns the current title of the node.
@@ -89,7 +144,7 @@ impl From<AttributeGraph> for NodeContext {
 pub struct Node {
     editor_context: imnodes::EditorContext,
     idgen: imnodes::IdentifierGenerator,
-    contexts: HashSet<NodeContext>,
+    contexts: Vec<NodeContext>,
     edit: HashMap<NodeContext, Edit<NodeContext>>,
     display: HashMap<NodeContext, Display<NodeContext>>,
     link_index: HashMap<LinkId, Link>,
@@ -136,10 +191,7 @@ impl Node {
             .contexts
             .iter()
             .find(|c| c.node_id == Some(*start_node));
-        let end = self
-            .contexts
-            .iter()
-            .find(|c| c.node_id == Some(*end_node));
+        let end = self.contexts.iter().find(|c| c.node_id == Some(*end_node));
 
         if let (Some(from), Some(to)) = (start, end) {
             Some((from, to))
@@ -170,7 +222,7 @@ impl From<imnodes::Context> for Node {
                 editor_context,
                 idgen,
                 graph: config,
-                contexts: HashSet::new(),
+                contexts: vec![],
                 edit: HashMap::new(),
                 display: HashMap::new(),
                 link_index: HashMap::new(),
@@ -181,7 +233,7 @@ impl From<imnodes::Context> for Node {
                 editor_context,
                 idgen,
                 graph: AttributeGraph::default(),
-                contexts: HashSet::new(),
+                contexts: vec![],
                 edit: HashMap::new(),
                 display: HashMap::new(),
                 link_index: HashMap::new(),
@@ -230,12 +282,16 @@ impl Extension for Node {
             let outer_scope = editor(&mut self.editor_context, |mut editor_scope| {
                 editor_scope.add_mini_map(imnodes::MiniMapLocation::BottomRight);
 
-                for mut context in self.contexts.iter().cloned() {
-                    if let Some(node_id) = &context.node_id {
+                for mut context in self.contexts.iter_mut() {
+                    if let Some(node_id) = context.node_id {
                         let edit = self.edit.get(&context).and_then(|e| Some(e.to_owned()));
                         let display = self.display.get(&context).and_then(|d| Some(d.to_owned()));
 
-                        editor_scope.add_node(*node_id, |mut node_scope| {
+                        editor_scope.add_node(node_id, |mut node_scope| {
+                            let imnodes::ImVec2 { x, y } =
+                                node_id.get_position(CoordinateSystem::ScreenSpace);
+                            context.emit_current_pos(x, y);
+
                             node_scope.add_titlebar(|| {
                                 if let Some(node_title) = context.node_title() {
                                     ui.text(node_title);
@@ -304,9 +360,7 @@ impl Extension for Node {
 }
 
 impl Engine for Node {
-    fn next_mut(&mut self, _: &mut AttributeGraph) {
-        // TODO find/add any links
-    }
+    fn next_mut(&mut self, _: &mut AttributeGraph) {}
 
     fn exit(&mut self, _: &AttributeGraph) {
         for (_, link) in self.link_index.iter() {
@@ -364,7 +418,7 @@ impl<'a> System<'a> for Node {
                         self.display.insert(context.clone(), display_node.clone());
                     }
 
-                    self.contexts.insert(context.clone());
+                    self.contexts.push(context.clone());
                 }
             }
 
@@ -382,14 +436,46 @@ impl<'a> System<'a> for Node {
 #[derive(Default)]
 struct NodeSync(HashMap<NodeContext, Entity>);
 
+impl NodeSync {
+    fn render_node(_: &NodeContext, graph: &mut AttributeGraph, ui: &Ui) {
+        graph.edit_form_block(ui);
+        // let save_name = format!("editing {}", graph.entity());
+        // if let Some(Value::BinaryVector(saved)) =  graph.find_attr_value(&save_name)
+        // {
+        //     let loaded = AttributeGraph::default();
+        //     let mut loaded = loaded.load(
+        //         String::from_utf8(saved.to_vec())
+        //             .unwrap_or_default(),
+        //     );
+
+        //     if let Some(saved) = loaded.save() {
+        //         graph.add_binary_attr(save_name, saved.as_bytes());
+        //     }
+
+        //     if let Some(update) = loaded.edit_form_block(ui) {
+        //         loaded.merge(&update);
+        //         Window::new(format!("editing {}", update.entity()))
+        //             .build(ui, || {
+        //                 loaded.edit_attr_table(ui);
+        //             });
+        //     }
+        // } else {
+        //     if let Some(saved) = graph.save() {
+        //         graph.add_binary_attr(save_name, saved.as_bytes());
+        //     }
+        // }
+    }
+}
+
 impl<'a> System<'a> for NodeSync {
     type SystemData = (
         Entities<'a>,
         WriteStorage<'a, NodeContext>,
         WriteStorage<'a, Display<NodeContext>>,
+        WriteStorage<'a, Edit<NodeContext>>,
     );
 
-    fn run(&mut self, (entities, mut contexts, mut displays): Self::SystemData) {
+    fn run(&mut self, (entities, mut contexts, mut displays, mut edits): Self::SystemData) {
         if let Some(config) = AttributeGraph::load_from_file("node.runmd") {
             // load each node block to the graph
             for block in config.find_blocks("node") {
