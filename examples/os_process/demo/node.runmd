@@ -1,16 +1,23 @@
 
-``` demo node
-add node_title .TEXT really cool
-add input_label .TEXT coolness
-add output_label .TEXT really coolness
-add enable_input .BOOL true
-add enable_attribute .BOOL true
-add enable_output .BOOL true
-``` demo node
-add node_title .TEXT really cool node3
+add window_title .TEXT cool demo window
+
+``` demo3 node
+add node_title .TEXT demo 3
+add coolness1 .EMPTY
+add input_label .TEXT coolness1
+```
+``` demo3 form
+add form_text .TEXT placeholder
+edit form_text .TEXT placeholder
+```
+
+``` demo5 node
+add node_title .TEXT demo 5
+add coolness2 .EMPTY
 add input_label .TEXT coolness2
-add output_label .TEXT really coolness
-add enable_input .BOOL true
-add enable_attribute .BOOL true
-add enable_output .BOOL true
+```
+``` demo5 form
+add form_text .TEXT placeholder
+add form_text2 .TEXT test
+add form_int .INT 10
 ```
