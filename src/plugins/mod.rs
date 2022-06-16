@@ -104,7 +104,7 @@ impl<'a> System<'a> for AttributeGraphSync {
     fn run(&mut self, (entities, mut graphs): Self::SystemData) {
         for (e, g) in (&entities, &mut graphs).join() {
             if g.entity() != e.id() {
-                g.set_parent_entity(e, true);
+                g.set_parent_entity(e);
             }
         }
     }

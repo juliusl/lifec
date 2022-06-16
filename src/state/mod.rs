@@ -4,7 +4,10 @@ use imgui::TableFlags;
 use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
-use specs::{storage::HashMapStorage, Component, Entity};
+use specs::{
+    storage::{self, HashMapStorage},
+    Component, Entity,
+};
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     fmt::Display,
@@ -95,7 +98,11 @@ impl AttributeGraph {
     }
 
     /// using self as source, include a sibling block given the context
-    pub fn include_block(&self, mut context: impl AsRef<AttributeGraph> + AsMut<AttributeGraph>, symbol_name: impl AsRef<str>) {
+    pub fn include_block(
+        &self,
+        mut context: impl AsRef<AttributeGraph> + AsMut<AttributeGraph>,
+        symbol_name: impl AsRef<str>,
+    ) {
         if let Some(block_name) = context.as_ref().find_text("block_name") {
             if let Some(form) = self.find_block(block_name, symbol_name) {
                 context.as_mut().merge(&form);
@@ -104,28 +111,23 @@ impl AttributeGraph {
     }
 
     /// if a block_name is set, finds the form block and displays an edit form
-    pub fn edit_form_block(
-        &self,
-        ui: &imgui::Ui 
-    ) -> Option<AttributeGraph> {
-        if let Some(block_name) = self.find_text("block_name") {
-            ui.text(&block_name);
-            if let Some(mut block) = self.find_block(block_name, "form") {
-                for attr in block.iter_mut_attributes() {
-                    match attr.value() {
-                        Value::Symbol(symbol) => {
-                            if !symbol.ends_with("block") {
-                                attr.edit_value(ui);
-                            }
-                        },
-                        _ => attr.edit_value(ui)
-                    }
+    pub fn edit_form_block(&self, ui: &imgui::Ui) -> Option<AttributeGraph> {
+        if let Some(mut block) = self.find_block("", "form") {
+            let hash_code = block.hash_code();
+            for attr in block.iter_mut_attributes().filter(|a| !a.name.starts_with("block_")) {
+                match attr.value() {
+                    Value::Symbol(_) => {}
+                    _ => attr.edit_value(ui),
                 }
-                return Some(block);
             }
+            if hash_code != block.hash_code() {
+                Some(block)
+            } else {
+                None
+            }
+        } else {
+            None
         }
-
-        None 
     }
 
     /// This method allows you to edit an attribute from this section
@@ -435,13 +437,13 @@ impl AttributeGraph {
     }
 
     /// Updates the parent entity id of the graph.
-    pub fn set_parent_entity(&mut self, parent: Entity, all: bool) {
-        self.set_parent_entity_id(parent.id(), all);
+    pub fn set_parent_entity(&mut self, parent: Entity) {
+        self.set_parent_entity_id(parent.id());
     }
 
     /// Sets the current parent entity id.
     /// The parent entity id is used when adding attributes to the graph.
-    pub fn set_parent_entity_id(&mut self, entity_id: u32, all: bool) {
+    pub fn set_parent_entity_id(&mut self, entity_id: u32) {
         // Update only attributes that the current parent owns
         // attributes that have a different id are only in the collection as references
         let current = self.clone();
@@ -449,7 +451,7 @@ impl AttributeGraph {
 
         current
             .iter_attributes()
-            .filter(|a| a.id() == current_id || all)
+            .filter(|a| a.id() == current_id)
             .for_each(|a| {
                 self.find_update_attr(a.name(), |a| a.set_id(entity_id));
             });
@@ -699,6 +701,39 @@ impl AttributeGraph {
             .collect()
     }
 
+    /// Finds and updates an attribute, also updates index key.
+    /// Returns true if update was called.
+    pub fn find_update_imported_attr(
+        &mut self,
+        with_id: u32,
+        with_name: impl AsRef<str>,
+        update: impl FnOnce(&mut Attribute),
+    ) -> bool {
+        if let Some(attr) = self.find_imported_attr(with_id, with_name) {
+            let old_key = attr.to_string();
+            update(attr);
+
+            // it's possible that the name changed, remove/add the attribute to update the key
+            if let Some(attr) = self.index.remove(&old_key) {
+                self.add_attribute(attr);
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Finds a mut attribute by name that is owned by `self.entity`
+    pub fn find_imported_attr(&mut self, with_id: u32, with_name: impl AsRef<str>) -> Option<&mut Attribute> {
+        let current_id = self.entity;
+        self.iter_mut_attributes()
+            .filter(|attr| attr.id() == with_id)
+            .find(|attr| attr.name() == with_name.as_ref())
+            .and_then(|a| Some(a))
+    }
+
     /// find all blocks by symbol name
     pub fn find_blocks(&self, symbol_name: impl AsRef<str>) -> Vec<Self> {
         let mut clone = self.clone();
@@ -755,8 +790,17 @@ impl AttributeGraph {
         with_name: impl AsRef<str>,
         symbol_name: impl AsRef<str>,
     ) -> Option<Self> {
-        self.find_block_id(with_name, symbol_name)
-            .and_then(|id| self.find_imported_graph(id))
+        if with_name.as_ref().is_empty() {
+            if let Some(block_name) = self.find_text("block_name") {
+                self.find_block_id(block_name, symbol_name)
+                    .and_then(|id| self.find_imported_graph(id))
+            } else {
+                None
+            }
+        } else {
+            self.find_block_id(with_name, symbol_name)
+                .and_then(|id| self.find_imported_graph(id))
+        }
     }
 
     /// iterates each block in the graph
@@ -790,14 +834,18 @@ impl AttributeGraph {
 
     pub fn find_blocks_for(&self, block_name: impl AsRef<str>) -> impl Iterator<Item = Self> + '_ {
         let block_name = block_name.as_ref().to_string();
-        self.iter_blocks().filter(move |b| {
-            if let Some(filtered) = b.find_text("block_name").and_then(|b| Some(b.as_str() == block_name)) {
-                filtered
-            } else {
-                false 
-            }
-        })
-        .into_iter()
+        self.iter_blocks()
+            .filter(move |b| {
+                if let Some(filtered) = b
+                    .find_text("block_name")
+                    .and_then(|b| Some(b.as_str() == block_name))
+                {
+                    filtered
+                } else {
+                    false
+                }
+            })
+            .into_iter()
     }
 
     /// Returns self with an empty attribute w/ name.
@@ -1665,9 +1713,7 @@ fn test_attribute_graph_block_dispatcher() {
         check_to
     );
 
-    let check_from_other = graph.clone()
-        .find_block("demo4", "window")
-        .expect("exists");        
+    let check_from_other = graph.clone().find_block("demo4", "window").expect("exists");
     println!("{:?}", check_from_other);
 
     let check_from_other = check_from_other.find_attr_value("demo_node_title");
@@ -1680,6 +1726,44 @@ fn test_attribute_graph_block_dispatcher() {
         println!("{:?}", demo4_block.find_text("block_name"));
         println!("{:?}", demo4_block.find_text("block_symbol"));
         println!("{:?}", demo4_block);
+    }
+}
+
+#[test]
+fn test_block_context() {
+    let test = r#"
+    ``` demo5 node
+    add node_title .TEXT really cool node3
+    ``` demo5 form 
+    add form_text .EMPTY
+    edit form_text .TEXT placeholder
+    ``` demo2 node
+    add node_title .TEXT really cool node3
+    add coolness2 .EMPTY
+    add input_label .TEXT coolness2
+    ``` demo2 form
+    add form_text .EMPTY
+    edit form_text .TEXT placeholder
+    ``` demo3 node
+    add node_title .TEXT really cool node3
+    ``` demo3 form 
+    add form_text .EMPTY
+    edit form_text .TEXT placeholder
+    ```
+    "#;
+
+    let mut graph = AttributeGraph::from(0);
+
+    assert!(graph.batch_mut(test).is_ok());
+    println!("{}", graph.save().expect("exists"));
+
+    for mut node in graph.find_blocks("node") {
+        graph.include_block(&mut node, "form");
+        println!("{}", node.save().expect("exists"));
+
+        if let Some(form) = node.find_block("", "form") {
+            println!("{}", form.save().expect("exists"));
+        }
     }
 }
 

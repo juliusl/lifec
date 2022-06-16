@@ -1,7 +1,7 @@
 use super::{Display, Edit, Engine, Plugin, Render};
 use crate::{AttributeGraph, RuntimeState};
 use atlier::system::{Extension, Value};
-use imgui::{Condition, Window, Ui};
+use imgui::{Condition, Ui, Window};
 use imnodes::{
     editor, AttributeFlag, AttributeId, CoordinateSystem, InputPinId, Link, LinkId, NodeId,
     OutputPinId,
@@ -11,6 +11,7 @@ use specs::{
     Component, Entities, Entity, Join, ReadStorage, RunNow, System, World, WorldExt, WriteStorage,
 };
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::hash::Hash;
 
 pub mod demo;
@@ -145,8 +146,8 @@ pub struct Node {
     editor_context: imnodes::EditorContext,
     idgen: imnodes::IdentifierGenerator,
     contexts: Vec<NodeContext>,
-    edit: HashMap<NodeContext, Edit<NodeContext>>,
-    display: HashMap<NodeContext, Display<NodeContext>>,
+    edit: HashMap<NodeId, Edit<NodeContext>>,
+    display: HashMap<NodeId, Display<NodeContext>>,
     link_index: HashMap<LinkId, Link>,
     graph: AttributeGraph,
     // TODO: Need to hold a context to this, because if it leaves scope it will drop
@@ -255,7 +256,6 @@ impl Extension for Node {
 
     fn on_ui(&mut self, app_world: &World, ui: &imgui::Ui) {
         let mut frame = Render::<NodeContext>::next_frame(ui);
-        self.run_now(app_world);
 
         let mut size = [800.0, 600.0];
         if let Some(Value::FloatPair(width, height)) = self.graph.find_attr_value("size") {
@@ -284,8 +284,8 @@ impl Extension for Node {
 
                 for mut context in self.contexts.iter_mut() {
                     if let Some(node_id) = context.node_id {
-                        let edit = self.edit.get(&context).and_then(|e| Some(e.to_owned()));
-                        let display = self.display.get(&context).and_then(|d| Some(d.to_owned()));
+                        let edit = self.edit.get(&node_id).and_then(|e| Some(e.to_owned()));
+                        let display = self.display.get(&node_id).and_then(|d| Some(d.to_owned()));
 
                         editor_scope.add_node(node_id, |mut node_scope| {
                             let imnodes::ImVec2 { x, y } =
@@ -356,6 +356,8 @@ impl Extension for Node {
 
             detatch.pop();
         });
+
+        self.run_now(app_world);
     }
 }
 
@@ -388,7 +390,8 @@ impl<'a> System<'a> for Node {
         {
             if edit_node.is_some() || display_node.is_some() {
                 if let None = context.node_id {
-                    context.node_id = Some(self.idgen.next_node());
+                    let node_id = self.idgen.next_node();
+                    context.node_id = Some(node_id);
 
                     if let None = context.input_pin_id {
                         if let Some(true) = context.as_ref().is_enabled("enable_input") {
@@ -410,26 +413,26 @@ impl<'a> System<'a> for Node {
 
                     if let Some(edit_node) = edit_node {
                         println!("found edit node for {:?}", context.node_id);
-                        self.edit.insert(context.clone(), edit_node.clone());
+                        self.edit.insert(node_id, edit_node.clone());
                     }
 
                     if let Some(display_node) = display_node {
                         println!("found display node for {:?}", context.node_id);
-                        self.display.insert(context.clone(), display_node.clone());
+                        self.display.insert(node_id, display_node.clone());
                     }
 
                     self.contexts.push(context.clone());
                 }
-            }
 
-            self.on_event(context);
-        }
-
-        if let Some(config) = AttributeGraph::load_from_file("node.runmd") {
-            if config.hash_code() != self.graph.hash_code() {
-                self.graph = config;
+                self.on_event(context);
             }
         }
+
+        // if let Some(config) = AttributeGraph::load_from_file("node.runmd") {
+        //     if config.hash_code() != self.graph.hash_code() {
+        //         self.graph = config;
+        //     }
+        // }
     }
 }
 
@@ -438,7 +441,22 @@ struct NodeSync(HashMap<NodeContext, Entity>);
 
 impl NodeSync {
     fn render_node(_: &NodeContext, graph: &mut AttributeGraph, ui: &Ui) {
-        graph.edit_form_block(ui);
+        if let Some(mut _update) = graph.edit_form_block(ui) {
+            let imported = _update.entity();
+            for attr in _update.iter_mut_attributes() {
+                match attr.value() {
+                    Value::Symbol(_) => {}
+                    _ => {
+                        attr.commit();
+                        let next_value = attr.value.clone();
+                        graph.find_update_imported_attr(imported, &attr.name(), |a| {
+                            a.edit_as(next_value);
+                            a.commit();
+                        });
+                    }
+                }
+            }
+        }
         // let save_name = format!("editing {}", graph.entity());
         // if let Some(Value::BinaryVector(saved)) =  graph.find_attr_value(&save_name)
         // {
@@ -470,15 +488,29 @@ impl NodeSync {
 impl<'a> System<'a> for NodeSync {
     type SystemData = (
         Entities<'a>,
+        ReadStorage<'a, AttributeGraph>,
         WriteStorage<'a, NodeContext>,
         WriteStorage<'a, Display<NodeContext>>,
         WriteStorage<'a, Edit<NodeContext>>,
     );
 
-    fn run(&mut self, (entities, mut contexts, mut displays, mut edits): Self::SystemData) {
+    fn run(&mut self, (entities, graphs, mut contexts, mut displays, mut edits): Self::SystemData) {
+        // for (_, entity) in self.0.iter() {
+        //     if let Some(graph) =  graphs.get(*entity) {
+        //         let other = graph.hash_code();
+
+        //         if let Some(current) = contexts.get_mut(*entity) {
+        //             if current.as_ref().hash_code() != other {
+        //                 current.as_mut().merge(graph);
+        //             }
+        //         }
+        //     }
+        // }
+
         if let Some(config) = AttributeGraph::load_from_file("node.runmd") {
             // load each node block to the graph
-            for block in config.find_blocks("node") {
+            for mut block in config.find_blocks("node") {
+                config.include_block(&mut block, "form");
                 let mut context = NodeContext::from(block);
 
                 let NodeSync(added) = self;
@@ -486,23 +518,22 @@ impl<'a> System<'a> for NodeSync {
 
                 if let None = added.get(&original) {
                     let entity = entities.create();
-                    context.as_mut().set_parent_entity(entity, true);
+
+                    if context.as_ref().values_missing().count() > 0 {
+                        context.enable_input();
+                    }
+
+                    if !context.as_ref().is_stable() {
+                        context.enable_output();
+                        context.as_mut().with_text("output_label", "published");
+                    }
+                    context.enable_attribute();
 
                     match contexts.insert(entity, context) {
                         Ok(_) => {
                             println!("Loaded new node_context entity {:?}", entity);
                             added.insert(original, entity);
-                            match displays.insert(
-                                entity,
-                                Display(|c, _, ui| {
-                                    ui.text(format!(
-                                        "{:?}",
-                                        c.node_id.and_then(|n| Some(
-                                            n.get_position(CoordinateSystem::ScreenSpace)
-                                        ))
-                                    ));
-                                }),
-                            ) {
+                            match edits.insert(entity, Edit(Self::render_node)) {
                                 Ok(_) => {
                                     println!(
                                         "Added display for new node_context entity {:?}",
