@@ -24,7 +24,49 @@ pub struct AttributeGraph {
     index: BTreeMap<String, Attribute>,
 }
 
+impl TryInto<Attribute> for AttributeGraph {
+    type Error = ();
+
+    fn try_into(self) -> Result<Attribute, Self::Error> {
+        if let Some(saved) = self.save() {
+            Ok(Attribute::new(self.entity, format!("{}.graph", self.hash_code()), Value::BinaryVector(saved.as_bytes().to_vec())))
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl From<Attribute> for AttributeGraph {
+    fn from(attr: Attribute) -> Self {
+        let graph = AttributeGraph::default();
+        if let Value::BinaryVector(graph_content) = attr.value() {
+            let graph_content = String::from_utf8(graph_content.to_vec()).unwrap_or_default();
+            let graph = graph.load(graph_content);
+            println!("{}", graph.save().expect("exists"));
+            return graph;
+        }
+        eprintln!("could not load attribute: {:?}, returning empty graph", attr);
+        graph 
+    }
+}
+
 impl AttributeGraph {
+    /// returns the graph after attributes are committed
+    pub fn commit(&self) -> AttributeGraph {
+        let mut saving = self.clone();
+        for attr in self.iter_attributes() {
+            saving.find_update_attr(attr.name(), |a| {
+                a.commit();
+            });
+        }
+        saving
+    }
+
+    /// commits each attribute and saves to attribute
+    pub fn to_attribute(&self) -> Option<Attribute> {
+        self.clone().try_into().ok()
+    }
+
     /// iterates through all missing values
     pub fn values_missing(&self) -> impl Iterator<Item = &Attribute> {
         self.iter_attributes()
@@ -1798,6 +1840,15 @@ fn test_block_context() {
 
     let main_elm = graph.find_block("Main.elm", "file").expect("exists");
     println!("{}", main_elm.save().expect("exists"));
+
+    let commited_main_elm = main_elm.commit();
+    let attr: Option<Attribute> = commited_main_elm.to_attribute();
+    println!("{:?}", attr);
+
+    if let Some(attr) = attr {
+        let reloaded = AttributeGraph::from(attr); 
+        assert_eq!(reloaded, commited_main_elm);
+    }
 }
 
 #[test]
