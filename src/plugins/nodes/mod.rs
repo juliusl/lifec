@@ -1,4 +1,5 @@
-use super::{Display, Edit, Engine, Plugin, Render};
+use super::{Display, Edit, Engine, Plugin, Render, ThunkContext, WriteFiles};
+use crate::plugins::Println;
 use crate::{AttributeGraph, RuntimeState};
 use atlier::system::{Extension, Value};
 use imgui::{Condition, Ui, Window};
@@ -10,8 +11,7 @@ use specs::storage::DenseVecStorage;
 use specs::{
     Component, Entities, Entity, Join, ReadStorage, RunNow, System, World, WorldExt, WriteStorage,
 };
-use std::collections::{HashMap, HashSet};
-use std::fs;
+use std::collections::HashMap;
 use std::hash::Hash;
 
 pub mod demo;
@@ -248,10 +248,17 @@ impl Extension for Node {
         world.register::<NodeContext>();
         world.register::<Edit<NodeContext>>();
         world.register::<Display<NodeContext>>();
+        world.register::<Println>();
+        world.register::<WriteFiles>();
+        world.register::<ThunkContext>();
     }
 
     fn configure_app_systems(builder: &mut specs::DispatcherBuilder) {
-        builder.add(NodeSync::default(), "node_sync", &[]);
+        let write_files = NodeSync::<WriteFiles>::default();
+        let println = NodeSync::<Println>::default();
+
+        builder.add(write_files, "write_files_node_sync", &[]);
+        builder.add(println, "println_node_sync", &[]);
     }
 
     fn on_ui(&mut self, app_world: &World, ui: &imgui::Ui) {
@@ -312,6 +319,14 @@ impl Extension for Node {
 
                             if let Some(attribute_id) = &context.attribute_id {
                                 node_scope.attribute(*attribute_id, || {
+                                    if let Some(true) = context.as_ref().is_enabled("debug") {
+                                        let imnodes::ImVec2 { x, y} = node_id.get_position(CoordinateSystem::ScreenSpace);
+                                        ui.text(format!("x: {}, y: {}", x, y));
+                                        let imnodes::ImVec2 { x: width, y: height } = node_id.get_dimensions();
+                                        ui.text(format!("width: {}", width));
+                                        ui.text(format!("height: {}", height));
+                                    }
+
                                     // If the entity has an edit/display, it's shown in this block
                                     frame.on_render(&mut context, edit.clone(), display.clone());
                                 });
@@ -437,10 +452,15 @@ impl<'a> System<'a> for Node {
 }
 
 #[derive(Default)]
-struct NodeSync(HashMap<NodeContext, Entity>);
+struct NodeSync<P>(HashMap<NodeContext, Entity>, P)
+    where
+    P: Plugin<ThunkContext> + Component + Default;
 
-impl NodeSync {
-    fn render_node(_: &NodeContext, graph: &mut AttributeGraph, ui: &Ui) {
+impl<P> NodeSync<P>
+where
+P: Plugin<ThunkContext> + Component + Default
+{
+    fn render_form(_: &NodeContext, graph: &mut AttributeGraph, ui: &Ui) {
         if let Some(mut _update) = graph.edit_form_block(ui) {
             let imported = _update.entity();
             for attr in _update.iter_mut_attributes() {
@@ -457,63 +477,37 @@ impl NodeSync {
                 }
             }
         }
-        // let save_name = format!("editing {}", graph.entity());
-        // if let Some(Value::BinaryVector(saved)) =  graph.find_attr_value(&save_name)
-        // {
-        //     let loaded = AttributeGraph::default();
-        //     let mut loaded = loaded.load(
-        //         String::from_utf8(saved.to_vec())
-        //             .unwrap_or_default(),
-        //     );
 
-        //     if let Some(saved) = loaded.save() {
-        //         graph.add_binary_attr(save_name, saved.as_bytes());
-        //     }
-
-        //     if let Some(update) = loaded.edit_form_block(ui) {
-        //         loaded.merge(&update);
-        //         Window::new(format!("editing {}", update.entity()))
-        //             .build(ui, || {
-        //                 loaded.edit_attr_table(ui);
-        //             });
-        //     }
-        // } else {
-        //     if let Some(saved) = graph.save() {
-        //         graph.add_binary_attr(save_name, saved.as_bytes());
-        //     }
-        // }
+        if graph.find_block("", "thunk").is_some() {
+            ui.new_line();
+            let label = format!("call {} {}", P::symbol(), graph.entity());
+            if ui.button(label) {
+                P::call(graph);
+            }
+            ui.new_line();
+        }
     }
 }
 
-impl<'a> System<'a> for NodeSync {
+impl<'a, P> System<'a> for NodeSync<P> 
+where
+    P: Plugin<ThunkContext> + Component + Default
+{
     type SystemData = (
         Entities<'a>,
-        ReadStorage<'a, AttributeGraph>,
         WriteStorage<'a, NodeContext>,
-        WriteStorage<'a, Display<NodeContext>>,
         WriteStorage<'a, Edit<NodeContext>>,
     );
 
-    fn run(&mut self, (entities, graphs, mut contexts, mut displays, mut edits): Self::SystemData) {
-        // for (_, entity) in self.0.iter() {
-        //     if let Some(graph) =  graphs.get(*entity) {
-        //         let other = graph.hash_code();
-
-        //         if let Some(current) = contexts.get_mut(*entity) {
-        //             if current.as_ref().hash_code() != other {
-        //                 current.as_mut().merge(graph);
-        //             }
-        //         }
-        //     }
-        // }
-
-        if let Some(config) = AttributeGraph::load_from_file("node.runmd") {
+    fn run(&mut self, (entities, mut contexts, mut edits): Self::SystemData) {
+        if let Some(config) = AttributeGraph::load_from_file(format!("{}.runmd", P::symbol())) {
             // load each node block to the graph
             for mut block in config.find_blocks("node") {
                 config.include_block(&mut block, "form");
+                config.include_block(&mut block, "thunk");
                 let mut context = NodeContext::from(block);
 
-                let NodeSync(added) = self;
+                let NodeSync(added, ..) = self;
                 let original = context.clone();
 
                 if let None = added.get(&original) {
@@ -533,7 +527,7 @@ impl<'a> System<'a> for NodeSync {
                         Ok(_) => {
                             println!("Loaded new node_context entity {:?}", entity);
                             added.insert(original, entity);
-                            match edits.insert(entity, Edit(Self::render_node)) {
+                            match edits.insert(entity, Edit(Self::render_form)) {
                                 Ok(_) => {
                                     println!(
                                         "Added display for new node_context entity {:?}",

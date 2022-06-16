@@ -2,7 +2,7 @@ use lifec::plugins::demos::NodeDemo;
 use lifec::{editor::*, AttributeGraph, Runtime};
 
 fn main() {
-    if let Some(file) = AttributeGraph::load_from_file("node.runmd") {
+    if let Some(file) = AttributeGraph::load_from_file(".runmd") {
         open(
             "demo",
             RuntimeEditor::new(Runtime::from(file)),

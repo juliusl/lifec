@@ -1,7 +1,7 @@
 use atlier::system::Extension;
 use specs::{Builder, WorldExt};
 
-use crate::plugins::{Node, Plugin, Edit, Display, ThunkContext, WriteFiles, demos::WriteFilesDemo};
+use crate::plugins::{Node, Plugin, Edit, Display, ThunkContext, WriteFiles, demos::WriteFilesDemo, Println};
 
 use super::NodeContext;
 
@@ -31,6 +31,10 @@ impl Extension for NodeDemo
 
             e.maybe_with(Some(display))
              .build()
+        });
+
+        Node::parse_entity("node.runnmd", world, |e|{
+            e.maybe_with(Some(Println::default())).build()
         });
 
         WriteFiles::parse_entity("println.runmd", world, |e|{

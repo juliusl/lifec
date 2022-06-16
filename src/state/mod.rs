@@ -5,7 +5,7 @@ use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::{
-    storage::{self, HashMapStorage},
+    storage::HashMapStorage,
     Component, Entity,
 };
 use std::{
@@ -727,7 +727,6 @@ impl AttributeGraph {
 
     /// Finds a mut attribute by name that is owned by `self.entity`
     pub fn find_imported_attr(&mut self, with_id: u32, with_name: impl AsRef<str>) -> Option<&mut Attribute> {
-        let current_id = self.entity;
         self.iter_mut_attributes()
             .filter(|attr| attr.id() == with_id)
             .find(|attr| attr.name() == with_name.as_ref())

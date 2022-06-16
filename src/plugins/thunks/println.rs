@@ -2,7 +2,11 @@ use crate::plugins::Plugin;
 
 use super::ThunkContext;
 use atlier::prelude::Value;
+use specs::Component;
+use specs::storage::DenseVecStorage;
 
+#[derive(Default, Component)]
+#[storage(DenseVecStorage)]
 pub struct Println;
 
 impl Plugin<ThunkContext> for Println {

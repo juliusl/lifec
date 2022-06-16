@@ -8,7 +8,7 @@ use crate::AttributeGraph;
 #[storage(HashMapStorage)]
 pub struct StoreContext {
     graph: AttributeGraph,
-    store: Store<()>,
+    _store: Store<()>,
 }
 
 impl AsRef<AttributeGraph> for StoreContext {
@@ -25,6 +25,6 @@ impl AsMut<AttributeGraph> for StoreContext {
 
 impl From<AttributeGraph> for StoreContext {
     fn from(graph: AttributeGraph) -> Self {
-        Self { graph, store: Store::default() }
+        Self { graph, _store: Store::default() }
     }
 }
