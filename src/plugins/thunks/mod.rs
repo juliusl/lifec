@@ -115,4 +115,12 @@ impl ThunkContext {
             .find_attr(symbol)
             .and_then(|a| if a.is_stable() { Some(a.value()) } else { None })
     }
+
+    pub fn import_file_blocks(&mut self, files: Vec<String>) {
+        for file in files {
+            if let Some(file) = self.as_ref().find_block(file, "file") {
+
+            }
+        }
+    }
 }

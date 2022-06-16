@@ -1298,10 +1298,22 @@ impl AttributeGraph {
 
         match (element_lexer.next(), element_lexer.next()) {
             (
+                Some(AttributeGraphElements::Name(block_name)),
+                Some(AttributeGraphElements::Symbol(block_symbol)),
+            )|
+            (
                 Some(AttributeGraphElements::Symbol(block_name)),
                 Some(AttributeGraphElements::Symbol(block_symbol)),
             ) => {
                 self.start_block_mode(block_name, block_symbol);
+            }
+            (
+                Some(AttributeGraphElements::Symbol(block_symbol)),
+                _
+            ) => {
+                if let Some(block_name) = self.find_text("block_name") {
+                    self.start_block_mode(block_name, block_symbol);
+                }
             }
             _ => {
                 self.end_block_mode();
@@ -1343,7 +1355,7 @@ impl AttributeGraph {
                     Ok(())
                 }
                 AttributeGraphElements::Entity(_) => todo!("value type unknown"),
-                AttributeGraphElements::Symbol(_) => todo!("unrecognized element"),
+                AttributeGraphElements::Symbol(_) | AttributeGraphElements::Name(_) => todo!("unrecognized element"),
                 AttributeGraphElements::Error => todo!("error parsing next value"),
             },
             (Some(AttributeGraphElements::Symbol(name)), Some(value), _) => match value {
@@ -1374,7 +1386,7 @@ impl AttributeGraph {
                     Ok(())
                 }
                 AttributeGraphElements::Entity(_) => todo!("value type unknown"),
-                AttributeGraphElements::Symbol(_) => todo!("unrecognized element"),
+                AttributeGraphElements::Symbol(_) | AttributeGraphElements::Name(_) => todo!("unrecognized element"),
                 AttributeGraphElements::Error => todo!("error parsing next value"),
             },
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
@@ -1455,7 +1467,8 @@ impl AttributeGraph {
                     Ok(())
                 }
                 AttributeGraphElements::Entity(_) => todo!("value type unknown"),
-                AttributeGraphElements::Symbol(_) => todo!("unrecognized element"),
+                AttributeGraphElements::Symbol(_)
+                | AttributeGraphElements::Name(_)  => todo!("unrecognized element"),
                 AttributeGraphElements::Error => todo!("error parsing next value"),
             },
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
@@ -1505,6 +1518,7 @@ impl AttributeGraph {
                     Err(AttributeGraphErrors::CannotImportEmptyAttribute)
                 }
                 AttributeGraphElements::Entity(_)
+                | AttributeGraphElements::Name(_) 
                 | AttributeGraphElements::Symbol(_)
                 | AttributeGraphElements::Error => {
                     Err(AttributeGraphErrors::IncorrectMessageFormat)
@@ -1552,6 +1566,10 @@ impl AttributeGraph {
         ) {
             (
                 Some(AttributeGraphElements::Symbol(block_name)),
+                Some(AttributeGraphElements::Symbol(block_symbol)),
+                Some(AttributeGraphElements::Symbol(attr_name)),
+            ) |(
+                Some(AttributeGraphElements::Name(block_name)),
                 Some(AttributeGraphElements::Symbol(block_symbol)),
                 Some(AttributeGraphElements::Symbol(attr_name)),
             ) => {
@@ -1734,7 +1752,7 @@ fn test_block_context() {
     let test = r#"
     ``` demo5 node
     add node_title .TEXT really cool node3
-    ``` demo5 form 
+    ``` form 
     add form_text .EMPTY
     edit form_text .TEXT placeholder
     ``` demo2 node
@@ -1749,6 +1767,13 @@ fn test_block_context() {
     ``` demo3 form 
     add form_text .EMPTY
     edit form_text .TEXT placeholder
+    ```
+    ``` #tasks.yaml file
+    ``` node
+    ``` form
+    ```
+
+    ``` #Main.elm file
     ```
     "#;
 
@@ -1765,6 +1790,14 @@ fn test_block_context() {
             println!("{}", form.save().expect("exists"));
         }
     }
+
+    let mut tasks_yaml = graph.find_block("tasks.yaml", "file").expect("exists");
+    graph.include_block(&mut tasks_yaml, "node");
+    graph.include_block(&mut tasks_yaml, "form");
+    println!("{}", tasks_yaml.save().expect("exists"));
+
+    let main_elm = graph.find_block("Main.elm", "file").expect("exists");
+    println!("{}", main_elm.save().expect("exists"));
 }
 
 #[test]
@@ -2078,10 +2111,13 @@ pub enum AttributeGraphElements {
     #[token(".EMPTY")]
     Empty,
     /// entity ids should be parsed before symbols
-    #[regex("[0-9]+", graph_lexer::from_entity)]
+    #[regex("[0-9]+", priority = 3, callback = graph_lexer::from_entity)]
     Entity(u32),
+     /// symbols must start with a character, and is composed of lowercase characters, digits, underscores, and colons
+    #[regex("#[A-Za-z_.0-9]+", graph_lexer::from_string)]
+    Name(String),
     /// symbols must start with a character, and is composed of lowercase characters, digits, underscores, and colons
-    #[regex("[a-z]+[a-z_:0-9]*", graph_lexer::from_symbol)]
+    #[regex("[a-z]+[a-z_:0-9]*", graph_lexer::from_string)]
     Symbol(String),
     // Logos requires one token variant to handle errors,
     // it can be named anything you wish.
@@ -2104,8 +2140,13 @@ mod graph_lexer {
         lexer.slice().parse().ok()
     }
 
-    pub fn from_symbol(lexer: &mut Lexer<AttributeGraphElements>) -> Option<String> {
-        Some(lexer.slice().to_string())
+    pub fn from_string(lexer: &mut Lexer<AttributeGraphElements>) -> Option<String> {
+        let mut slice = lexer.slice();
+        if slice.starts_with('#') {
+            slice = &slice[1..]; 
+        }
+
+        Some(slice.to_string())
     }
 
     pub fn from_text(lexer: &mut Lexer<AttributeGraphElements>) -> Option<Value> {

@@ -1,6 +1,9 @@
 mod block;
 pub use block::BlockContext;
 
+mod files;
+pub use files::FileContext;
+
 mod nodes;
 pub use nodes::Node;
 pub use nodes::NodeContext;
