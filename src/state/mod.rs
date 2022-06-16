@@ -1670,6 +1670,7 @@ fn test_attribute_graph_block_dispatcher() {
     add demo_node_title .EMPTY
     from node6 demo_node_title
     apply demo_node_title
+    from demo_doesnt_exist demo_node_title
     ```
     "#;
 

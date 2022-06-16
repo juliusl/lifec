@@ -1,0 +1,6 @@
+``` writefiles node
+add node_title .TEXT writefiles
+add debug .BOOL true
+``` writefiles form
+``` writefiles thunk
+```

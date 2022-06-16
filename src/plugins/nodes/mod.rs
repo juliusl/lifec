@@ -1,4 +1,4 @@
-use super::{Display, Edit, Engine, Plugin, Render, ThunkContext, WriteFiles};
+use super::{Display, Edit, Engine, Plugin, Render, ThunkContext, WriteFiles, Process};
 use crate::plugins::Println;
 use crate::{AttributeGraph, RuntimeState};
 use atlier::system::{Extension, Value};
@@ -256,9 +256,11 @@ impl Extension for Node {
     fn configure_app_systems(builder: &mut specs::DispatcherBuilder) {
         let write_files = NodeSync::<WriteFiles>::default();
         let println = NodeSync::<Println>::default();
+        let process = NodeSync::<Process>::default();
 
         builder.add(write_files, "write_files_node_sync", &[]);
         builder.add(println, "println_node_sync", &[]);
+        builder.add(process, "process_node_sync", &[]);
     }
 
     fn on_ui(&mut self, app_world: &World, ui: &imgui::Ui) {

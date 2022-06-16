@@ -1,12 +1,13 @@
-use atlier::system::{Value, Extension};
+use super::{Edit, Plugin, ThunkContext};
+use crate::{AttributeGraph, RuntimeDispatcher, RuntimeState};
+use atlier::system::{Extension, Value};
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
-use specs::{Component, HashMapStorage, WorldExt, Builder};
+use specs::{Builder, Component, HashMapStorage, WorldExt};
 use std::{
-    process::{Command, Output}, fmt::Display,
+    fmt::Display,
+    process::{Command, Output},
 };
-use crate::{RuntimeDispatcher, AttributeGraph, RuntimeState};
-use super::{Plugin, ThunkContext, Edit};
 
 mod echo;
 pub use echo::Echo;
@@ -43,27 +44,22 @@ impl Extension for Process {
         world.register::<Edit<ThunkContext>>();
         world.register::<Process>();
         world.register::<Edit<Process>>();
-    
+
         if let Some(graph) = AttributeGraph::load_from_file("process.runmd") {
             for process in graph.find_blocks("process") {
-                world.create_entity()
+                world
+                    .create_entity()
                     .with(Process::from(process))
-                    .maybe_with(Some(Edit::<ThunkContext>(|_, _, _| {
-
-                    })))
-                    .maybe_with(Some(Edit::<Process>(|_, _, _| {
-
-                    })))
+                    .maybe_with(Some(Edit::<ThunkContext>(|_, _, _| {})))
+                    .maybe_with(Some(Edit::<Process>(|_, _, _| {})))
                     .build();
             }
         }
     }
 
-    fn configure_app_systems(_: &mut specs::DispatcherBuilder) {
-    }
+    fn configure_app_systems(_: &mut specs::DispatcherBuilder) {}
 
-    fn on_ui(&mut self, _app_world: &specs::World, _ui: &imgui::Ui<'_>) {
-    }
+    fn on_ui(&mut self, _app_world: &specs::World, _ui: &imgui::Ui<'_>) {}
 }
 
 impl Plugin<ThunkContext> for Process {
@@ -76,61 +72,64 @@ impl Plugin<ThunkContext> for Process {
     }
 
     fn call_with_context(context: &mut super::ThunkContext) {
-        let process = Self::from(context.as_ref().clone());
-        if let Some(command) = process.command() {
-            match process.interpret_command(command, Process::handle_output) {
-                Ok(mut output) => {
-                    output.stdout = output.stdout.and_then(|o| {
-                        context.write_output(
-                            "stdout", 
-                            Value::BinaryVector(o)
-                        );
-                        None
-                    });
+        if let Some(process) = context
+            .as_ref()
+            .find_block("", "form")
+            .and_then(|a| Some(Self::from(a)))
+        {
+            if let Some(command) = process.command() {
+                match process.interpret_command(command, Process::handle_output) {
+                    Ok(mut output) => {
+                        if let Some(true) = process.as_ref().is_enabled("debug_out") {
+                            println!("{:?}", &output.stdout.as_ref().and_then(|o| String::from_utf8(o.to_vec()).ok()));
+                        }
 
-                    output.stderr = output.stderr.and_then(|o| {
-                        context.write_output(
-                            "stderr", 
-                            Value::BinaryVector(o)
-                        );
-                        None
-                    });
+                        output.stdout = output.stdout.and_then(|o| {
+                            context.write_output("stdout", Value::BinaryVector(o));
+                            None
+                        });
 
-                    if let Some(code) = output.code {
-                        context.write_output("code", Value::Int(code));
+                        output.stderr = output.stderr.and_then(|o| {
+                            context.write_output("stderr", Value::BinaryVector(o));
+                            None
+                        });
+
+                        if let Some(code) = output.code {
+                            context.write_output("code", Value::Int(code));
+                        }
+
+                        if let Some(local_ts) = output.timestamp_local {
+                            context.write_output("timestamp_local", Value::TextBuffer(local_ts));
+                        }
+
+                        if let Some(utc_ts) = output.timestamp_utc {
+                            context.write_output("timestamp_utc", Value::TextBuffer(utc_ts));
+                        }
+
+                        if let Some(elapsed) = output.elapsed {
+                            context.write_output("elapsed", Value::TextBuffer(elapsed));
+                        }
+
+                        context.set_return::<Process>("called", Value::Bool(true));
+                        context.as_mut().find_remove("error");
+
+                        let mut to_save = context.clone();
+                        for a in to_save.as_mut().iter_mut_attributes() {
+                            a.commit();
+                        }
+                        let saved = to_save.as_ref().save().expect("exists");
+                        if let None = std::fs::write("process.out", saved.as_bytes()).ok() {
+
+                        }
                     }
-
-                    if let Some(local_ts) = output.timestamp_local {
-                        context.write_output(
-                            "timestamp_local", 
-                            Value::TextBuffer(local_ts));
+                    Err(e) => {
+                        if let Some(true) = process.as_ref().is_enabled("debug_out") {
+                            eprintln!("{:?}", &e);
+                        }
+                        context
+                            .as_mut()
+                            .with("error", Value::TextBuffer(format!("Error: {:?}", e)));
                     }
-
-                    if let Some(utc_ts) = output.timestamp_utc {
-                        context.write_output(
-                            "timestamp_utc", 
-                            Value::TextBuffer(utc_ts)
-                        );
-                    }
-
-                    if let Some(elapsed) = output.elapsed {
-                        context.write_output(
-                            "elapsed", 
-                            Value::TextBuffer(elapsed)
-                        );
-                    }
-
-                    context.set_return::<Process>(
-                        "called", 
-                        Value::Bool(true)
-                    );
-
-                    context.as_mut().find_remove("error");
-                }
-                Err(e) => {
-                    context
-                        .as_mut()
-                        .with("error", Value::TextBuffer(format!("Error: {:?}", e)));
                 }
             }
         }
@@ -143,7 +142,7 @@ impl Process {
         expr: impl AsRef<str>,
         interpret: impl Fn(Self, &mut Command) -> Result<Self, ProcessExecutionError>,
     ) -> Result<Self, ProcessExecutionError> {
-        let parts: Vec<String> = expr.as_ref().split("::").map(|p| p.to_string()).collect();
+        let parts: Vec<String> = expr.as_ref().split(" ").map(|p| p.to_string()).collect();
 
         if let Some(command) = parts.get(0) {
             let subcommands = &parts[1..];
@@ -215,7 +214,8 @@ impl Display for Process {
 
 impl From<AttributeGraph> for Process {
     fn from(graph: AttributeGraph) -> Self {
-        Self { graph, 
+        Self {
+            graph,
             ..Default::default()
         }
     }
