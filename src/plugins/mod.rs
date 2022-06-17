@@ -7,9 +7,6 @@ mod nodes;
 pub use nodes::Node;
 pub use nodes::NodeContext;
 
-mod store;
-pub use store::StoreContext;
-
 mod process;
 pub use process::Process;
 

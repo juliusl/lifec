@@ -1,7 +1,5 @@
-use crate::plugins::{Plugin, BlockContext};
-
+use crate::plugins::Plugin;
 use super::ThunkContext;
-use atlier::prelude::Value;
 use specs::Component;
 use specs::storage::DenseVecStorage;
 
@@ -19,7 +17,7 @@ impl Plugin<ThunkContext> for Println {
     }
 
     fn call_with_context(context: &mut ThunkContext) {
-        context.accept(|a| {
+        context.accept("thunk", |a| {
             a.is_stable()
         });
 
@@ -31,6 +29,6 @@ impl Plugin<ThunkContext> for Println {
                 println!("{}: {}", name, value);
             });
 
-        context.write_output("printed", Value::Bool(true));
+        context.publish(|a| a.add_bool_attr("printed", true));
     }
 }

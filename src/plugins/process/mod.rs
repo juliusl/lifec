@@ -78,57 +78,32 @@ impl Plugin<ThunkContext> for Process {
             .and_then(|a| Some(Self::from(a)))
         {
             if let Some(command) = process.command() {
-                match process.interpret_command(command, Process::handle_output) {
-                    Ok(mut output) => {
+                match process.interpret_command(&command, Process::handle_output) {
+                    Ok(output) => {
                         if let Some(true) = process.as_ref().is_enabled("debug_out") {
                             println!("{:?}", &output.stdout.as_ref().and_then(|o| String::from_utf8(o.to_vec()).ok()));
                         }
-
-                        output.stdout = output.stdout.and_then(|o| {
-                            context.write_output("stdout", Value::BinaryVector(o));
-                            None
+                        
+                        // publish the result
+                        context.publish(|publish_block| {
+                            publish_block
+                                .with_text("command", command)
+                                .with_int("code", output.code.unwrap_or_default())
+                                .with_binary("stdout", output.stdout.unwrap_or_default())
+                                .with_binary("stderr", process.stdout.unwrap_or_default())
+                                .with_text("timestamp_local", output.timestamp_local.unwrap_or_default())
+                                .with_text("timestamp_utc", output.timestamp_utc.unwrap_or_default())
+                                .with_text("elapsed", output.elapsed.unwrap_or_default())
+                                .with_bool("called", true);
                         });
 
-                        output.stderr = output.stderr.and_then(|o| {
-                            context.write_output("stderr", Value::BinaryVector(o));
-                            None
-                        });
-
-                        if let Some(code) = output.code {
-                            context.write_output("code", Value::Int(code));
-                        }
-
-                        if let Some(local_ts) = output.timestamp_local {
-                            context.write_output("timestamp_local", Value::TextBuffer(local_ts));
-                        }
-
-                        if let Some(utc_ts) = output.timestamp_utc {
-                            context.write_output("timestamp_utc", Value::TextBuffer(utc_ts));
-                        }
-
-                        if let Some(elapsed) = output.elapsed {
-                            context.write_output("elapsed", Value::TextBuffer(elapsed));
-                        }
-
-                        context.write_output("called", Value::Bool(true));
                         context.as_mut().find_remove("error");
-
-                        let mut to_save = context.clone();
-                        for a in to_save.as_mut().iter_mut_attributes() {
-                            a.commit();
-                        }
-                        let saved = to_save.as_ref().save().expect("exists");
-                        if let None = std::fs::write("process.out", saved.as_bytes()).ok() {
-
-                        }
                     }
                     Err(e) => {
                         if let Some(true) = process.as_ref().is_enabled("debug_out") {
                             eprintln!("{:?}", &e);
                         }
-                        context
-                            .as_mut()
-                            .with("error", Value::TextBuffer(format!("Error: {:?}", e)));
+                        context.error(|a| a.add_text_attr("error", format!("Error: {:?}", e)))
                     }
                 }
             }

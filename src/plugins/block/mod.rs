@@ -63,11 +63,14 @@ impl BlockContext {
         }
     }
 
-    /// update an existing block, otherwise no-op
-    pub fn update_block(&mut self, block_symbol: impl AsRef<str>, update: impl FnOnce(&mut AttributeGraph)) {
+    /// update an existing block, otherwise no-op, returns true if udpate was called
+    pub fn update_block(&mut self, block_symbol: impl AsRef<str>, update: impl FnOnce(&mut AttributeGraph)) -> bool {
         if let Some(mut block) = self.get_block(block_symbol) {
             update(&mut block);
             self.as_mut().merge(&block);
+            true 
+        } else {
+            false
         }
     }
 
@@ -180,13 +183,42 @@ impl BlockContext {
         if let Some(token) = ui.begin_menu("File") {
             if let Some(token) = ui.begin_menu("Blocks") {
                 if MenuItem::new(format!("Transpile {0} to {0}.runmd", block_name)).build(ui) {
-                    self.add_block("file", |f| f.add_text_attr("runmd_path", format!("{}.runmd", block_name)));
+                    self.add_block(
+                        "file", 
+                        |f| 
+                        f.add_text_attr("runmd_path", format!("{}.runmd", block_name)
+                    ));
                     Transpile::call_with_context(self);
                 }
                 token.end();
             }
             token.end();
         }
+    }
+}
+
+impl From<AttributeGraph> for BlockContext {
+    fn from(g: AttributeGraph) -> Self {
+        if let Some(block_name) = g.find_text("block_name") {
+            Self::root_context(&g, block_name)
+        } else {
+            Self {
+                graph: g,
+                ..Default::default()
+            }
+        }
+    }
+}
+
+impl AsRef<AttributeGraph> for BlockContext {
+    fn as_ref(&self) -> &AttributeGraph {
+        &self.graph
+    }
+}
+
+impl AsMut<AttributeGraph> for BlockContext {
+    fn as_mut(&mut self) -> &mut AttributeGraph {
+        &mut self.graph
     }
 }
 
@@ -240,30 +272,5 @@ add debug_out .BOOL true
             println!("{}", result);
         },
         Err(_) => todo!(),
-    }
-}
-
-impl From<AttributeGraph> for BlockContext {
-    fn from(g: AttributeGraph) -> Self {
-        if let Some(block_name) = g.find_text("block_name") {
-            Self::root_context(&g, block_name)
-        } else {
-            Self {
-                graph: g,
-                ..Default::default()
-            }
-        }
-    }
-}
-
-impl AsRef<AttributeGraph> for BlockContext {
-    fn as_ref(&self) -> &AttributeGraph {
-        &self.graph
-    }
-}
-
-impl AsMut<AttributeGraph> for BlockContext {
-    fn as_mut(&mut self) -> &mut AttributeGraph {
-        &mut self.graph
     }
 }

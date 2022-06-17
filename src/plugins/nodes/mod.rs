@@ -5,7 +5,7 @@ use super::{
 use crate::plugins::Println;
 use crate::{AttributeGraph, RuntimeState};
 use atlier::system::{Extension, Value};
-use imgui::{Condition, Ui, Window};
+use imgui::{Condition, Ui, Window, MenuItem};
 use imnodes::{
     editor, AttributeFlag, AttributeId, CoordinateSystem, InputPinId, Link, LinkId, NodeId,
     OutputPinId,
@@ -14,8 +14,9 @@ use specs::storage::DenseVecStorage;
 use specs::{
     Component, Entities, Entity, Join, ReadStorage, RunNow, System, World, WorldExt, WriteStorage,
 };
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
+use std::time::{Duration, Instant};
 
 pub mod demo;
 
@@ -165,6 +166,16 @@ impl Node {
         }
     }
 
+    /// reverse lookup a link into block contexts
+    pub fn reverse_lookup_blocks(&self, link: &Link) -> Option<(BlockContext, BlockContext)> {
+        self.reverse_lookup(link).and_then(|(from, to)| {
+            Some((
+                BlockContext::from(from.as_ref().clone()),
+                BlockContext::from(to.as_ref().clone()),
+            ))
+        })
+    }
+
     /// gets all values from the publish block of "from"
     /// and writes to the the accept block of "to"
     pub fn connect(&mut self, link: &Link) {
@@ -174,15 +185,19 @@ impl Node {
                 let from = BlockContext::from(from);
                 let to = to.as_ref().clone();
                 let mut to = BlockContext::from(to);
-    
+
                 if let Some(publish) = from.get_block("publish") {
                     to.update_block("accept", |accepting| {
-                        for (name, value) in publish.iter_attributes().filter(|a| !a.name().starts_with("block_")).filter_map(|a| Some((a.name(), a.value()))) {
+                        for (name, value) in publish
+                            .iter_attributes()
+                            .filter(|a| !a.name().starts_with("block_"))
+                            .filter_map(|a| Some((a.name(), a.value())))
+                        {
                             accepting.with(name, value.clone());
                         }
                     });
-    
-                    if let Some(to_update)  = self.contexts.get_mut(&to_node_id) {
+
+                    if let Some(to_update) = self.contexts.get_mut(&to_node_id) {
                         to_update.as_mut().merge(to.as_ref());
                     }
                 }
@@ -198,10 +213,16 @@ impl Node {
                 let from = BlockContext::from(from);
                 let to = to.as_ref().clone();
                 let to = BlockContext::from(to);
-    
-                if let (Some(publish), Some(accept)) = (from.get_block("publish"), to.get_block("accept")) {
-                    if let Some(to_update)  = self.contexts.get_mut(&to_node_id) {
-                        for mut attr in publish.iter_attributes().filter(|a| !a.name().starts_with("block_")).cloned() {
+
+                if let (Some(publish), Some(accept)) =
+                    (from.get_block("publish"), to.get_block("accept"))
+                {
+                    if let Some(to_update) = self.contexts.get_mut(&to_node_id) {
+                        for mut attr in publish
+                            .iter_attributes()
+                            .filter(|a| !a.name().starts_with("block_"))
+                            .cloned()
+                        {
                             attr.set_id(accept.entity());
                             to_update.as_mut().remove(&attr);
                         }
@@ -324,7 +345,7 @@ impl Extension for Node {
                     let mut ordered = BTreeMap::default();
                     for (_, context) in self.contexts.iter() {
                         let block = context.as_ref().clone();
-                        let block = BlockContext::from(block); 
+                        let block = BlockContext::from(block);
                         ordered.insert(block.block_name(), block);
                     }
 
@@ -332,8 +353,9 @@ impl Extension for Node {
                         block.edit_menu(ui);
                     }
                 });
-                ui.label_text("hash", format!("{}", self.graph.hash_code()));
 
+                ui.label_text("hash", format!("{}", self.graph.hash_code()));
+                
                 let detatch = self
                     .editor_context
                     .push(AttributeFlag::EnableLinkDetachWithDragClick);
@@ -481,7 +503,7 @@ impl<'a> System<'a> for Node {
 }
 
 #[derive(Default)]
-struct NodeSync<P>(HashMap<NodeContext, Entity>, P)
+struct NodeSync<P>(HashMap<NodeContext, Entity>, Option<P>, Option<Instant>)
 where
     P: Plugin<ThunkContext> + Component + Default;
 
@@ -529,6 +551,14 @@ where
     );
 
     fn run(&mut self, (entities, mut contexts, mut edits): Self::SystemData) {
+        if let Some(instant) = self.2 {
+            if instant.elapsed() > Duration::from_millis(16) {
+                self.2.take();
+            } else {
+                return;
+            }
+        }
+
         if let Some(source) = AttributeGraph::load_from_file(format!("{}.runmd", P::symbol())) {
             // load each node block to the graph
             for block in source.find_blocks("node") {
@@ -539,9 +569,8 @@ where
 
                 let mut context = BlockContext::root_context(&source, block_name);
                 context.update_block("node", |a| {
-                    a
-                    .with_text("input_label", "accept")
-                    .with_text("output_label", "publish");
+                    a.with_text("input_label", "accept")
+                        .with_text("output_label", "publish");
                 });
 
                 let context = NodeContext::from(context.as_ref().clone());
@@ -568,6 +597,8 @@ where
                     }
                 }
             }
+
+            self.2 = Some(Instant::now());
         }
     }
 }

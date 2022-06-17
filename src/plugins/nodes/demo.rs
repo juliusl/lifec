@@ -57,7 +57,8 @@ impl Extension for NodeDemo
         self.0.on_ui(app_world, ui);
 
         // Since write files demo is stateless, it doesn't need to maintain state between frames
-        WriteFilesDemo::default()
-            .on_ui(app_world, ui);
+        //WriteFilesDemo::default().on_ui(app_world, ui);
+
+        ui.show_demo_window(&mut true);
     }
 }

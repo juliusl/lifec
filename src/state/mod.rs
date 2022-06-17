@@ -899,6 +899,11 @@ impl AttributeGraph {
         self.with(name, Value::Symbol(symbol.as_ref().to_string()))
     }
 
+    /// Returns self with a binary attribute w/ name
+    pub fn with_binary(&mut self, name: impl AsRef<str>, binary: impl Into<Vec<u8>>)-> &mut Self {
+        self.with(name, Value::BinaryVector(binary.into()))
+    }
+
     /// Returns self with a text buffer attribute w/ name.
     pub fn with_text(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) -> &mut Self {
         self.with(name, Value::TextBuffer(init_value.as_ref().to_string()))

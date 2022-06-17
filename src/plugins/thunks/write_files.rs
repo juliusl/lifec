@@ -37,7 +37,9 @@ impl Plugin<ThunkContext> for WriteFiles {
                 None
             })
         {
-            context.write_output(file_name, value);
+            context.publish(|a| { 
+                a.with(file_name, value);
+            });
         }
 
         // returns current directory
@@ -45,7 +47,7 @@ impl Plugin<ThunkContext> for WriteFiles {
             let dir = dir.display().to_string();
 
             println!("Setting parent dir {}", dir);
-            context.write_output("parent_dir", Value::TextBuffer(dir));
+            context.publish(|a| a.add_text_attr("parent_dir", dir));
         }
     }
 }

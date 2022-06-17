@@ -1,11 +1,11 @@
 use crate::AttributeGraph;
-use atlier::system::{Value, Attribute};
+use atlier::system::{Attribute, Value};
 use specs::storage::DenseVecStorage;
 use specs::Component;
 use std::collections::BTreeMap;
 
-mod println;
 mod form;
+mod println;
 pub use form::Form;
 pub use println::Println;
 
@@ -22,61 +22,46 @@ use super::BlockContext;
 /// in the context of a thunk.
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
-pub struct ThunkContext(AttributeGraph);
+pub struct ThunkContext(BlockContext);
 
 impl From<AttributeGraph> for ThunkContext {
     fn from(g: AttributeGraph) -> Self {
-        Self(g)
+        Self(BlockContext::from(g))
     }
 }
 
 impl AsRef<AttributeGraph> for ThunkContext {
     fn as_ref(&self) -> &AttributeGraph {
-        &self.0
+        self.0.as_ref()
     }
 }
 
 impl AsMut<AttributeGraph> for ThunkContext {
     fn as_mut(&mut self) -> &mut AttributeGraph {
-        &mut self.0
+        self.0.as_mut()
     }
 }
 
 impl ThunkContext {
-    // Write a transient output value for this context
-    pub fn write_output(&mut self, output_name: impl AsRef<str>, output: Value) {
-        let mut block_context = BlockContext::from(self.as_ref().clone());
-
-        block_context.update_block("publish", |u| {
-            u.with(output_name, output);
-        });
-
-        self.as_mut().merge(block_context.as_ref());
+    /// Update error block
+    pub fn error(&mut self, record: impl FnOnce(&mut AttributeGraph)) {
+        self.0.update_block("error", record);
     }
 
-    pub fn read_outputs(&self) -> Option<BTreeMap<String, Value>> {
-        let mut outputs = BTreeMap::default();
-
-        let block_context = BlockContext::from(self.as_ref().clone()); 
-        if let Some(publish) = block_context.get_block("publish") {
-            for attr in publish.clone().iter_attributes() {
-                if let Some((publish_name, value)) = attr.transient() {
-                    outputs.insert(publish_name.to_string(), value.clone());
-                }
-            }
-
-            Some(outputs)
-        } else {
-            None
-        }
+    /// Update publish block
+    pub fn publish(&mut self, update: impl FnOnce(&mut AttributeGraph)) {
+        self.0.update_block("publish", update);
     }
 
-    pub fn accept(&mut self, accept: impl Fn(&Attribute) -> bool) {
-        let mut block_context = BlockContext::from(self.as_ref().clone()); 
-
-        if let Some(accept_block) = block_context.get_block("accept") {
-            for (name, value) in accept_block.iter_attributes().filter(|a| accept(a)).map(|a| (a.name(), a.value())) {
-                block_context.update_block("thunk", |u| {
+    /// Receives values from the accept block, and updates the destination block with the new values
+    pub fn accept(&mut self, dest_block: impl AsRef<str>, accept: impl Fn(&Attribute) -> bool) {
+        if let Some(accept_block) = self.0.get_block("accept") {
+            for (name, value) in accept_block
+                .iter_attributes()
+                .filter(|a| accept(a))
+                .map(|a| (a.name(), a.value()))
+            {
+                self.0.update_block(dest_block.as_ref(), |u| {
                     u.with(name, value.clone());
                 });
             }
