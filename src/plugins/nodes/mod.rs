@@ -155,6 +155,24 @@ impl Node {
             None
         }
     }
+
+    pub fn connect(&mut self, link: &Link) {
+        if let Some(publish) = self
+            .reverse_lookup(&link)
+            .and_then(|(from, _)| from.as_ref().find_block("", "publish"))
+        {
+            let to = self.reverse_lookup(&link).and_then(|(_, to)| to.node_id);
+
+            if let Some(to) = to {
+                if let Some(to) = self.contexts.get_mut(&to) {
+                    if let Some(mut accept) = to.as_ref().find_block("", "accept") {
+                        accept.merge(&publish);
+                        to.as_mut().merge(&accept);
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Plugin<NodeContext> for Node {
@@ -181,22 +199,13 @@ impl Plugin<NodeContext> for Node {
                     context.attribute_id = Some(self.idgen.next_attribute());
                 }
             }
-            self.contexts.insert(node_id, context.clone());
-        }
-
-        if let Some(node_id) = context.node_id {
-            if let Some(ui_context) = self.contexts.get_mut(&node_id) {
-                if let None = context.output_pin_id {
-                    if ui_context.as_ref().find_block("", "publish").is_some() {
-                        ui_context.output_pin_id = Some(self.idgen.next_output_pin());
-                    }
-                }
-                if let None = context.input_pin_id {
-                    if ui_context.as_ref().find_block("", "accept").is_some() {
-                        ui_context.input_pin_id = Some(self.idgen.next_input_pin());
-                    }
-                }
+            if let None = context.output_pin_id {
+                context.output_pin_id = Some(self.idgen.next_output_pin());
             }
+            if let None = context.input_pin_id {
+                context.input_pin_id = Some(self.idgen.next_input_pin());
+            }
+            self.contexts.insert(node_id, context.clone());
         }
     }
 }
@@ -266,107 +275,107 @@ impl Extension for Node {
             node_editor_window_title = window_title;
         }
 
-        Window::new(format!(
-            "{}",
-            node_editor_window_title,
-        ))
-        .menu_bar(true)
-        .size(size, Condition::Appearing)
-        .build(ui, || {
-            ui.menu_bar(|| {
-                self.graph.edit_attr_menu(ui);
-            });
+        Window::new(format!("{}", node_editor_window_title,))
+            .menu_bar(true)
+            .size(size, Condition::Appearing)
+            .build(ui, || {
+                ui.menu_bar(|| {
+                    self.graph.edit_attr_menu(ui);
+                });
 
-            let detatch = self
-                .editor_context
-                .push(AttributeFlag::EnableLinkDetachWithDragClick);
-            let outer_scope = editor(&mut self.editor_context, |mut editor_scope| {
-                editor_scope.add_mini_map(imnodes::MiniMapLocation::BottomRight);
+                let detatch = self
+                    .editor_context
+                    .push(AttributeFlag::EnableLinkDetachWithDragClick);
+                let outer_scope = editor(&mut self.editor_context, |mut editor_scope| {
+                    editor_scope.add_mini_map(imnodes::MiniMapLocation::BottomRight);
 
-                for (node_id, mut context) in self.contexts.iter_mut() {
-                    let edit = self.edit.get(&node_id).and_then(|e| Some(e.to_owned()));
-                    let display = self.display.get(&node_id).and_then(|d| Some(d.to_owned()));
+                    for (node_id, mut context) in self.contexts.iter_mut() {
+                        let edit = self.edit.get(&node_id).and_then(|e| Some(e.to_owned()));
+                        let display = self.display.get(&node_id).and_then(|d| Some(d.to_owned()));
 
-                    editor_scope.add_node(*node_id, |mut node_scope| {
-                        let imnodes::ImVec2 { x, y } =
-                            node_id.get_position(CoordinateSystem::ScreenSpace);
-                        context.emit_current_pos(x, y);
+                        editor_scope.add_node(*node_id, |mut node_scope| {
+                            let imnodes::ImVec2 { x, y } =
+                                node_id.get_position(CoordinateSystem::ScreenSpace);
+                            context.emit_current_pos(x, y);
 
-                        node_scope.add_titlebar(|| {
-                            if let Some(node_title) = context.node_title() {
-                                ui.text(node_title);
+                            node_scope.add_titlebar(|| {
+                                if let Some(node_title) = context.node_title() {
+                                    ui.text(node_title);
+                                }
+                            });
+
+                            if let Some(input_pin_id) = &context.input_pin_id {
+                                node_scope.add_input(
+                                    *input_pin_id,
+                                    imnodes::PinShape::Circle,
+                                    || {
+                                        if let Some(input_label) = context.input_label() {
+                                            ui.text(input_label);
+                                        }
+                                    },
+                                );
+                            }
+
+                            if let Some(attribute_id) = &context.attribute_id {
+                                node_scope.attribute(*attribute_id, || {
+                                    if let Some(true) = context.as_ref().is_enabled("debug") {
+                                        let imnodes::ImVec2 { x, y } =
+                                            node_id.get_position(CoordinateSystem::ScreenSpace);
+                                        ui.text(format!("x: {}, y: {}", x, y));
+                                        let imnodes::ImVec2 {
+                                            x: width,
+                                            y: height,
+                                        } = node_id.get_dimensions();
+                                        ui.text(format!("width: {}", width));
+                                        ui.text(format!("height: {}", height));
+                                    }
+
+                                    // If the entity has an edit/display, it's shown in this block
+                                    frame.on_render(&mut context, edit.clone(), display.clone());
+                                });
+                            }
+
+                            if let Some(output_pin_id) = &context.output_pin_id {
+                                if let Some(_) = context.as_ref().find_block("", "publish") {
+                                    node_scope.add_output(
+                                        *output_pin_id,
+                                        imnodes::PinShape::Triangle,
+                                        || {
+                                            if let Some(output_label) = context.output_label() {
+                                                ui.text(output_label);
+                                            }
+                                        },
+                                    );
+                                }
                             }
                         });
+                    }
 
-                        if let Some(input_pin_id) = &context.input_pin_id {
-                            node_scope.add_input(
-                                *input_pin_id,
-                                imnodes::PinShape::Circle,
-                                || {
-                                    if let Some(input_label) = context.input_label() {
-                                        ui.text(input_label);
-                                    }
-                                },
-                            );
-                        }
+                    for (
+                        link_id,
+                        Link {
+                            start_pin, end_pin, ..
+                        },
+                    ) in &self.link_index
+                    {
+                        editor_scope.add_link(*link_id, *end_pin, *start_pin);
+                    }
+                });
 
-                        if let Some(attribute_id) = &context.attribute_id {
-                            node_scope.attribute(*attribute_id, || {
-                                if let Some(true) = context.as_ref().is_enabled("debug") {
-                                    let imnodes::ImVec2 { x, y } =
-                                        node_id.get_position(CoordinateSystem::ScreenSpace);
-                                    ui.text(format!("x: {}, y: {}", x, y));
-                                    let imnodes::ImVec2 {
-                                        x: width,
-                                        y: height,
-                                    } = node_id.get_dimensions();
-                                    ui.text(format!("width: {}", width));
-                                    ui.text(format!("height: {}", height));
-                                }
-
-                                // If the entity has an edit/display, it's shown in this block
-                                frame.on_render(&mut context, edit.clone(), display.clone());
-                            });
-                        }
-
-                        if let Some(output_pin_id) = &context.output_pin_id {
-                            node_scope.add_output(
-                                *output_pin_id,
-                                imnodes::PinShape::Triangle,
-                                || {
-                                    if let Some(output_label) = context.output_label() {
-                                        ui.text(output_label);
-                                    }
-                                },
-                            );
-                        }
-                    });
+                if let Some(link) = outer_scope.links_created() {
+                    println!("Link created {:?}", link);
+                    self.link_index.insert(self.idgen.next_link(), link);
+                    self.connect(&link);
                 }
 
-                for (
-                    link_id,
-                    Link {
-                        start_pin, end_pin, ..
-                    },
-                ) in &self.link_index
-                {
-                    editor_scope.add_link(*link_id, *end_pin, *start_pin);
+                if let Some(dropped) = outer_scope.get_dropped_link() {
+                    if let Some(dropped) = self.link_index.remove(&dropped) {
+                        println!("Link dropped {:?}", dropped);
+                    }
                 }
+
+                detatch.pop();
             });
-
-            if let Some(link) = outer_scope.links_created() {
-                println!("Link created {:?}", link);
-                self.link_index.insert(self.idgen.next_link(), link);
-            }
-
-            if let Some(dropped) = outer_scope.get_dropped_link() {
-                if let Some(dropped) = self.link_index.remove(&dropped) {
-                    println!("Link dropped {:?}", dropped);
-                }
-            }
-
-            detatch.pop();
-        });
 
         self.run_now(app_world);
     }
