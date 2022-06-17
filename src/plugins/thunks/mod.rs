@@ -5,6 +5,8 @@ use specs::Component;
 use std::collections::BTreeMap;
 
 mod println;
+mod form;
+pub use form::Form;
 pub use println::Println;
 
 mod write_files;

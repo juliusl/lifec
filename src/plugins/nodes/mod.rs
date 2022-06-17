@@ -1,3 +1,4 @@
+use super::thunks::Form;
 use super::{
     BlockContext, Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles,
 };
@@ -291,10 +292,12 @@ impl Extension for Node {
         let write_files = NodeSync::<WriteFiles>::default();
         let println = NodeSync::<Println>::default();
         let process = NodeSync::<Process>::default();
+        let form = NodeSync::<Form>::default();
 
         builder.add(write_files, "write_files_node_sync", &[]);
         builder.add(println, "println_node_sync", &[]);
         builder.add(process, "process_node_sync", &[]);
+        builder.add(form, "form_node_sync", &[]);
     }
 
     fn on_ui(&mut self, app_world: &World, ui: &imgui::Ui) {

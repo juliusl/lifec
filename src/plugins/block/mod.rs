@@ -115,43 +115,13 @@ impl BlockContext {
 
                     if attr.is_stable() {
                         write!(src, "add {} ", attr.name())?;
-                        match attr.value() {
-                            atlier::system::Value::Empty => {
-                                writeln!(src, ".EMPTY")?;
-                            },
-                            atlier::system::Value::Bool(val) => {
-                                writeln!(src, ".BOOL {}", val)?;
-                            },
-                            atlier::system::Value::TextBuffer(text) => {
-                                writeln!(src, ".TEXT {}", text)?;
-                            },
-                            atlier::system::Value::Int(val) => {
-                                writeln!(src, ".INT {}", val)?;
-                            },
-                            atlier::system::Value::IntPair(val1, val2) => {
-                                writeln!(src, ".INT_PAIR {}, {}", val1, val2)?;
-                            },
-                            atlier::system::Value::IntRange(val1, val2, val3) => {
-                                writeln!(src, ".INT_RANGE {}, {}, {}", val1, val2, val3)?;
-                            },
-                            atlier::system::Value::Float(val) => {
-                                writeln!(src, ".FLOAT {}", val)?;
-                            },
-                            atlier::system::Value::FloatPair(val1, val2) => {
-                                writeln!(src, ".FLOAT_PAIR {}, {}", val1, val2)?;
-                            },
-                            atlier::system::Value::FloatRange(val1, val2, val3) => {
-                                writeln!(src, ".FLOAT_RANGE {}, {}, {}", val1, val2, val3)?;
-                            },
-                            atlier::system::Value::BinaryVector(bin) => {
-                                writeln!(src, ".BINARY_VECTOR {}", base64::encode(bin))?;
-                            },
-                            atlier::system::Value::Reference(val) => {
-                                writeln!(src, ".REFERENCE {}", val)?;
-                            },
-                            atlier::system::Value::Symbol(val) => {
-                                writeln!(src, ".SYMBOL {}", val)?;
-                            },
+                        Self::transpile_value(&mut src, attr.value())?;
+                    } else {
+                        if let Some((name, value)) = attr.transient() {
+                            if name != &format!("{}::{}", self.block_name, symbol) {
+                                write!(src, "edit {} {} ", attr.name(), name)?;
+                                Self::transpile_value(&mut src, value)?;
+                            }
                         }
                     }
                 }
@@ -160,6 +130,49 @@ impl BlockContext {
             writeln!(src, "")?;
         }
         Ok(src)
+    }
+
+    pub fn transpile_value(src: &mut String, value: &Value) -> Result<(), Error>{
+        match value {
+            atlier::system::Value::Empty => {
+                writeln!(src, ".EMPTY")?;
+            },
+            atlier::system::Value::Bool(val) => {
+                writeln!(src, ".BOOL {}", val)?;
+            },
+            atlier::system::Value::TextBuffer(text) => {
+                writeln!(src, ".TEXT {}", text)?;
+            },
+            atlier::system::Value::Int(val) => {
+                writeln!(src, ".INT {}", val)?;
+            },
+            atlier::system::Value::IntPair(val1, val2) => {
+                writeln!(src, ".INT_PAIR {}, {}", val1, val2)?;
+            },
+            atlier::system::Value::IntRange(val1, val2, val3) => {
+                writeln!(src, ".INT_RANGE {}, {}, {}", val1, val2, val3)?;
+            },
+            atlier::system::Value::Float(val) => {
+                writeln!(src, ".FLOAT {}", val)?;
+            },
+            atlier::system::Value::FloatPair(val1, val2) => {
+                writeln!(src, ".FLOAT_PAIR {}, {}", val1, val2)?;
+            },
+            atlier::system::Value::FloatRange(val1, val2, val3) => {
+                writeln!(src, ".FLOAT_RANGE {}, {}, {}", val1, val2, val3)?;
+            },
+            atlier::system::Value::BinaryVector(bin) => {
+                writeln!(src, ".BINARY_VECTOR {}", base64::encode(bin))?;
+            },
+            atlier::system::Value::Reference(val) => {
+                writeln!(src, ".REFERENCE {}", val)?;
+            },
+            atlier::system::Value::Symbol(val) => {
+                writeln!(src, ".SYMBOL {}", val)?;
+            },
+        }
+
+        Ok(())
     }
 
     pub fn edit_menu(&mut self, ui: &Ui) {
