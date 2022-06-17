@@ -255,7 +255,7 @@ impl Extension for Node {
     fn on_ui(&mut self, app_world: &World, ui: &imgui::Ui) {
         let mut frame = Render::<NodeContext>::next_frame(ui);
 
-        let mut size = [800.0, 600.0];
+        let mut size = [1920.0, 1080.0];
         if let Some(Value::FloatPair(width, height)) = self.graph.find_attr_value("size") {
             size[0] = *width as f32;
             size[1] = *height as f32;
@@ -267,9 +267,8 @@ impl Extension for Node {
         }
 
         Window::new(format!(
-            "{} - {}",
+            "{}",
             node_editor_window_title,
-            self.graph.hash_code()
         ))
         .menu_bar(true)
         .size(size, Condition::Appearing)

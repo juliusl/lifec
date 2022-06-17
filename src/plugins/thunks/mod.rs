@@ -74,7 +74,7 @@ impl ThunkContext {
             ))
             .ok()
         {
-            if let Some(mut publish) = self.as_ref().find_block("", "publish") {
+            if let Some(mut publish) = self.as_ref().find_block(block_name, "publish") {
                 publish.as_mut()
                     .find_update_attr(format!("{}::output", output_name.as_ref()), |a| a.edit_as(output));
 
@@ -114,7 +114,7 @@ impl ThunkContext {
             ))
             .ok()
         {
-            if let Some(mut publish) = self.as_ref().find_block("", "publish") {
+            if let Some(mut publish) = self.as_ref().find_block(block_name, "publish") {
                 publish.as_mut()
                     .find_update_attr(format!("{}::returns", T::symbol()), |a| a.edit_as(returns));
 
