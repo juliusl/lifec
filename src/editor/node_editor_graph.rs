@@ -830,15 +830,15 @@ impl Visitor<NodeId> for NodeEditorGraph {
                 }
                 (Value::Symbol(_), Value::Empty) => {
                     if let Some(values) = &from_node.values {
-                        let context = ThunkContext::from(values.clone());
+                        let _context = ThunkContext::from(values.clone());
 
-                        if let Some((_, output)) = context.returns().first() {
-                            let reference = output.to_ref();
-                            if let Some(update) = self.find_node_mut(*t) {
-                                let updating = update.attribute.value_mut();
-                                *updating = reference;
-                            }
-                        }
+                        // if let Some((_, output)) = context.returns().first() {
+                        //     let reference = output.to_ref();
+                        //     if let Some(update) = self.find_node_mut(*t) {
+                        //         let updating = update.attribute.value_mut();
+                        //         *updating = reference;
+                        //     }
+                        // }
                     }
                 }
                 (Value::Empty, Value::Symbol(_)) => {
@@ -856,25 +856,25 @@ impl Visitor<NodeId> for NodeEditorGraph {
                     if symbol.starts_with("thunk::") {
                         let thunk_name = symbol[7..].to_string();
                         if let Some(thunk) = self.thunk_index.get(&thunk_name) {
-                            let thunk = thunk.clone();
+                            let _thunk = thunk.clone();
                             let input = from_node.clone().clone();
 
                             if let Some(values) = input.values {
-                                let thunk_context = ThunkContext::from(values);
-                                let inputs = thunk_context.outputs();
+                                let _thunk_context = ThunkContext::from(values);
+                                // let inputs = thunk_context.outputs();
 
-                                if let Some(update) = self.find_node_mut(*t) {
-                                    for (input_name, input) in inputs {
-                                        update.update(thunk, input_name, input.to_owned())
-                                    }
+                                if let Some(_update) = self.find_node_mut(*t) {
+                                    // for (input_name, input) in inputs {
+                                    //     update.update(thunk, input_name, input.to_owned())
+                                    // }
 
-                                    thunk_context.returns().iter().for_each(|(name, value)| {
-                                        update.update(
-                                            thunk,
-                                            name,
-                                            value.clone(),
-                                        );
-                                    });
+                                    // thunk_context.returns().iter().for_each(|(name, value)| {
+                                    //     update.update(
+                                    //         thunk,
+                                    //         name,
+                                    //         value.clone(),
+                                    //     );
+                                    // });
                                 }
                             } else {
                                 return false;

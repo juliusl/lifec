@@ -1,4 +1,4 @@
-use crate::plugins::Plugin;
+use crate::plugins::{Plugin, BlockContext};
 
 use super::ThunkContext;
 use atlier::prelude::Value;
@@ -19,6 +19,10 @@ impl Plugin<ThunkContext> for Println {
     }
 
     fn call_with_context(context: &mut ThunkContext) {
+        context.accept(|a| {
+            a.is_stable()
+        });
+
         context
             .as_ref()
             .iter_attributes()
@@ -27,6 +31,6 @@ impl Plugin<ThunkContext> for Println {
                 println!("{}: {}", name, value);
             });
 
-        context.set_return::<Println>("printed", Value::Bool(true));
+        context.write_output("printed", Value::Bool(true));
     }
 }

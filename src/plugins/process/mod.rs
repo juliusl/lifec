@@ -110,7 +110,7 @@ impl Plugin<ThunkContext> for Process {
                             context.write_output("elapsed", Value::TextBuffer(elapsed));
                         }
 
-                        context.set_return::<Process>("called", Value::Bool(true));
+                        context.write_output("called", Value::Bool(true));
                         context.as_mut().find_remove("error");
 
                         let mut to_save = context.clone();

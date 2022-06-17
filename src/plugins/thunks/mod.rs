@@ -1,6 +1,5 @@
 use crate::AttributeGraph;
-use crate::RuntimeDispatcher;
-use atlier::system::Value;
+use atlier::system::{Value, Attribute};
 use specs::storage::DenseVecStorage;
 use specs::Component;
 use std::collections::BTreeMap;
@@ -16,8 +15,7 @@ pub mod demo {
     pub use demo::WriteFilesDemo;
 }
 
-use super::Plugin;
-
+use super::BlockContext;
 /// ThunkContext provides common methods for updating the underlying state graph,
 /// in the context of a thunk.
 #[derive(Component, Default, Clone)]
@@ -43,100 +41,42 @@ impl AsMut<AttributeGraph> for ThunkContext {
 }
 
 impl ThunkContext {
-    // Gets the current outputs for this context
-    pub fn outputs(&self) -> BTreeMap<String, Value> {
-        let mut outputs = BTreeMap::default();
-        self.as_ref()
-            .find_symbol_values("output")
-            .iter()
-            .for_each(|(k, o)| {
-                outputs.insert(k.to_string(), o.clone());
-            });
-
-        outputs
-    }
-
     // Write a transient output value for this context
     pub fn write_output(&mut self, output_name: impl AsRef<str>, output: Value) {
-        let block_name = self.as_ref().find_text("block_name").unwrap_or_default();
+        let mut block_context = BlockContext::from(self.as_ref().clone());
 
-        if let Some(_) = self
-            .as_mut()
-            .batch_mut(format!(
-                r#"
-                ``` {1} publish
-                define {0} output
-                edit {0}::output .EMPTY
-                ```
-                "#,
-                output_name.as_ref(),
-                block_name,
-            ))
-            .ok()
-        {
-            if let Some(mut publish) = self.as_ref().find_block(block_name, "publish") {
-                publish.as_mut()
-                    .find_update_attr(format!("{}::output", output_name.as_ref()), |a| a.edit_as(output));
+        block_context.update_block("publish", |u| {
+            u.with(output_name, output);
+        });
 
-                self.as_mut().merge(&publish.commit());
+        self.as_mut().merge(block_context.as_ref());
+    }
+
+    pub fn read_outputs(&self) -> Option<BTreeMap<String, Value>> {
+        let mut outputs = BTreeMap::default();
+
+        let block_context = BlockContext::from(self.as_ref().clone()); 
+        if let Some(publish) = block_context.get_block("publish") {
+            for attr in publish.clone().iter_attributes() {
+                if let Some((publish_name, value)) = attr.transient() {
+                    outputs.insert(publish_name.to_string(), value.clone());
+                }
             }
+
+            Some(outputs)
+        } else {
+            None
         }
     }
 
-    // Returns all transient return values from this context
-    pub fn returns(&self) -> Vec<&(String, Value)> {
-        self.as_ref()
-            .find_symbols("returns")
-            .iter()
-            .filter_map(|a| a.transient())
-            .collect()
-    }
+    pub fn accept(&mut self, accept: impl Fn(&Attribute) -> bool) {
+        let mut block_context = BlockContext::from(self.as_ref().clone()); 
 
-    // Set a transient return value for this context
-    pub fn set_return<T>(&mut self, name: &str, returns: Value)
-    where
-        T: Plugin<ThunkContext>,
-    {
-        let block_name = self.as_ref().find_text("block_name").unwrap_or_default();
-
-        if let Some(_) = self
-            .as_mut()
-            .batch_mut(format!(
-                r#"
-                ``` {2} publish
-                define {0} returns
-                edit {0}::returns {1} .EMPTY
-                ```
-                "#,
-                T::symbol(),
-                name,
-                block_name
-            ))
-            .ok()
-        {
-            if let Some(mut publish) = self.as_ref().find_block(block_name, "publish") {
-                publish.as_mut()
-                    .find_update_attr(format!("{}::returns", T::symbol()), |a| a.edit_as(returns));
-
-                self.as_mut().merge(&publish.commit());
-            }
-        }
-    }
-
-    // Returns the transient return value for thunk type of T
-    pub fn return_for<T>(&self) -> Option<&Value>
-    where
-        T: Plugin<ThunkContext>,
-    {
-        let symbol = format!("{}::returns", T::symbol());
-        self.as_ref()
-            .find_attr(symbol)
-            .and_then(|a| if a.is_stable() { Some(a.value()) } else { None })
-    }
-
-    pub fn import_file_blocks(&mut self, files: Vec<String>) {
-        for file in files {
-            if let Some(file) = self.as_ref().find_block(file, "file") {
+        if let Some(accept_block) = block_context.get_block("accept") {
+            for (name, value) in accept_block.iter_attributes().filter(|a| accept(a)).map(|a| (a.name(), a.value())) {
+                block_context.update_block("thunk", |u| {
+                    u.with(name, value.clone());
+                });
             }
         }
     }

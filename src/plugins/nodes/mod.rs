@@ -1,4 +1,6 @@
-use super::{Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles};
+use super::{
+    BlockContext, Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles,
+};
 use crate::plugins::Println;
 use crate::{AttributeGraph, RuntimeState};
 use atlier::system::{Extension, Value};
@@ -11,7 +13,7 @@ use specs::storage::DenseVecStorage;
 use specs::{
     Component, Entities, Entity, Join, ReadStorage, RunNow, System, World, WorldExt, WriteStorage,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::hash::Hash;
 
 pub mod demo;
@@ -63,17 +65,23 @@ impl NodeContext {
 
     /// Returns the current title of the node.
     pub fn node_title(&self) -> Option<String> {
-        self.as_ref().find_text("node_title")
+        self.as_ref()
+            .find_block("", "node")
+            .and_then(|node| node.find_text("node_title"))
     }
 
     /// Returns the current input label for this node.
     pub fn input_label(&self) -> Option<String> {
-        self.as_ref().find_text("input_label")
+        self.as_ref()
+            .find_block("", "node")
+            .and_then(|node| node.find_text("input_label"))
     }
 
     /// Returns the current output label for this node.
     pub fn output_label(&self) -> Option<String> {
-        self.as_ref().find_text("output_label")
+        self.as_ref()
+            .find_block("", "node")
+            .and_then(|node| node.find_text("output_label"))
     }
 }
 
@@ -156,18 +164,46 @@ impl Node {
         }
     }
 
+    /// gets all values from the publish block of "from"
+    /// and writes to the the accept block of "to"
     pub fn connect(&mut self, link: &Link) {
-        if let Some(publish) = self
-            .reverse_lookup(&link)
-            .and_then(|(from, _)| from.as_ref().find_block("", "publish"))
-        {
-            let to = self.reverse_lookup(&link).and_then(|(_, to)| to.node_id);
+        if let Some((from, to)) = &self.reverse_lookup(link) {
+            if let Some(to_node_id) = to.node_id {
+                let from = from.as_ref().clone();
+                let from = BlockContext::from(from);
+                let to = to.as_ref().clone();
+                let mut to = BlockContext::from(to);
+    
+                if let Some(publish) = from.get_block("publish") {
+                    to.update_block("accept", |accepting| {
+                        for (name, value) in publish.iter_attributes().filter(|a| !a.name().starts_with("block_")).filter_map(|a| Some((a.name(), a.value()))) {
+                            accepting.with(name, value.clone());
+                        }
+                    });
+    
+                    if let Some(to_update)  = self.contexts.get_mut(&to_node_id) {
+                        to_update.as_mut().merge(to.as_ref());
+                    }
+                }
+            }
+        }
+    }
 
-            if let Some(to) = to {
-                if let Some(to) = self.contexts.get_mut(&to) {
-                    if let Some(mut accept) = to.as_ref().find_block("", "accept") {
-                        accept.merge(&publish);
-                        to.as_mut().merge(&accept);
+    /// cleans up the accept cache of to
+    pub fn disconnect(&mut self, link: &Link) {
+        if let Some((from, to)) = &self.reverse_lookup(link) {
+            if let Some(to_node_id) = to.node_id {
+                let from = from.as_ref().clone();
+                let from = BlockContext::from(from);
+                let to = to.as_ref().clone();
+                let to = BlockContext::from(to);
+    
+                if let (Some(publish), Some(accept)) = (from.get_block("publish"), to.get_block("accept")) {
+                    if let Some(to_update)  = self.contexts.get_mut(&to_node_id) {
+                        for mut attr in publish.iter_attributes().filter(|a| !a.name().starts_with("block_")).cloned() {
+                            attr.set_id(accept.entity());
+                            to_update.as_mut().remove(&attr);
+                        }
                     }
                 }
             }
@@ -264,7 +300,7 @@ impl Extension for Node {
     fn on_ui(&mut self, app_world: &World, ui: &imgui::Ui) {
         let mut frame = Render::<NodeContext>::next_frame(ui);
 
-        let mut size = [1920.0, 1080.0];
+        let mut size = [800.0, 600.0];
         if let Some(Value::FloatPair(width, height)) = self.graph.find_attr_value("size") {
             size[0] = *width as f32;
             size[1] = *height as f32;
@@ -281,7 +317,19 @@ impl Extension for Node {
             .build(ui, || {
                 ui.menu_bar(|| {
                     self.graph.edit_attr_menu(ui);
+
+                    let mut ordered = BTreeMap::default();
+                    for (_, context) in self.contexts.iter() {
+                        let block = context.as_ref().clone();
+                        let block = BlockContext::from(block); 
+                        ordered.insert(block.block_name(), block);
+                    }
+
+                    for (_, block) in ordered.iter_mut() {
+                        block.edit_menu(ui);
+                    }
                 });
+                ui.label_text("hash", format!("{}", self.graph.hash_code()));
 
                 let detatch = self
                     .editor_context
@@ -305,15 +353,18 @@ impl Extension for Node {
                             });
 
                             if let Some(input_pin_id) = &context.input_pin_id {
-                                node_scope.add_input(
-                                    *input_pin_id,
-                                    imnodes::PinShape::Circle,
-                                    || {
-                                        if let Some(input_label) = context.input_label() {
-                                            ui.text(input_label);
-                                        }
-                                    },
-                                );
+                                if let Some(_) = context.as_ref().find_block("", "accept") {
+                                    node_scope.add_input(
+                                        *input_pin_id,
+                                        imnodes::PinShape::Circle,
+                                        || {
+                                            if let Some(input_label) = context.input_label() {
+                                                ui.set_next_item_width(130.0);
+                                                ui.label_text(input_label, "input");
+                                            }
+                                        },
+                                    );
+                                }
                             }
 
                             if let Some(attribute_id) = &context.attribute_id {
@@ -328,6 +379,7 @@ impl Extension for Node {
                                         } = node_id.get_dimensions();
                                         ui.text(format!("width: {}", width));
                                         ui.text(format!("height: {}", height));
+                                        ui.text(format!("entity: {}", context.as_ref().entity()));
                                     }
 
                                     // If the entity has an edit/display, it's shown in this block
@@ -342,7 +394,8 @@ impl Extension for Node {
                                         imnodes::PinShape::Triangle,
                                         || {
                                             if let Some(output_label) = context.output_label() {
-                                                ui.text(output_label);
+                                                ui.set_next_item_width(130.0);
+                                                ui.label_text("output", output_label);
                                             }
                                         },
                                     );
@@ -370,6 +423,7 @@ impl Extension for Node {
 
                 if let Some(dropped) = outer_scope.get_dropped_link() {
                     if let Some(dropped) = self.link_index.remove(&dropped) {
+                        self.disconnect(&dropped);
                         println!("Link dropped {:?}", dropped);
                     }
                 }
@@ -472,26 +526,27 @@ where
     );
 
     fn run(&mut self, (entities, mut contexts, mut edits): Self::SystemData) {
-        if let Some(config) = AttributeGraph::load_from_file(format!("{}.runmd", P::symbol())) {
+        if let Some(source) = AttributeGraph::load_from_file(format!("{}.runmd", P::symbol())) {
             // load each node block to the graph
-            for mut block in config.find_blocks("node") {
-                config.include_block(&mut block, "form");
-                config.include_block(&mut block, "thunk");
-                config.include_block(&mut block, "publish");
-                config.include_block(&mut block, "accept");
-                let mut context = NodeContext::from(block);
+            for block in source.find_blocks("node") {
+                let block_name = block.find_text("block_name").unwrap_or_default();
+                if block_name.is_empty() {
+                    continue;
+                }
 
+                let mut context = BlockContext::root_context(&source, block_name);
+                context.update_block("node", |a| {
+                    a
+                    .with_text("input_label", "accept")
+                    .with_text("output_label", "publish");
+                });
+
+                let context = NodeContext::from(context.as_ref().clone());
                 let NodeSync(added, ..) = self;
                 let original = context.clone();
 
                 if let None = added.get(&original) {
                     let entity = entities.create();
-
-                    context
-                        .as_mut()
-                        .with_text("input_label", "accept")
-                        .with_text("output_label", "publish");
-
                     match contexts.insert(entity, context) {
                         Ok(_) => {
                             println!("Loaded new node_context entity {:?}", entity);
