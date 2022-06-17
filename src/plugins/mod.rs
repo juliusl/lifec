@@ -1,3 +1,5 @@
+use specs::{Builder, Component, Entity, EntityBuilder, World, WorldExt};
+
 mod block;
 pub use block::BlockContext;
 
@@ -15,16 +17,6 @@ mod process;
 pub use process::Process;
 
 mod thunks;
-use specs::Builder;
-use specs::Component;
-use specs::Entities;
-use specs::Entity;
-use specs::EntityBuilder;
-use specs::Join;
-use specs::System;
-use specs::World;
-use specs::WorldExt;
-use specs::WriteStorage;
 pub use thunks::Println;
 pub use thunks::ThunkContext;
 pub use thunks::WriteFiles;
@@ -41,6 +33,7 @@ pub use render::Render;
 
 use crate::AttributeGraph;
 
+/// This trait is to facilitate extending working with the attribute graph
 pub trait Plugin<T>
 where
     T: AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph> + Component + Send + Sync,
@@ -82,6 +75,7 @@ where
         }
     }
 
+    /// if this plugin implements an engine, this can be called in the event_loop to automate the engine sequence
     fn on_event(&mut self, context: &mut T) 
         where 
             Self: Engine + Sized
@@ -99,19 +93,4 @@ pub trait Engine {
 
     /// exit is always called, regardless if attributes has been updated
     fn exit(&mut self, attributes: &AttributeGraph);
-}
-
-/// Ensure attribute graph id is synced to its parent entity
-pub struct AttributeGraphSync;
-
-impl<'a> System<'a> for AttributeGraphSync {
-    type SystemData = (Entities<'a>, WriteStorage<'a, AttributeGraph>);
-
-    fn run(&mut self, (entities, mut graphs): Self::SystemData) {
-        for (e, g) in (&entities, &mut graphs).join() {
-            if g.entity() != e.id() {
-                g.set_parent_entity(e);
-            }
-        }
-    }
 }

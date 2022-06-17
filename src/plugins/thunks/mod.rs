@@ -58,19 +58,28 @@ impl ThunkContext {
 
     // Write a transient output value for this context
     pub fn write_output(&mut self, output_name: impl AsRef<str>, output: Value) {
+        let block_name = self.as_ref().find_text("block_name").unwrap_or_default();
+
         if let Some(_) = self
             .as_mut()
             .batch_mut(format!(
                 r#"
+                ``` {1} publish
                 define {0} output
                 edit {0}::output .EMPTY
+                ```
                 "#,
-                output_name.as_ref()
+                output_name.as_ref(),
+                block_name,
             ))
             .ok()
         {
-            self.as_mut()
-                .find_update_attr(format!("{}::output", output_name.as_ref()), |a| a.edit_as(output));
+            if let Some(mut publish) = self.as_ref().find_block("", "publish") {
+                publish.as_mut()
+                    .find_update_attr(format!("{}::output", output_name.as_ref()), |a| a.edit_as(output));
+
+                self.as_mut().merge(&publish.commit());
+            }
         }
     }
 
@@ -88,20 +97,29 @@ impl ThunkContext {
     where
         T: Plugin<ThunkContext>,
     {
+        let block_name = self.as_ref().find_text("block_name").unwrap_or_default();
+
         if let Some(_) = self
             .as_mut()
             .batch_mut(format!(
                 r#"
+                ``` {2} publish
                 define {0} returns
                 edit {0}::returns {1} .EMPTY
+                ```
                 "#,
                 T::symbol(),
-                name
+                name,
+                block_name
             ))
             .ok()
         {
-            self.as_mut()
-                .find_update_attr(format!("{}::returns", T::symbol()), |a| a.edit_as(returns));
+            if let Some(mut publish) = self.as_ref().find_block("", "publish") {
+                publish.as_mut()
+                    .find_update_attr(format!("{}::returns", T::symbol()), |a| a.edit_as(returns));
+
+                self.as_mut().merge(&publish.commit());
+            }
         }
     }
 
@@ -119,7 +137,6 @@ impl ThunkContext {
     pub fn import_file_blocks(&mut self, files: Vec<String>) {
         for file in files {
             if let Some(file) = self.as_ref().find_block(file, "file") {
-
             }
         }
     }

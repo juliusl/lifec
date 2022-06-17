@@ -1,4 +1,4 @@
-use super::{Display, Edit, Engine, Plugin, Render, ThunkContext, WriteFiles, Process};
+use super::{Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles};
 use crate::plugins::Println;
 use crate::{AttributeGraph, RuntimeState};
 use atlier::system::{Extension, Value};
@@ -61,48 +61,6 @@ impl NodeContext {
         });
     }
 
-    /// Enable input for this node.
-    /// In the UI this is the input pin.
-    pub fn enable_input(&mut self) {
-        self.input_enabled(true);
-    }
-
-    pub fn disable_input(&mut self) {
-        self.input_enabled(false);
-    }
-
-    /// Enable output component for this node.
-    /// In the UI this is the output pin.
-    pub fn enable_output(&mut self) {
-        self.output_enabled(true);
-    }
-
-    pub fn disable_output(&mut self) {
-        self.output_enabled(false);
-    }
-
-    /// Enable attribute component for this node.
-    /// In the UI this will enable rendering the attribute render component.
-    pub fn enable_attribute(&mut self) {
-        self.attribute_enabled(true);
-    }
-
-    pub fn disable_attribute(&mut self) {
-        self.attribute_enabled(false);
-    }
-
-    pub fn input_enabled(&mut self, enable: bool) {
-        self.as_mut().with_bool("enable_input", enable);
-    }
-
-    pub fn output_enabled(&mut self, enable: bool) {
-        self.as_mut().with_bool("enable_output", enable);
-    }
-
-    pub fn attribute_enabled(&mut self, enable: bool) {
-        self.as_mut().with_bool("enable_attribute", enable);
-    }
-
     /// Returns the current title of the node.
     pub fn node_title(&self) -> Option<String> {
         self.as_ref().find_text("node_title")
@@ -145,7 +103,7 @@ impl From<AttributeGraph> for NodeContext {
 pub struct Node {
     editor_context: imnodes::EditorContext,
     idgen: imnodes::IdentifierGenerator,
-    contexts: Vec<NodeContext>,
+    contexts: HashMap<NodeId, NodeContext>,
     edit: HashMap<NodeId, Edit<NodeContext>>,
     display: HashMap<NodeId, Display<NodeContext>>,
     link_index: HashMap<LinkId, Link>,
@@ -188,11 +146,8 @@ impl Node {
             ..
         } = link;
 
-        let start = self
-            .contexts
-            .iter()
-            .find(|c| c.node_id == Some(*start_node));
-        let end = self.contexts.iter().find(|c| c.node_id == Some(*end_node));
+        let start = self.contexts.get(start_node);
+        let end = self.contexts.get(end_node);
 
         if let (Some(from), Some(to)) = (start, end) {
             Some((from, to))
@@ -210,6 +165,40 @@ impl Plugin<NodeContext> for Node {
     fn call_with_context(_: &mut NodeContext) {
         // No-OP
     }
+
+    fn on_event(&mut self, context: &mut NodeContext)
+    where
+        Self: Engine + Sized,
+    {
+        if let None = context.node_id {
+            let node_id = self.idgen.next_node();
+            context.node_id = Some(node_id);
+
+            if let None = context.attribute_id {
+                if context.as_ref().find_block("", "form").is_some()
+                    || context.as_ref().find_block("", "thunk").is_some()
+                {
+                    context.attribute_id = Some(self.idgen.next_attribute());
+                }
+            }
+            self.contexts.insert(node_id, context.clone());
+        }
+
+        if let Some(node_id) = context.node_id {
+            if let Some(ui_context) = self.contexts.get_mut(&node_id) {
+                if let None = context.output_pin_id {
+                    if ui_context.as_ref().find_block("", "publish").is_some() {
+                        ui_context.output_pin_id = Some(self.idgen.next_output_pin());
+                    }
+                }
+                if let None = context.input_pin_id {
+                    if ui_context.as_ref().find_block("", "accept").is_some() {
+                        ui_context.input_pin_id = Some(self.idgen.next_input_pin());
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl From<imnodes::Context> for Node {
@@ -223,7 +212,7 @@ impl From<imnodes::Context> for Node {
                 editor_context,
                 idgen,
                 graph: config,
-                contexts: vec![],
+                contexts: HashMap::new(),
                 edit: HashMap::new(),
                 display: HashMap::new(),
                 link_index: HashMap::new(),
@@ -234,7 +223,7 @@ impl From<imnodes::Context> for Node {
                 editor_context,
                 idgen,
                 graph: AttributeGraph::default(),
-                contexts: vec![],
+                contexts: HashMap::new(),
                 edit: HashMap::new(),
                 display: HashMap::new(),
                 link_index: HashMap::new(),
@@ -285,68 +274,74 @@ impl Extension for Node {
         .menu_bar(true)
         .size(size, Condition::Appearing)
         .build(ui, || {
+            ui.menu_bar(|| {
+                self.graph.edit_attr_menu(ui);
+            });
+
             let detatch = self
                 .editor_context
                 .push(AttributeFlag::EnableLinkDetachWithDragClick);
             let outer_scope = editor(&mut self.editor_context, |mut editor_scope| {
                 editor_scope.add_mini_map(imnodes::MiniMapLocation::BottomRight);
 
-                for mut context in self.contexts.iter_mut() {
-                    if let Some(node_id) = context.node_id {
-                        let edit = self.edit.get(&node_id).and_then(|e| Some(e.to_owned()));
-                        let display = self.display.get(&node_id).and_then(|d| Some(d.to_owned()));
+                for (node_id, mut context) in self.contexts.iter_mut() {
+                    let edit = self.edit.get(&node_id).and_then(|e| Some(e.to_owned()));
+                    let display = self.display.get(&node_id).and_then(|d| Some(d.to_owned()));
 
-                        editor_scope.add_node(node_id, |mut node_scope| {
-                            let imnodes::ImVec2 { x, y } =
-                                node_id.get_position(CoordinateSystem::ScreenSpace);
-                            context.emit_current_pos(x, y);
+                    editor_scope.add_node(*node_id, |mut node_scope| {
+                        let imnodes::ImVec2 { x, y } =
+                            node_id.get_position(CoordinateSystem::ScreenSpace);
+                        context.emit_current_pos(x, y);
 
-                            node_scope.add_titlebar(|| {
-                                if let Some(node_title) = context.node_title() {
-                                    ui.text(node_title);
-                                }
-                            });
-
-                            if let Some(input_pin_id) = &context.input_pin_id {
-                                node_scope.add_input(
-                                    *input_pin_id,
-                                    imnodes::PinShape::Circle,
-                                    || {
-                                        if let Some(input_label) = context.input_label() {
-                                            ui.text(input_label);
-                                        }
-                                    },
-                                );
-                            }
-
-                            if let Some(attribute_id) = &context.attribute_id {
-                                node_scope.attribute(*attribute_id, || {
-                                    if let Some(true) = context.as_ref().is_enabled("debug") {
-                                        let imnodes::ImVec2 { x, y} = node_id.get_position(CoordinateSystem::ScreenSpace);
-                                        ui.text(format!("x: {}, y: {}", x, y));
-                                        let imnodes::ImVec2 { x: width, y: height } = node_id.get_dimensions();
-                                        ui.text(format!("width: {}", width));
-                                        ui.text(format!("height: {}", height));
-                                    }
-
-                                    // If the entity has an edit/display, it's shown in this block
-                                    frame.on_render(&mut context, edit.clone(), display.clone());
-                                });
-                            }
-
-                            if let Some(output_pin_id) = &context.output_pin_id {
-                                node_scope.add_output(
-                                    *output_pin_id,
-                                    imnodes::PinShape::Triangle,
-                                    || {
-                                        if let Some(output_label) = context.output_label() {
-                                            ui.text(output_label);
-                                        }
-                                    },
-                                );
+                        node_scope.add_titlebar(|| {
+                            if let Some(node_title) = context.node_title() {
+                                ui.text(node_title);
                             }
                         });
-                    }
+
+                        if let Some(input_pin_id) = &context.input_pin_id {
+                            node_scope.add_input(
+                                *input_pin_id,
+                                imnodes::PinShape::Circle,
+                                || {
+                                    if let Some(input_label) = context.input_label() {
+                                        ui.text(input_label);
+                                    }
+                                },
+                            );
+                        }
+
+                        if let Some(attribute_id) = &context.attribute_id {
+                            node_scope.attribute(*attribute_id, || {
+                                if let Some(true) = context.as_ref().is_enabled("debug") {
+                                    let imnodes::ImVec2 { x, y } =
+                                        node_id.get_position(CoordinateSystem::ScreenSpace);
+                                    ui.text(format!("x: {}, y: {}", x, y));
+                                    let imnodes::ImVec2 {
+                                        x: width,
+                                        y: height,
+                                    } = node_id.get_dimensions();
+                                    ui.text(format!("width: {}", width));
+                                    ui.text(format!("height: {}", height));
+                                }
+
+                                // If the entity has an edit/display, it's shown in this block
+                                frame.on_render(&mut context, edit.clone(), display.clone());
+                            });
+                        }
+
+                        if let Some(output_pin_id) = &context.output_pin_id {
+                            node_scope.add_output(
+                                *output_pin_id,
+                                imnodes::PinShape::Triangle,
+                                || {
+                                    if let Some(output_label) = context.output_label() {
+                                        ui.text(output_label);
+                                    }
+                                },
+                            );
+                        }
+                    });
                 }
 
                 for (
@@ -381,17 +376,7 @@ impl Extension for Node {
 impl Engine for Node {
     fn next_mut(&mut self, _: &mut AttributeGraph) {}
 
-    fn exit(&mut self, _: &AttributeGraph) {
-        for (_, link) in self.link_index.iter() {
-            if let Some((from, to)) = self.reverse_lookup(link) {
-                let (from, to) = (from.as_ref().entity(), to.as_ref().entity());
-                let from = from as i32;
-                let to = to as i32;
-                self.graph.with_int_pair("last_link", &[from, to]);
-                println!("{}", self.graph.save().unwrap());
-            }
-        }
-    }
+    fn exit(&mut self, _: &AttributeGraph) {}
 }
 
 impl<'a> System<'a> for Node {
@@ -402,67 +387,44 @@ impl<'a> System<'a> for Node {
     );
 
     fn run(&mut self, (mut contexts, edit_node, display_node): Self::SystemData) {
+        for (_, graph) in self.contexts.iter() {
+            self.graph.merge(graph.as_ref());
+        }
+
         for (context, edit_node, display_node) in
             (&mut contexts, edit_node.maybe(), display_node.maybe()).join()
         {
             if edit_node.is_some() || display_node.is_some() {
-                if let None = context.node_id {
-                    let node_id = self.idgen.next_node();
-                    context.node_id = Some(node_id);
+                self.on_event(context);
 
-                    if let None = context.input_pin_id {
-                        if let Some(true) = context.as_ref().is_enabled("enable_input") {
-                            context.input_pin_id = Some(self.idgen.next_input_pin());
-                        }
-                    }
-
-                    if let None = context.attribute_id {
-                        if let Some(true) = context.as_ref().is_enabled("enable_attribute") {
-                            context.attribute_id = Some(self.idgen.next_attribute());
-                        }
-                    }
-
-                    if let None = context.output_pin_id {
-                        if let Some(true) = context.as_ref().is_enabled("enable_output") {
-                            context.output_pin_id = Some(self.idgen.next_output_pin());
-                        }
-                    }
-
-                    if let Some(edit_node) = edit_node {
-                        println!("found edit node for {:?}", context.node_id);
+                if let (Some(edit_node), Some(node_id)) = (edit_node, context.node_id) {
+                    if !self.edit.contains_key(&node_id) {
+                        println!("found edit node for {:?}", node_id);
                         self.edit.insert(node_id, edit_node.clone());
                     }
-
-                    if let Some(display_node) = display_node {
-                        println!("found display node for {:?}", context.node_id);
-                        self.display.insert(node_id, display_node.clone());
-                    }
-
-                    self.contexts.push(context.clone());
                 }
 
-                self.on_event(context);
+                if let (Some(display_node), Some(node_id)) = (display_node, context.node_id) {
+                    if !self.display.contains_key(&node_id) {
+                        println!("found display node for {:?}", node_id);
+                        self.display.insert(node_id, display_node.clone());
+                    }
+                }
             }
         }
-
-        // if let Some(config) = AttributeGraph::load_from_file("node.runmd") {
-        //     if config.hash_code() != self.graph.hash_code() {
-        //         self.graph = config;
-        //     }
-        // }
     }
 }
 
 #[derive(Default)]
 struct NodeSync<P>(HashMap<NodeContext, Entity>, P)
-    where
+where
     P: Plugin<ThunkContext> + Component + Default;
 
 impl<P> NodeSync<P>
 where
-P: Plugin<ThunkContext> + Component + Default
+    P: Plugin<ThunkContext> + Component + Default,
 {
-    fn render_form(_: &NodeContext, graph: &mut AttributeGraph, ui: &Ui) {
+    fn render_node(_: &NodeContext, graph: &mut AttributeGraph, ui: &Ui) {
         if let Some(mut _update) = graph.edit_form_block(ui) {
             let imported = _update.entity();
             for attr in _update.iter_mut_attributes() {
@@ -491,9 +453,9 @@ P: Plugin<ThunkContext> + Component + Default
     }
 }
 
-impl<'a, P> System<'a> for NodeSync<P> 
+impl<'a, P> System<'a> for NodeSync<P>
 where
-    P: Plugin<ThunkContext> + Component + Default
+    P: Plugin<ThunkContext> + Component + Default,
 {
     type SystemData = (
         Entities<'a>,
@@ -507,6 +469,8 @@ where
             for mut block in config.find_blocks("node") {
                 config.include_block(&mut block, "form");
                 config.include_block(&mut block, "thunk");
+                config.include_block(&mut block, "publish");
+                config.include_block(&mut block, "accept");
                 let mut context = NodeContext::from(block);
 
                 let NodeSync(added, ..) = self;
@@ -515,21 +479,16 @@ where
                 if let None = added.get(&original) {
                     let entity = entities.create();
 
-                    if context.as_ref().values_missing().count() > 0 {
-                        context.enable_input();
-                    }
-
-                    if !context.as_ref().is_stable() {
-                        context.enable_output();
-                        context.as_mut().with_text("output_label", "published");
-                    }
-                    context.enable_attribute();
+                    context
+                        .as_mut()
+                        .with_text("input_label", "accept")
+                        .with_text("output_label", "publish");
 
                     match contexts.insert(entity, context) {
                         Ok(_) => {
                             println!("Loaded new node_context entity {:?}", entity);
                             added.insert(original, entity);
-                            match edits.insert(entity, Edit(Self::render_form)) {
+                            match edits.insert(entity, Edit(Self::render_node)) {
                                 Ok(_) => {
                                     println!(
                                         "Added display for new node_context entity {:?}",

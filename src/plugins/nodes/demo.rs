@@ -32,11 +32,7 @@ impl Extension for NodeDemo
             e.maybe_with(Some(display))
              .build()
         });
-
-        Node::parse_entity("node.runnmd", world, |e|{
-            e.maybe_with(Some(Println::default())).build()
-        });
-
+        
         WriteFiles::parse_entity("println.runmd", world, |e|{
             let edit = Edit::<ThunkContext>(
                 |_, g, ui| {
