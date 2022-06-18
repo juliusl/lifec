@@ -479,10 +479,10 @@ impl<'a> System<'a> for Node {
     );
 
     fn run(&mut self, (mut contexts, edit_node, display_node): Self::SystemData) {
-        for (_, graph) in self.contexts.iter() {
-            if let Some(block_name) = graph.as_ref().find_text("block_name") {
+        for (_, node_context) in self.contexts.iter() {
+            if let Some(block_name) = node_context.as_ref().find_text("block_name") {
                 if let Some(block_context) = self.source.find_block_mut(block_name) {
-                    let node_block_context = BlockContext::from(graph.as_ref().clone());
+                    let node_block_context = BlockContext::from(node_context.as_ref().clone());
                     block_context.merge_block(&node_block_context, "form");
                     block_context.merge_block(&node_block_context, "thunk");
                     block_context.merge_block(&node_block_context, "publish");

@@ -60,7 +60,15 @@ impl Project {
     /// shows export block view
     pub fn export_blocks_view(&mut self, ui: &Ui) {
         for (block_name, block) in self.iter_block_mut() {
-            block.as_mut().edit_attr(format!("Select {}", block_name), "project_selected", ui); 
+            block.as_mut().edit_attr(format!("Select {}", block_name), "project_selected", ui);
+            if ui.is_item_hovered() {
+                ui.tooltip(||{
+                    ui.text("Preview:");
+                    ui.disabled(true, ||{
+                        block.as_mut().edit_form_block(ui);
+                    });
+                });
+            }
         }
 
         let selected = self.select_blocks(|_, context| {

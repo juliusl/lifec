@@ -44,18 +44,24 @@ impl BlockContext {
 
     /// merge the block symbol of another block context, returns true if a change happend
     pub fn merge_block(&mut self, other: &BlockContext, block_symbol: impl AsRef<str>) -> bool {
-        if let Some(update) = other.get_block(block_symbol.as_ref()) {
-            let current = self.as_ref().hash_code();
+        if let Some(mut update) = other.get_block(block_symbol.as_ref()) {
+            let imported = update.entity();
+            for attr in update.iter_mut_attributes() {
+                match attr.value() {
+                    Value::Symbol(_) => {}
+                    _ => {
+                        attr.commit();
+                        let next_value = attr.value.clone();
 
-            if self.update_block(block_symbol, |updating| {
-                if updating.hash_code() != update.hash_code() {
-                    updating.merge(&update);
+                   
+                        self.as_mut().find_update_imported_attr(imported, &attr.name(), |a| {
+                            a.edit_as(next_value);
+                            a.commit();
+                        });
+                    }
                 }
-            }) {
-                current != self.as_ref().hash_code()
-            } else {
-                false 
             }
+            true
         } else {
             false
         }
