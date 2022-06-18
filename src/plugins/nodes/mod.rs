@@ -1,11 +1,12 @@
+use super::block::Project;
 use super::thunks::Form;
 use super::{
     BlockContext, Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles,
 };
 use crate::plugins::Println;
-use crate::{AttributeGraph, RuntimeState};
+use crate::AttributeGraph;
 use atlier::system::{Extension, Value};
-use imgui::{Condition, Ui, Window, MenuItem};
+use imgui::{Condition, Ui, Window};
 use imnodes::{
     editor, AttributeFlag, AttributeId, CoordinateSystem, InputPinId, Link, LinkId, NodeId,
     OutputPinId,
@@ -14,7 +15,7 @@ use specs::storage::DenseVecStorage;
 use specs::{
     Component, Entities, Entity, Join, ReadStorage, RunNow, System, World, WorldExt, WriteStorage,
 };
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::{Duration, Instant};
 
@@ -117,7 +118,7 @@ pub struct Node {
     edit: HashMap<NodeId, Edit<NodeContext>>,
     display: HashMap<NodeId, Display<NodeContext>>,
     link_index: HashMap<LinkId, Link>,
-    graph: AttributeGraph,
+    source: Project,
     // TODO: Need to hold a context to this, because if it leaves scope it will drop
     // But that means we can only have 1 node editor window open
     _context: imnodes::Context,
@@ -264,6 +265,11 @@ impl Plugin<NodeContext> for Node {
                 context.input_pin_id = Some(self.idgen.next_input_pin());
             }
             self.contexts.insert(node_id, context.clone());
+        
+            let block_context = BlockContext::from(context.as_ref().clone());
+            if self.source.import_block(block_context) {
+                println!("new block imported");
+            }
         }
     }
 }
@@ -273,12 +279,12 @@ impl From<imnodes::Context> for Node {
         let editor_context = context.create_editor();
         let idgen = editor_context.new_identifier_generator();
 
-        if let Some(config) = AttributeGraph::load_from_file("node.runmd") {
+        if let Some(source) = Project::load_file("node.runmd") {
             Self {
                 _context: context,
                 editor_context,
                 idgen,
-                graph: config,
+                source,
                 contexts: HashMap::new(),
                 edit: HashMap::new(),
                 display: HashMap::new(),
@@ -289,7 +295,7 @@ impl From<imnodes::Context> for Node {
                 _context: context,
                 editor_context,
                 idgen,
-                graph: AttributeGraph::default(),
+                source: Project::default(),
                 contexts: HashMap::new(),
                 edit: HashMap::new(),
                 display: HashMap::new(),
@@ -325,13 +331,14 @@ impl Extension for Node {
         let mut frame = Render::<NodeContext>::next_frame(ui);
 
         let mut size = [800.0, 600.0];
-        if let Some(Value::FloatPair(width, height)) = self.graph.find_attr_value("size") {
+        if let Some(Value::FloatPair(width, height)) = self.source.as_ref().find_attr_value("size")
+        {
             size[0] = *width as f32;
             size[1] = *height as f32;
         }
 
         let mut node_editor_window_title = format!("node_editor");
-        if let Some(window_title) = self.graph.find_text("window_title") {
+        if let Some(window_title) = self.source.as_ref().find_text("window_title") {
             node_editor_window_title = window_title;
         }
 
@@ -340,22 +347,20 @@ impl Extension for Node {
             .size(size, Condition::Appearing)
             .build(ui, || {
                 ui.menu_bar(|| {
-                    self.graph.edit_attr_menu(ui);
+                    self.source.edit_project_menu(ui);
 
-                    let mut ordered = BTreeMap::default();
-                    for (_, context) in self.contexts.iter() {
-                        let block = context.as_ref().clone();
-                        let block = BlockContext::from(block);
-                        ordered.insert(block.block_name(), block);
-                    }
+                    if let Some(token) = ui.begin_menu("Debug") {
+                        self.source.as_mut().edit_attr("Debug nodes", "debug_nodes", ui);
+                        if ui.is_item_hovered() {
+                            ui.tooltip_text("This will show information on each node such as x,y coordinates");
+                        }
 
-                    for (_, block) in ordered.iter_mut() {
-                        block.edit_menu(ui);
+                        token.end();
                     }
                 });
 
-                ui.label_text("hash", format!("{}", self.graph.hash_code()));
-                
+                ui.label_text("hash", format!("{}", self.source.as_ref().hash_code()));
+
                 let detatch = self
                     .editor_context
                     .push(AttributeFlag::EnableLinkDetachWithDragClick);
@@ -394,7 +399,7 @@ impl Extension for Node {
 
                             if let Some(attribute_id) = &context.attribute_id {
                                 node_scope.attribute(*attribute_id, || {
-                                    if let Some(true) = context.as_ref().is_enabled("debug") {
+                                    if let Some(true) = self.source.as_ref().is_enabled("debug_nodes") {
                                         let imnodes::ImVec2 { x, y } =
                                             node_id.get_position(CoordinateSystem::ScreenSpace);
                                         ui.text(format!("x: {}, y: {}", x, y));
@@ -404,7 +409,6 @@ impl Extension for Node {
                                         } = node_id.get_dimensions();
                                         ui.text(format!("width: {}", width));
                                         ui.text(format!("height: {}", height));
-                                        ui.text(format!("entity: {}", context.as_ref().entity()));
                                     }
 
                                     // If the entity has an edit/display, it's shown in this block
@@ -463,7 +467,8 @@ impl Extension for Node {
 impl Engine for Node {
     fn next_mut(&mut self, _: &mut AttributeGraph) {}
 
-    fn exit(&mut self, _: &AttributeGraph) {}
+    fn exit(&mut self, _: &AttributeGraph) {
+    }
 }
 
 impl<'a> System<'a> for Node {
@@ -475,7 +480,14 @@ impl<'a> System<'a> for Node {
 
     fn run(&mut self, (mut contexts, edit_node, display_node): Self::SystemData) {
         for (_, graph) in self.contexts.iter() {
-            self.graph.merge(graph.as_ref());
+            if let Some(block_name) = graph.as_ref().find_text("block_name") {
+                if let Some(block_context) = self.source.find_block_mut(block_name) {
+                    let node_block_context = BlockContext::from(graph.as_ref().clone());
+                    block_context.merge_block(&node_block_context, "form");
+                    block_context.merge_block(&node_block_context, "thunk");
+                    block_context.merge_block(&node_block_context, "publish");
+                }
+            }
         }
 
         for (context, edit_node, display_node) in
@@ -559,45 +571,42 @@ where
             }
         }
 
-        if let Some(source) = AttributeGraph::load_from_file(format!("{}.runmd", P::symbol())) {
-            // load each node block to the graph
-            for block in source.find_blocks("node") {
-                let block_name = block.find_text("block_name").unwrap_or_default();
-                if block_name.is_empty() {
-                    continue;
-                }
+        if let Some(mut source) = Project::load_file(format!("{}.runmd", P::symbol())) {
+            for (block_name, block) in source.iter_block_mut() {
+                // load each node block to the graph
+                let has_node = block.update_block(
+                        "node", 
+                        |node| {
+                            node.with_text("input_label", "accept")
+                                .with_text("output_label", "publish");
+                        });
+                
+                if has_node {
+                    let context = NodeContext::from(block.as_ref().clone());
+                    let NodeSync(added, ..) = self;
+                    let original = context.clone();
 
-                let mut context = BlockContext::root_context(&source, block_name);
-                context.update_block("node", |a| {
-                    a.with_text("input_label", "accept")
-                        .with_text("output_label", "publish");
-                });
-
-                let context = NodeContext::from(context.as_ref().clone());
-                let NodeSync(added, ..) = self;
-                let original = context.clone();
-
-                if let None = added.get(&original) {
-                    let entity = entities.create();
-                    match contexts.insert(entity, context) {
-                        Ok(_) => {
-                            println!("Loaded new node_context entity {:?}", entity);
-                            added.insert(original, entity);
-                            match edits.insert(entity, Edit(Self::render_node)) {
-                                Ok(_) => {
-                                    println!(
-                                        "Added display for new node_context entity {:?}",
-                                        entity
-                                    );
+                    if let None = added.get(&original) {
+                        let entity = entities.create();
+                        match contexts.insert(entity, context) {
+                            Ok(_) => {
+                                println!("NodeSync loaded new node_context entity: {:?}, block_name: {}, plugin: {}", entity, block_name, P::symbol());
+                                added.insert(original, entity);
+                                match edits.insert(entity, Edit(Self::render_node)) {
+                                    Ok(_) => {
+                                        println!(
+                                            "Added edit for new node_context entity {:?}",
+                                            entity
+                                        );
+                                    }
+                                    Err(_) => {}
                                 }
-                                Err(_) => {}
                             }
+                            Err(_) => {}
                         }
-                        Err(_) => {}
                     }
                 }
             }
-
             self.2 = Some(Instant::now());
         }
     }

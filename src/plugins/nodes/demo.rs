@@ -1,7 +1,7 @@
 use atlier::system::Extension;
 use specs::{Builder, WorldExt};
 
-use crate::plugins::{Node, Plugin, Edit, Display, ThunkContext, WriteFiles, demos::WriteFilesDemo, Println};
+use crate::plugins::{Node, Plugin, Edit, Display, ThunkContext, WriteFiles, demos::WriteFilesDemo};
 
 use super::NodeContext;
 
@@ -15,8 +15,7 @@ impl Default for NodeDemo
     }
 }
 
-impl Extension for NodeDemo
-{
+impl Extension for NodeDemo {
     fn configure_app_world(world: &mut specs::World) {
         world.register::<ThunkContext>();
         world.register::<WriteFiles>();

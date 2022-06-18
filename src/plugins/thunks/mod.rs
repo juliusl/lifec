@@ -1,8 +1,7 @@
 use crate::AttributeGraph;
-use atlier::system::{Attribute, Value};
+use atlier::system::Attribute;
 use specs::storage::DenseVecStorage;
 use specs::Component;
-use std::collections::BTreeMap;
 
 mod form;
 mod println;

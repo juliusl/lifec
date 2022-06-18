@@ -1,14 +1,16 @@
 mod transpile;
-use imgui::{Ui, MenuItem};
 use transpile::Transpile;
 
+mod project;
+pub use project::Project;
+
+use imgui::{Ui, MenuItem};
 use std::{collections::BTreeSet, fmt::Error};
 use std::fmt::Write;
 use atlier::system::Value;
 use specs::Component;
 use specs::storage::DenseVecStorage;
-use crate::plugins::NodeContext;
-use crate::{AttributeGraph, RuntimeDispatcher};
+use crate::{AttributeGraph};
 
 use super::Plugin;
 
@@ -23,6 +25,42 @@ pub struct BlockContext {
 }
 
 impl BlockContext {
+    pub fn transpile_blocks(blocks: Vec<(String, BlockContext)>) -> Result<String, Error> {
+        let mut output = String::new(); 
+
+        for (_, context) in blocks { 
+            match context.transpile() {
+                Ok(transpiled) => {
+                    writeln!(output, "{}", transpiled)?;
+                },
+                Err(err) => {
+                    return Err(err);
+                },
+            }
+        }
+
+        Ok(output)
+    }
+
+    /// merge the block symbol of another block context, returns true if a change happend
+    pub fn merge_block(&mut self, other: &BlockContext, block_symbol: impl AsRef<str>) -> bool {
+        if let Some(update) = other.get_block(block_symbol.as_ref()) {
+            let current = self.as_ref().hash_code();
+
+            if self.update_block(block_symbol, |updating| {
+                if updating.hash_code() != update.hash_code() {
+                    updating.merge(&update);
+                }
+            }) {
+                current != self.as_ref().hash_code()
+            } else {
+                false 
+            }
+        } else {
+            false
+        }
+    }
+
     /// returns the block name of the current context
     pub fn block_name(&self) -> Option<String> {
         self.as_ref().find_text("block_name")
@@ -224,6 +262,8 @@ impl AsMut<AttributeGraph> for BlockContext {
 
 #[test]
 fn test_block_context() {
+    use crate::plugins::NodeContext;
+    use crate::RuntimeDispatcher;
     let mut test_graph = AttributeGraph::from(0);
 
     let test = r#"
