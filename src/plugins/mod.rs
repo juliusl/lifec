@@ -2,6 +2,7 @@ use specs::{Builder, Component, Entity, EntityBuilder, World, WorldExt};
 
 mod block;
 pub use block::BlockContext;
+pub use block::Project;
 
 mod nodes;
 pub use nodes::Node;

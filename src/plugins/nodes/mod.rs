@@ -549,7 +549,11 @@ where
             ui.new_line();
         }
 
-        // let mut block_context = BlockContext::from(graph.clone());
+        let mut block_context = BlockContext::from(graph.clone());
+        block_context.edit_block("publish", ui);
+
+        *graph = block_context.as_ref().clone();
+
         // block_context.update_block("accept", |accept| {
         //     ui.text("Accept:");
         //     for attr in accept.iter_mut_attributes() {

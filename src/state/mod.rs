@@ -284,6 +284,8 @@ impl AttributeGraph {
                     }
                 }
             }
+
+            ui.separator();
             token.end()
         }
 

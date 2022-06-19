@@ -2,7 +2,7 @@ use imgui::{Window, TreeNodeFlags};
 use specs::{Component, Entities, System};
 
 use super::App;
-use crate::{Runtime, RuntimeState};
+use crate::{Runtime, RuntimeState, plugins::Project};
 
 #[derive(Clone)]
 pub struct RuntimeEditor<S>
@@ -63,27 +63,17 @@ where
             .menu_bar(true)
             .build(ui, || {
                 if let Some(state) = &mut self.runtime.state {
-                    let graph = state.dispatcher_mut().as_mut();
+                    let graph = state.dispatcher().as_ref();
+                    let mut project = Project::from(graph.clone());
                     ui.menu_bar(|| {
-                        graph.edit_attr_menu(ui);
+                        project.edit_project_menu(ui);
                     });
                     
-                    graph.edit_attr_table(ui);
-
-                    if ui.collapsing_header("blocks", TreeNodeFlags::empty()) {
-                        for mut block in graph.iter_blocks() {
-                            let block_name = block
-                                .find_text("block_name")
-                                .unwrap_or("unknown".to_string());
-                            let block_symbol = block.
-                                find_text("block_symbol")
-                                .unwrap_or("unknown".to_string());
-
-                            if ui.collapsing_header(format!("{} {}, {}", block_name, block_symbol, block.hash_code()), TreeNodeFlags::empty()) {
-                                block.edit_attr_table(ui);
-                            }
+                   for (block_name, block) in project.iter_block_mut() {
+                        if ui.collapsing_header(format!("Block entity: {}", block_name), TreeNodeFlags::DEFAULT_OPEN) {
+                            block.edit_block_view(ui);
                         }
-                    }
+                   }
                 }
             });
     }

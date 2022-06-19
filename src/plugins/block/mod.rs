@@ -5,8 +5,8 @@ mod project;
 pub use project::Project;
 
 use crate::AttributeGraph;
-use atlier::system::Value;
-use imgui::{MenuItem, Ui};
+use atlier::system::{Attribute, Value};
+use imgui::{MenuItem, Ui, ChildWindow};
 use specs::storage::DenseVecStorage;
 use specs::Component;
 use std::fmt::Write;
@@ -240,33 +240,50 @@ impl BlockContext {
     }
 
     pub fn edit_block_view(&mut self, ui: &Ui) {
-        self.update_block("accept", |accept| {
-            ui.text("Accept:");
-            for attr in accept.iter_mut_attributes() {
-                attr.edit_value(ui);
+        ui.group(|| {
+            for block_symbol in self.block_symbols.clone().iter() {
+                self.edit_block(block_symbol, ui);
+                ui.new_line();
             }
         });
 
-        self.update_block("form", |form| {
-            ui.text("Form:");
-            for attr in form.iter_mut_attributes() {
-                attr.edit_value(ui);
+        if let Some(mut transpiled) = self.transpile().ok() {
+            if transpiled.is_empty() {
+                return;
             }
-        });
+            ui.same_line();
+            ui.group(||{
+                ui.disabled(true, ||{
+                    ui.input_text_multiline(format!("Preview {}.runmd", self.block_name), &mut transpiled, [400.0, 300.0]).build();
+                })
+            });
+        }
+    }
 
-        self.update_block("thunk", |thunk| {
-            ui.text("Thunk:");
-            for attr in thunk.iter_mut_attributes() {
-                attr.edit_value(ui);
+    pub fn edit_block(&mut self, symbol_name: impl AsRef<str>, ui: &Ui) {
+        self.update_block(&symbol_name, |block| {
+            let attrs: Vec<&mut Attribute> = Self::iter_block_attrs_mut(block).collect();
+            if !attrs.is_empty() {
+                ui.text(format!("{}:", symbol_name.as_ref()));
+                for attr in attrs {
+                    attr.edit_value(ui);
+                }
             }
         });
+    }
 
-        self.update_block("publish", |publish| {
-            ui.text("Publish:");
-            for attr in publish.iter_mut_attributes() {
-                attr.edit_value(ui);
-            }
-        });
+    /// creates an iter on all the block attributes skipping block specific attrs
+    fn iter_block_attrs_mut(block: &mut AttributeGraph) -> impl Iterator<Item = &mut Attribute> {
+        block
+            .iter_mut_attributes()
+            .filter(|a| {
+                !a.name().starts_with("block_")
+                    && match a.value() {
+                        Value::Symbol(symbol) => !symbol.ends_with("::block"),
+                        _ => true,
+                    }
+            })
+            .into_iter()
     }
 }
 

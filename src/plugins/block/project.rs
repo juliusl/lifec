@@ -51,10 +51,19 @@ impl Project {
             block.edit_menu(ui);
         }
 
-        if let Some(token) = ui.begin_menu("Export") {
-            self.export_blocks_view(ui);
-            token.end();
-        }
+        ui.menu("File", ||{
+            if let Some(token) = ui.begin_menu("Export") {
+                self.export_blocks_view(ui);
+                token.end();
+            }
+
+            if let Some(token) = ui.begin_menu("Import") {
+
+                token.end();
+            }
+
+            ui.separator();
+        });
     }
 
     /// shows export block view
