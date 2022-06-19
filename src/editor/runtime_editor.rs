@@ -69,9 +69,18 @@ where
                         project.edit_project_menu(ui);
                     });
                     
-                   for (block_name, block) in project.iter_block_mut() {
-                        if ui.collapsing_header(format!("Block entity: {}", block_name), TreeNodeFlags::DEFAULT_OPEN) {
+                   for (entity, block) in project.iter_block_mut().enumerate() {
+                        let (block_name, block) = block;
+                        let mut flags = TreeNodeFlags::empty();
+                        if entity == 0 {
+                            flags |= TreeNodeFlags::DEFAULT_OPEN;
+                        }
+                        if ui.collapsing_header(format!("Block entity: {}", block_name), flags) {
+                            ui.indent();
                             block.edit_block_view(ui);
+                            ui.new_line();
+                            block.edit_block_table_view(ui);
+                            ui.unindent();
                         }
                    }
                 }

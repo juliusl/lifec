@@ -1,0 +1,83 @@
+``` cargo_help form
+add admin_name .TEXT admin_name
+add command .TEXT cargo help
+add debug_out .BOOL true
+```
+
+``` cargo_help node
+add debug .BOOL true
+add input_label .TEXT accept
+add node_title .TEXT cargo_help
+add output_label .TEXT publish
+```
+
+``` cargo_help thunk
+```
+
+
+``` demo3 form
+edit form_text form_text .TEXT placeholder
+```
+
+``` demo3 node
+add coolness1 .EMPTY
+add input_label .TEXT coolness1
+add node_title .TEXT demo 3
+```
+
+
+``` demo5 form
+add form_int .INT 10
+add form_text2 .TEXT test
+add form_text .TEXT placeholder
+```
+
+``` demo5 node
+add coolness2 .EMPTY
+add input_label .TEXT coolness2
+add node_title .TEXT demo 5
+```
+
+
+``` println_settings accept
+add called .EMPTY
+```
+
+``` println_settings form
+add enable_stderr .BOOL true
+add enable_stdout .BOOL true
+```
+
+``` println_settings node
+add debug .BOOL true
+add input_label .TEXT accept
+add node_title .TEXT println_settings
+add output_label .TEXT publish
+```
+
+``` println_settings publish
+```
+
+``` println_settings thunk
+```
+
+
+``` sh_test form
+add command .TEXT sh ./test.sh
+add debug_out .BOOL true
+```
+
+``` sh_test node
+add debug .BOOL true
+add input_label .TEXT accept
+add node_title .TEXT sh_test
+add output_label .TEXT publish
+```
+
+``` sh_test publish
+```
+
+``` sh_test thunk
+```
+
+

@@ -6,7 +6,7 @@ pub use project::Project;
 
 use crate::AttributeGraph;
 use atlier::system::{Attribute, Value};
-use imgui::{MenuItem, Ui, ChildWindow};
+use imgui::{MenuItem, Ui, ChildWindow, TreeNode, TreeNodeFlags};
 use specs::storage::DenseVecStorage;
 use specs::Component;
 use std::fmt::Write;
@@ -260,15 +260,30 @@ impl BlockContext {
         }
     }
 
+    pub fn edit_block_table_view(&mut self, ui: &Ui) {
+        ui.group(|| {
+            for block_symbol in self.block_symbols.clone().iter() {
+                if ui.collapsing_header(format!("Block {} {}:", self.block_name, block_symbol), TreeNodeFlags::empty()) {
+                    self.edit_block_table(block_symbol, ui);
+                }
+            }
+        });
+    }
+
     pub fn edit_block(&mut self, symbol_name: impl AsRef<str>, ui: &Ui) {
         self.update_block(&symbol_name, |block| {
             let attrs: Vec<&mut Attribute> = Self::iter_block_attrs_mut(block).collect();
             if !attrs.is_empty() {
-                ui.text(format!("{}:", symbol_name.as_ref()));
                 for attr in attrs {
                     attr.edit_value(ui);
                 }
             }
+        });
+    }
+
+    pub fn edit_block_table(&mut self, symbol_name: impl AsRef<str>, ui: &Ui) {
+        self.update_block(&symbol_name, |block| {
+            block.edit_attr_table(ui);
         });
     }
 
