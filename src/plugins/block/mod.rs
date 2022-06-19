@@ -4,64 +4,50 @@ use transpile::Transpile;
 mod project;
 pub use project::Project;
 
-use imgui::{Ui, MenuItem};
-use std::{collections::BTreeSet, fmt::Error};
-use std::fmt::Write;
+use crate::AttributeGraph;
 use atlier::system::Value;
-use specs::Component;
+use imgui::{MenuItem, Ui};
 use specs::storage::DenseVecStorage;
-use crate::{AttributeGraph};
+use specs::Component;
+use std::fmt::Write;
+use std::{collections::BTreeSet, fmt::Error};
 
 use super::Plugin;
 
 /// BlockContext provides common methods for working with blocks
-#[derive(Component, Default, Clone)]
+#[derive(Component, Default, Clone, Hash, PartialEq)]
 #[storage(DenseVecStorage)]
 pub struct BlockContext {
     graph: AttributeGraph,
     block_name: String,
     block_symbols: BTreeSet<String>,
-    max_block_id: u32
+    max_block_id: u32,
 }
 
 impl BlockContext {
     pub fn transpile_blocks(blocks: Vec<(String, BlockContext)>) -> Result<String, Error> {
-        let mut output = String::new(); 
+        let mut output = String::new();
 
-        for (_, context) in blocks { 
+        for (_, context) in blocks {
             match context.transpile() {
                 Ok(transpiled) => {
                     writeln!(output, "{}", transpiled)?;
-                },
+                }
                 Err(err) => {
                     return Err(err);
-                },
+                }
             }
         }
 
         Ok(output)
     }
 
-    /// merge the block symbol of another block context, returns true if a change happend
-    pub fn merge_block(&mut self, other: &BlockContext, block_symbol: impl AsRef<str>) -> bool {
-        if let Some(mut update) = other.get_block(block_symbol.as_ref()) {
-            let imported = update.entity();
-            for attr in update.iter_mut_attributes() {
-                match attr.value() {
-                    Value::Symbol(_) => {}
-                    _ => {
-                        attr.commit();
-                        let next_value = attr.value.clone();
-
-                   
-                        self.as_mut().find_update_imported_attr(imported, &attr.name(), |a| {
-                            a.edit_as(next_value);
-                            a.commit();
-                        });
-                    }
-                }
-            }
-            true
+    /// replace a block by symbol, using the block of another block context
+    pub fn replace_block(&mut self, other: &BlockContext, block_symbol: impl AsRef<str>) -> bool {
+        if let Some(update) = other.get_block(block_symbol.as_ref()) {
+            self.update_block(&block_symbol, |graph| {
+                *graph = update;
+            })
         } else {
             false
         }
@@ -103,43 +89,51 @@ impl BlockContext {
         if self.block_symbols.contains(block_symbol.as_ref()) {
             self.graph.find_block("", block_symbol)
         } else {
-            None 
+            None
         }
     }
 
     /// update an existing block, otherwise no-op, returns true if udpate was called
-    pub fn update_block(&mut self, block_symbol: impl AsRef<str>, update: impl FnOnce(&mut AttributeGraph)) -> bool {
+    pub fn update_block(
+        &mut self,
+        block_symbol: impl AsRef<str>,
+        update: impl FnOnce(&mut AttributeGraph),
+    ) -> bool {
         if let Some(mut block) = self.get_block(block_symbol) {
             update(&mut block);
             self.as_mut().merge(&block);
-            true 
+            true
         } else {
             false
         }
     }
 
     /// adds a new block, returns true if a new block was added, does not call configure if the block exists
-    pub fn add_block(&mut self, block_symbol: impl AsRef<str>, configure: impl FnOnce(&mut AttributeGraph)) -> bool {
+    pub fn add_block(
+        &mut self,
+        block_symbol: impl AsRef<str>,
+        configure: impl FnOnce(&mut AttributeGraph),
+    ) -> bool {
         if self.block_symbols.contains(block_symbol.as_ref()) {
-            false 
+            false
         } else {
             self.max_block_id += 1;
             let next = self.max_block_id;
-    
+
             let mut next_block = AttributeGraph::from(next);
             next_block
                 .with_text("block_name", self.block_name.to_string())
                 .with_text("block_symbol", block_symbol.as_ref().to_string());
-            
+
             let block = next_block.define(&self.block_name, &block_symbol.as_ref());
             block.edit_as(Value::Symbol(format!(
-                    "{}::{}",
-                    block_symbol.as_ref(),
-                    "block"
+                "{}::{}",
+                block_symbol.as_ref(),
+                "block"
             )));
             block.commit();
             block.edit_as(Value::Int(next as i32));
-            
+
             self.block_symbols.insert(block_symbol.as_ref().to_string());
             configure(&mut next_block);
 
@@ -179,44 +173,44 @@ impl BlockContext {
         Ok(src)
     }
 
-    pub fn transpile_value(src: &mut String, value: &Value) -> Result<(), Error>{
+    pub fn transpile_value(src: &mut String, value: &Value) -> Result<(), Error> {
         match value {
             atlier::system::Value::Empty => {
                 writeln!(src, ".EMPTY")?;
-            },
+            }
             atlier::system::Value::Bool(val) => {
                 writeln!(src, ".BOOL {}", val)?;
-            },
+            }
             atlier::system::Value::TextBuffer(text) => {
                 writeln!(src, ".TEXT {}", text)?;
-            },
+            }
             atlier::system::Value::Int(val) => {
                 writeln!(src, ".INT {}", val)?;
-            },
+            }
             atlier::system::Value::IntPair(val1, val2) => {
                 writeln!(src, ".INT_PAIR {}, {}", val1, val2)?;
-            },
+            }
             atlier::system::Value::IntRange(val1, val2, val3) => {
                 writeln!(src, ".INT_RANGE {}, {}, {}", val1, val2, val3)?;
-            },
+            }
             atlier::system::Value::Float(val) => {
                 writeln!(src, ".FLOAT {}", val)?;
-            },
+            }
             atlier::system::Value::FloatPair(val1, val2) => {
                 writeln!(src, ".FLOAT_PAIR {}, {}", val1, val2)?;
-            },
+            }
             atlier::system::Value::FloatRange(val1, val2, val3) => {
                 writeln!(src, ".FLOAT_RANGE {}, {}, {}", val1, val2, val3)?;
-            },
+            }
             atlier::system::Value::BinaryVector(bin) => {
                 writeln!(src, ".BINARY_VECTOR {}", base64::encode(bin))?;
-            },
+            }
             atlier::system::Value::Reference(val) => {
                 writeln!(src, ".REFERENCE {}", val)?;
-            },
+            }
             atlier::system::Value::Symbol(val) => {
                 writeln!(src, ".SYMBOL {}", val)?;
-            },
+            }
         }
 
         Ok(())
@@ -227,17 +221,52 @@ impl BlockContext {
         if let Some(token) = ui.begin_menu("File") {
             if let Some(token) = ui.begin_menu("Blocks") {
                 if MenuItem::new(format!("Transpile {0} to {0}.runmd", block_name)).build(ui) {
-                    self.add_block(
-                        "file", 
-                        |f| 
-                        f.add_text_attr("runmd_path", format!("{}.runmd", block_name)
-                    ));
-                    Transpile::call_with_context(self);
+                    let mut transpiled = self.clone();
+                    transpiled.add_block("file", |f| {
+                        f.add_text_attr("runmd_path", format!("{}.runmd", block_name))
+                    });
+                    Transpile::call_with_context(&mut transpiled);
+                }
+
+                if ui.is_item_hovered() {
+                    ui.tooltip(|| {
+                        self.edit_block_view(ui);
+                    });
                 }
                 token.end();
             }
             token.end();
         }
+    }
+
+    pub fn edit_block_view(&mut self, ui: &Ui) {
+        self.update_block("accept", |accept| {
+            ui.text("Accept:");
+            for attr in accept.iter_mut_attributes() {
+                attr.edit_value(ui);
+            }
+        });
+
+        self.update_block("form", |form| {
+            ui.text("Form:");
+            for attr in form.iter_mut_attributes() {
+                attr.edit_value(ui);
+            }
+        });
+
+        self.update_block("thunk", |thunk| {
+            ui.text("Thunk:");
+            for attr in thunk.iter_mut_attributes() {
+                attr.edit_value(ui);
+            }
+        });
+
+        self.update_block("publish", |publish| {
+            ui.text("Publish:");
+            for attr in publish.iter_mut_attributes() {
+                attr.edit_value(ui);
+            }
+        });
     }
 }
 
@@ -294,7 +323,7 @@ add debug_out .BOOL true
     assert!(test_graph.batch_mut(test).is_ok());
 
     let mut sh_test = BlockContext::root_context(&test_graph, "sh_test");
-    
+
     let sh_test_command = sh_test
         .get_block("form")
         .and_then(|a| a.find_text("command"));
@@ -316,7 +345,7 @@ add debug_out .BOOL true
     match back_to_block.transpile() {
         Ok(result) => {
             println!("{}", result);
-        },
+        }
         Err(_) => todo!(),
     }
 }

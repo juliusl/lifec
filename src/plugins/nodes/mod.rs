@@ -25,7 +25,7 @@ pub mod demo;
 #[derive(Component, Clone, Default, Hash, PartialEq)]
 #[storage(DenseVecStorage)]
 pub struct NodeContext {
-    graph: AttributeGraph,
+    block: BlockContext,
     node_id: Option<NodeId>,
     attribute_id: Option<AttributeId>,
     input_pin_id: Option<InputPinId>,
@@ -90,20 +90,20 @@ impl NodeContext {
 
 impl AsRef<AttributeGraph> for NodeContext {
     fn as_ref(&self) -> &AttributeGraph {
-        &self.graph
+        &self.block.as_ref()
     }
 }
 
 impl AsMut<AttributeGraph> for NodeContext {
     fn as_mut(&mut self) -> &mut AttributeGraph {
-        &mut self.graph
+        self.block.as_mut()
     }
 }
 
 impl From<AttributeGraph> for NodeContext {
     fn from(graph: AttributeGraph) -> Self {
         Self {
-            graph,
+            block: BlockContext::from(graph),
             ..Default::default()
         }
     }
@@ -480,13 +480,12 @@ impl<'a> System<'a> for Node {
 
     fn run(&mut self, (mut contexts, edit_node, display_node): Self::SystemData) {
         for (_, node_context) in self.contexts.iter() {
-            if let Some(block_name) = node_context.as_ref().find_text("block_name") {
-                if let Some(block_context) = self.source.find_block_mut(block_name) {
-                    let node_block_context = BlockContext::from(node_context.as_ref().clone());
-                    block_context.merge_block(&node_block_context, "form");
-                    block_context.merge_block(&node_block_context, "thunk");
-                    block_context.merge_block(&node_block_context, "publish");
-                }
+            let block_name = node_context.block.block_name().unwrap_or_default();
+            if let Some(block_context) = self.source.find_block_mut(block_name) {
+                block_context.replace_block(&node_context.block, "accept");
+                block_context.replace_block(&node_context.block, "form");
+                block_context.replace_block(&node_context.block, "thunk");
+                block_context.replace_block(&node_context.block, "publish");
             }
         }
 
@@ -542,13 +541,36 @@ where
         }
 
         if graph.find_block("", "thunk").is_some() {
-            ui.new_line();
+            ui.new_line();        
             let label = format!("call {} {}", P::symbol(), graph.entity());
             if ui.button(label) {
                 P::call(graph);
             }
             ui.new_line();
         }
+
+        // let mut block_context = BlockContext::from(graph.clone());
+        // block_context.update_block("accept", |accept| {
+        //     ui.text("Accept:");
+        //     for attr in accept.iter_mut_attributes() {
+        //         attr.edit_value(ui);
+        //     }
+        // });
+
+        // block_context.update_block("thunk", |thunk| {
+        //     ui.text("Thunk:");
+        //     for attr in thunk.iter_mut_attributes() {
+        //         attr.edit_value(ui);
+        //     }
+        // });
+
+        // block_context.update_block("publish", |publish| {
+        //     ui.text("Publish:");
+        //     for attr in publish.iter_mut_attributes() {
+        //         attr.edit_value(ui);
+        //     }
+        // });
+        // *graph = block_context.as_ref().clone();
     }
 }
 

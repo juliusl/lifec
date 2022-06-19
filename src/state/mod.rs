@@ -440,12 +440,21 @@ impl AttributeGraph {
             if !self.index.contains_key(&attr.to_string()) {
                 self.index.insert(attr.to_string(), attr.clone());
             } else {
-                let name = &attr.name();
-                self.find_update_attr(name, |existing| {
-                    if existing.value() != attr.value() {
-                        *existing.value_mut() = attr.value().clone();
-                    }
-                });
+                if other.entity != self.entity {
+                    let name = &attr.name();
+                    self.find_update_imported_attr(attr.id(), name, |existing| {
+                        if existing.value() != attr.value() {
+                            *existing.value_mut() = attr.value().clone();
+                        }
+                    });
+                } else {
+                    let name = &attr.name();
+                    self.find_update_attr(name, |existing| {
+                        if existing.value() != attr.value() {
+                            *existing.value_mut() = attr.value().clone();
+                        }
+                    });
+                }
             }
         }
     }

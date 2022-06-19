@@ -1,16 +1,13 @@
-use super::{Edit, Plugin, ThunkContext};
+use super::{Plugin, ThunkContext};
 use crate::{AttributeGraph, RuntimeDispatcher, RuntimeState};
-use atlier::system::{Extension, Value};
+use atlier::system::Value;
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
-use specs::{Builder, Component, HashMapStorage, WorldExt};
+use specs::{Component, HashMapStorage};
 use std::{
     fmt::Display,
     process::{Command, Output},
 };
-
-mod echo;
-pub use echo::Echo;
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
 #[storage(HashMapStorage)]
@@ -36,30 +33,6 @@ impl Process {
             None
         }
     }
-}
-
-impl Extension for Process {
-    fn configure_app_world(world: &mut specs::World) {
-        world.register::<ThunkContext>();
-        world.register::<Edit<ThunkContext>>();
-        world.register::<Process>();
-        world.register::<Edit<Process>>();
-
-        if let Some(graph) = AttributeGraph::load_from_file("process.runmd") {
-            for process in graph.find_blocks("process") {
-                world
-                    .create_entity()
-                    .with(Process::from(process))
-                    .maybe_with(Some(Edit::<ThunkContext>(|_, _, _| {})))
-                    .maybe_with(Some(Edit::<Process>(|_, _, _| {})))
-                    .build();
-            }
-        }
-    }
-
-    fn configure_app_systems(_: &mut specs::DispatcherBuilder) {}
-
-    fn on_ui(&mut self, _app_world: &specs::World, _ui: &imgui::Ui<'_>) {}
 }
 
 impl Plugin<ThunkContext> for Process {
