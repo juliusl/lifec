@@ -1,4 +1,5 @@
 mod transpile;
+use serde::{Deserialize, Serialize};
 use transpile::Transpile;
 
 mod project;
@@ -6,7 +7,7 @@ pub use project::Project;
 
 use crate::AttributeGraph;
 use atlier::system::{Attribute, Value};
-use imgui::{MenuItem, Ui, ChildWindow, TreeNode, TreeNodeFlags};
+use imgui::{ChildWindow, MenuItem, Ui};
 use specs::storage::DenseVecStorage;
 use specs::Component;
 use std::fmt::Write;
@@ -15,7 +16,7 @@ use std::{collections::BTreeSet, fmt::Error};
 use super::Plugin;
 
 /// BlockContext provides common methods for working with blocks
-#[derive(Component, Default, Clone, Hash, PartialEq)]
+#[derive(Debug, Component, Default, Clone, Hash, PartialEq, Serialize, Deserialize)]
 #[storage(DenseVecStorage)]
 pub struct BlockContext {
     graph: AttributeGraph,
@@ -38,7 +39,6 @@ impl BlockContext {
                 }
             }
         }
-
         Ok(output)
     }
 
@@ -155,13 +155,12 @@ impl BlockContext {
                     }
 
                     if attr.is_stable() {
-                        write!(src, "add {} ", attr.name())?;
-                        Self::transpile_value(&mut src, attr.value())?;
+                        Self::transpile_value(&mut src, "add", attr.name(), attr.value())?;
                     } else {
                         if let Some((name, value)) = attr.transient() {
                             if name != &format!("{}::{}", self.block_name, symbol) {
-                                write!(src, "edit {} {} ", attr.name(), name)?;
-                                Self::transpile_value(&mut src, value)?;
+                                write!(src, "edit")?;
+                                Self::transpile_value(&mut src, "name", attr.name(), value)?;
                             }
                         }
                     }
@@ -173,43 +172,96 @@ impl BlockContext {
         Ok(src)
     }
 
-    pub fn transpile_value(src: &mut String, value: &Value) -> Result<(), Error> {
+    pub fn transpile_value(
+        src: &mut String,
+        event: impl AsRef<str>,
+        name: impl AsRef<str>,
+        value: &Value,
+    ) -> Result<(), Error> {
         match value {
             atlier::system::Value::Empty => {
-                writeln!(src, ".EMPTY")?;
+                writeln!(src, "{} {} .EMPTY", event.as_ref(), name.as_ref())?;
             }
             atlier::system::Value::Bool(val) => {
-                writeln!(src, ".BOOL {}", val)?;
+                writeln!(src, "{} {} .BOOL {}", event.as_ref(), name.as_ref(), val)?;
             }
             atlier::system::Value::TextBuffer(text) => {
-                writeln!(src, ".TEXT {}", text)?;
+                writeln!(src, "{} {} .TEXT {}", event.as_ref(), name.as_ref(), text)?;
             }
             atlier::system::Value::Int(val) => {
-                writeln!(src, ".INT {}", val)?;
+                writeln!(src, "{} {} .INT {}", event.as_ref(), name.as_ref(), val)?;
             }
             atlier::system::Value::IntPair(val1, val2) => {
-                writeln!(src, ".INT_PAIR {}, {}", val1, val2)?;
+                writeln!(
+                    src,
+                    "{} {} .INT_PAIR {}, {}",
+                    event.as_ref(),
+                    name.as_ref(),
+                    val1,
+                    val2
+                )?;
             }
             atlier::system::Value::IntRange(val1, val2, val3) => {
-                writeln!(src, ".INT_RANGE {}, {}, {}", val1, val2, val3)?;
+                writeln!(
+                    src,
+                    "{} {} .INT_RANGE {}, {}, {}",
+                    event.as_ref(),
+                    name.as_ref(),
+                    val1,
+                    val2,
+                    val3
+                )?;
             }
             atlier::system::Value::Float(val) => {
-                writeln!(src, ".FLOAT {}", val)?;
+                writeln!(src, "{} {} .FLOAT {}", event.as_ref(), name.as_ref(), val)?;
             }
             atlier::system::Value::FloatPair(val1, val2) => {
-                writeln!(src, ".FLOAT_PAIR {}, {}", val1, val2)?;
+                writeln!(
+                    src,
+                    "{} {}, .FLOAT_PAIR {}, {}",
+                    event.as_ref(),
+                    name.as_ref(),
+                    val1,
+                    val2
+                )?;
             }
             atlier::system::Value::FloatRange(val1, val2, val3) => {
-                writeln!(src, ".FLOAT_RANGE {}, {}, {}", val1, val2, val3)?;
+                writeln!(
+                    src,
+                    "{} {} .FLOAT_RANGE {}, {}, {}",
+                    event.as_ref(),
+                    name.as_ref(),
+                    val1,
+                    val2,
+                    val3
+                )?;
             }
             atlier::system::Value::BinaryVector(bin) => {
-                writeln!(src, ".BINARY_VECTOR {}", base64::encode(bin))?;
+                writeln!(
+                    src,
+                    "{} {} .BINARY_VECTOR {}",
+                    event.as_ref(),
+                    name.as_ref(),
+                    base64::encode(bin)
+                )?;
             }
             atlier::system::Value::Reference(val) => {
-                writeln!(src, ".REFERENCE {}", val)?;
+                writeln!(
+                    src,
+                    "{} {} .REFERENCE {}",
+                    event.as_ref(),
+                    name.as_ref(),
+                    val
+                )?;
             }
             atlier::system::Value::Symbol(val) => {
-                writeln!(src, ".SYMBOL {}", val)?;
+                if !val.ends_with("::block") {
+                    write!(src, "define")?;
+                    for part in val.split("::") {
+                        write!(src, " {}", part)?;
+                    }
+                    writeln!(src, "")?;
+                }
             }
         }
 
@@ -230,7 +282,7 @@ impl BlockContext {
 
                 if ui.is_item_hovered() {
                     ui.tooltip(|| {
-                        self.edit_block_view(ui);
+                        self.edit_block_tooltip_view(true, ui);
                     });
                 }
                 token.end();
@@ -239,22 +291,68 @@ impl BlockContext {
         }
     }
 
-    pub fn edit_block_view(&mut self, ui: &Ui) {
+    pub fn edit_block_view(&mut self, show_transpile_preview: bool, ui: &Ui) {
+        ChildWindow::new(&format!("edit_block_view_{}", self.as_ref().hash_code()))
+            .size([600.0, 420.0])
+            .build(ui, || {
+                ui.group(|| {
+                    for block_symbol in self.block_symbols.clone().iter() {
+                        ui.text(format!("Current {}:", block_symbol));
+                        ui.separator();
+                        self.edit_block(block_symbol, ui);
+                        ui.new_line();
+                    }
+                });
+            });
+
+        if let Some(mut transpiled) = self.transpile().ok() {
+            ui.same_line();
+            ChildWindow::new(&format!("transpile_preview{}", self.as_ref().hash_code()))
+                .size([0.0, 420.0])
+                .build(ui, || {
+                    if transpiled.is_empty() || !show_transpile_preview {
+                        return;
+                    }
+
+                    let size = ui.calc_text_size(&transpiled);
+                    ui.group(|| {
+                        ui.disabled(true, || {
+                            ui.input_text_multiline(
+                                format!("Preview {}.runmd", self.block_name),
+                                &mut transpiled,
+                                size,
+                            )
+                            .build();
+                        })
+                    });
+                });
+        }
+    }
+
+    pub fn edit_block_tooltip_view(&mut self, show_transpile_preview: bool, ui: &Ui) {
         ui.group(|| {
             for block_symbol in self.block_symbols.clone().iter() {
+                ui.text(format!("Current {}:", block_symbol));
                 self.edit_block(block_symbol, ui);
                 ui.new_line();
             }
         });
 
         if let Some(mut transpiled) = self.transpile().ok() {
-            if transpiled.is_empty() {
+            ui.same_line();
+            if transpiled.is_empty() || !show_transpile_preview {
                 return;
             }
-            ui.same_line();
-            ui.group(||{
-                ui.disabled(true, ||{
-                    ui.input_text_multiline(format!("Preview {}.runmd", self.block_name), &mut transpiled, [400.0, 300.0]).build();
+
+            let size = ui.calc_text_size(&transpiled);
+            ui.group(|| {
+                ui.disabled(true, || {
+                    ui.input_text_multiline(
+                        format!("Preview {}.runmd", self.block_name),
+                        &mut transpiled,
+                        size,
+                    )
+                    .build();
                 })
             });
         }
@@ -262,11 +360,19 @@ impl BlockContext {
 
     pub fn edit_block_table_view(&mut self, ui: &Ui) {
         ui.group(|| {
-            for block_symbol in self.block_symbols.clone().iter() {
-                if ui.collapsing_header(format!("Block {} {}:", self.block_name, block_symbol), TreeNodeFlags::empty()) {
-                    self.edit_block_table(block_symbol, ui);
+            let hash_code = self.as_ref().hash_code();
+            if let Some(token) = ui.tab_bar(format!("{}", hash_code)) {
+                for block_symbol in self.block_symbols.clone().iter() {
+                    if let Some(token) = ui.tab_item(
+                        format!("{} {} block:", self.block_name, block_symbol),
+                    ) {
+                        self.edit_block_table(block_symbol, ui);
+                        token.end();
+                    }
                 }
+                token.end();
             }
+            
         });
     }
 
@@ -275,8 +381,10 @@ impl BlockContext {
             let attrs: Vec<&mut Attribute> = Self::iter_block_attrs_mut(block).collect();
             if !attrs.is_empty() {
                 for attr in attrs {
-                    attr.edit_value(ui);
+                    attr.edit_value("", ui);
                 }
+            } else {
+                ui.text("Empty");
             }
         });
     }

@@ -3,9 +3,7 @@ use atlier::system::Attribute;
 use specs::storage::DenseVecStorage;
 use specs::Component;
 
-mod form;
 mod println;
-pub use form::Form;
 pub use println::Println;
 
 mod write_files;
@@ -16,12 +14,34 @@ pub mod demo {
     pub use demo::WriteFilesDemo;
 }
 
-use super::BlockContext;
+use super::{BlockContext, Plugin};
+
+#[derive(Component, Clone)]
+#[storage(DenseVecStorage)]
+pub struct Call(&'static str, fn(&mut ThunkContext));
+
+impl Call {
+    pub fn from_plugin<P>() -> Self
+    where
+        P: Plugin<ThunkContext>,
+    {
+        Self(P::symbol(), P::call_with_context)
+    }
+
+    pub fn symbol(&self) -> impl AsRef<str> {
+        self.0
+    }
+
+    pub fn call(&self, context: &mut ThunkContext) {
+        (self.1)(context)
+    }
+}
+
 /// ThunkContext provides common methods for updating the underlying state graph,
 /// in the context of a thunk.
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
-pub struct ThunkContext(BlockContext);
+pub struct ThunkContext(pub BlockContext);
 
 impl From<AttributeGraph> for ThunkContext {
     fn from(g: AttributeGraph) -> Self {

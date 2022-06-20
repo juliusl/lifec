@@ -15,6 +15,7 @@ mod thunks;
 pub use thunks::Println;
 pub use thunks::ThunkContext;
 pub use thunks::WriteFiles;
+pub use thunks::Call;
 
 pub mod demos {
     pub use super::thunks::demo::*;
@@ -75,9 +76,8 @@ where
         where 
             Self: Engine + Sized
     {
-        let attributes = context.as_mut();
-        self.next_mut(attributes);
-        self.exit(&attributes);
+        self.next_mut(context.as_mut());
+        self.exit(context.as_ref());
     }
 }
 

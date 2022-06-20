@@ -10,7 +10,7 @@ use crate::state::AttributeGraph;
 
 use super::BlockContext;
 
-#[derive(Default, Component)]
+#[derive(Default, Component, Clone)]
 #[storage(HashMapStorage)]
 pub struct Project {
     source: AttributeGraph,
@@ -126,8 +126,7 @@ impl From<AttributeGraph> for Project {
 
         for block_name in block_names.iter() {
             let mut block = BlockContext::root_context(&mut source, block_name);
-
-            block.as_mut().with_bool("project_selected", false);
+            block.as_mut().add_bool_attr("project_selected", false);
 
             project.block_index.insert(block_name.to_string(), block);
         }

@@ -1,4 +1,4 @@
-use super::{Plugin, ThunkContext};
+use super::{Plugin, ThunkContext, BlockContext};
 use crate::{AttributeGraph, RuntimeDispatcher, RuntimeState};
 use atlier::system::Value;
 use chrono::{DateTime, Local, Utc};
@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use specs::{Component, HashMapStorage};
 use std::{
     fmt::Display,
-    process::{Command, Output},
+    process::{Command, Output}, 
 };
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
@@ -18,14 +18,14 @@ pub struct Process {
     pub elapsed: Option<String>,
     pub timestamp_utc: Option<String>,
     pub timestamp_local: Option<String>,
-    graph: AttributeGraph,
+    block: BlockContext,
     #[serde(skip)]
     start_time: Option<DateTime<Utc>>,
 }
 
 impl Process {
     fn command(&self) -> Option<String> {
-        let command = self.graph.find_attr_value("command");
+        let command = self.block.as_ref().find_attr_value("command");
 
         if let Some(Value::TextBuffer(command)) = command {
             Some(command.to_string())
@@ -94,7 +94,6 @@ impl Process {
 
         if let Some(command) = parts.get(0) {
             let subcommands = &parts[1..];
-
             let process = Process {
                 stdout: None,
                 stderr: None,
@@ -103,12 +102,11 @@ impl Process {
                 timestamp_local: None,
                 timestamp_utc: None,
                 start_time: Some(Utc::now()),
-                graph: AttributeGraph::default(),
+                block: BlockContext::default(),
             };
 
             let mut command = Command::new(&command);
             let mut command = &mut command;
-
             for s in subcommands {
                 if !s.is_empty() {
                     command = command.arg(s);
@@ -122,11 +120,10 @@ impl Process {
     }
 
     fn handle_output(mut self, mut command: &mut Command) -> Result<Self, ProcessExecutionError> {
-        for (name, value) in &self.graph.find_symbol_values("flag") {
+        for (name, value) in &self.block.as_ref().find_symbol_values("flag") {
             if !name.is_empty() {
                 command = command.arg(name);
             }
-
             if let Value::TextBuffer(value) = value {
                 command = command.arg(value);
             }
@@ -163,7 +160,7 @@ impl Display for Process {
 impl From<AttributeGraph> for Process {
     fn from(graph: AttributeGraph) -> Self {
         Self {
-            graph,
+            block: BlockContext::from(graph),
             ..Default::default()
         }
     }
@@ -171,13 +168,13 @@ impl From<AttributeGraph> for Process {
 
 impl AsMut<AttributeGraph> for Process {
     fn as_mut(&mut self) -> &mut AttributeGraph {
-        &mut self.graph
+        self.block.as_mut()
     }
 }
 
 impl AsRef<AttributeGraph> for Process {
     fn as_ref(&self) -> &AttributeGraph {
-        &self.graph
+        &self.block.as_ref()
     }
 }
 
@@ -185,11 +182,11 @@ impl RuntimeState for Process {
     type Dispatcher = AttributeGraph;
 
     fn dispatcher(&self) -> &Self::Dispatcher {
-        &self.graph
+        &self.block.as_ref()
     }
 
     fn dispatcher_mut(&mut self) -> &mut Self::Dispatcher {
-        &mut self.graph
+        self.block.as_mut()
     }
 }
 

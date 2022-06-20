@@ -1,15 +1,14 @@
 use super::block::Project;
-use super::thunks::Form;
 use super::{
-    BlockContext, Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles,
+    BlockContext, Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles, Call,
 };
 use crate::plugins::Println;
 use crate::AttributeGraph;
 use atlier::system::{Extension, Value};
-use imgui::{Condition, Ui, Window};
+use imgui::{Condition, Ui, Window, MenuItem};
 use imnodes::{
     editor, AttributeFlag, AttributeId, CoordinateSystem, InputPinId, Link, LinkId, NodeId,
-    OutputPinId,
+    OutputPinId, ImVec2,
 };
 use specs::storage::DenseVecStorage;
 use specs::{
@@ -25,6 +24,7 @@ pub mod demo;
 #[derive(Component, Clone, Default, Hash, PartialEq)]
 #[storage(DenseVecStorage)]
 pub struct NodeContext {
+    entity: Option<Entity>, 
     block: BlockContext,
     node_id: Option<NodeId>,
     attribute_id: Option<AttributeId>,
@@ -232,6 +232,18 @@ impl Node {
             }
         }
     }
+
+    pub fn arrange_vertical(&mut self) {
+        self.contexts.keys().enumerate().for_each(|(i, n)| {
+            let spacing = i as f32;
+            let ImVec2 { x: height, .. } = n.get_dimensions();
+            let spacing = spacing * height;
+
+            let ImVec2 { x, .. } = n
+                .get_position(imnodes::CoordinateSystem::ScreenSpace);
+            n.set_position(x, spacing, imnodes::CoordinateSystem::ScreenSpace);
+        });
+    }
 }
 
 impl Plugin<NodeContext> for Node {
@@ -279,7 +291,8 @@ impl From<imnodes::Context> for Node {
         let editor_context = context.create_editor();
         let idgen = editor_context.new_identifier_generator();
 
-        if let Some(source) = Project::load_file("node.runmd") {
+        if let Some(mut source) = Project::load_file("node.runmd") {
+            source.as_mut().with_bool("debug_nodes", false);
             Self {
                 _context: context,
                 editor_context,
@@ -291,11 +304,13 @@ impl From<imnodes::Context> for Node {
                 link_index: HashMap::new(),
             }
         } else {
+            let mut default_source = Project::default();
+            default_source.as_mut().add_bool_attr("debug_nodes", false);
             Self {
                 _context: context,
                 editor_context,
                 idgen,
-                source: Project::default(),
+                source: default_source,
                 contexts: HashMap::new(),
                 edit: HashMap::new(),
                 display: HashMap::new(),
@@ -313,18 +328,13 @@ impl Extension for Node {
         world.register::<Println>();
         world.register::<WriteFiles>();
         world.register::<ThunkContext>();
+        world.register::<Call>();
     }
 
     fn configure_app_systems(builder: &mut specs::DispatcherBuilder) {
-        let write_files = NodeSync::<WriteFiles>::default();
-        let println = NodeSync::<Println>::default();
-        let process = NodeSync::<Process>::default();
-        let form = NodeSync::<Form>::default();
-
-        builder.add(write_files, "write_files_node_sync", &[]);
-        builder.add(println, "println_node_sync", &[]);
-        builder.add(process, "process_node_sync", &[]);
-        builder.add(form, "form_node_sync", &[]);
+        builder.add( NodeSync::<WriteFiles>::default(), "write_files_node_sync", &[]);
+        builder.add( NodeSync::<Println>::default(), "println_node_sync", &[]);
+        builder.add( NodeSync::<Process>::default(), "process_node_sync", &[]);
     }
 
     fn on_ui(&mut self, app_world: &World, ui: &imgui::Ui) {
@@ -349,14 +359,18 @@ impl Extension for Node {
                 ui.menu_bar(|| {
                     self.source.edit_project_menu(ui);
 
-                    if let Some(token) = ui.begin_menu("Debug") {
+                    ui.menu("Edit", ||{
+                        if MenuItem::new("Arrange nodes vertically").build(ui) {
+                            self.arrange_vertical();
+                        }
+                    });
+
+                    ui.menu("Debug", ||{
                         self.source.as_mut().edit_attr("Debug nodes", "debug_nodes", ui);
                         if ui.is_item_hovered() {
                             ui.tooltip_text("This will show information on each node such as x,y coordinates");
                         }
-
-                        token.end();
-                    }
+                    });
                 });
 
                 ui.label_text("hash", format!("{}", self.source.as_ref().hash_code()));
@@ -474,11 +488,12 @@ impl Engine for Node {
 impl<'a> System<'a> for Node {
     type SystemData = (
         WriteStorage<'a, NodeContext>,
+        WriteStorage<'a, BlockContext>,
         ReadStorage<'a, Edit<NodeContext>>,
         ReadStorage<'a, Display<NodeContext>>,
     );
 
-    fn run(&mut self, (mut contexts, edit_node, display_node): Self::SystemData) {
+    fn run(&mut self, (mut contexts, mut blocks, edit_node, display_node): Self::SystemData) {
         for (_, node_context) in self.contexts.iter() {
             let block_name = node_context.block.block_name().unwrap_or_default();
             if let Some(block_context) = self.source.find_block_mut(block_name) {
@@ -486,6 +501,17 @@ impl<'a> System<'a> for Node {
                 block_context.replace_block(&node_context.block, "form");
                 block_context.replace_block(&node_context.block, "thunk");
                 block_context.replace_block(&node_context.block, "publish");
+
+                if let Some(entity) = node_context.entity {
+                    match blocks.insert(entity, block_context.clone()) {
+                        Ok(_) => {
+    
+                        },
+                        Err(_) => {
+    
+                        },
+                    }
+                }
             }
         }
 
@@ -553,28 +579,6 @@ where
         block_context.edit_block("publish", ui);
 
         *graph = block_context.as_ref().clone();
-
-        // block_context.update_block("accept", |accept| {
-        //     ui.text("Accept:");
-        //     for attr in accept.iter_mut_attributes() {
-        //         attr.edit_value(ui);
-        //     }
-        // });
-
-        // block_context.update_block("thunk", |thunk| {
-        //     ui.text("Thunk:");
-        //     for attr in thunk.iter_mut_attributes() {
-        //         attr.edit_value(ui);
-        //     }
-        // });
-
-        // block_context.update_block("publish", |publish| {
-        //     ui.text("Publish:");
-        //     for attr in publish.iter_mut_attributes() {
-        //         attr.edit_value(ui);
-        //     }
-        // });
-        // *graph = block_context.as_ref().clone();
     }
 }
 
@@ -586,9 +590,10 @@ where
         Entities<'a>,
         WriteStorage<'a, NodeContext>,
         WriteStorage<'a, Edit<NodeContext>>,
+        WriteStorage<'a, Call>,
     );
 
-    fn run(&mut self, (entities, mut contexts, mut edits): Self::SystemData) {
+    fn run(&mut self, (entities, mut contexts, mut edits, mut calls): Self::SystemData) {
         if let Some(instant) = self.2 {
             if instant.elapsed() > Duration::from_millis(16) {
                 self.2.take();
@@ -608,12 +613,14 @@ where
                         });
                 
                 if has_node {
-                    let context = NodeContext::from(block.as_ref().clone());
+                    let mut context = NodeContext::from(block.as_ref().clone());
                     let NodeSync(added, ..) = self;
                     let original = context.clone();
 
                     if let None = added.get(&original) {
                         let entity = entities.create();
+                        context.entity = Some(entity);
+
                         match contexts.insert(entity, context) {
                             Ok(_) => {
                                 println!("NodeSync loaded new node_context entity: {:?}, block_name: {}, plugin: {}", entity, block_name, P::symbol());
@@ -624,6 +631,13 @@ where
                                             "Added edit for new node_context entity {:?}",
                                             entity
                                         );
+
+                                        match calls.insert(entity, Call::from_plugin::<P>()) {
+                                            Ok(_) => {
+                                                println!("Added call for new node_context entity {:?}", entity);
+                                            },
+                                            Err(_) => {},
+                                        }
                                     }
                                     Err(_) => {}
                                 }

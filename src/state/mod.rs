@@ -1,5 +1,5 @@
 use crate::{editor::unique_title, RuntimeDispatcher, RuntimeState};
-use atlier::system::{App, Attribute, Value};
+use atlier::system::{Attribute, Value};
 use imgui::TableFlags;
 use logos::Logos;
 use ron::ser::PrettyConfig;
@@ -159,7 +159,7 @@ impl AttributeGraph {
             for attr in block.iter_mut_attributes().filter(|a| !a.name.starts_with("block_")) {
                 match attr.value() {
                     Value::Symbol(_) => {}
-                    _ => attr.edit_value(ui),
+                    _ => attr.edit_value("", ui),
                 }
             }
             if hash_code != block.hash_code() {
@@ -184,66 +184,18 @@ impl AttributeGraph {
         if let Some(Value::Float(width)) = self.find_attr_value("edit_width") {
             ui.set_next_item_width(*width);
         } else {
-            ui.set_next_item_width(130.0);
+            ui.set_next_item_width(0.0);
         }
 
         let label = format!("{} {}", label, self.entity);
         let attr_name = attr_name.as_ref().to_string();
-        match self.find_attr_value_mut(&attr_name) {
-            Some(Value::TextBuffer(val)) => {
-                ui.input_text(label, val).build();
-            }
-            Some(Value::Int(val)) => {
-                ui.input_int(label, val).build();
-            }
-            Some(Value::Float(val)) => {
-                ui.input_float(label, val).build();
-            }
-            Some(Value::Bool(val)) => {
-                ui.checkbox(label, val);
-            }
-            Some(Value::FloatPair(f1, f2)) => {
-                let clone = &mut [*f1, *f2];
-                ui.input_float2(label, clone).build();
-                *f1 = clone[0];
-                *f2 = clone[1];
-            }
-            Some(Value::IntPair(i1, i2)) => {
-                let clone = &mut [*i1, *i2];
-                ui.input_int2(label, clone).build();
-                *i1 = clone[0];
-                *i2 = clone[1];
-            }
-            Some(Value::IntRange(i, i_min, i_max)) => {
-                imgui::Slider::new(label, *i_min, *i_max).build(ui, i);
-            }
-            Some(Value::FloatRange(f, f_min, f_max)) => {
-                imgui::Slider::new(label, *f_min, *f_max).build(ui, f);
-            }
-            None => {}
-            _ => match self.clone().find_attr(&attr_name) {
-                Some(attr) => {
-                    // If not stable,
-                    // shows a preview and add's a button to apply the value if transient
-                    if !attr.is_stable() {
-                        if attr
-                            .transient()
-                            .and_then(|(_, value)| Some(*value != Value::Empty))
-                            .unwrap_or(false)
-                        {
-                            if ui.button(format!("apply {}", attr.id())) {
-                                self.apply_mut(attr.name());
-                            }
-                            ui.same_line();
-                        }
-                        ui.disabled(true, || {
-                            let mut preview = attr.clone();
-                            preview.commit();
-                            preview.show_editor(ui);
-                        });
-                    }
-                }
-                None => {}
+
+        match self.find_attr_mut(&attr_name) {
+            Some(attr) => {
+                attr.edit_value(label, ui);
+            },
+            None => {
+                ui.text(format!("'{}' not found", &attr_name));
             },
         }
     }

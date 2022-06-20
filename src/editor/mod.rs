@@ -1,18 +1,13 @@
-mod node_editor;
-mod node_editor_graph;
 mod runtime_editor;
 use atlier::system::start_editor_from;
 use rand::Rng;
 use specs::prelude::*;
-
 pub use specs::prelude::WorldExt;
 pub use specs::prelude::Builder;
 pub use atlier::system::App;
 pub use atlier::system::Attribute;
 pub use atlier::system::Extension;
 pub use atlier::system::Value;
-pub use node_editor::NodeEditor;
-pub use node_editor_graph::NodeEditorGraph;
 pub use runtime_editor::RuntimeEditor;
 
 /// open a runtime editor for an attribute graph, and extension
