@@ -61,7 +61,6 @@ impl Project {
 
                 token.end();
             }
-
             ui.separator();
         });
     }

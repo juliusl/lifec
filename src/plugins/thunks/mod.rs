@@ -16,11 +16,12 @@ pub mod demo {
 
 use super::{BlockContext, Plugin};
 
+/// Thunk is a function that can be passed around for the system to call later
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
-pub struct Call(&'static str, fn(&mut ThunkContext));
+pub struct Thunk(&'static str, fn(&mut ThunkContext));
 
-impl Call {
+impl Thunk {
     pub fn from_plugin<P>() -> Self
     where
         P: Plugin<ThunkContext>,

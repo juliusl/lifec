@@ -1,6 +1,6 @@
 use super::block::Project;
 use super::{
-    BlockContext, Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles, Call,
+    BlockContext, Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles, Thunk,
 };
 use crate::plugins::Println;
 use crate::AttributeGraph;
@@ -328,7 +328,7 @@ impl Extension for Node {
         world.register::<Println>();
         world.register::<WriteFiles>();
         world.register::<ThunkContext>();
-        world.register::<Call>();
+        world.register::<Thunk>();
     }
 
     fn configure_app_systems(builder: &mut specs::DispatcherBuilder) {
@@ -590,7 +590,7 @@ where
         Entities<'a>,
         WriteStorage<'a, NodeContext>,
         WriteStorage<'a, Edit<NodeContext>>,
-        WriteStorage<'a, Call>,
+        WriteStorage<'a, Thunk>,
     );
 
     fn run(&mut self, (entities, mut contexts, mut edits, mut calls): Self::SystemData) {
@@ -632,7 +632,7 @@ where
                                             entity
                                         );
 
-                                        match calls.insert(entity, Call::from_plugin::<P>()) {
+                                        match calls.insert(entity, Thunk::from_plugin::<P>()) {
                                             Ok(_) => {
                                                 println!("Added call for new node_context entity {:?}", entity);
                                             },

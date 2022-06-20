@@ -15,7 +15,7 @@ mod thunks;
 pub use thunks::Println;
 pub use thunks::ThunkContext;
 pub use thunks::WriteFiles;
-pub use thunks::Call;
+pub use thunks::Thunk;
 
 pub mod demos {
     pub use super::thunks::demo::*;

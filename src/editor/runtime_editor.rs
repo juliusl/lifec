@@ -4,7 +4,7 @@ use imgui::{Window, MenuItem, ChildWindow};
 use specs::{Component, Entities, System, ReadStorage, Join, Entity};
 
 use super::App;
-use crate::{Runtime, RuntimeState, plugins::{Project, Call, ThunkContext, BlockContext}};
+use crate::{Runtime, RuntimeState, plugins::{Project, Thunk, ThunkContext, BlockContext}};
 
 pub struct RuntimeEditor<S>
 where
@@ -12,7 +12,7 @@ where
 {
     _runtime: Runtime<S>,
     project: Project,
-    calls: HashMap<Entity, Call>,
+    calls: HashMap<Entity, Thunk>,
     blocks: HashMap<Entity, BlockContext>,
 }
 
@@ -37,7 +37,7 @@ where
 {
     type SystemData = (
         Entities<'a>,
-        ReadStorage<'a, Call>,
+        ReadStorage<'a, Thunk>,
         ReadStorage<'a, BlockContext>,
     );
 
