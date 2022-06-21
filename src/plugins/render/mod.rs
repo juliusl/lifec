@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use super::{Engine, Plugin};
+use super::{Engine, Plugin, Thunk};
 use crate::AttributeGraph;
 use imgui::Ui;
 use specs::storage::DenseVecStorage;
@@ -9,40 +9,27 @@ use specs::{Component, Join, ReadStorage, RunNow, System, World, WriteStorage};
 /// For rendering a ui frame that can mutate state
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
-pub struct Edit<Context>(pub fn(&Context, &mut AttributeGraph, &Ui))
-where
-    Context: Component;
+pub struct Edit(pub fn(&mut AttributeGraph, Option<Thunk>, &Ui));
 
 /// For rendering a ui frame that is read-only
 #[derive(Clone, Component)]
 #[storage(DenseVecStorage)]
-pub struct Display<Context>(pub fn(&Context, &AttributeGraph, &Ui))
-where
-    Context: Component;
+pub struct Display(pub fn(&AttributeGraph, Option<Thunk>, &Ui));
 
 #[derive(Clone)]
 /// The render system is to interface entities with specs systems
-pub struct Render<'ui, Context>(
+pub struct Render<'ui>(
     RefCell<Option<&'ui Ui<'ui>>>,
-    Option<Edit<Context>>,
-    Option<Display<Context>>,
-)
-where
-    Context: Component;
+    Option<Thunk>,
+    Option<Edit>,
+    Option<Display>,
+);
 
-impl<'ui, Context> Render<'ui, Context>
-where
-    Context: Component
-        + Clone
-        + AsRef<AttributeGraph>
-        + AsMut<AttributeGraph>
-        + From<AttributeGraph>
-        + Send
-        + Sync,
+impl<'ui> Render<'ui>
 {
     /// next_frame prepares the the system for the next frame
     pub fn next_frame(ui: &'ui imgui::Ui<'ui>) -> Self {
-        Self(RefCell::new(Some(ui)), None, None)
+        Self(RefCell::new(Some(ui)), None, None, None)
     }
 
     /// since render needs to happen on the ui thread, this method is to call the system
@@ -52,16 +39,25 @@ where
     }
 
     /// handles the render event
-    pub fn on_render(
+    pub fn on_render<Context>(
         &mut self,
         context: &mut Context,
-        edit: Option<Edit<Context>>,
-        display: Option<Display<Context>>,
-    ) where
-        Self: Plugin<Context>,
+        thunk: Option<Thunk>,
+        edit: Option<Edit>,
+        display: Option<Display>,
+    )
+    where
+    Context: Component
+        + Clone
+        + AsRef<AttributeGraph>
+        + AsMut<AttributeGraph>
+        + From<AttributeGraph>
+        + Sync
+        + Send,
     {
-        self.1 = edit;
-        self.2 = display;
+        self.1 = thunk;
+        self.2 = edit;
+        self.3 = display;
         self.on_event(context);
     }
 
@@ -72,33 +68,26 @@ where
     }
 }
 
-impl<Context> Engine for Render<'_, Context>
-where
-    Context:
-        Component + Clone + AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph>,
+impl Engine for Render<'_>
 {
     fn next_mut(&mut self, attributes: &mut AttributeGraph) {
-        let context = Context::from(attributes.clone());
-
-        if let Render(ui, Some(Edit(edit)), ..) = self {
+        if let Render(ui, thunk, Some(Edit(edit)), ..) = self {
             if let Some(ui) = ui.borrow().and_then(|ui| Some(ui)) {
-                edit(&context, attributes, ui);
+                edit(attributes, thunk.clone(), ui);
             }
         }
     }
 
     fn exit(&mut self, attributes: &AttributeGraph) {
-        let context = Context::from(attributes.clone());
-
-        if let Render(ui, .., Some(Display(display))) = self {
+        if let Render(ui, thunk, .., Some(Display(display))) = self {
             if let Some(ui) = ui.borrow().and_then(|ui| Some(ui)) {
-                display(&context, attributes, ui);
+                display(attributes, thunk.clone(), ui);
             }
         }
     }
 }
 
-impl<Context> Plugin<Context> for Render<'_, Context>
+impl<Context> Plugin<Context> for Render<'_>
 where
     Context: Component
         + Clone
@@ -115,40 +104,28 @@ where
     fn call_with_context(_: &mut Context) {}
 }
 
-impl<'a, Context> System<'a> for Render<'_, Context>
-where
-    Context: Component
-        + Clone
-        + AsRef<AttributeGraph>
-        + AsMut<AttributeGraph>
-        + From<AttributeGraph>
-        + Send
-        + Sync,
-{
+impl<'a> System<'a> for Render<'_> {
     type SystemData = (
         WriteStorage<'a, AttributeGraph>,
-        ReadStorage<'a, Context>,
-        ReadStorage<'a, Edit<Context>>,
-        ReadStorage<'a, Display<Context>>,
+        ReadStorage<'a, Thunk>,
+        ReadStorage<'a, Edit>,
+        ReadStorage<'a, Display>,
     );
 
-    fn run(&mut self, (mut graphs, context, edits, displays): Self::SystemData) {
-        for (graph, c, e, d) in (
+    fn run(&mut self, (mut graphs, thunks, edits, displays): Self::SystemData) {
+        for (graph, t, e, d) in (
             &mut graphs,
-            context.maybe(),
+            thunks.maybe(),
             edits.maybe(),
             displays.maybe(),
         )
             .join()
         {
-            let context = c.and_then(|c| Some(c.clone()));
+            let thunk = t.and_then(|t| Some(t.clone()));
             let edit = e.and_then(|e| Some(e.clone()));
             let display = d.and_then(|d| Some(d.clone()));
+            self.on_render(graph, thunk, edit, display);
 
-            if let Some(mut context) = context {
-                self.on_render(&mut context, edit, display);
-                graph.merge(context.as_ref());
-            }
         }
     }
 }

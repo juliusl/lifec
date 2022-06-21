@@ -115,8 +115,9 @@ pub struct Node {
     editor_context: imnodes::EditorContext,
     idgen: imnodes::IdentifierGenerator,
     contexts: HashMap<NodeId, NodeContext>,
-    edit: HashMap<NodeId, Edit<NodeContext>>,
-    display: HashMap<NodeId, Display<NodeContext>>,
+    thunk: HashMap<NodeId, Thunk>,
+    edit: HashMap<NodeId, Edit>,
+    display: HashMap<NodeId, Display>,
     link_index: HashMap<LinkId, Link>,
     source: Project,
     // TODO: Need to hold a context to this, because if it leaves scope it will drop
@@ -299,6 +300,7 @@ impl From<imnodes::Context> for Node {
                 idgen,
                 source,
                 contexts: HashMap::new(),
+                thunk: HashMap::new(),
                 edit: HashMap::new(),
                 display: HashMap::new(),
                 link_index: HashMap::new(),
@@ -312,6 +314,7 @@ impl From<imnodes::Context> for Node {
                 idgen,
                 source: default_source,
                 contexts: HashMap::new(),
+                thunk: HashMap::new(),
                 edit: HashMap::new(),
                 display: HashMap::new(),
                 link_index: HashMap::new(),
@@ -323,8 +326,8 @@ impl From<imnodes::Context> for Node {
 impl Extension for Node {
     fn configure_app_world(world: &mut World) {
         world.register::<NodeContext>();
-        world.register::<Edit<NodeContext>>();
-        world.register::<Display<NodeContext>>();
+        world.register::<Edit>();
+        world.register::<Display>();
         world.register::<Println>();
         world.register::<WriteFiles>();
         world.register::<ThunkContext>();
@@ -338,7 +341,7 @@ impl Extension for Node {
     }
 
     fn on_ui(&mut self, app_world: &World, ui: &imgui::Ui) {
-        let mut frame = Render::<NodeContext>::next_frame(ui);
+        let mut frame = Render::next_frame(ui);
 
         let mut size = [800.0, 600.0];
         if let Some(Value::FloatPair(width, height)) = self.source.as_ref().find_attr_value("size")
@@ -382,6 +385,7 @@ impl Extension for Node {
                     editor_scope.add_mini_map(imnodes::MiniMapLocation::BottomRight);
 
                     for (node_id, mut context) in self.contexts.iter_mut() {
+                        let thunk = self.thunk.get(&node_id).and_then(|t| Some(t.to_owned()));
                         let edit = self.edit.get(&node_id).and_then(|e| Some(e.to_owned()));
                         let display = self.display.get(&node_id).and_then(|d| Some(d.to_owned()));
 
@@ -426,7 +430,7 @@ impl Extension for Node {
                                     }
 
                                     // If the entity has an edit/display, it's shown in this block
-                                    frame.on_render(&mut context, edit.clone(), display.clone());
+                                    frame.on_render(context.as_mut(), thunk.clone(), edit.clone(), display.clone());
                                 });
                             }
 
@@ -489,11 +493,12 @@ impl<'a> System<'a> for Node {
     type SystemData = (
         WriteStorage<'a, NodeContext>,
         WriteStorage<'a, BlockContext>,
-        ReadStorage<'a, Edit<NodeContext>>,
-        ReadStorage<'a, Display<NodeContext>>,
+        ReadStorage<'a, Thunk>,
+        ReadStorage<'a, Edit>,
+        ReadStorage<'a, Display>,
     );
 
-    fn run(&mut self, (mut contexts, mut blocks, edit_node, display_node): Self::SystemData) {
+    fn run(&mut self, (mut contexts, mut blocks, thunks, edit_node, display_node): Self::SystemData) {
         for (_, node_context) in self.contexts.iter() {
             let block_name = node_context.block.block_name().unwrap_or_default();
             if let Some(block_context) = self.source.find_block_mut(block_name) {
@@ -515,11 +520,17 @@ impl<'a> System<'a> for Node {
             }
         }
 
-        for (context, edit_node, display_node) in
-            (&mut contexts, edit_node.maybe(), display_node.maybe()).join()
+        for (context, thunk, edit_node, display_node) in
+            (&mut contexts, thunks.maybe(), edit_node.maybe(), display_node.maybe()).join()
         {
             if edit_node.is_some() || display_node.is_some() {
                 self.on_event(context);
+                if let (Some(thunk), Some(node_id)) = (thunk, context.node_id) {
+                    if !self.thunk.contains_key(&node_id) {
+                        println!("found display node for {:?}", node_id);
+                        self.thunk.insert(node_id, thunk.clone());
+                    }
+                }
 
                 if let (Some(edit_node), Some(node_id)) = (edit_node, context.node_id) {
                     if !self.edit.contains_key(&node_id) {
@@ -548,7 +559,7 @@ impl<P> NodeSync<P>
 where
     P: Plugin<ThunkContext> + Component + Default,
 {
-    fn render_node(_: &NodeContext, graph: &mut AttributeGraph, ui: &Ui) {
+    fn render_node(graph: &mut AttributeGraph, thunk: Option<Thunk>, ui: &Ui) {
         if let Some(mut _update) = graph.edit_form_block(ui) {
             let imported = _update.entity();
             for attr in _update.iter_mut_attributes() {
@@ -566,14 +577,19 @@ where
             }
         }
 
-        if graph.find_block("", "thunk").is_some() {
-            ui.new_line();        
-            let label = format!("call {} {}", P::symbol(), graph.entity());
-            if ui.button(label) {
-                P::call(graph);
+        if let Some(thunk) = thunk {
+            if graph.find_block("", "thunk").is_some() {
+                ui.new_line();        
+                let label = format!("call {} {}", P::symbol(), graph.entity());
+                if ui.button(label) {
+                    let mut thunk_context = ThunkContext::from(graph.to_owned());
+                    thunk.call(&mut thunk_context);
+                    graph.merge(thunk_context.as_ref());
+                }
+                ui.new_line();
             }
-            ui.new_line();
         }
+
 
         let mut block_context = BlockContext::from(graph.clone());
         block_context.edit_block("publish", ui);
@@ -589,7 +605,7 @@ where
     type SystemData = (
         Entities<'a>,
         WriteStorage<'a, NodeContext>,
-        WriteStorage<'a, Edit<NodeContext>>,
+        WriteStorage<'a, Edit>,
         WriteStorage<'a, Thunk>,
     );
 

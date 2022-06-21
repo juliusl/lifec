@@ -3,8 +3,6 @@ use specs::{Builder, WorldExt};
 
 use crate::plugins::{Node, Plugin, Edit, Display, ThunkContext, WriteFiles, demos::WriteFilesDemo};
 
-use super::NodeContext;
-
 /// Starts a demo of the node editor
 pub struct NodeDemo(Node);
 
@@ -19,11 +17,11 @@ impl Extension for NodeDemo {
     fn configure_app_world(world: &mut specs::World) {
         world.register::<ThunkContext>();
         world.register::<WriteFiles>();
-        world.register::<Edit::<ThunkContext>>();
+        world.register::<Edit>();
 
         Node::configure_app_world(world);
         Node::parse_entity(".runmd", world, |e|{
-            let display = Display::<NodeContext>(
+            let display = Display(
                 |_, _, ui|{
                     ui.text("hello");
                 });
@@ -33,8 +31,8 @@ impl Extension for NodeDemo {
         });
         
         WriteFiles::parse_entity("println.runmd", world, |e|{
-            let edit = Edit::<ThunkContext>(
-                |_, g, ui| {
+            let edit = Edit(
+                |g, _, ui| {
                     g.edit_attr_table(ui);
                 }
             );

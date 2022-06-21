@@ -72,21 +72,18 @@ pub mod demo {
             world.register::<AttributeGraph>();
             world.register::<WriteFiles>();
             world.register::<ThunkContext>();
-            world.register::<Edit<ThunkContext>>();
-            world.register::<Display<ThunkContext>>();
+            world.register::<Edit>();
+            world.register::<Display>();
 
             WriteFiles::parse_entity("demo.runmd", world, |e| {
                 e.maybe_with(Some(ThunkContext::from(
                     AttributeGraph::load_from_file(".runmd").unwrap_or_default(),
                 )))
-                .maybe_with(Some(Edit::<ThunkContext>(|initial, g, ui| {
+                .maybe_with(Some(Edit(|g, _, ui| {
                     Window::new("demo").build(ui, || {
                         if ui.button("write all files") {
                             WriteFiles::call(g);
                         }
-                        initial.clone()
-                            .as_mut()
-                            .edit_attr_table(ui);
                             
                         g.edit_attr_table(ui);
                     });
@@ -100,7 +97,7 @@ pub mod demo {
 
 
         fn on_ui(&mut self, app_world: &specs::World, ui: &imgui::Ui) {
-            let mut render = Render::<ThunkContext>::next_frame(ui);
+            let mut render = Render::next_frame(ui);
             render.render_now(app_world);
         }
     }
