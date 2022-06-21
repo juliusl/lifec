@@ -34,7 +34,6 @@ impl BlockContext {
         self.update_block(block_symbol.as_ref(), |updating|{
             let index_entry = updating.define(&block_name, &block_symbol);
             let mut index_entry = index_entry.to_owned();
-            //"0x00000007::sh_test::event::from::"
             index_entry.edit_as(Value::Symbol(format!(
                 "{}::{}",
                 block_symbol.as_ref(),

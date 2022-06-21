@@ -55,8 +55,10 @@ impl AttributeGraph {
     pub fn read_block_index(&self, block_id: u32, block_name: impl AsRef<str>, block_symbol: impl AsRef<str>, symbol: impl AsRef<str>) -> Option<(String, Value)> {
         let key = format!("{:#010x}::{}::{}::{}", block_id, block_name.as_ref(), block_symbol.as_ref(), symbol.as_ref());
 
-        //"0x00000007::sh_test::event::from::"
-        self.index.get(&key).and_then(|a| a.transient.clone())
+        // 0x00000007::test::event::from
+        self.index
+            .get(&key)
+            .and_then(|a| a.transient.clone())
     }
 
     /// returns the graph after attributes are committed

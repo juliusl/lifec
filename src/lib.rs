@@ -35,12 +35,12 @@ where
         }
     }
 
-    fn batch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> 
+    fn batch(&self, msgs: impl AsRef<str>) -> Result<Self, Self::Error> 
     where 
         Self: Clone
     {
         let mut next = self.clone();
-        for message in msg.as_ref().trim().split("\n").filter(|line| !line.is_empty()) {
+        for message in msgs.as_ref().trim().split("\n").filter(|line| !line.is_empty()) {
              next = next.dispatch(message)?;
         }
     

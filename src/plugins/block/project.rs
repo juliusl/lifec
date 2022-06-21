@@ -1,13 +1,11 @@
 use std::collections::btree_map::IterMut;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
+use atlier::system::Value;
 use imgui::Ui;
 use specs::Component;
 use specs::storage::HashMapStorage;
-
-
 use crate::state::AttributeGraph;
-
 use super::BlockContext;
 
 #[derive(Default, Component, Clone)]
@@ -24,6 +22,12 @@ impl Project {
         } else {
             None
         }
+    }
+
+    pub fn read_index(&self, block_name: impl AsRef<str>, block_symbol: impl AsRef<str>, symbol: impl AsRef<str>) -> Option<(String, Value)> {
+        self.block_index
+            .get(block_name.as_ref())
+            .and_then(|block| block.read_index(block_symbol, symbol))
     }
 
     pub fn find_block_mut(&mut self, block_name: impl AsRef<str>) -> Option<&mut BlockContext> {
@@ -145,4 +149,58 @@ impl AsMut<AttributeGraph> for Project {
     fn as_mut(&mut self) -> &mut AttributeGraph {
         &mut self.source
     }
+}
+
+#[test]
+fn test_read_index() {
+    use crate::RuntimeDispatcher;
+
+    let test = r#"
+``` sh_test form
+add command .TEXT sh ./test.sh
+add debug_out .BOOL true
+```
+
+``` sh_test node
+add debug .BOOL true
+add input_label .TEXT accept
+add node_title .TEXT sh_test
+add output_label .TEXT publish
+```
+
+``` sh_test publish
+add called .BOOL true
+add code .INT 0
+add command .TEXT sh ./test.sh
+add elapsed .TEXT 2 ms
+add stderr .BINARY_VECTOR 
+add stdout .BINARY_VECTOR SGVsbG8gV29ybGQK
+add timestamp_local .TEXT 2022-06-20 19:50:07.782710 -07:00
+add timestamp_utc .TEXT 2022-06-21 02:50:07.782701 UTC
+```
+
+``` sh_test thunk
+add thunk_symbol .TEXT process
+``` 
+    "#;
+
+   match AttributeGraph::from(0).batch(test) {
+    Ok(graph) => {
+        let mut graph = Project::from(graph);
+
+        if let Some(block) = graph.find_block_mut("sh_test") {
+            block.add_block("event", |_| {});
+            assert!(block.write_index("event", "from", "block_name", Value::Empty));
+        } else {
+            assert!(false, "should write index");
+        }
+
+        if let Some((_, value)) = graph.read_index("sh_test", "event", "from") {
+            assert_eq!(value, Value::Empty);
+        } else {
+            assert!(false, "should read index");
+        }
+    },
+    Err(_) => assert!(false, "should be able to dispatch test"),
+}
 }

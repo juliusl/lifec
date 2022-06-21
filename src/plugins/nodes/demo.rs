@@ -1,7 +1,7 @@
 use atlier::system::Extension;
 use specs::{Builder, WorldExt};
 
-use crate::plugins::{Node, Plugin, Edit, Display, ThunkContext, WriteFiles, demos::WriteFilesDemo};
+use crate::plugins::{Node, Plugin, Edit, Display, ThunkContext, WriteFiles, demos::WriteFilesDemo, Project};
 
 /// Starts a demo of the node editor
 pub struct NodeDemo(Node);
@@ -20,28 +20,6 @@ impl Extension for NodeDemo {
         world.register::<Edit>();
 
         Node::configure_app_world(world);
-        Node::parse_entity(".runmd", world, |e|{
-            let display = Display(
-                |_, _, ui|{
-                    ui.text("hello");
-                });
-
-            e.maybe_with(Some(display))
-             .build()
-        });
-        
-        WriteFiles::parse_entity("println.runmd", world, |e|{
-            let edit = Edit(
-                |g, _, ui| {
-                    g.edit_attr_table(ui);
-                }
-            );
-
-            e.maybe_with(Some(edit))
-             .build()
-        });
-
-        WriteFilesDemo::configure_app_world(world);
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
