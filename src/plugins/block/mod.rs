@@ -364,7 +364,7 @@ impl BlockContext {
             if let Some(token) = ui.tab_bar(format!("{}", hash_code)) {
                 for block_symbol in self.block_symbols.clone().iter() {
                     if let Some(token) = ui.tab_item(
-                        format!("{} {} block:", self.block_name, block_symbol),
+                        format!("{} {}", self.block_name, block_symbol),
                     ) {
                         self.edit_block_table(block_symbol, ui);
                         token.end();

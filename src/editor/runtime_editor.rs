@@ -113,7 +113,16 @@ where
                 if let Some(tabbar) = ui.tab_bar("runtime_tabs") {
                     for (_, block) in project.iter_block_mut().enumerate() {
                         let (block_name, block) = block;
-                        if let Some(token) = ui.tab_item(format!("Block entity: {}", block_name)) {
+
+                       let thunk_symbol = if let Some(thunk) = block.get_block("thunk") {
+                            thunk.find_text("thunk_symbol")
+                        } else {
+                            None 
+                        };
+
+                        let thunk_symbol = thunk_symbol.unwrap_or("entity".to_string());
+
+                        if let Some(token) = ui.tab_item(format!("{} {}", thunk_symbol, block_name)) {
                             ui.group(|| {
                                 block.edit_block_view(true, ui);
                                 ChildWindow::new(&format!("table_view_{}", block_name)).size([0.0, 0.0]).build(ui, ||{

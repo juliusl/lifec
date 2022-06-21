@@ -34,7 +34,13 @@ impl Thunk {
     }
 
     pub fn call(&self, context: &mut ThunkContext) {
-        (self.1)(context)
+        (self.1)(context);
+
+        let ThunkContext(block) = context; 
+
+        block.update_block("thunk", |t| {
+            t.add_text_attr("thunk_symbol", self.symbol().as_ref().to_string());
+        });
     }
 }
 
@@ -63,6 +69,15 @@ impl AsMut<AttributeGraph> for ThunkContext {
 }
 
 impl ThunkContext {
+    pub fn symbol(&self) -> Option<String> {
+        let ThunkContext(block) = self; 
+        if let Some(thunk) = block.get_block("thunk") {
+            thunk.find_text("thunk_symbol")
+        } else {
+            None
+        }
+    }
+
     /// Updates error block
     pub fn error(&mut self, record: impl FnOnce(&mut AttributeGraph)) {
         self.0.update_block("error", record);
