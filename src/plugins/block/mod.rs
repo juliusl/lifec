@@ -292,12 +292,12 @@ impl BlockContext {
     }
 
     pub fn edit_block_view(&mut self, show_transpile_preview: bool, ui: &Ui) {
-        ChildWindow::new(&format!("edit_block_view_{}", self.as_ref().hash_code()))
+        ChildWindow::new(&format!("edit_block_view_{}", self.block_name))
             .size([600.0, 420.0])
             .build(ui, || {
                 ui.group(|| {
                     for block_symbol in self.block_symbols.clone().iter() {
-                        ui.text(format!("Current {}:", block_symbol));
+                        ui.text(format!("{}:", block_symbol));
                         ui.separator();
                         self.edit_block(block_symbol, ui);
                         ui.new_line();
@@ -307,7 +307,7 @@ impl BlockContext {
 
         if let Some(mut transpiled) = self.transpile().ok() {
             ui.same_line();
-            ChildWindow::new(&format!("transpile_preview{}", self.as_ref().hash_code()))
+            ChildWindow::new(&format!("transpile_preview_{}", self.block_name))
                 .size([0.0, 420.0])
                 .build(ui, || {
                     if transpiled.is_empty() || !show_transpile_preview {
@@ -332,7 +332,7 @@ impl BlockContext {
     pub fn edit_block_tooltip_view(&mut self, show_transpile_preview: bool, ui: &Ui) {
         ui.group(|| {
             for block_symbol in self.block_symbols.clone().iter() {
-                ui.text(format!("Current {}:", block_symbol));
+                ui.text(format!("{}:", block_symbol));
                 self.edit_block(block_symbol, ui);
                 ui.new_line();
             }
@@ -360,8 +360,7 @@ impl BlockContext {
 
     pub fn edit_block_table_view(&mut self, ui: &Ui) {
         ui.group(|| {
-            let hash_code = self.as_ref().hash_code();
-            if let Some(token) = ui.tab_bar(format!("{}", hash_code)) {
+            if let Some(token) = ui.tab_bar(format!("{}_table_view_tab_bar", self.block_name)) {
                 for block_symbol in self.block_symbols.clone().iter() {
                     if let Some(token) = ui.tab_item(
                         format!("{} {}", self.block_name, block_symbol),
