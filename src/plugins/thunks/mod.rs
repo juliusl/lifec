@@ -63,7 +63,7 @@ impl AsMut<AttributeGraph> for ThunkContext {
 }
 
 impl ThunkContext {
-    /// Update error block
+    /// Updates error block
     pub fn error(&mut self, record: impl FnOnce(&mut AttributeGraph)) {
         self.0.update_block("error", record);
     }

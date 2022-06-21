@@ -6,6 +6,7 @@ use specs::{Component, Entities, System, ReadStorage, Join, Entity};
 use super::App;
 use crate::{Runtime, RuntimeState, plugins::{Project, Thunk, ThunkContext, BlockContext}};
 
+#[derive(Clone)]
 pub struct RuntimeEditor<S>
 where
     S: RuntimeState,

@@ -25,10 +25,16 @@ pub struct Process {
 
 impl Process {
     fn command(&self) -> Option<String> {
-        let command = self.block.as_ref().find_attr_value("command");
+        if let Some(form) = self.block.get_block("form") {
+            form.find_text("command")
+        } else {
+            None 
+        }
+    }
 
-        if let Some(Value::TextBuffer(command)) = command {
-            Some(command.to_string())
+    fn debug_out_enabled(&self) -> Option<bool> {
+        if let Some(form) = self.block.get_block("form") {
+            form.is_enabled("debug_out")
         } else {
             None
         }
@@ -53,7 +59,7 @@ impl Plugin<ThunkContext> for Process {
             if let Some(command) = process.command() {
                 match process.interpret_command(&command, Process::handle_output) {
                     Ok(output) => {
-                        if let Some(true) = process.as_ref().is_enabled("debug_out") {
+                        if let Some(true) = process.debug_out_enabled() {
                             println!("{:?}", &output.stdout.as_ref().and_then(|o| String::from_utf8(o.to_vec()).ok()));
                         }
                         

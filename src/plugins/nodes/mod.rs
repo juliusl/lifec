@@ -634,7 +634,7 @@ where
 
                                         match calls.insert(entity, Thunk::from_plugin::<P>()) {
                                             Ok(_) => {
-                                                println!("Added call for new node_context entity {:?}", entity);
+                                                println!("Added thunk for new node_context entity {:?}", entity);
                                             },
                                             Err(_) => {},
                                         }
