@@ -51,6 +51,14 @@ impl From<Attribute> for AttributeGraph {
 }
 
 impl AttributeGraph {
+    /// reads a value directly from the index by key
+    pub fn read_block_index(&self, block_id: u32, block_name: impl AsRef<str>, block_symbol: impl AsRef<str>, symbol: impl AsRef<str>) -> Option<(String, Value)> {
+        let key = format!("{:#010x}::{}::{}::{}", block_id, block_name.as_ref(), block_symbol.as_ref(), symbol.as_ref());
+
+        //"0x00000007::sh_test::event::from::"
+        self.index.get(&key).and_then(|a| a.transient.clone())
+    }
+
     /// returns the graph after attributes are committed
     pub fn commit(&self) -> AttributeGraph {
         let mut saving = self.clone();
@@ -764,6 +772,7 @@ impl AttributeGraph {
     ) -> Option<u32> {
         let symbol = format!("{}::", symbol_name.as_ref());
         let symbol_name = format!("{}::{}", with_name.as_ref(), symbol_name.as_ref());
+
         self.index
             .iter()
             .find_map(|(_, a)| {
@@ -1104,8 +1113,24 @@ impl AttributeGraph {
         }
     }
 
-    fn add_attribute(&mut self, attr: Attribute) {
-        self.index.insert(attr.to_string(), attr);
+    pub fn add_attribute(&mut self, attr: Attribute) {
+        if !attr.is_stable() {
+            if let Value::Symbol(symbol) = attr.value() {
+                let parts: Vec<&str> = symbol.split("::").collect();
+                if let Some(first_part) = parts.get(0) {
+                    let key = attr.to_string().replace(&format!("{}::", first_part), &symbol);
+                    self.index.insert(key, attr);
+                } else {
+                    eprintln!("symbol value was empty");
+                }
+            } else {
+                eprintln!("transient attribute is not symbol, committing first");
+                //attr.commit();
+                self.index.insert(attr.to_string(), attr);
+            }
+        } else {
+            self.index.insert(attr.to_string(), attr);
+        }
     }
 
     fn update(&mut self, func: impl FnOnce(&mut Self)) -> &mut Self {
@@ -1711,7 +1736,7 @@ fn test_attribute_graph_block_dispatcher() {
     }
 
     let check_from = graph.clone().find_block("demo4", "node3").expect("exists");
-    println!("{:?}", check_from);
+    println!("{:#?}", check_from);
 
     let check_from = check_from
         .find_attr("demo_node_title")
@@ -1726,8 +1751,8 @@ fn test_attribute_graph_block_dispatcher() {
     );
 
     let check_to = graph.clone().find_block("demo4", "node").expect("exists");
-    println!("{:?}", check_to);
-    println!("{:?}", check_to.find_symbol_values("link"));
+    println!("{:#?}", check_to);
+    println!("{:#?}", check_to.find_symbol_values("link"));
 
     let check_to = check_to
         .find_attr("demo_node_title")
@@ -1742,7 +1767,7 @@ fn test_attribute_graph_block_dispatcher() {
     );
 
     let check_from_other = graph.clone().find_block("demo4", "window").expect("exists");
-    println!("{:?}", check_from_other);
+    println!("{:#?}", check_from_other);
 
     let check_from_other = check_from_other.find_attr_value("demo_node_title");
     assert_eq!(
@@ -1751,9 +1776,9 @@ fn test_attribute_graph_block_dispatcher() {
     );
 
     for demo4_block in graph.find_blocks_for("demo4") {
-        println!("{:?}", demo4_block.find_text("block_name"));
-        println!("{:?}", demo4_block.find_text("block_symbol"));
-        println!("{:?}", demo4_block);
+        println!("{:#?}", demo4_block.find_text("block_name"));
+        println!("{:#?}", demo4_block.find_text("block_symbol"));
+        println!("{:#?}", demo4_block);
     }
 }
 
