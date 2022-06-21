@@ -384,7 +384,7 @@ impl Extension for Node {
                 let outer_scope = editor(&mut self.editor_context, |mut editor_scope| {
                     editor_scope.add_mini_map(imnodes::MiniMapLocation::BottomRight);
 
-                    for (node_id, mut context) in self.contexts.iter_mut() {
+                    for (node_id, context) in self.contexts.iter_mut() {
                         let thunk = self.thunk.get(&node_id).and_then(|t| Some(t.to_owned()));
                         let edit = self.edit.get(&node_id).and_then(|e| Some(e.to_owned()));
                         let display = self.display.get(&node_id).and_then(|d| Some(d.to_owned()));
