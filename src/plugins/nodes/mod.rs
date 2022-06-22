@@ -177,8 +177,8 @@ impl Node {
     pub fn reverse_lookup_blocks(&self, link: &Link) -> Option<(BlockContext, BlockContext)> {
         self.reverse_lookup(link).and_then(|(from, to)| {
             Some((
-                BlockContext::from(from.as_ref().clone()),
-                BlockContext::from(to.as_ref().clone()),
+                from.block.clone(),
+                to.block.clone(),
             ))
         })
     }
@@ -188,10 +188,8 @@ impl Node {
     pub fn connect(&mut self, link: &Link) {
         if let Some((from, to)) = &self.reverse_lookup(link) {
             if let Some(to_node_id) = to.node_id {
-                let from = from.as_ref().clone();
-                let from = BlockContext::from(from);
-                let to = to.as_ref().clone();
-                let mut to = BlockContext::from(to);
+                let from = from.block.clone();
+                let mut to = to.block.clone();
 
                 if let Some(publish) = from.get_block("publish") {
                     to.update_block("accept", |accepting| {
@@ -205,7 +203,13 @@ impl Node {
                     });
 
                     if let Some(to_update) = self.contexts.get_mut(&to_node_id) {
-                        to_update.as_mut().merge(to.as_ref());
+                        if let Some(message) = to.transpile_block("accept").ok() {
+                            if to_update.block.update_block("accept", |accept| {
+                                accept.add_event("connect", message);
+                            }) {
+                                to_update.block.resolve_events();
+                            }
+                        }
                     }
                 }
             }
@@ -216,14 +220,11 @@ impl Node {
     pub fn disconnect(&mut self, link: &Link) {
         if let Some((from, to)) = &self.reverse_lookup(link) {
             if let Some(to_node_id) = to.node_id {
-                let from = from.as_ref().clone();
-                let from = BlockContext::from(from);
-                let to = to.as_ref().clone();
-                let to = BlockContext::from(to);
+                let from = from.block.clone();
+                let to = to.block.clone();
 
                 let mut disconnect = format!(" ``` {} accept\n", to.block_name);
-
-                if let (Some(publish), Some(mut accept)) =
+                if let (Some(publish), Some(_)) =
                     (from.get_block("publish"), to.get_block("accept"))
                 {
                     if let Some(to_update) = self.contexts.get_mut(&to_node_id) {
@@ -239,16 +240,12 @@ impl Node {
                                 }
                             }
                         }
-
                         match writeln!(disconnect, "```") {
                             Ok(_) => {},
                             Err(_) => {},
                         }
-
-                        accept.as_mut().add_event("disconnect", disconnect);
-
                         if to_update.block.update_block("accept", |a| {
-                            a.merge(&accept);
+                            a.add_event("disconnect", disconnect)
                         }) {
                             to_update.block.resolve_events();
                         }
@@ -593,17 +590,13 @@ where
 
         if let Some(thunk) = thunk {
             if graph.find_block("", "thunk").is_some() {
-                ui.new_line();        
-                let label = format!("call {} {}", P::symbol(), graph.entity());
-                if ui.button(label) {
-                    let mut thunk_context = ThunkContext::from(graph.to_owned());
-                    thunk.call(&mut thunk_context);
-                    graph.merge(thunk_context.as_ref());
-                }
+                ui.new_line();
+                let mut thunk_context = ThunkContext::from(graph.to_owned());
+                thunk.show(&mut thunk_context, ui);
+                graph.merge(thunk_context.as_ref());
                 ui.new_line();
             }
         }
-
 
         let mut block_context = BlockContext::from(graph.clone());
         block_context.edit_block("publish", ui);

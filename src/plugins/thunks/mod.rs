@@ -1,5 +1,6 @@
 use crate::AttributeGraph;
 use atlier::system::Attribute;
+use imgui::Ui;
 use specs::storage::DenseVecStorage;
 use specs::Component;
 
@@ -41,6 +42,13 @@ impl Thunk {
         block.update_block("thunk", |t| {
             t.add_text_attr("thunk_symbol", self.symbol().as_ref().to_string());
         });
+    }
+
+    pub fn show(&self, context: &mut ThunkContext, ui: &Ui) {
+        ui.set_next_item_width(130.0);
+        if ui.button(context.label(self.0)) {
+            self.call(context);
+        }
     }
 }
 
@@ -101,5 +109,9 @@ impl ThunkContext {
                 });
             }
         }
+    }
+
+    pub fn label(&self, label: impl AsRef<str>) -> impl AsRef<str> {
+        format!("{} {:#2x}", label.as_ref(), self.as_ref().hash_code() as u16 )
     }
 }

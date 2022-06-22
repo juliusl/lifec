@@ -206,21 +206,32 @@ impl BlockContext {
         let mut src = String::new();
 
         for symbol in self.block_symbols.iter() {
-            writeln!(src, "``` {} {}", self.block_name, symbol)?;
-            if let Some(block) = self.get_block(symbol) {
-                for attr in block.iter_attributes() {
-                    if attr.name().starts_with("block_") {
-                        continue;
-                    }
+            match self.transpile_block(symbol) {
+                Ok(block_runmd) => {
+                    writeln!(src, "{}", block_runmd)?;
+                },
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(src)
+    }
 
-                    if attr.is_stable() {
-                        Self::transpile_value(&mut src, "add", attr.name(), attr.value())?;
-                    }
+    pub fn transpile_block(&self, block_symbol: impl AsRef<str>) -> Result<String, Error> {
+        let mut src = String::new();
+        writeln!(src, "``` {} {}", self.block_name, block_symbol.as_ref())?;
+        if let Some(block) = self.get_block(block_symbol) {
+            for attr in block.iter_attributes() {
+                if attr.name().starts_with("block_") {
+                    continue;
+                }
+
+                if attr.is_stable() {
+                    Self::transpile_value(&mut src, "add", attr.name(), attr.value())?;
                 }
             }
-            writeln!(src, "```")?;
-            writeln!(src, "")?;
         }
+        writeln!(src, "```")?;
+        writeln!(src, "")?;
         Ok(src)
     }
 
