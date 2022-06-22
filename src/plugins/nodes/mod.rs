@@ -204,11 +204,8 @@ impl Node {
 
                     if let Some(to_update) = self.contexts.get_mut(&to_node_id) {
                         if let Some(message) = to.transpile_block("accept").ok() {
-                            if to_update.block.update_block("accept", |accept| {
-                                accept.add_event("connect", message);
-                            }) {
-                                to_update.block.resolve_events();
-                            }
+                            to_update.as_mut().add_event("connect", message);
+                            to_update.as_mut().apply_events();
                         }
                     }
                 }
@@ -244,11 +241,9 @@ impl Node {
                             Ok(_) => {},
                             Err(_) => {},
                         }
-                        if to_update.block.update_block("accept", |a| {
-                            a.add_event("disconnect", disconnect)
-                        }) {
-                            to_update.block.resolve_events();
-                        }
+                       
+                        to_update.as_mut().add_event("disconnect", disconnect);
+                        to_update.as_mut().apply_events();
                     }
                 }
             }
