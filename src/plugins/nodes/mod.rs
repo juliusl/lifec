@@ -1,4 +1,4 @@
-use super::block::{Project, self};
+use super::block::Project;
 use super::{
     BlockContext, Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles, Thunk,
 };

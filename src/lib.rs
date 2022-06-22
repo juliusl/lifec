@@ -3,7 +3,7 @@ use logos::Logos;
 use parser::Lifecycle;
 use std::any::Any;
 use std::collections::BTreeMap;
-use std::fmt::{Debug, Display, Write};
+use std::fmt::{Debug, Display};
 
 pub mod editor;
 pub mod plugins;

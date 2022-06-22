@@ -1,6 +1,5 @@
 use super::BlockContext;
 use crate::state::AttributeGraph;
-use crate::RuntimeDispatcher;
 use atlier::system::Value;
 use imgui::Ui;
 use specs::storage::HashMapStorage;
@@ -31,17 +30,6 @@ impl Project {
         } else {
             None
         }
-    }
-
-    pub fn read_index(
-        &self,
-        block_name: impl AsRef<str>,
-        block_symbol: impl AsRef<str>,
-        symbol: impl AsRef<str>,
-    ) -> Option<(String, Value)> {
-        self.block_index
-            .get(block_name.as_ref())
-            .and_then(|block| block.read_index(block_symbol, symbol))
     }
 
     pub fn replace_block(&mut self, mut block_context: BlockContext) -> bool {
@@ -191,7 +179,7 @@ impl AsMut<AttributeGraph> for Project {
 }
 
 #[test]
-fn test_read_index() {
+fn test_send_event() {
     use crate::RuntimeDispatcher;
 
     let test = r#"
@@ -250,14 +238,8 @@ fn test_read_index() {
         ```
         "#;
 
-            if let Some(block) = graph.find_block_mut("println_settings") {
-                block.update_block("accept", |accept| {
-                    accept.add_event("disconnect", message);
-                });
-                block.resolve_events();
-            } else {
-                assert!(false, "should have added event");
-            }
+            graph.as_mut().add_event("disconnect", message);
+            graph.as_mut().apply_events();
 
             if let Some(accept) = graph.find_block_mut("println_settings") {
                 println!("{:#?}", accept.as_ref());

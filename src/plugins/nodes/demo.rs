@@ -1,7 +1,6 @@
 use atlier::system::Extension;
-use specs::{Builder, WorldExt};
-
-use crate::plugins::{Node, Plugin, Edit, Display, ThunkContext, WriteFiles, demos::WriteFilesDemo, Project};
+use specs::WorldExt;
+use crate::plugins::{Node, Edit, ThunkContext, WriteFiles, demos::WriteFilesDemo};
 
 /// Starts a demo of the node editor
 pub struct NodeDemo(Node);

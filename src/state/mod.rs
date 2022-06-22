@@ -8,7 +8,6 @@ use specs::{storage::HashMapStorage, Component, Entity};
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     fmt::Display,
-    fmt::Write,
     fs,
     hash::{Hash, Hasher},
     str::from_utf8,
@@ -57,26 +56,7 @@ impl From<Attribute> for AttributeGraph {
 }
 
 impl AttributeGraph {
-    /// reads a value directly from the index by key
-    pub fn read_block_index(
-        &self,
-        block_id: u32,
-        block_name: impl AsRef<str>,
-        block_symbol: impl AsRef<str>,
-        symbol: impl AsRef<str>,
-    ) -> Option<(String, Value)> {
-        let key = format!(
-            "{:#010x}::{}::{}::{}",
-            block_id,
-            block_name.as_ref(),
-            block_symbol.as_ref(),
-            symbol.as_ref()
-        );
-
-        // 0x00000007::test::event::from
-        self.index.get(&key).and_then(|a| a.transient.clone())
-    }
-
+    /// writes a binary vector to a path
     pub fn write_file(&self, path: impl AsRef<str>, attr_name: impl AsRef<str>) {
         if let Some(Value::BinaryVector(contents)) = self.find_attr_value(attr_name) {
             match fs::write(path.as_ref(), contents) {
@@ -1811,13 +1791,15 @@ fn test_attribute_graph_block_dispatcher() {
 
     let check_from = check_from
         .find_attr("demo_node_title")
-        .expect("exists")
-        .transient();
+        .expect("exists");
+
+    let check_from = (check_from.name().to_string(), check_from.value().clone());
+    
     assert_eq!(
-        Some(&(
+        (
             "demo_node_title".to_string(),
             Value::TextBuffer("hello demo node".to_string())
-        )),
+        ),
         check_from
     );
 

@@ -27,49 +27,6 @@ pub struct BlockContext {
 }
 
 impl BlockContext {
-    /// creates an index entry for block_symbol
-    pub fn write_index(
-        &mut self,
-        block_symbol: impl AsRef<str>,
-        symbol: impl AsRef<str>,
-        index_name: impl AsRef<str>,
-        index_value: Value,
-    ) -> bool {
-        let block_name = self.block_name.to_string();
-        let to_index = (index_name.as_ref().to_string(), index_value.clone());
-
-        self.update_block(block_symbol.as_ref(), |updating| {
-            let index_entry = updating.define(&block_name, &block_symbol);
-            let mut index_entry = index_entry.to_owned();
-            index_entry.edit_as(Value::Symbol(format!(
-                "{}::{}",
-                block_symbol.as_ref(),
-                symbol.as_ref()
-            )));
-            index_entry.commit();
-            index_entry.edit(to_index.clone());
-            updating.add_attribute(index_entry);
-        })
-    }
-
-    /// reads the index directly for a string/value pair by block_symbol/symbol pair
-    pub fn read_index(
-        &self,
-        block_symbol: impl AsRef<str>,
-        symbol: impl AsRef<str>,
-    ) -> Option<(String, Value)> {
-        if let Some(block) = self.get_block(&block_symbol) {
-            block.read_block_index(
-                block.entity(),
-                &self.block_name,
-                block_symbol.as_ref(),
-                symbol,
-            )
-        } else {
-            None
-        }
-    }
-
     pub fn transpile_blocks(blocks: Vec<(String, BlockContext)>) -> Result<String, Error> {
         let mut output = String::new();
 
@@ -570,15 +527,6 @@ add debug_out .BOOL true
     println!("{:#?}", test_graph);
 
     let mut sh_test = BlockContext::root_context(&test_graph, "sh_test");
-
-    assert!(sh_test.write_index("event", "from", "test::publish", Value::Empty));
-    println!("{:#?}", sh_test.get_block("event"));
-
-    if let Some((name, Value::Empty)) = sh_test.read_index("event", "from") {
-        assert_eq!(name, "test::publish".to_string());
-    } else {
-        assert!(false, "should exist")
-    }
 
     let sh_test_command = sh_test
         .get_block("form")
