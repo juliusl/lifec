@@ -108,28 +108,22 @@ impl AttributeGraph {
 
     /// returns the graph after attributes are committed
     pub fn apply_events(&mut self) {
-        let mut messages = String::default();
+        for (name, value) in self.take_symbol_values("event") {
+            println!("Event {}", name);
+            if let Value::BinaryVector(content) = value {
+                if let Some(content) = from_utf8(&content).ok() {
+                    println!("Applying\n{}", content);
 
-        for symbol in self.find_symbols_mut("event") {
-            if let Some((event_name, Value::BinaryVector(msg))) = symbol.take_transient() {
-                match from_utf8(&msg) {
-                    Ok(message) => match writeln!(messages, "{}", message) {
+                    match self.batch_mut(content) {
                         Ok(_) => {
-                            println!("Event {} found", event_name);
-                        }
-                        Err(_) => {}
-                    },
-                    Err(_) => {}
+                            println!("Applied event {}", name);
+                            self.find_remove(name);
+                        },
+                        Err(_) => {
+                            eprintln!("could not apply events");
+                        },
+                    }
                 }
-            }
-        }
-
-        match self.batch_mut(messages) {
-            Ok(_) => {
-                println!("applied events");
-            }
-            Err(err) => {
-                eprintln!("Error parsing messages {:?}", err);
             }
         }
     }

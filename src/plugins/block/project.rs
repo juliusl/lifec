@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::str::from_utf8;
 
-#[derive(Default, Component, Clone)]
+#[derive(Debug, Default, Component, Clone)]
 #[storage(HashMapStorage)]
 pub struct Project {
     source: AttributeGraph,
@@ -18,6 +18,10 @@ pub struct Project {
 }
 
 impl Project {
+    pub fn reload_source(&self) -> Self {
+        Project::from(self.as_ref().clone())
+    }
+
     pub fn load_file(path: impl AsRef<str>) -> Option<Project> {
         if let Some(source) = AttributeGraph::load_from_file(&path) {
             let path = format!("{}.journal", path.as_ref());

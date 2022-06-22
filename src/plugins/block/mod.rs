@@ -605,3 +605,37 @@ add debug_out .BOOL true
         Err(_) => todo!(),
     }
 }
+
+#[test]
+fn test_event() {
+    let mut sh_test = AttributeGraph::from(0);
+    let sh_test_test = r#"
+    ``` sh_test publish
+    add called .BOOL true
+    add code .INT 0
+    add command .TEXT sh ./test.sh
+    add elapsed .TEXT 2 ms
+    add stderr .BINARY_VECTOR 
+    add stdout .BINARY_VECTOR SGVsbG8gV29ybGQK
+    add timestamp_local .TEXT 2022-06-20 19:50:07.782710 -07:00
+    add timestamp_utc .TEXT 2022-06-21 02:50:07.782701 UTC
+    ```
+    "#;
+    assert!(sh_test.batch_mut(sh_test_test).is_ok());
+
+    let mut sh_test = Project::from(sh_test);
+    sh_test.as_mut().add_event("connect", r#"
+    ``` println accept
+    from sh_test publish command
+    ```
+    "#);
+    sh_test.as_mut().apply_events();
+
+    // reload changes from source
+    let mut sh_test = sh_test.reload_source();
+    let command = sh_test.find_block_mut("println")
+        .and_then(|println| println.get_block("accept"))
+        .and_then(|a| a.find_text("command"));
+
+    assert_eq!(Some("sh ./test.sh".to_string()), command);
+}
