@@ -1,33 +1,51 @@
+use super::BlockContext;
+use crate::state::AttributeGraph;
+use crate::RuntimeDispatcher;
+use atlier::system::Value;
+use imgui::Ui;
+use specs::storage::HashMapStorage;
+use specs::Component;
 use std::collections::btree_map::IterMut;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use atlier::system::Value;
-use imgui::Ui;
-use specs::Component;
-use specs::storage::HashMapStorage;
-use crate::state::AttributeGraph;
-use super::BlockContext;
+use std::str::from_utf8;
 
 #[derive(Default, Component, Clone)]
 #[storage(HashMapStorage)]
 pub struct Project {
     source: AttributeGraph,
-    block_index: BTreeMap<String, BlockContext>
+    block_index: BTreeMap<String, BlockContext>,
 }
 
 impl Project {
     pub fn load_file(path: impl AsRef<str>) -> Option<Project> {
-        if let Some(source) = AttributeGraph::load_from_file(path) {
+        if let Some(source) = AttributeGraph::load_from_file(&path) {
+            let path = format!("{}.journal", path.as_ref());
+            source.write_file(path, "journal");
+
             Some(Self::from(source))
         } else {
             None
         }
     }
 
-    pub fn read_index(&self, block_name: impl AsRef<str>, block_symbol: impl AsRef<str>, symbol: impl AsRef<str>) -> Option<(String, Value)> {
+    pub fn read_index(
+        &self,
+        block_name: impl AsRef<str>,
+        block_symbol: impl AsRef<str>,
+        symbol: impl AsRef<str>,
+    ) -> Option<(String, Value)> {
         self.block_index
             .get(block_name.as_ref())
             .and_then(|block| block.read_index(block_symbol, symbol))
+    }
+
+    pub fn replace_block(&mut self, mut block_context: BlockContext) -> bool {
+        let block_name = block_context.block_name.to_string();
+
+        block_context.as_mut().with_bool("project_selected", false);
+
+        self.block_index.insert(block_name, block_context).is_some()
     }
 
     pub fn find_block_mut(&mut self, block_name: impl AsRef<str>) -> Option<&mut BlockContext> {
@@ -40,14 +58,18 @@ impl Project {
     }
 
     /// returns a filtered vectored of selected blocks
-    pub fn select_blocks(&mut self, select: impl Fn(&String, &BlockContext) -> bool) -> Vec<(String, BlockContext)> {
-        self.block_index.iter()
+    pub fn select_blocks(
+        &mut self,
+        select: impl Fn(&String, &BlockContext) -> bool,
+    ) -> Vec<(String, BlockContext)> {
+        self.block_index
+            .iter()
             .filter(|(name, block)| select(name, block))
             .map(|(n, b)| (n.to_string(), b.clone()))
             .collect()
     }
 
-    /// shows the project menu 
+    /// shows the project menu
     pub fn edit_project_menu(&mut self, ui: &Ui) {
         self.source.edit_attr_menu(ui);
 
@@ -55,14 +77,13 @@ impl Project {
             block.edit_menu(ui);
         }
 
-        ui.menu("File", ||{
+        ui.menu("File", || {
             if let Some(token) = ui.begin_menu("Export") {
                 self.export_blocks_view(ui);
                 token.end();
             }
 
             if let Some(token) = ui.begin_menu("Import") {
-
                 token.end();
             }
             ui.separator();
@@ -72,28 +93,42 @@ impl Project {
     /// shows export block view
     pub fn export_blocks_view(&mut self, ui: &Ui) {
         for (block_name, block) in self.iter_block_mut() {
-            block.as_mut().edit_attr(format!("Select {}", block_name), "project_selected", ui);
+            block
+                .as_mut()
+                .edit_attr(format!("Select {}", block_name), "project_selected", ui);
             if ui.is_item_hovered() {
-                ui.tooltip(||{
+                ui.tooltip(|| {
                     ui.text("Preview:");
-                    ui.disabled(true, ||{
+                    ui.disabled(true, || {
                         block.as_mut().edit_form_block(ui);
+
+                        if let Some(Value::BinaryVector(journal)) =
+                            block.as_ref().find_attr_value("journal")
+                        {
+                            if let Some(journal) = from_utf8(journal).ok() {
+                                ui.text_wrapped(journal);
+                            }
+                        }
                     });
                 });
             }
         }
 
         let selected = self.select_blocks(|_, context| {
-            context.as_ref().is_enabled("project_selected").unwrap_or_default()
+            context
+                .as_ref()
+                .is_enabled("project_selected")
+                .unwrap_or_default()
         });
 
         if ui.button("Export selected") {
             if let Some(content) = BlockContext::transpile_blocks(selected).ok() {
-                match fs::write(format!("{}-exported.runmd", self.source.hash_code()), content) {
-                    Ok(_) => {
-                    },
-                    Err(_) => {
-                    },
+                match fs::write(
+                    format!("{}-exported.runmd", self.source.hash_code()),
+                    content,
+                ) {
+                    Ok(_) => {}
+                    Err(_) => {}
                 }
             }
         }
@@ -156,51 +191,74 @@ fn test_read_index() {
     use crate::RuntimeDispatcher;
 
     let test = r#"
-``` sh_test form
-add command .TEXT sh ./test.sh
-add debug_out .BOOL true
-```
+    ``` sh_test form
+    add command .TEXT sh ./test.sh
+    add debug_out .BOOL true
+    ```
 
-``` sh_test node
-add debug .BOOL true
-add input_label .TEXT accept
-add node_title .TEXT sh_test
-add output_label .TEXT publish
-```
+    ``` sh_test node
+    add debug .BOOL true
+    add input_label .TEXT accept
+    add node_title .TEXT sh_test
+    add output_label .TEXT publish
+    ```
 
-``` sh_test publish
-add called .BOOL true
-add code .INT 0
-add command .TEXT sh ./test.sh
-add elapsed .TEXT 2 ms
-add stderr .BINARY_VECTOR 
-add stdout .BINARY_VECTOR SGVsbG8gV29ybGQK
-add timestamp_local .TEXT 2022-06-20 19:50:07.782710 -07:00
-add timestamp_utc .TEXT 2022-06-21 02:50:07.782701 UTC
-```
+    ``` sh_test publish
+    add called .BOOL true
+    add code .INT 0
+    add command .TEXT sh ./test.sh
+    add elapsed .TEXT 2 ms
+    add stderr .BINARY_VECTOR 
+    add stdout .BINARY_VECTOR SGVsbG8gV29ybGQK
+    add timestamp_local .TEXT 2022-06-20 19:50:07.782710 -07:00
+    add timestamp_utc .TEXT 2022-06-21 02:50:07.782701 UTC
+    ```
 
-``` sh_test thunk
-add thunk_symbol .TEXT process
-``` 
+    ``` sh_test thunk
+    add thunk_symbol .TEXT process
+    ``` 
+
+    ``` println_settings accept
+    from sh_test publish called
+    from sh_test publish code 
+    from sh_test publish command
+    from sh_test publish elapsed
+    from sh_test publish stderr
+    from sh_test publish stdout
+    from sh_test publish timestamp_local
+    from sh_test publish timestamp_utc
+    ```
     "#;
 
-   match AttributeGraph::from(0).batch(test) {
-    Ok(graph) => {
-        let mut graph = Project::from(graph);
+    match AttributeGraph::from(0).batch(test) {
+        Ok(graph) => {
+            let mut graph = Project::from(graph);
 
-        if let Some(block) = graph.find_block_mut("sh_test") {
-            block.add_block("event", |_| {});
-            assert!(block.write_index("event", "from", "block_name", Value::Empty));
-        } else {
-            assert!(false, "should write index");
-        }
+            let message = r#"
+        ``` println_settings accept
+        find_remove called
+        find_remove code
+        find_remove stdout
+        find_remove stderr
+        find_remove elapsed
+        find_remove timestamp_utc
+        find_remove timestamp_local
+        ```
+        "#;
 
-        if let Some((_, value)) = graph.read_index("sh_test", "event", "from") {
-            assert_eq!(value, Value::Empty);
-        } else {
-            assert!(false, "should read index");
+            if let Some(block) = graph.find_block_mut("println_settings") {
+                block.update_block("accept", |accept| {
+                    accept.add_event("disconnect", message);
+                });
+                block.resolve_events();
+            } else {
+                assert!(false, "should have added event");
+            }
+
+            if let Some(accept) = graph.find_block_mut("println_settings") {
+                println!("{:#?}", accept.as_ref());
+            }
         }
-    },
-    Err(_) => assert!(false, "should be able to dispatch test"),
-}
+        Err(_) => assert!(false, "should be able to dispatch test"),
+    }
 }

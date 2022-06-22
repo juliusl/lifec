@@ -3,7 +3,7 @@ use logos::Logos;
 use parser::Lifecycle;
 use std::any::Any;
 use std::collections::BTreeMap;
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug, Display, Write};
 
 pub mod editor;
 pub mod plugins;
@@ -51,7 +51,6 @@ where
         for message in msg.as_ref().trim().split("\n").map(|line| line.trim()).filter(|line| !line.is_empty()) {
             self.dispatch_mut(message)?;
         }
-    
         Ok(())
     }
 

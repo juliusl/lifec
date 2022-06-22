@@ -5,12 +5,13 @@ use transpile::Transpile;
 mod project;
 pub use project::Project;
 
-use crate::AttributeGraph;
+use crate::{AttributeGraph, RuntimeDispatcher};
 use atlier::system::{Attribute, Value};
 use imgui::{ChildWindow, MenuItem, Ui};
 use specs::storage::DenseVecStorage;
 use specs::Component;
 use std::fmt::Write;
+use std::str::from_utf8;
 use std::{collections::BTreeSet, fmt::Error};
 
 use super::Plugin;
@@ -20,18 +21,24 @@ use super::Plugin;
 #[storage(DenseVecStorage)]
 pub struct BlockContext {
     graph: AttributeGraph,
-    block_name: String,
+    pub block_name: String,
     block_symbols: BTreeSet<String>,
     max_block_id: u32,
 }
 
 impl BlockContext {
     /// creates an index entry for block_symbol
-    pub fn write_index(&mut self, block_symbol: impl AsRef<str>, symbol: impl AsRef<str>, index_name: impl AsRef<str>, index_value: Value) -> bool {
+    pub fn write_index(
+        &mut self,
+        block_symbol: impl AsRef<str>,
+        symbol: impl AsRef<str>,
+        index_name: impl AsRef<str>,
+        index_value: Value,
+    ) -> bool {
         let block_name = self.block_name.to_string();
         let to_index = (index_name.as_ref().to_string(), index_value.clone());
 
-        self.update_block(block_symbol.as_ref(), |updating|{
+        self.update_block(block_symbol.as_ref(), |updating| {
             let index_entry = updating.define(&block_name, &block_symbol);
             let mut index_entry = index_entry.to_owned();
             index_entry.edit_as(Value::Symbol(format!(
@@ -46,11 +53,20 @@ impl BlockContext {
     }
 
     /// reads the index directly for a string/value pair by block_symbol/symbol pair
-    pub fn read_index(&self, block_symbol: impl AsRef<str>, symbol: impl AsRef<str>) -> Option<(String, Value)> {
+    pub fn read_index(
+        &self,
+        block_symbol: impl AsRef<str>,
+        symbol: impl AsRef<str>,
+    ) -> Option<(String, Value)> {
         if let Some(block) = self.get_block(&block_symbol) {
-            block.read_block_index(block.entity(), &self.block_name, block_symbol.as_ref(), symbol)
+            block.read_block_index(
+                block.entity(),
+                &self.block_name,
+                block_symbol.as_ref(),
+                symbol,
+            )
         } else {
-            None 
+            None
         }
     }
 
@@ -84,6 +100,18 @@ impl BlockContext {
     /// returns the block name of the current context
     pub fn block_name(&self) -> Option<String> {
         self.as_ref().find_text("block_name")
+    }
+
+    pub fn has_pending_events(&self) -> bool {
+        let mut has_event = !self.graph.find_symbols("event").is_empty();
+
+        for symbol in self.block_symbols.iter() {
+            if let Some(graph) = self.get_block(symbol) {
+                has_event |= !graph.find_symbols("event").is_empty();
+            }
+        }
+
+        has_event
     }
 
     /// create a root context for a given block name from a source graph
@@ -128,6 +156,9 @@ impl BlockContext {
         update: impl FnOnce(&mut AttributeGraph),
     ) -> bool {
         if let Some(mut block) = self.get_block(block_symbol) {
+            for attr in block.iter_attributes() {
+                self.as_mut().remove(attr); 
+            }
             update(&mut block);
             self.as_mut().merge(&block);
             true
@@ -184,13 +215,6 @@ impl BlockContext {
 
                     if attr.is_stable() {
                         Self::transpile_value(&mut src, "add", attr.name(), attr.value())?;
-                    } else {
-                        if let Some((name, value)) = attr.transient() {
-                            if name != &format!("{}::{}", self.block_name, symbol) {
-                                write!(src, "edit")?;
-                                Self::transpile_value(&mut src, name, attr.name(), value)?;
-                            }
-                        }
                     }
                 }
             }
@@ -313,9 +337,50 @@ impl BlockContext {
                         self.edit_block_tooltip_view(true, ui);
                     });
                 }
+
+                if MenuItem::new(format!("Dump {}", self.block_name)).build(ui) {
+                    println!("{:#?}", self.as_ref());
+                }
+
+                if self.has_pending_events() {
+                    if MenuItem::new(format!("Apply events for {}", self.block_name)).build(ui) {
+                        self.resolve_events();
+                    }
+                }
                 token.end();
             }
             token.end();
+        }
+    }
+
+    /// resolve by applying and completing events
+    /// resolving at this scope, is valid for entity scoped events
+    pub fn resolve_events(&mut self) {
+        for block_symbol in self.block_symbols.clone().iter() {
+            if let Some(mut block) = self.get_block(block_symbol) {
+                for (name, value) in block.take_symbol_values("event") {
+                    println!("Event {}", name);
+                    if let Value::BinaryVector(content) = value {
+                        if let Some(content) = from_utf8(&content).ok() {
+                            println!("Applying\n{}", content);
+
+                            match self.as_mut().batch_mut(content) {
+                                Ok(_) => {
+                                    println!("Applied event {}", name);
+                                    if self.update_block(block_symbol, |block| {
+                                        block.find_remove(&name);
+                                    }) {
+                                        println!("Completing event {}", name);
+                                    }
+                                },
+                                Err(_) => {
+                                    eprintln!("could not apply events");
+                                },
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -390,16 +455,15 @@ impl BlockContext {
         ui.group(|| {
             if let Some(token) = ui.tab_bar(format!("{}_table_view_tab_bar", self.block_name)) {
                 for block_symbol in self.block_symbols.clone().iter() {
-                    if let Some(token) = ui.tab_item(
-                        format!("{} {}", self.block_name, block_symbol),
-                    ) {
+                    if let Some(token) =
+                        ui.tab_item(format!("{} {}", self.block_name, block_symbol))
+                    {
                         self.edit_block_table(block_symbol, ui);
                         token.end();
                     }
                 }
                 token.end();
             }
-            
         });
     }
 
@@ -468,6 +532,8 @@ fn test_block_context() {
     use crate::RuntimeDispatcher;
     let mut test_graph = AttributeGraph::from(0);
 
+    test_graph.with_text("journal", "".to_string());
+
     let test = r#"
 ``` cargo_help node
 add node_title .TEXT cargo_help
@@ -490,14 +556,11 @@ add debug_out .BOOL true
     "#;
     assert!(test_graph.batch_mut(test).is_ok());
 
+    println!("{:#?}", test_graph);
+
     let mut sh_test = BlockContext::root_context(&test_graph, "sh_test");
 
-    assert!(sh_test.write_index(
-        "event", 
-        "from", 
-        "test::publish", 
-        Value::Empty
-    ));
+    assert!(sh_test.write_index("event", "from", "test::publish", Value::Empty));
     println!("{:#?}", sh_test.get_block("event"));
 
     if let Some((name, Value::Empty)) = sh_test.read_index("event", "from") {
@@ -530,6 +593,4 @@ add debug_out .BOOL true
         }
         Err(_) => todo!(),
     }
-
-
 }

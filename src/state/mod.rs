@@ -4,15 +4,14 @@ use imgui::TableFlags;
 use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
-use specs::{
-    storage::HashMapStorage,
-    Component, Entity,
-};
+use specs::{storage::HashMapStorage, Component, Entity};
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     fmt::Display,
+    fmt::Write,
     fs,
     hash::{Hash, Hasher},
+    str::from_utf8,
 };
 
 /// Attribute graph is a component that indexes attributes for an entity
@@ -29,7 +28,11 @@ impl TryInto<Attribute> for AttributeGraph {
 
     fn try_into(self) -> Result<Attribute, Self::Error> {
         if let Some(saved) = self.save() {
-            Ok(Attribute::new(self.entity, format!("{}.graph", self.hash_code()), Value::BinaryVector(saved.as_bytes().to_vec())))
+            Ok(Attribute::new(
+                self.entity,
+                format!("{}.graph", self.hash_code()),
+                Value::BinaryVector(saved.as_bytes().to_vec()),
+            ))
         } else {
             Err(())
         }
@@ -45,20 +48,50 @@ impl From<Attribute> for AttributeGraph {
             println!("{}", graph.save().expect("exists"));
             return graph;
         }
-        eprintln!("could not load attribute: {:?}, returning empty graph", attr);
-        graph 
+        eprintln!(
+            "could not load attribute: {:?}, returning empty graph",
+            attr
+        );
+        graph
     }
 }
 
 impl AttributeGraph {
     /// reads a value directly from the index by key
-    pub fn read_block_index(&self, block_id: u32, block_name: impl AsRef<str>, block_symbol: impl AsRef<str>, symbol: impl AsRef<str>) -> Option<(String, Value)> {
-        let key = format!("{:#010x}::{}::{}::{}", block_id, block_name.as_ref(), block_symbol.as_ref(), symbol.as_ref());
+    pub fn read_block_index(
+        &self,
+        block_id: u32,
+        block_name: impl AsRef<str>,
+        block_symbol: impl AsRef<str>,
+        symbol: impl AsRef<str>,
+    ) -> Option<(String, Value)> {
+        let key = format!(
+            "{:#010x}::{}::{}::{}",
+            block_id,
+            block_name.as_ref(),
+            block_symbol.as_ref(),
+            symbol.as_ref()
+        );
 
         // 0x00000007::test::event::from
-        self.index
-            .get(&key)
-            .and_then(|a| a.transient.clone())
+        self.index.get(&key).and_then(|a| a.transient.clone())
+    }
+
+    pub fn write_file(&self, path: impl AsRef<str>, attr_name: impl AsRef<str>) {
+        if let Some(Value::BinaryVector(contents)) = self.find_attr_value(attr_name) {
+            match fs::write(path.as_ref(), contents) {
+                Ok(_) => {}
+                Err(err) => {
+                    eprintln!("file not written {}", err);
+                }
+            }
+        }
+    }
+
+    /// add event which will be applied when commit is called
+    pub fn add_event(&mut self, event_name: impl AsRef<str>, message: impl AsRef<str>) {
+        self.define(event_name.as_ref(), "event")
+            .edit_as(Value::BinaryVector(message.as_ref().as_bytes().to_vec()));
     }
 
     /// returns the graph after attributes are committed
@@ -69,7 +102,36 @@ impl AttributeGraph {
                 a.commit();
             });
         }
+        saving.apply_events();
         saving
+    }
+
+    /// returns the graph after attributes are committed
+    pub fn apply_events(&mut self) {
+        let mut messages = String::default();
+
+        for symbol in self.find_symbols_mut("event") {
+            if let Some((event_name, Value::BinaryVector(msg))) = symbol.take_transient() {
+                match from_utf8(&msg) {
+                    Ok(message) => match writeln!(messages, "{}", message) {
+                        Ok(_) => {
+                            println!("Event {} found", event_name);
+                        }
+                        Err(_) => {}
+                    },
+                    Err(_) => {}
+                }
+            }
+        }
+
+        match self.batch_mut(messages) {
+            Ok(_) => {
+                println!("applied events");
+            }
+            Err(err) => {
+                eprintln!("Error parsing messages {:?}", err);
+            }
+        }
     }
 
     /// commits each attribute and saves to attribute
@@ -166,7 +228,10 @@ impl AttributeGraph {
     pub fn edit_form_block(&self, ui: &imgui::Ui) -> Option<AttributeGraph> {
         if let Some(mut block) = self.find_block("", "form") {
             let hash_code = block.hash_code();
-            for attr in block.iter_mut_attributes().filter(|a| !a.name.starts_with("block_")) {
+            for attr in block
+                .iter_mut_attributes()
+                .filter(|a| !a.name.starts_with("block_"))
+            {
                 match attr.value() {
                     Value::Symbol(_) => {}
                     _ => attr.edit_value("", ui),
@@ -203,10 +268,10 @@ impl AttributeGraph {
         match self.find_attr_mut(&attr_name) {
             Some(attr) => {
                 attr.edit_value(label, ui);
-            },
+            }
             None => {
                 ui.text(format!("'{}' not found", &attr_name));
-            },
+            }
         }
     }
 
@@ -666,6 +731,15 @@ impl AttributeGraph {
             .collect()
     }
 
+    /// Takes all transient values
+    pub fn take_symbol_values(&mut self, with_symbol: impl AsRef<str>) -> Vec<(String, Value)> {
+        self.find_symbols_mut(with_symbol)
+            .iter_mut()
+            .filter_map(|a| a.take_transient())
+            .map(|a| a)
+            .collect()
+    }
+
     /// Finds a graph that has been imported by this graph.
     pub fn find_imported_graph(&self, id: u32) -> Option<Self> {
         let mut imported = Self::from(id);
@@ -741,7 +815,11 @@ impl AttributeGraph {
     }
 
     /// Finds a mut attribute by name that is owned by `self.entity`
-    pub fn find_imported_attr(&mut self, with_id: u32, with_name: impl AsRef<str>) -> Option<&mut Attribute> {
+    pub fn find_imported_attr(
+        &mut self,
+        with_id: u32,
+        with_name: impl AsRef<str>,
+    ) -> Option<&mut Attribute> {
         self.iter_mut_attributes()
             .filter(|attr| attr.id() == with_id)
             .find(|attr| attr.name() == with_name.as_ref())
@@ -874,7 +952,7 @@ impl AttributeGraph {
     }
 
     /// Returns self with a binary attribute w/ name
-    pub fn with_binary(&mut self, name: impl AsRef<str>, binary: impl Into<Vec<u8>>)-> &mut Self {
+    pub fn with_binary(&mut self, name: impl AsRef<str>, binary: impl Into<Vec<u8>>) -> &mut Self {
         self.with(name, Value::BinaryVector(binary.into()))
     }
 
@@ -1080,19 +1158,13 @@ impl AttributeGraph {
         block_symbol: impl AsRef<str>,
         attr_name: impl AsRef<str>,
     ) {
-        if let Some(block) = self.find_block(block_name, block_symbol) {
+        let mut root = self.clone();
+        root.entity = 0;
+
+        if let Some(block) = root.find_block(block_name, block_symbol) {
             if let Some(attr_value) = block.find_attr(&attr_name) {
-                if let Some((name, value)) = attr_value.transient() {
-                    if self
-                        .find_update_attr(name, |attr| attr.edit((name.to_string(), value.clone())))
-                    {
-                        let current = self.entity as i32;
-                        self.define(attr_name, "link")
-                            .edit_as(Value::IntPair(block.entity as i32, current));
-                    }
-                } else {
-                    // If there isn't a transient value currently, do we skip?, could mean it isn't being published?
-                }
+                let (name, value) = (attr_value.name(), attr_value.value());
+                self.with(name, value.clone());
             }
         }
     }
@@ -1120,14 +1192,14 @@ impl AttributeGraph {
             if let Value::Symbol(symbol) = attr.value() {
                 let parts: Vec<&str> = symbol.split("::").collect();
                 if let Some(first_part) = parts.get(0) {
-                    let key = attr.to_string().replace(&format!("{}::", first_part), &symbol);
+                    let key = attr
+                        .to_string()
+                        .replace(&format!("{}::", first_part), &symbol);
                     self.index.insert(key, attr);
                 } else {
                     eprintln!("symbol value was empty");
                 }
             } else {
-                eprintln!("transient attribute is not symbol, committing first");
-                //attr.commit();
                 self.index.insert(attr.to_string(), attr);
             }
         } else {
@@ -1337,17 +1409,14 @@ impl AttributeGraph {
             (
                 Some(AttributeGraphElements::Name(block_name)),
                 Some(AttributeGraphElements::Symbol(block_symbol)),
-            )|
-            (
+            )
+            | (
                 Some(AttributeGraphElements::Symbol(block_name)),
                 Some(AttributeGraphElements::Symbol(block_symbol)),
             ) => {
                 self.start_block_mode(block_name, block_symbol);
             }
-            (
-                Some(AttributeGraphElements::Symbol(block_symbol)),
-                _
-            ) => {
+            (Some(AttributeGraphElements::Symbol(block_symbol)), _) => {
                 if let Some(block_name) = self.find_text("block_name") {
                     self.start_block_mode(block_name, block_symbol);
                 }
@@ -1392,7 +1461,9 @@ impl AttributeGraph {
                     Ok(())
                 }
                 AttributeGraphElements::Entity(_) => todo!("value type unknown"),
-                AttributeGraphElements::Symbol(_) | AttributeGraphElements::Name(_) => todo!("unrecognized element"),
+                AttributeGraphElements::Symbol(_) | AttributeGraphElements::Name(_) => {
+                    todo!("unrecognized element")
+                }
                 AttributeGraphElements::Error => todo!("error parsing next value"),
             },
             (Some(AttributeGraphElements::Symbol(name)), Some(value), _) => match value {
@@ -1423,7 +1494,9 @@ impl AttributeGraph {
                     Ok(())
                 }
                 AttributeGraphElements::Entity(_) => todo!("value type unknown"),
-                AttributeGraphElements::Symbol(_) | AttributeGraphElements::Name(_) => todo!("unrecognized element"),
+                AttributeGraphElements::Symbol(_) | AttributeGraphElements::Name(_) => {
+                    todo!("unrecognized element")
+                }
                 AttributeGraphElements::Error => todo!("error parsing next value"),
             },
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
@@ -1504,8 +1577,9 @@ impl AttributeGraph {
                     Ok(())
                 }
                 AttributeGraphElements::Entity(_) => todo!("value type unknown"),
-                AttributeGraphElements::Symbol(_)
-                | AttributeGraphElements::Name(_)  => todo!("unrecognized element"),
+                AttributeGraphElements::Symbol(_) | AttributeGraphElements::Name(_) => {
+                    todo!("unrecognized element")
+                }
                 AttributeGraphElements::Error => todo!("error parsing next value"),
             },
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
@@ -1555,7 +1629,7 @@ impl AttributeGraph {
                     Err(AttributeGraphErrors::CannotImportEmptyAttribute)
                 }
                 AttributeGraphElements::Entity(_)
-                | AttributeGraphElements::Name(_) 
+                | AttributeGraphElements::Name(_)
                 | AttributeGraphElements::Symbol(_)
                 | AttributeGraphElements::Error => {
                     Err(AttributeGraphErrors::IncorrectMessageFormat)
@@ -1605,7 +1679,8 @@ impl AttributeGraph {
                 Some(AttributeGraphElements::Symbol(block_name)),
                 Some(AttributeGraphElements::Symbol(block_symbol)),
                 Some(AttributeGraphElements::Symbol(attr_name)),
-            ) |(
+            )
+            | (
                 Some(AttributeGraphElements::Name(block_name)),
                 Some(AttributeGraphElements::Symbol(block_symbol)),
                 Some(AttributeGraphElements::Symbol(attr_name)),
@@ -1841,7 +1916,7 @@ fn test_block_context() {
     println!("{:?}", attr);
 
     if let Some(attr) = attr {
-        let reloaded = AttributeGraph::from(attr); 
+        let reloaded = AttributeGraph::from(attr);
         assert_eq!(reloaded, commited_main_elm);
     }
 }
@@ -2159,7 +2234,7 @@ pub enum AttributeGraphElements {
     /// entity ids should be parsed before symbols
     #[regex("[0-9]+", priority = 3, callback = graph_lexer::from_entity)]
     Entity(u32),
-     /// symbols must start with a character, and is composed of lowercase characters, digits, underscores, and colons
+    /// symbols must start with a character, and is composed of lowercase characters, digits, underscores, and colons
     #[regex("#[A-Za-z_.0-9]+", graph_lexer::from_string)]
     Name(String),
     /// symbols must start with a character, and is composed of lowercase characters, digits, underscores, and colons
@@ -2189,7 +2264,7 @@ mod graph_lexer {
     pub fn from_string(lexer: &mut Lexer<AttributeGraphElements>) -> Option<String> {
         let mut slice = lexer.slice();
         if slice.starts_with('#') {
-            slice = &slice[1..]; 
+            slice = &slice[1..];
         }
 
         Some(slice.to_string())

@@ -1,4 +1,4 @@
-use super::block::Project;
+use super::block::{Project, self};
 use super::{
     BlockContext, Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles, Thunk,
 };
@@ -17,6 +17,7 @@ use specs::{
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::time::{Duration, Instant};
+use std::fmt::Write;
 
 pub mod demo;
 
@@ -24,8 +25,8 @@ pub mod demo;
 #[derive(Component, Clone, Default, Hash, PartialEq)]
 #[storage(DenseVecStorage)]
 pub struct NodeContext {
-    entity: Option<Entity>, 
     block: BlockContext,
+    entity: Option<Entity>, 
     node_id: Option<NodeId>,
     attribute_id: Option<AttributeId>,
     input_pin_id: Option<InputPinId>,
@@ -35,6 +36,10 @@ pub struct NodeContext {
 impl Eq for NodeContext {}
 
 impl NodeContext {
+    pub fn update_block(&mut self) {
+        
+    }
+
     pub fn node_pos(&self) -> Option<(&f32, &f32)> {
         self.as_ref()
             .find_attr_value("node_pos")
@@ -216,17 +221,36 @@ impl Node {
                 let to = to.as_ref().clone();
                 let to = BlockContext::from(to);
 
-                if let (Some(publish), Some(accept)) =
+                let mut disconnect = format!(" ``` {} accept\n", to.block_name);
+
+                if let (Some(publish), Some(mut accept)) =
                     (from.get_block("publish"), to.get_block("accept"))
                 {
                     if let Some(to_update) = self.contexts.get_mut(&to_node_id) {
-                        for mut attr in publish
+                        for attr in publish
                             .iter_attributes()
                             .filter(|a| !a.name().starts_with("block_"))
                             .cloned()
                         {
-                            attr.set_id(accept.entity());
-                            to_update.as_mut().remove(&attr);
+                            match writeln!(disconnect, "find_remove {}", attr.name()) {
+                                Ok(()) => {
+                                }, 
+                                Err(_) => {
+                                }
+                            }
+                        }
+
+                        match writeln!(disconnect, "```") {
+                            Ok(_) => {},
+                            Err(_) => {},
+                        }
+
+                        accept.as_mut().add_event("disconnect", disconnect);
+
+                        if to_update.block.update_block("accept", |a| {
+                            a.merge(&accept);
+                        }) {
+                            to_update.block.resolve_events();
                         }
                     }
                 }
@@ -500,22 +524,12 @@ impl<'a> System<'a> for Node {
 
     fn run(&mut self, (mut contexts, mut blocks, thunks, edit_node, display_node): Self::SystemData) {
         for (_, node_context) in self.contexts.iter() {
-            let block_name = node_context.block.block_name().unwrap_or_default();
-            if let Some(block_context) = self.source.find_block_mut(block_name) {
-                block_context.replace_block(&node_context.block, "accept");
-                block_context.replace_block(&node_context.block, "form");
-                block_context.replace_block(&node_context.block, "thunk");
-                block_context.replace_block(&node_context.block, "publish");
-
-                if let Some(entity) = node_context.entity {
-                    match blocks.insert(entity, block_context.clone()) {
-                        Ok(_) => {
-    
-                        },
-                        Err(_) => {
-    
-                        },
-                    }
+            self.source.replace_block(node_context.block.to_owned());
+        
+            if let Some(entity) = node_context.entity {
+                match blocks.insert(entity, node_context.block.to_owned()) {
+                    Ok(_) => {},
+                    Err(_) => {},
                 }
             }
         }
