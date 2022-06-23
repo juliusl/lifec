@@ -176,19 +176,29 @@ impl BlockContext {
     pub fn transpile_block(&self, block_symbol: impl AsRef<str>) -> Result<String, Error> {
         let mut src = String::new();
         writeln!(src, "``` {} {}", self.block_name, block_symbol.as_ref())?;
-        if let Some(block) = self.get_block(block_symbol) {
-            for attr in block.iter_attributes() {
+        if let Some(mut block) = self.get_block(block_symbol) {
+            for attr in Self::iter_block_attrs_mut(block.as_mut()) {
                 if attr.name().starts_with("block_") {
                     continue;
                 }
 
                 if attr.is_stable() {
                     Self::transpile_value(&mut src, "add", attr.name(), attr.value())?;
+                } else {
+                    let symbols: Vec<&str> = attr.name().split("::").collect();
+                    let a = symbols.get(0);
+                    let b = symbols.get(1);
+
+                    if let (Some(a), Some(b)) = (a, b) {
+                        writeln!(src, "define {} {}", a, b)?; 
+                        if let Some((name, value)) = attr.transient() {
+                            Self::transpile_value(&mut src, "edit", name, value)?;
+                        }
+                    }
                 }
             }
         }
         writeln!(src, "```")?;
-        writeln!(src, "")?;
         Ok(src)
     }
 
@@ -577,11 +587,36 @@ fn test_event() {
     from sh_test publish command
     ```
     "#);
-    sh_test.as_mut().apply_events();
 
+    if let Some(transpiled) = sh_test.transpile().ok() {
+        let mut test_sh_test = AttributeGraph::from(0);
+        assert!(test_sh_test.batch_mut(transpiled).is_ok());
+        test_sh_test.apply_events();
+        
+        let mut project = Project::from(test_sh_test);
+        println!("{:#?}", project);
+    
+        let command = project.find_block_mut("println")
+            .and_then(|println| println.get_block("accept"))
+            .and_then(|a| a.find_text("command"));
+    
+        assert_eq!(Some("sh ./test.sh".to_string()), command);
+    } else {
+        assert!(false, "should work");
+    }
+
+    sh_test.as_mut().apply_events();
     // reload changes from source
-    let mut sh_test = sh_test.reload_source();
-    let command = sh_test.find_block_mut("println")
+    let sh_test = sh_test.reload_source();
+    println!("{}", sh_test.transpile().expect("works"));
+
+    let mut test_sh_test = AttributeGraph::from(0);
+    assert!(test_sh_test.batch_mut(sh_test.transpile().expect("works")).is_ok());
+    
+    let mut project = Project::from(test_sh_test);
+    println!("{:#?}", project);
+
+    let command = project.find_block_mut("println")
         .and_then(|println| println.get_block("accept"))
         .and_then(|a| a.find_text("command"));
 

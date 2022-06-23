@@ -6,6 +6,8 @@ use specs::storage::HashMapStorage;
 use specs::Component;
 use std::collections::btree_map::IterMut;
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Error;
+use std::fmt::Write;
 use std::fs;
 use std::str::from_utf8;
 
@@ -17,6 +19,56 @@ pub struct Project {
 }
 
 impl Project {
+    pub fn transpile(&self) -> Result<String, Error> {
+        let mut src = String::default();
+
+        match self.transpile_root() {
+            Ok(root) => {
+                writeln!(src, "{}", root)?;
+            },
+            Err(_) => {
+            },
+        }
+
+        for (_, block) in self.block_index.iter() {
+            match block.transpile() {
+                Ok(block) => {
+                    writeln!(src, "{}", block)?;
+                },
+                Err(_) => todo!(),
+            }
+        }
+
+        Ok(src)
+    }
+
+    pub fn transpile_root(&self) -> Result<String, Error> {
+        let mut src = String::new();
+        writeln!(src, "```")?;
+        for attr in self.as_ref().iter_attributes().filter(|a| a.id() == 0) {
+            if attr.name().starts_with("block_") {
+                continue;
+            }
+    
+            if attr.is_stable() {
+                BlockContext::transpile_value(&mut src, "add", attr.name(), attr.value())?;
+            } else {
+                let symbols: Vec<&str> = attr.name().split("::").collect();
+                let a = symbols.get(0);
+                let b = symbols.get(1);
+    
+                if let (Some(a), Some(b)) = (a, b) {
+                    writeln!(src, "define {} {}", a, b)?; 
+                    if let Some((name, value)) = attr.transient() {
+                        BlockContext::transpile_value(&mut src, "edit", name, value)?;
+                    }
+                }
+            }
+        }
+        writeln!(src, "```")?;
+        Ok(src)
+    }
+
     pub fn reload_source(&self) -> Self {
         Project::from(self.as_ref().clone())
     }
