@@ -3,7 +3,7 @@ use super::{
     BlockContext, Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles, Thunk,
 };
 use crate::plugins::Println;
-use crate::AttributeGraph;
+use crate::{AttributeGraph, RuntimeDispatcher};
 use atlier::system::{Extension, Value};
 use imgui::{Condition, Ui, Window, MenuItem};
 use imnodes::{
@@ -25,7 +25,7 @@ pub mod demo;
 #[derive(Component, Clone, Default, Hash, PartialEq)]
 #[storage(DenseVecStorage)]
 pub struct NodeContext {
-    block: BlockContext,
+    pub block: BlockContext,
     entity: Option<Entity>, 
     node_id: Option<NodeId>,
     attribute_id: Option<AttributeId>,
@@ -36,10 +36,6 @@ pub struct NodeContext {
 impl Eq for NodeContext {}
 
 impl NodeContext {
-    pub fn update_block(&mut self) {
-        
-    }
-
     pub fn node_pos(&self) -> Option<(&f32, &f32)> {
         self.as_ref()
             .find_attr_value("node_pos")
@@ -173,39 +169,59 @@ impl Node {
         }
     }
 
-    /// reverse lookup a link into block contexts
-    pub fn reverse_lookup_blocks(&self, link: &Link) -> Option<(BlockContext, BlockContext)> {
-        self.reverse_lookup(link).and_then(|(from, to)| {
-            Some((
-                from.block.clone(),
-                to.block.clone(),
-            ))
-        })
-    }
-
     /// gets all values from the publish block of "from"
     /// and writes to the the accept block of "to"
     pub fn connect(&mut self, link: &Link) {
         if let Some((from, to)) = &self.reverse_lookup(link) {
             if let Some(to_node_id) = to.node_id {
                 let from = from.block.clone();
-                let mut to = to.block.clone();
-
-                if let Some(publish) = from.get_block("publish") {
-                    to.update_block("accept", |accepting| {
-                        for (name, value) in publish
+                let to = to.block.clone();
+   
+                let mut connect = format!(" ``` {} accept\n", to.block_name);
+                if let (Some(publish), Some(_)) =
+                    (from.get_block("publish"), to.get_block("accept"))
+                {
+                    if let Some(to_update) = self.contexts.get_mut(&to_node_id) {
+                        for attr in publish
                             .iter_attributes()
                             .filter(|a| !a.name().starts_with("block_"))
-                            .filter_map(|a| Some((a.name(), a.value())))
+                            .cloned()
                         {
-                            accepting.with(name, value.clone());
+                            match writeln!(connect, "from {} publish {}", from.block_name, attr.name()) {
+                                Ok(()) => {
+                                }, 
+                                Err(_) => {
+                                }
+                            }
                         }
-                    });
+                        match writeln!(connect, "```") {
+                            Ok(_) => {},
+                            Err(_) => {},
+                        }
 
-                    if let Some(to_update) = self.contexts.get_mut(&to_node_id) {
-                        if let Some(message) = to.transpile_block("accept").ok() {
-                            to_update.as_mut().add_event("connect", message);
-                            to_update.as_mut().apply_events();
+                        let mut update = AttributeGraph::from(0);
+                        if let Some(from) = from.transpile().ok() {
+                            match update.batch_mut(from) {
+                                Ok(_) => {
+                                },
+                                Err(_) => {
+                                },
+                            }
+                        }
+                        if let Some(to) = to.transpile().ok() {
+                            match update.batch_mut(to) {
+                                Ok(_) => {
+                                },
+                                Err(_) => {
+                                },
+                            }
+                        }
+
+                        let mut update = Project::from(update);
+                        update.as_mut().add_event("connect", connect);
+                        update.as_mut().apply_events();
+                        if let Some(to_block) = update.reload_source().find_block_mut(to.block_name) {
+                            to_update.block = to_block.clone();
                         }
                     }
                 }
