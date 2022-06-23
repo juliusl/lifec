@@ -92,10 +92,10 @@ where
                 ui.menu_bar(|| {
                     project.edit_project_menu(ui);
 
-                    ui.menu("Thunks", ||{
+                    ui.menu("Plugins", ||{
                         for (entity, call) in self.calls.iter() {
                             if let Some(block) = self.blocks.get(entity) {
-                                let label = format!("Call thunk {} - {:?}", call.symbol().as_ref(), entity);
+                                let label = format!("Call thunk {} {} - entity: {}", call.symbol().as_ref(), block.block_name, entity.id());
                                 if MenuItem::new(label).build(ui) {
                                     let mut context = ThunkContext(block.clone());
                                     call.call(&mut context);

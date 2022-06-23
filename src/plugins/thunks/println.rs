@@ -1,4 +1,4 @@
-use crate::plugins::Plugin;
+use crate::plugins::{Plugin, Project};
 use super::ThunkContext;
 use specs::Component;
 use specs::storage::DenseVecStorage;

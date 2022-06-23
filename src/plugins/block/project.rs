@@ -1,5 +1,6 @@
 use super::BlockContext;
-use crate::state::AttributeGraph;
+use crate::state::{AttributeGraph, AttributeGraphErrors};
+use crate::RuntimeDispatcher;
 use atlier::system::Value;
 use imgui::Ui;
 use specs::storage::HashMapStorage;
@@ -25,16 +26,15 @@ impl Project {
         match self.transpile_root() {
             Ok(root) => {
                 writeln!(src, "{}", root)?;
-            },
-            Err(_) => {
-            },
+            }
+            Err(_) => {}
         }
 
         for (_, block) in self.block_index.iter() {
             match block.transpile() {
                 Ok(block) => {
                     writeln!(src, "{}", block)?;
-                },
+                }
                 Err(_) => todo!(),
             }
         }
@@ -49,16 +49,16 @@ impl Project {
             if attr.name().starts_with("block_") {
                 continue;
             }
-    
+
             if attr.is_stable() {
                 BlockContext::transpile_value(&mut src, "add", attr.name(), attr.value())?;
             } else {
                 let symbols: Vec<&str> = attr.name().split("::").collect();
                 let a = symbols.get(0);
                 let b = symbols.get(1);
-    
+
                 if let (Some(a), Some(b)) = (a, b) {
-                    writeln!(src, "define {} {}", a, b)?; 
+                    writeln!(src, "define {} {}", a, b)?;
                     if let Some((name, value)) = attr.transient() {
                         BlockContext::transpile_value(&mut src, "edit", name, value)?;
                     }
@@ -86,14 +86,28 @@ impl Project {
 
     pub fn replace_block(&mut self, mut block_context: BlockContext) -> bool {
         let block_name = block_context.block_name.to_string();
-
         block_context.as_mut().with_bool("project_selected", false);
 
-        self.block_index.insert(block_name, block_context).is_some()
+        if let Some(removed) = self.block_index.insert(block_name.clone(), block_context) {
+            if let Some(next) = self.find_block_mut(block_name) {
+                if let Some(enabled) = removed.as_ref().is_enabled("project_selected") {
+                    next.as_mut().with_bool("project_selected", enabled);
+                }
+            }
+            true
+        } else {
+            false
+        }
     }
 
     pub fn find_block_mut(&mut self, block_name: impl AsRef<str>) -> Option<&mut BlockContext> {
         self.block_index.get_mut(block_name.as_ref())
+    }
+
+    pub fn find_block(&self, block_name: impl AsRef<str>) -> Option<BlockContext> {
+        self.block_index
+            .get(block_name.as_ref())
+            .and_then(|b| Some(b.to_owned()))
     }
 
     /// iterate through each block_name
@@ -192,6 +206,80 @@ impl Project {
             false
         }
     }
+
+    /// sends a message between two blocks within the project
+    /// returns the transpilation of the project without applying the events
+    pub fn send(
+        &self,
+        from: impl AsRef<str>,
+        to: impl AsRef<str>,
+        event_name: impl AsRef<str>,
+        message: impl AsRef<str>,
+    ) -> Option<String> {
+        println!(
+            "Sending event {} {}->{}",
+            event_name.as_ref(),
+            from.as_ref(),
+            to.as_ref()
+        );
+        let from = self.find_block(from.as_ref());
+        let to = self.find_block(to.as_ref());
+
+        if let (Some(from), Some(to)) = (from, to) {
+            let mut update = AttributeGraph::from(0);
+            if let Some(from) = from.transpile().ok() {
+                match update.batch_mut(from) {
+                    Ok(_) => {}
+                    Err(_) => {}
+                }
+            }
+            if let Some(to) = to.transpile().ok() {
+                match update.batch_mut(to) {
+                    Ok(_) => {}
+                    Err(_) => {}
+                }
+            }
+
+            let mut update = Project::from(update);
+            update.as_mut().add_event(event_name, message);
+            update.as_mut()
+                .with_text("from", from.block_name)
+                .with_text("to", to.block_name);
+            update.transpile().ok()
+        } else {
+            None
+        }
+    }
+
+    pub fn receive(&self, update: impl AsRef<str>, dest_block: impl AsRef<str>) -> Option<BlockContext> {
+        if let Some(mut graph) = AttributeGraph::from(0).batch(update.as_ref()).ok() {
+            println!("Received update -> {}", dest_block.as_ref());
+            graph.apply_events();
+            let update = Project::from(graph);
+            update.find_block(dest_block)
+        } else {
+            None
+        }
+    }
+
+    pub fn receive_mut(&mut self, update: impl AsRef<str>, dest_block: impl AsRef<str>, received: impl FnOnce(&mut BlockContext)) -> bool {
+        match self.as_mut().batch_mut(update) {
+            Ok(_) => {            
+                self.as_mut().apply_events();
+                *self = self.reload_source();
+                if let Some(dest) = self.find_block_mut(&dest_block) {
+                    println!("Received update -> {}", dest_block.as_ref());
+                    received(dest);
+                    true
+                } else {
+                    false
+                }
+            },
+            Err(_) => {
+                false
+            },
+        }
+    }
 }
 
 impl From<AttributeGraph> for Project {
@@ -260,43 +348,53 @@ fn test_send_event() {
 
     ``` sh_test thunk
     add thunk_symbol .TEXT process
-    ``` 
+    ```
 
     ``` println_settings accept
-    from sh_test publish called
-    from sh_test publish code 
-    from sh_test publish command
-    from sh_test publish elapsed
-    from sh_test publish stderr
-    from sh_test publish stdout
-    from sh_test publish timestamp_local
-    from sh_test publish timestamp_utc
     ```
     "#;
 
     match AttributeGraph::from(0).batch(test) {
         Ok(graph) => {
             let mut graph = Project::from(graph);
+            if let Some(message) = graph.send(
+                "sh_test", 
+                  "println_settings", 
+          "connect", 
+            r#"
+            ``` println_settings accept
+            from sh_test publish called
+            from sh_test publish code 
+            from sh_test publish command
+            from sh_test publish elapsed
+            from sh_test publish stderr
+            from sh_test publish stdout
+            from sh_test publish timestamp_local
+            from sh_test publish timestamp_utc
+            ```
+            "#) {
+                let update = Project::from(AttributeGraph::from(0).batch(&message).expect("works"));
 
-            let message = r#"
-        ``` println_settings accept
-        find_remove called
-        find_remove code
-        find_remove stdout
-        find_remove stderr
-        find_remove elapsed
-        find_remove timestamp_utc
-        find_remove timestamp_local
-        ```
-        "#;
+                let from_block = update.as_ref()
+                    .find_text("from")
+                    .and_then(|f| update.find_block(f));
+                let to_block = update.as_ref()
+                    .find_text("to")
+                    .and_then(|f| update.find_block(f));
 
-            graph.as_mut().add_event("disconnect", message);
-            graph.as_mut().apply_events();
+                assert!(from_block.is_some());
+                assert!(to_block.is_some());
 
-            if let Some(accept) = graph.find_block_mut("println_settings") {
-                println!("{:#?}", accept.as_ref());
+                println!("from: {}", from_block.expect("exists").block_name);
+                println!("to: {}", to_block.expect("exists").block_name);
+                
+                assert!(graph.receive_mut(message, "println_settings", |received| {
+                    println!("{}",  received.transpile().expect("should exist"));
+                }));
+            } else {
+                assert!(false, "should exist");
             }
         }
-        Err(_) => assert!(false, "should be able to dispatch test"),
+        Err(err) => assert!(false, "should be able to dispatch test, {:?}", err)
     }
 }

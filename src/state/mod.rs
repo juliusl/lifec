@@ -86,7 +86,7 @@ impl AttributeGraph {
         saving
     }
 
-    /// returns the graph after attributes are committed
+    /// finds and applies events to the graph
     pub fn apply_events(&mut self) {
         for (name, value) in self.take_symbol_values("event") {
             println!("Event {}", name);

@@ -40,7 +40,7 @@ where
         Self: Clone
     {
         let mut next = self.clone();
-        for message in msgs.as_ref().trim().split("\n").filter(|line| !line.is_empty()) {
+        for message in msgs.as_ref().trim().lines().filter(|line| !line.trim().is_empty()) {
              next = next.dispatch(message)?;
         }
     

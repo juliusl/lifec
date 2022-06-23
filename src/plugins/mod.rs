@@ -4,6 +4,9 @@ mod block;
 pub use block::BlockContext;
 pub use block::Project;
 
+mod events;
+pub use events::Event;
+
 mod nodes;
 pub use nodes::Node;
 pub use nodes::NodeContext;

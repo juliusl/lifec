@@ -1,32 +1,40 @@
 use super::block::Project;
 use super::{
-    BlockContext, Display, Edit, Engine, Plugin, Process, Render, ThunkContext, WriteFiles, Thunk,
+    BlockContext, Display, Edit, Engine, Plugin, Process, Render, Thunk, ThunkContext, WriteFiles,
 };
 use crate::plugins::Println;
 use crate::{AttributeGraph, RuntimeDispatcher};
 use atlier::system::{Extension, Value};
-use imgui::{Condition, Ui, Window, MenuItem};
+use imgui::{Condition, MenuItem, Ui, Window};
 use imnodes::{
-    editor, AttributeFlag, AttributeId, CoordinateSystem, InputPinId, Link, LinkId, NodeId,
-    OutputPinId, ImVec2,
+    editor, AttributeFlag, AttributeId, CoordinateSystem, ImVec2, InputPinId, Link, LinkId, NodeId,
+    OutputPinId,
 };
 use specs::storage::DenseVecStorage;
 use specs::{
     Component, Entities, Entity, Join, ReadStorage, RunNow, System, World, WorldExt, WriteStorage,
 };
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::hash::Hash;
 use std::time::{Duration, Instant};
-use std::fmt::Write;
 
 pub mod demo;
+
+#[derive(Component)]
+#[storage(DenseVecStorage)]
+pub struct LinkContext {
+    pub block: BlockContext,
+    entity: Option<Entity>,
+    link: Option<Link>
+}
 
 /// This component renders a graph to an editor node
 #[derive(Component, Clone, Default, Hash, PartialEq)]
 #[storage(DenseVecStorage)]
 pub struct NodeContext {
     pub block: BlockContext,
-    entity: Option<Entity>, 
+    entity: Option<Entity>,
     node_id: Option<NodeId>,
     attribute_id: Option<AttributeId>,
     input_pin_id: Option<InputPinId>,
@@ -119,7 +127,7 @@ pub struct Node {
     thunk: HashMap<NodeId, Thunk>,
     edit: HashMap<NodeId, Edit>,
     display: HashMap<NodeId, Display>,
-    link_index: HashMap<LinkId, Link>,
+    link_index: HashMap<LinkId, LinkContext>,
     source: Project,
     // TODO: Need to hold a context to this, because if it leaves scope it will drop
     // But that means we can only have 1 node editor window open
@@ -176,52 +184,35 @@ impl Node {
             if let Some(to_node_id) = to.node_id {
                 let from = from.block.clone();
                 let to = to.block.clone();
-   
+
                 let mut connect = format!(" ``` {} accept\n", to.block_name);
                 if let (Some(publish), Some(_)) =
                     (from.get_block("publish"), to.get_block("accept"))
                 {
-                    if let Some(to_update) = self.contexts.get_mut(&to_node_id) {
-                        for attr in publish
-                            .iter_attributes()
-                            .filter(|a| !a.name().starts_with("block_"))
-                            .cloned()
+                    for attr in publish
+                        .iter_attributes()
+                        .filter(|a| !a.name().starts_with("block_"))
+                        .cloned()
+                    {
+                        match writeln!(connect, "from {} publish {}", from.block_name, attr.name())
                         {
-                            match writeln!(connect, "from {} publish {}", from.block_name, attr.name()) {
-                                Ok(()) => {
-                                }, 
-                                Err(_) => {
-                                }
-                            }
+                            Ok(()) => {}
+                            Err(_) => {}
                         }
-                        match writeln!(connect, "```") {
-                            Ok(_) => {},
-                            Err(_) => {},
-                        }
+                    }
+                    match writeln!(connect, "```") {
+                        Ok(_) => {}
+                        Err(_) => {}
+                    }
+                }
 
-                        let mut update = AttributeGraph::from(0);
-                        if let Some(from) = from.transpile().ok() {
-                            match update.batch_mut(from) {
-                                Ok(_) => {
-                                },
-                                Err(_) => {
-                                },
-                            }
-                        }
-                        if let Some(to) = to.transpile().ok() {
-                            match update.batch_mut(to) {
-                                Ok(_) => {
-                                },
-                                Err(_) => {
-                                },
-                            }
-                        }
-
-                        let mut update = Project::from(update);
-                        update.as_mut().add_event("connect", connect);
-                        update.as_mut().apply_events();
-                        if let Some(to_block) = update.reload_source().find_block_mut(to.block_name) {
-                            to_update.block = to_block.clone();
+                if let Some(result) =
+                    self.source
+                        .send(from.block_name, &to.block_name, "connect", connect)
+                {
+                    if let Some(to_update) = self.contexts.get_mut(&to_node_id) {
+                        if let Some(update) = self.source.receive(result, to.block_name) {
+                            to_update.block = update;
                         }
                     }
                 }
@@ -240,26 +231,30 @@ impl Node {
                 if let (Some(publish), Some(_)) =
                     (from.get_block("publish"), to.get_block("accept"))
                 {
+                    for attr in publish
+                        .iter_attributes()
+                        .filter(|a| !a.name().starts_with("block_"))
+                        .cloned()
+                    {
+                        match writeln!(disconnect, "find_remove {}", attr.name()) {
+                            Ok(()) => {}
+                            Err(_) => {}
+                        }
+                    }
+                    match writeln!(disconnect, "```") {
+                        Ok(_) => {}
+                        Err(_) => {}
+                    }
+                }
+
+                if let Some(result) =
+                    self.source
+                        .send(from.block_name, &to.block_name, "disconnect", disconnect)
+                {
                     if let Some(to_update) = self.contexts.get_mut(&to_node_id) {
-                        for attr in publish
-                            .iter_attributes()
-                            .filter(|a| !a.name().starts_with("block_"))
-                            .cloned()
-                        {
-                            match writeln!(disconnect, "find_remove {}", attr.name()) {
-                                Ok(()) => {
-                                }, 
-                                Err(_) => {
-                                }
-                            }
+                        if let Some(update) = self.source.receive(result, to.block_name) {
+                            to_update.block = update;
                         }
-                        match writeln!(disconnect, "```") {
-                            Ok(_) => {},
-                            Err(_) => {},
-                        }
-                       
-                        to_update.as_mut().add_event("disconnect", disconnect);
-                        to_update.as_mut().apply_events();
                     }
                 }
             }
@@ -272,8 +267,7 @@ impl Node {
             let ImVec2 { x: height, .. } = n.get_dimensions();
             let spacing = spacing * height;
 
-            let ImVec2 { x, .. } = n
-                .get_position(imnodes::CoordinateSystem::ScreenSpace);
+            let ImVec2 { x, .. } = n.get_position(imnodes::CoordinateSystem::ScreenSpace);
             n.set_position(x, spacing, imnodes::CoordinateSystem::ScreenSpace);
         });
     }
@@ -310,7 +304,7 @@ impl Plugin<NodeContext> for Node {
                 context.input_pin_id = Some(self.idgen.next_input_pin());
             }
             self.contexts.insert(node_id, context.clone());
-        
+
             let block_context = BlockContext::from(context.as_ref().clone());
             if self.source.import_block(block_context) {
                 println!("new block imported");
@@ -360,16 +354,18 @@ impl Extension for Node {
         world.register::<NodeContext>();
         world.register::<Edit>();
         world.register::<Display>();
-        world.register::<Println>();
-        world.register::<WriteFiles>();
         world.register::<ThunkContext>();
         world.register::<Thunk>();
+        
+        NodeSync::<Process>::configure_app_world(world);
+        NodeSync::<Println>::configure_app_world(world);
+        NodeSync::<WriteFiles>::configure_app_world(world);
     }
 
     fn configure_app_systems(builder: &mut specs::DispatcherBuilder) {
-        builder.add( NodeSync::<WriteFiles>::default(), "write_files_node_sync", &[]);
-        builder.add( NodeSync::<Println>::default(), "println_node_sync", &[]);
-        builder.add( NodeSync::<Process>::default(), "process_node_sync", &[]);
+        NodeSync::<Process>::configure_app_systems(builder);
+        NodeSync::<Println>::configure_app_systems(builder);
+        NodeSync::<WriteFiles>::configure_app_systems(builder);
     }
 
     fn on_ui(&mut self, app_world: &World, ui: &imgui::Ui) {
@@ -394,16 +390,20 @@ impl Extension for Node {
                 ui.menu_bar(|| {
                     self.source.edit_project_menu(ui);
 
-                    ui.menu("Edit", ||{
+                    ui.menu("Edit", || {
                         if MenuItem::new("Arrange nodes vertically").build(ui) {
                             self.arrange_vertical();
                         }
                     });
 
-                    ui.menu("Debug", ||{
-                        self.source.as_mut().edit_attr("Debug nodes", "debug_nodes", ui);
+                    ui.menu("Debug", || {
+                        self.source
+                            .as_mut()
+                            .edit_attr("Debug nodes", "debug_nodes", ui);
                         if ui.is_item_hovered() {
-                            ui.tooltip_text("This will show information on each node such as x,y coordinates");
+                            ui.tooltip_text(
+                                "This will show information on each node such as x,y coordinates",
+                            );
                         }
                     });
                 });
@@ -449,7 +449,9 @@ impl Extension for Node {
 
                             if let Some(attribute_id) = &context.attribute_id {
                                 node_scope.attribute(*attribute_id, || {
-                                    if let Some(true) = self.source.as_ref().is_enabled("debug_nodes") {
+                                    if let Some(true) =
+                                        self.source.as_ref().is_enabled("debug_nodes")
+                                    {
                                         let imnodes::ImVec2 { x, y } =
                                             node_id.get_position(CoordinateSystem::ScreenSpace);
                                         ui.text(format!("x: {}, y: {}", x, y));
@@ -462,7 +464,12 @@ impl Extension for Node {
                                     }
 
                                     // If the entity has an edit/display, it's shown in this block
-                                    frame.on_render(context.as_mut(), thunk.clone(), edit.clone(), display.clone());
+                                    frame.on_render(
+                                        context.as_mut(),
+                                        thunk.clone(),
+                                        edit.clone(),
+                                        display.clone(),
+                                    );
                                 });
                             }
 
@@ -485,25 +492,25 @@ impl Extension for Node {
 
                     for (
                         link_id,
-                        Link {
-                            start_pin, end_pin, ..
-                        },
+                        link_context,
                     ) in &self.link_index
                     {
-                        editor_scope.add_link(*link_id, *end_pin, *start_pin);
+                        if let Some(Link { start_pin, end_pin, .. }) = link_context.link {
+                            editor_scope.add_link(*link_id, end_pin, start_pin);
+                        }
                     }
                 });
 
                 if let Some(link) = outer_scope.links_created() {
                     println!("Link created {:?}", link);
-                    self.link_index.insert(self.idgen.next_link(), link);
-                    self.connect(&link);
+                    // self.link_index.insert(self.idgen.next_link(), );
+                    // self.connect(&link);
                 }
 
                 if let Some(dropped) = outer_scope.get_dropped_link() {
                     if let Some(dropped) = self.link_index.remove(&dropped) {
-                        self.disconnect(&dropped);
-                        println!("Link dropped {:?}", dropped);
+                        println!("Link dropped {:?}", dropped.link);
+                       // self.disconnect(&dropped);
                     }
                 }
 
@@ -517,8 +524,7 @@ impl Extension for Node {
 impl Engine for Node {
     fn next_mut(&mut self, _: &mut AttributeGraph) {}
 
-    fn exit(&mut self, _: &AttributeGraph) {
-    }
+    fn exit(&mut self, _: &AttributeGraph) {}
 }
 
 impl<'a> System<'a> for Node {
@@ -530,20 +536,28 @@ impl<'a> System<'a> for Node {
         ReadStorage<'a, Display>,
     );
 
-    fn run(&mut self, (mut contexts, mut blocks, thunks, edit_node, display_node): Self::SystemData) {
+    fn run(
+        &mut self,
+        (mut contexts, mut blocks, thunks, edit_node, display_node): Self::SystemData,
+    ) {
         for (_, node_context) in self.contexts.iter() {
             self.source.replace_block(node_context.block.to_owned());
-        
+
             if let Some(entity) = node_context.entity {
                 match blocks.insert(entity, node_context.block.to_owned()) {
-                    Ok(_) => {},
-                    Err(_) => {},
+                    Ok(_) => {}
+                    Err(_) => {}
                 }
             }
         }
 
-        for (context, thunk, edit_node, display_node) in
-            (&mut contexts, thunks.maybe(), edit_node.maybe(), display_node.maybe()).join()
+        for (context, thunk, edit_node, display_node) in (
+            &mut contexts,
+            thunks.maybe(),
+            edit_node.maybe(),
+            display_node.maybe(),
+        )
+            .join()
         {
             if edit_node.is_some() || display_node.is_some() {
                 self.on_event(context);
@@ -611,7 +625,6 @@ where
 
         let mut block_context = BlockContext::from(graph.clone());
         block_context.edit_block("publish", ui);
-
         *graph = block_context.as_ref().clone();
     }
 }
@@ -639,13 +652,11 @@ where
         if let Some(mut source) = Project::load_file(format!("{}.runmd", P::symbol())) {
             for (block_name, block) in source.iter_block_mut() {
                 // load each node block to the graph
-                let has_node = block.update_block(
-                        "node", 
-                        |node| {
-                            node.with_text("input_label", "accept")
-                                .with_text("output_label", "publish");
-                        });
-                
+                let has_node = block.update_block("node", |node| {
+                    node.with_text("input_label", "accept")
+                        .with_text("output_label", "publish");
+                });
+
                 if has_node {
                     let mut context = NodeContext::from(block.as_ref().clone());
                     let NodeSync(added, ..) = self;
@@ -668,9 +679,12 @@ where
 
                                         match calls.insert(entity, Thunk::from_plugin::<P>()) {
                                             Ok(_) => {
-                                                println!("Added thunk for new node_context entity {:?}", entity);
-                                            },
-                                            Err(_) => {},
+                                                println!(
+                                                    "Added thunk for new node_context entity {:?}",
+                                                    entity
+                                                );
+                                            }
+                                            Err(_) => {}
                                         }
                                     }
                                     Err(_) => {}
@@ -683,5 +697,23 @@ where
             }
             self.2 = Some(Instant::now());
         }
+    }
+}
+
+impl<P> Extension for NodeSync<P> 
+where
+    P: Plugin<ThunkContext> + Component + Default + Send,
+    <P as Component>::Storage: Default
+{
+    fn configure_app_world(world: &mut World) {
+        world.register::<P>();
+    }
+
+    fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
+        let system_name = format!("{}_node_sync", P::symbol());
+        dispatcher.add(NodeSync::<P>::default(), &system_name, &[]);
+    }
+
+    fn on_ui(&'_ mut self, _app_world: &World, _ui: &'_ imgui::Ui<'_>) {
     }
 }
