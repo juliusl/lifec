@@ -19,8 +19,6 @@ use std::fmt::Write;
 use std::hash::Hash;
 use std::time::{Duration, Instant};
 
-pub mod demo;
-
 #[derive(Component)]
 #[storage(DenseVecStorage)]
 pub struct LinkContext {

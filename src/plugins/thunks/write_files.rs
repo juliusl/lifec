@@ -75,7 +75,7 @@ pub mod demo {
             world.register::<Edit>();
             world.register::<Display>();
 
-            WriteFiles::parse_entity("demo.runmd", world, |e| {
+            WriteFiles::parse_entity("demo.runmd",  world, |_|{}, |e| {
                 e.maybe_with(Some(ThunkContext::from(
                     AttributeGraph::load_from_file(".runmd").unwrap_or_default(),
                 )))

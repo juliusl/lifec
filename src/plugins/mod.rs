@@ -22,7 +22,6 @@ pub use thunks::Thunk;
 
 pub mod demos {
     pub use super::thunks::demo::*;
-    pub use super::nodes::demo::*;
 }
 
 mod render;
@@ -61,13 +60,14 @@ where
     }
 
     /// Parses entity from a .runmd file and add's T as a component from the parsed graph.
+    /// Calls handle to handle any actions on the graph before T::from(graph)
     /// Calls init to complete building the entity.
-    fn parse_entity(path: impl AsRef<str>, world: &mut World, init: impl Fn(EntityBuilder) -> Entity) -> Option<Entity> {
-        if let Some(node) = AttributeGraph::load_from_file(path) {
-            let context = T::from(node);
+    fn parse_entity(path: impl AsRef<str>, world: &mut World, handle: impl FnOnce(&mut AttributeGraph), init: impl Fn(EntityBuilder) -> Entity) -> Option<Entity> {
+        if let Some(mut graph) = AttributeGraph::load_from_file(path) {
+            handle(&mut graph);
+            let context = T::from(graph);
 
             let entity = world.create_entity().with(context);
-
             Some(init(entity))
         } else {
             None

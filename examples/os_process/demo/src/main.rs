@@ -1,4 +1,4 @@
-use lifec::plugins::demos::NodeDemo;
+use lifec::plugins::Node;
 use lifec::{editor::*, AttributeGraph, Runtime};
 
 fn main() {
@@ -6,7 +6,7 @@ fn main() {
         open(
             "demo",
             RuntimeEditor::new(Runtime::from(file)),
-            NodeDemo::default(),
+            Node::new(),
         );
     }
 }
