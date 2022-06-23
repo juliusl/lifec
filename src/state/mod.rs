@@ -68,40 +68,51 @@ impl AttributeGraph {
         }
     }
 
-    /// add event which will be applied when commit is called
-    pub fn add_event(&mut self, event_name: impl AsRef<str>, message: impl AsRef<str>) {
-        self.define(event_name.as_ref(), "event")
-            .edit_as(Value::BinaryVector(message.as_ref().as_bytes().to_vec()));
-    }
-
-    /// returns the graph after attributes are committed
-    pub fn commit(&self) -> AttributeGraph {
+    /// returns the graph after attributes are committed and processed
+    pub fn commit(&self, process: impl FnOnce(&mut AttributeGraph)) -> AttributeGraph {
         let mut saving = self.clone();
-        for attr in self.iter_attributes() {
+        process(&mut saving);
+
+        for attr in saving.clone().iter_attributes() {
             saving.find_update_attr(attr.name(), |a| {
                 a.commit();
             });
         }
-        saving.apply_events();
         saving
     }
 
     /// finds and applies events to the graph
     pub fn apply_events(&mut self) {
-        for (name, value) in self.take_symbol_values("event") {
-            println!("Event {}", name);
+        self.apply("event");
+    }
+
+    /// add event which will be applied when commit is called
+    pub fn add_event(&mut self, event_name: impl AsRef<str>, message: impl AsRef<str>) {
+        self.add_message(event_name, "event", message)
+    }
+
+    /// add message to graph that can be dispatched with apply(..)
+    pub fn add_message(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>, message: impl AsRef<str>) {
+        self.define(name.as_ref(), symbol.as_ref())
+            .edit_as(Value::BinaryVector(message.as_ref().as_bytes().to_vec()));
+    }
+
+    /// finds and applies all symbols to graph
+    pub fn apply(&mut self, symbol: impl AsRef<str>) {
+        for (name, value) in self.take_symbol_values(symbol.as_ref()) {
+            println!("Symbol '{}' {}", symbol.as_ref(), name);
             if let Value::BinaryVector(content) = value {
                 if let Some(content) = from_utf8(&content).ok() {
-                    println!("Applying\n{}", content);
+                    println!("Applying {}\n{}", symbol.as_ref(), content);
 
                     match self.batch_mut(content) {
                         Ok(_) => {
-                            println!("Applied event {}", name);
+                            println!("Applied {} {}", symbol.as_ref(), name);
                             self.find_remove(name);
-                        },
+                        }
                         Err(_) => {
                             eprintln!("could not apply events");
-                        },
+                        }
                     }
                 }
             }
@@ -168,16 +179,6 @@ impl AttributeGraph {
         let defined = self.find_attr_mut(&symbol_name).expect("just added");
         defined.edit_as(Value::Empty);
         defined
-    }
-
-    /// Clones the graph and commits a transient attribute with attr_name.
-    pub fn apply(&self, attr_name: impl AsRef<str>) -> Option<Self> {
-        let mut clone = self.clone();
-        if clone.apply_mut(attr_name) {
-            Some(clone)
-        } else {
-            None
-        }
     }
 
     /// Commit's a transient attribute with attr_name.
@@ -1789,12 +1790,10 @@ fn test_attribute_graph_block_dispatcher() {
     let check_from = graph.clone().find_block("demo4", "node3").expect("exists");
     println!("{:#?}", check_from);
 
-    let check_from = check_from
-        .find_attr("demo_node_title")
-        .expect("exists");
+    let check_from = check_from.find_attr("demo_node_title").expect("exists");
 
     let check_from = (check_from.name().to_string(), check_from.value().clone());
-    
+
     assert_eq!(
         (
             "demo_node_title".to_string(),
@@ -1887,7 +1886,7 @@ fn test_block_context() {
     let main_elm = graph.find_block("Main.elm", "file").expect("exists");
     println!("{}", main_elm.save().expect("exists"));
 
-    let commited_main_elm = main_elm.commit();
+    let commited_main_elm = main_elm.commit(|_|{});
     let attr: Option<Attribute> = commited_main_elm.to_attribute();
     println!("{:?}", attr);
 
