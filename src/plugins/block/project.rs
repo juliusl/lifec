@@ -75,9 +75,6 @@ impl Project {
 
     pub fn load_file(path: impl AsRef<str>) -> Option<Project> {
         if let Some(source) = AttributeGraph::load_from_file(&path) {
-            let path = format!("{}.journal", path.as_ref());
-            source.write_file(path, "journal");
-
             Some(Self::from(source))
         } else {
             None

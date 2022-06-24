@@ -56,15 +56,42 @@ impl From<Attribute> for AttributeGraph {
 }
 
 impl AttributeGraph {
-    /// writes a binary vector to a path
-    pub fn write_file(&self, path: impl AsRef<str>, attr_name: impl AsRef<str>) {
-        if let Some(Value::BinaryVector(contents)) = self.find_attr_value(attr_name) {
-            match fs::write(path.as_ref(), contents) {
-                Ok(_) => {}
-                Err(err) => {
-                    eprintln!("file not written {}", err);
-                }
-            }
+    /// writes a binary vector in graph with attr_name to path
+    pub fn write_file_as(&self, path: impl AsRef<str>, attr_name: impl AsRef<str>) -> std::io::Result<()> {
+        if let Some(Value::BinaryVector(contents)) = self.find_attr_value(attr_name.as_ref()) {
+            fs::write(path.as_ref(), contents)
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound, 
+                format!("could not find binary attribute {}", attr_name.as_ref()))
+            )
+        }
+    }
+
+    /// writes a binary vector in graph as path to path
+    /// meant to be used with add_file
+    pub fn write_file(&self, path: impl AsRef<str>) -> std::io::Result<()> {
+        self.write_file_as(path.as_ref(), path.as_ref())
+    }
+
+    /// adds a file from path to a binary attr
+    pub fn add_file(&mut self, path: impl AsRef<str>) {
+        match fs::read_to_string(path.as_ref()) {
+            Ok(content) => {
+                self.add_binary_attr(path, content);
+            },
+            Err(err) => {
+                eprintln!("file not added {}", err);
+            },
+        }
+    }
+
+    /// finds a file attribute that was added with add_file
+    pub fn find_file(&self, path: impl AsRef<str>) -> Option<Vec<u8>> {
+        if let Some(Value::BinaryVector(content)) = self.find_attr_value(path) {
+            Some(content.to_vec())
+        } else {
+            None
         }
     }
 
@@ -179,11 +206,6 @@ impl AttributeGraph {
         let defined = self.find_attr_mut(&symbol_name).expect("just added");
         defined.edit_as(Value::Empty);
         defined
-    }
-
-    /// Commit's a transient attribute with attr_name.
-    pub fn apply_mut(&mut self, attr_name: impl AsRef<str>) -> bool {
-        self.find_update_attr(attr_name, |a| a.commit())
     }
 
     /// using self as source, include a sibling block given the context
