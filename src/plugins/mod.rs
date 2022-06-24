@@ -76,22 +76,24 @@ where
             None
         }
     }
-
-    /// if this plugin implements an engine, this can be called in the event_loop to automate the engine sequence
-    fn on_event(&mut self, context: &mut T) 
-        where 
-            Self: Engine + Sized
-    {
-        self.next_mut(context.as_mut());
-        self.exit(context.as_ref());
-    }
 }
 
-/// An engine is a sequence of at least 2 events
-pub trait Engine {
-    /// next_mut is called after attributes has been updated
-    fn next_mut(&mut self, attributes: &mut AttributeGraph);
+/// The engine trait is to enable an event struct to be created which handles the dynamics for an entity
+pub trait Engine
+where
+    Self: Plugin<ThunkContext> + Component + Send + Default,
+    <Self as specs::Component>::Storage: Default
+{
+    /// The name of the event this engine produces
+    fn event_name() -> &'static str;
 
-    /// exit is always called, regardless if attributes has been updated
-    fn exit(&mut self, attributes: &AttributeGraph);
+    fn event() -> Event {
+        Event::from_plugin::<Self>(Self::event_name())
+    }
+
+    fn parse_engine(path: impl AsRef<str>, world: &mut World) -> Option<Entity> {
+        Self::parse_entity(path, world, |_|{}, |entity|{
+            entity.with(Self::event()).build()
+        })
+    }
 }

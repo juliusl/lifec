@@ -1,7 +1,7 @@
 use super::block::Project;
 use super::events::EventRuntime;
 use super::{
-    BlockContext, Display, Edit, Engine, Plugin, Process, Render, Thunk, ThunkContext, WriteFiles,
+    BlockContext, Display, Edit, Plugin, Process, Render, Thunk, ThunkContext, WriteFiles,
 };
 use crate::plugins::Println;
 use crate::{AttributeGraph, RuntimeDispatcher};
@@ -13,7 +13,7 @@ use imnodes::{
 };
 use specs::storage::DenseVecStorage;
 use specs::{
-    Component, Entities, Entity, Join, ReadStorage, RunNow, System, World, WorldExt, WriteStorage, Builder,
+    Component, Entities, Entity, Join, ReadStorage, RunNow, System, World, WorldExt, WriteStorage,
 };
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -272,46 +272,6 @@ impl Node {
     }
 }
 
-impl Plugin<NodeContext> for Node {
-    fn symbol() -> &'static str {
-        "node"
-    }
-
-    fn call_with_context(_: &mut NodeContext) {
-        // No-OP
-    }
-
-    fn on_event(&mut self, context: &mut NodeContext)
-    where
-        Self: Engine + Sized,
-    {
-        if let None = context.node_id {
-            let node_id = self.idgen.next_node();
-            context.node_id = Some(node_id);
-
-            if let None = context.attribute_id {
-                if context.as_ref().find_block("", "form").is_some()
-                    || context.as_ref().find_block("", "thunk").is_some()
-                {
-                    context.attribute_id = Some(self.idgen.next_attribute());
-                }
-            }
-            if let None = context.output_pin_id {
-                context.output_pin_id = Some(self.idgen.next_output_pin());
-            }
-            if let None = context.input_pin_id {
-                context.input_pin_id = Some(self.idgen.next_input_pin());
-            }
-            self.contexts.insert(node_id, context.clone());
-
-            let block_context = BlockContext::from(context.as_ref().clone());
-            if self.source.import_block(block_context) {
-                println!("new block imported");
-            }
-        }
-    }
-}
-
 impl From<imnodes::Context> for Node {
     fn from(context: imnodes::Context) -> Self {
         let editor_context = context.create_editor();
@@ -520,12 +480,6 @@ impl Extension for Node {
     }
 }
 
-impl Engine for Node {
-    fn next_mut(&mut self, _: &mut AttributeGraph) {}
-
-    fn exit(&mut self, _: &AttributeGraph) {}
-}
-
 impl<'a> System<'a> for Node {
     type SystemData = (
         WriteStorage<'a, NodeContext>,
@@ -559,7 +513,31 @@ impl<'a> System<'a> for Node {
             .join()
         {
             if edit_node.is_some() || display_node.is_some() {
-                self.on_event(context);
+                if let None = context.node_id {
+                    let node_id = self.idgen.next_node();
+                    context.node_id = Some(node_id);
+        
+                    if let None = context.attribute_id {
+                        if context.as_ref().find_block("", "form").is_some()
+                            || context.as_ref().find_block("", "thunk").is_some()
+                        {
+                            context.attribute_id = Some(self.idgen.next_attribute());
+                        }
+                    }
+                    if let None = context.output_pin_id {
+                        context.output_pin_id = Some(self.idgen.next_output_pin());
+                    }
+                    if let None = context.input_pin_id {
+                        context.input_pin_id = Some(self.idgen.next_input_pin());
+                    }
+                    self.contexts.insert(node_id, context.clone());
+        
+                    let block_context = BlockContext::from(context.as_ref().clone());
+                    if self.source.import_block(block_context) {
+                        println!("new block imported");
+                    }
+                }
+
                 if let (Some(thunk), Some(node_id)) = (thunk, context.node_id) {
                     if !self.thunk.contains_key(&node_id) {
                         println!("found display node for {:?}", node_id);

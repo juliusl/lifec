@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use super::{Engine, Plugin, Thunk};
+use super::{Plugin, Thunk};
 use crate::AttributeGraph;
 use imgui::Ui;
 use specs::storage::DenseVecStorage;
@@ -58,31 +58,23 @@ impl<'ui> Render<'ui>
         self.1 = thunk;
         self.2 = edit;
         self.3 = display;
-        self.on_event(context);
+
+        if let Render(ui, thunk, Some(Edit(edit)), ..) = self {
+            if let Some(ui) = ui.borrow().and_then(|ui| Some(ui)) {
+                edit(context.as_mut(), thunk.clone(), ui);
+            }
+        }
+
+        if let Render(ui, thunk, .., Some(Display(display))) = self {
+            if let Some(ui) = ui.borrow().and_then(|ui| Some(ui)) {
+                display(context.as_ref(), thunk.clone(), ui);
+            }
+        }
     }
 
     pub fn frame(&self, render: impl FnOnce(&Ui)) {
         if let Some(ui) = &self.0.borrow().and_then(|ui| Some(ui)) {
             render(ui);
-        }
-    }
-}
-
-impl Engine for Render<'_>
-{
-    fn next_mut(&mut self, attributes: &mut AttributeGraph) {
-        if let Render(ui, thunk, Some(Edit(edit)), ..) = self {
-            if let Some(ui) = ui.borrow().and_then(|ui| Some(ui)) {
-                edit(attributes, thunk.clone(), ui);
-            }
-        }
-    }
-
-    fn exit(&mut self, attributes: &AttributeGraph) {
-        if let Render(ui, thunk, .., Some(Display(display))) = self {
-            if let Some(ui) = ui.borrow().and_then(|ui| Some(ui)) {
-                display(attributes, thunk.clone(), ui);
-            }
         }
     }
 }
@@ -125,7 +117,6 @@ impl<'a> System<'a> for Render<'_> {
             let edit = e.and_then(|e| Some(e.clone()));
             let display = d.and_then(|d| Some(d.clone()));
             self.on_render(graph, thunk, edit, display);
-
         }
     }
 }

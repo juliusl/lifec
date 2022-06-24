@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use lifec::plugins::{Event, EventRuntime, ProgressBar, Node, Plugin, Progress, ThunkContext};
+use lifec::plugins::{Event, EventRuntime, ProgressBar, Plugin, Progress, ThunkContext, Engine};
 use lifec::{editor::*, AttributeGraph, Runtime};
 use specs::storage::DenseVecStorage;
 use specs::{
-    Component, DispatcherBuilder, Entities, Join, ReadStorage, RunNow, System, World, WriteStorage, Read,
+    Component, DispatcherBuilder, Entities, Join, ReadStorage, RunNow, System, World, WriteStorage,
 };
 use tokio::time::{sleep, Instant};
 
@@ -27,8 +27,39 @@ impl Plugin<ThunkContext> for Timer {
         "timer"
     }
 
-    fn call_with_context(context: &mut ThunkContext) {
+    fn call_with_context(_: &mut ThunkContext) {
         println!("timer finished");
+    }
+}
+
+impl Engine for Timer {
+    fn event_name() -> &'static str {
+        "start_timer"
+    }
+
+    fn event() -> Event {
+        Event::from_plugin_with::<Self>(Self::event_name(), 
+              |entity, thunk, initial_context, _status_sender, handle| {
+                  let thunk = thunk.clone();
+                  let initial_context = initial_context.clone();
+                  handle.spawn(async move {
+                      let progress_bar = ProgressBar(_status_sender);
+                      progress_bar.update_status(entity, "timer started", 0.01).await;
+                      if let Some(Value::Int(duration)) = initial_context.as_ref().find_attr_value("duration") {
+                          progress_bar.update_status(entity, "duration found", 0.01).await;
+                          let start = Instant::now();
+                          for i in 1..*duration + 1 {
+                              sleep(Duration::from_secs(1)).await;
+                              progress_bar.update_status(entity, format!("elapsed {:?}", start.elapsed()), i as f32/ (*duration as f32)).await;
+                          }
+                      } else {
+                          sleep(Duration::from_secs(10)).await;
+                      }
+                      progress_bar.update_status(entity, "timer completed", 1.0).await;
+                      thunk.call(&mut initial_context.clone());
+                      ThunkContext::default()
+                  })
+              })
     }
 }
 
@@ -36,34 +67,7 @@ impl Extension for Timer {
     fn configure_app_world(world: &mut World) {
         EventRuntime::configure_app_world(world);
 
-        let event =
-            Event::from_plugin_with::<Self>(
-          "start_timer", 
-            |entity, thunk, initial_context, _status_sender, handle| {
-                let thunk = thunk.clone();
-                let initial_context = initial_context.clone();
-                handle.spawn(async move {
-                    let progress_bar = ProgressBar(_status_sender);
-                    progress_bar.update_status(entity, "timer started", 0.01).await;
-                    
-                    if let Some(Value::Int(duration)) = initial_context.as_ref().find_attr_value("duration") {
-                        progress_bar.update_status(entity, "duration found", 0.01).await;
-                        let start = Instant::now();
-                        for i in 1..*duration + 1 {
-                            sleep(Duration::from_secs(1)).await;
-                            progress_bar.update_status(entity, format!("elapsed {:?}", start.elapsed()), i as f32/ (*duration as f32)).await;
-                        }
-
-                    } else {
-                        sleep(Duration::from_secs(10)).await;
-                    }
-                    progress_bar.update_status(entity, "timer completed", 1.0).await;
-                    thunk.call(&mut initial_context.clone());
-                    ThunkContext::default()
-                })
-            });
-
-        world.create_entity().with(event).build();
+        world.create_entity().with(Timer::event()).build();
     }
 
     fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
@@ -89,7 +93,7 @@ impl<'a> System<'a> for Timer {
     type SystemData = (Entities<'a>, WriteStorage<'a, Event>, ReadStorage<'a, Progress>);
 
     fn run(&mut self, (entities, mut events, progress): Self::SystemData) {
-        for (entity, event) in (&entities, &mut events).join() {
+        for (_, event) in (&entities, &mut events).join() {
             if self.0 {
                 let mut initial = ThunkContext::default();
                 initial.as_mut().with_int("duration", 5);
