@@ -10,7 +10,7 @@ use std::{
     fmt::Display,
     fs,
     hash::{Hash, Hasher},
-    str::from_utf8,
+    str::from_utf8, path::PathBuf,
 };
 
 /// Attribute graph is a component that indexes attributes for an entity
@@ -57,7 +57,14 @@ impl From<Attribute> for AttributeGraph {
 
 impl AttributeGraph {
     /// writes a binary vector in graph with attr_name to path
+    /// tries to create parent directories in path before writing the file
     pub fn write_file_as(&self, path: impl AsRef<str>, attr_name: impl AsRef<str>) -> std::io::Result<()> {
+        let path_buf = PathBuf::from(path.as_ref());
+
+        if let Some(parent) = path_buf.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
         if let Some(Value::BinaryVector(contents)) = self.find_attr_value(attr_name.as_ref()) {
             fs::write(path.as_ref(), contents)
         } else {
@@ -124,7 +131,7 @@ impl AttributeGraph {
             .edit_as(Value::BinaryVector(message.as_ref().as_bytes().to_vec()));
     }
 
-    /// finds and applies all symbols to graph
+    /// finds and applies all messages to graph
     pub fn apply(&mut self, symbol: impl AsRef<str>) {
         for (name, value) in self.take_symbol_values(symbol.as_ref()) {
             println!("Symbol '{}' {}", symbol.as_ref(), name);
