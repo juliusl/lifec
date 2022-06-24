@@ -1,7 +1,5 @@
 use atlier::system::Extension;
-use specs::{
-    shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage,
-};
+use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage};
 use tokio::{
     runtime::{Handle, Runtime},
     task::JoinHandle,
@@ -26,7 +24,7 @@ impl Event {
     pub fn from_plugin<P>(event_name: &'static str) -> Self
     where
         P: Plugin<ThunkContext> + Component + Default + Send,
-        <P as Component>::Storage: Default
+        <P as Component>::Storage: Default,
     {
         Self::from_plugin_with::<P>(event_name, |thunk, initial_context, handle| {
             let thunk = thunk.clone();
@@ -45,9 +43,9 @@ impl Event {
         event_name: &'static str,
         on_event: fn(&Thunk, &ThunkContext, &Handle) -> JoinHandle<ThunkContext>,
     ) -> Self
-    where      
+    where
         P: Plugin<ThunkContext> + Component + Default + Send,
-        <P as Component>::Storage: Default
+        <P as Component>::Storage: Default,
     {
         Self(event_name, on_event, Thunk::from_plugin::<P>(), None, None)
     }
@@ -57,8 +55,14 @@ impl Event {
         self.3 = Some(thunk_context);
 
         if let Some(task) = self.4.as_mut() {
+            eprintln!("aborting existing task");
             task.abort();
         }
+    }
+
+    /// returns true if task is running
+    pub fn is_running(&self) -> bool {
+        self.4.is_some()
     }
 }
 
@@ -75,8 +79,7 @@ impl Extension for EventRuntime {
         dispatcher.add(EventRuntime::default(), "event_runtime", &[]);
     }
 
-    fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {
-    }
+    fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {}
 }
 
 impl SetupHandler<Runtime> for EventRuntime {

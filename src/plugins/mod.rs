@@ -6,6 +6,7 @@ pub use block::Project;
 
 mod events;
 pub use events::Event;
+pub use events::EventRuntime;
 
 mod nodes;
 pub use nodes::Node;

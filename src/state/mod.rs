@@ -91,12 +91,17 @@ impl AttributeGraph {
     pub fn add_file(&mut self, path: impl AsRef<str>) {
         match fs::read_to_string(path.as_ref()) {
             Ok(content) => {
-                self.add_binary_attr(path, content);
+                self.add_file_with(path, content);
             },
             Err(err) => {
                 eprintln!("file not added {}", err);
             },
         }
+    }
+
+    /// adds a file with path and content
+    pub fn add_file_with(&mut self, path: impl AsRef<str>, content: impl AsRef<str>) {
+        self.add_binary_attr(path, content.as_ref());
     }
 
     /// finds a file attribute that was added with add_file
