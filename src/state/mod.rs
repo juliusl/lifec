@@ -1942,7 +1942,7 @@ fn test_attribute_graph_dispatcher() {
 
     let test_messages = r#"
     ```
-    add test_attr             .TEXT testing text attr
+    add test_attr             .text testing text attr
     add test_attr_empty       .EMPTY
     add test_attr_bool        .BOOL true
     add test_attr_int         .INT 510982
@@ -2217,18 +2217,23 @@ pub enum AttributeGraphEvents {
 #[derive(Logos, Debug, Hash, Clone, PartialEq, PartialOrd)]
 pub enum AttributeGraphElements {
     /// text element parses all remaining text after .TEXT as a string
+    #[token(".text", graph_lexer::from_text)]
     #[token(".TEXT", graph_lexer::from_text)]
     Text(Value),
     /// bool element parses remaining as bool
+    #[token(".bool", graph_lexer::from_bool)]
     #[token(".BOOL", graph_lexer::from_bool)]
     Bool(Value),
     /// int element parses remaining as i32
+    #[token(".int", graph_lexer::from_int)]
     #[token(".INT", graph_lexer::from_int)]
     Int(Value),
     /// int pair element parses remaining as 2 comma-delimmited i32's
+    #[token(".int2", graph_lexer::from_int_pair)]
     #[token(".INT_PAIR", graph_lexer::from_int_pair)]
     IntPair(Value),
     /// int range element parses remaining as 3 comma-delimitted i32's
+    #[token(".int3", graph_lexer::from_int_range)]
     #[token(".INT_RANGE", graph_lexer::from_int_range)]
     IntRange(Value),
     /// float element parses remaining as f32

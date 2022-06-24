@@ -7,6 +7,8 @@ pub use block::Project;
 mod events;
 pub use events::Event;
 pub use events::EventRuntime;
+pub use events::ProgressBar;
+pub use events::Progress;
 
 mod nodes;
 pub use nodes::Node;
