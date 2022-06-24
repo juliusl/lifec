@@ -11,7 +11,6 @@ use imgui::{ChildWindow, MenuItem, Ui};
 use specs::storage::DenseVecStorage;
 use specs::Component;
 use std::fmt::Write;
-use std::str::from_utf8;
 use std::{collections::BTreeSet, fmt::Error};
 
 use super::Plugin;
@@ -322,43 +321,12 @@ impl BlockContext {
 
                 if self.has_pending_events() {
                     if MenuItem::new(format!("Apply events for {}", self.block_name)).build(ui) {
-                        self.resolve_events();
+                        self.as_mut().apply_events();
                     }
                 }
                 token.end();
             }
             token.end();
-        }
-    }
-
-    /// resolve by applying and completing events
-    /// resolving at this scope, is valid for entity scoped events
-    pub fn resolve_events(&mut self) {
-        for block_symbol in self.block_symbols.clone().iter() {
-            if let Some(mut block) = self.get_block(block_symbol) {
-                for (name, value) in block.take_symbol_values("event") {
-                    println!("Event {}", name);
-                    if let Value::BinaryVector(content) = value {
-                        if let Some(content) = from_utf8(&content).ok() {
-                            println!("Applying\n{}", content);
-
-                            match self.as_mut().batch_mut(content) {
-                                Ok(_) => {
-                                    println!("Applied event {}", name);
-                                    if self.update_block(block_symbol, |block| {
-                                        block.find_remove(&name);
-                                    }) {
-                                        println!("Completing event {}", name);
-                                    }
-                                },
-                                Err(_) => {
-                                    eprintln!("could not apply events");
-                                },
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 

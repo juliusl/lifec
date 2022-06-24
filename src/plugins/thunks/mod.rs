@@ -20,7 +20,7 @@ use super::{BlockContext, Plugin};
 /// Thunk is a function that can be passed around for the system to call later
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
-pub struct Thunk(&'static str, fn(&mut ThunkContext));
+pub struct Thunk(pub &'static str, pub fn(&mut ThunkContext));
 
 impl Thunk {
     pub fn from_plugin<P>() -> Self

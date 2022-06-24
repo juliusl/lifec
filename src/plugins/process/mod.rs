@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use specs::{Component, HashMapStorage};
 use std::{
     fmt::Display,
-    process::{Command, Output}, 
+    process::{Command, Output}
 };
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]

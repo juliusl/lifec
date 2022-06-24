@@ -56,6 +56,12 @@ impl From<Attribute> for AttributeGraph {
 }
 
 impl AttributeGraph {
+    /// ends block mode, and puts the graph back to its initial root 
+    pub fn root_mut(&mut self) -> &mut Self {
+        self.dispatch_mut("```").expect("should be able to end block mode");
+        self
+    }
+
     /// writes a binary vector in graph with attr_name to path
     /// tries to create parent directories in path before writing the file
     pub fn write_file_as(&self, path: impl AsRef<str>, attr_name: impl AsRef<str>) -> std::io::Result<()> {

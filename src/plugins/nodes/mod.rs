@@ -1,4 +1,5 @@
 use super::block::Project;
+use super::events::EventRuntime;
 use super::{
     BlockContext, Display, Edit, Engine, Plugin, Process, Render, Thunk, ThunkContext, WriteFiles,
 };
@@ -12,7 +13,7 @@ use imnodes::{
 };
 use specs::storage::DenseVecStorage;
 use specs::{
-    Component, Entities, Entity, Join, ReadStorage, RunNow, System, World, WorldExt, WriteStorage,
+    Component, Entities, Entity, Join, ReadStorage, RunNow, System, World, WorldExt, WriteStorage, Builder,
 };
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -705,11 +706,14 @@ where
 {
     fn configure_app_world(world: &mut World) {
         world.register::<P>();
+
+        EventRuntime::configure_app_world(world);
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
         let system_name = format!("{}_node_sync", P::symbol());
         dispatcher.add(NodeSync::<P>::default(), &system_name, &[]);
+        dispatcher.add(EventRuntime::default(), "event_runtime", &[ &system_name ]);
     }
 
     fn on_ui(&'_ mut self, _app_world: &World, _ui: &'_ imgui::Ui<'_>) {
