@@ -67,7 +67,8 @@ impl Event {
         self.4.is_some()
     }
 }
-
+/// Event runtime handles various system related tasks, such as the progress system
+/// and scheduling tasks on tokio
 #[derive(Default)]
 pub struct EventRuntime;
 
