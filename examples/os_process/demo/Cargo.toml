@@ -7,4 +7,7 @@ edition = "2021"
 
 [dependencies]
 compression = "0.1.5"
+imgui = "0.8.2"
 lifec = { path = "../../.." }
+specs = "0.17.0"
+tokio = { version = "1.19.2", features = ["full"] }
