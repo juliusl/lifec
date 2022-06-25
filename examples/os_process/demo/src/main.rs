@@ -83,14 +83,13 @@ impl Extension for Timer {
         if let Some(progress) = &self.2 {
             progress.show(ui);
         }
-
-        self.run_now(app_world);
     }
 
     fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {
     }
 
     fn on_run(&'_ mut self, app_world: &World) {
+        self.run_now(app_world);
         EventRuntime{}.on_run(app_world);
     }
 }
