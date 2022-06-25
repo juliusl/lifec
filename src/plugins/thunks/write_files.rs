@@ -3,7 +3,6 @@ use super::ThunkContext;
 use atlier::prelude::Value;
 use specs::storage::DenseVecStorage;
 use specs::Component;
-use tokio::runtime::Handle;
 use tokio::task::JoinHandle;
 
 #[derive(Component, Clone, Default)]
@@ -19,7 +18,7 @@ impl Plugin<ThunkContext> for WriteFiles {
         "Writes any input binary vector value to a file."
     }
 
-    fn call_with_context(context: &mut ThunkContext, _: Option<Handle>) -> Option<JoinHandle<()>> {
+    fn call_with_context(context: &mut ThunkContext) -> Option<JoinHandle<()>> {
         for (file_name, value) in context
             .clone()
             .as_ref()

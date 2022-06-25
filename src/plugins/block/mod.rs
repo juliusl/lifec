@@ -306,7 +306,7 @@ impl BlockContext {
                     transpiled.add_block("file", |f| {
                         f.add_text_attr("runmd_path", format!("{}.runmd", block_name))
                     });
-                    Transpile::call_with_context(&mut transpiled, None);
+                    Transpile::call_with_context(&mut transpiled);
                 }
 
                 if ui.is_item_hovered() {

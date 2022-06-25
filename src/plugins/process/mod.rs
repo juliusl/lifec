@@ -4,7 +4,7 @@ use atlier::system::Value;
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 use specs::{Component, HashMapStorage};
-use tokio::{runtime::Handle, task::JoinHandle};
+use tokio::{task::JoinHandle};
 use std::{
     fmt::Display,
     process::{Command, Output}
@@ -59,8 +59,8 @@ impl Plugin<ThunkContext> for Process {
         "Executes a new command w/ an OS process."
     }
 
-    fn call_with_context(context: &mut super::ThunkContext, handle: Option<Handle>) -> Option<JoinHandle<()>> {
-        if let Some(handle) = handle {
+    fn call_with_context(context: &mut super::ThunkContext) -> Option<JoinHandle<()>> {
+        if let Some(handle) = context.handle() {
             handle.block_on(async {
                 
             });

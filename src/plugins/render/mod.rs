@@ -5,7 +5,6 @@ use crate::AttributeGraph;
 use imgui::Ui;
 use specs::storage::DenseVecStorage;
 use specs::{Component, Join, ReadStorage, RunNow, System, World, WriteStorage};
-use tokio::runtime::Handle;
 use tokio::task::JoinHandle;
 
 /// For rendering a ui frame that can mutate state
@@ -95,7 +94,7 @@ where
         "render"
     }
 
-    fn call_with_context(_: &mut Context, _: Option<Handle>) -> Option<JoinHandle<()>> {
+    fn call_with_context(_: &mut Context) -> Option<JoinHandle<()>> {
         None
     }
 }

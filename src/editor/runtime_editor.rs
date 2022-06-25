@@ -122,8 +122,8 @@ where
                                     entity.id()
                                 );
                                 if MenuItem::new(label).build(ui) {
-                                    let mut context = ThunkContext(block.clone());
-                                    thunk(&mut context, None);
+                                    let mut context = ThunkContext::from(block.as_ref().clone());
+                                    thunk(&mut context);
                                 }
                                 if ui.is_item_hovered() {
                                     ui.tooltip(|| {

@@ -10,6 +10,7 @@ use tokio::{
 };
 
 use super::Engine;
+use super::thunks::StatusUpdate;
 use super::{Plugin, Thunk, ThunkContext};
 use specs::storage::VecStorage;
 use specs::storage::HashMapStorage;
@@ -19,7 +20,6 @@ use specs::storage::HashMapStorage;
 #[storage(VecStorage)]
 pub struct Event(
     &'static str,
-    fn(Entity, &Thunk, &ThunkContext, Sender<StatusUpdate>, &Handle) -> JoinHandle<ThunkContext>,
     Thunk,
     Option<ThunkContext>,
     Option<JoinHandle<ThunkContext>>,
@@ -28,38 +28,28 @@ pub struct Event(
 impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}_", self.0)?;
-        write!(f, "{}", self.2.0)?;
+        write!(f, "{}", self.1.0)?;
         Ok(())
     }
 }
 
 impl Event {
-    /// creates an event component, wrapping the thunk call in a tokio task
-    pub fn from_engine_plugin<E, P>(event_name: &'static str) -> Self
-    where
-        P: Plugin<ThunkContext> + Component + Default + Send,
-        E: Engine<P>
-    {
-        Self::from_plugin::<P>(event_name, E::on_event)
-    }
-
     /// creates an event component, with a task created with on_event
     /// a handle to the tokio runtime is passed to this function to customize the task spawning
     pub fn from_plugin<P>(
         event_name: &'static str,
-        on_event: fn(Entity, &Thunk, &ThunkContext, Sender<StatusUpdate>, &Handle) -> JoinHandle<ThunkContext>,
     ) -> Self
     where
         P: Plugin<ThunkContext> + Component + Default + Send,
     {
-        Self(event_name, on_event, Thunk::from_plugin::<P>(), None, None)
+        Self(event_name, Thunk::from_plugin::<P>(), None, None)
     }
 
     /// "fire" the event, abort any previously running tasks
     pub fn fire(&mut self, thunk_context: ThunkContext) {
-        self.3 = Some(thunk_context);
+        self.2 = Some(thunk_context);
 
-        if let Some(task) = self.4.as_mut() {
+        if let Some(task) = self.3.as_mut() {
             eprintln!("aborting existing task");
             task.abort();
         }
@@ -67,7 +57,7 @@ impl Event {
 
     /// returns true if task is running
     pub fn is_running(&self) -> bool {
-        self.4.is_some()
+        self.3.is_some()
     }
 }
 /// Event runtime handles various system related tasks, such as the progress system
@@ -113,8 +103,6 @@ impl SetupHandler<Runtime> for EventRuntime {
     }
 }
 
-pub type StatusUpdate = (Entity, f32, String);
-
 #[derive(Component, Clone)]
 #[storage(HashMapStorage)]
 pub struct Progress(f32, String);
@@ -158,7 +146,7 @@ impl<'a> System<'a> for EventRuntime {
     fn run(&mut self, (runtime, status_sender, entities, mut events, mut contexts): Self::SystemData) {
         for (entity, event) in (&entities, &mut events).join() {
             let event_name = event.to_string();
-            let Event(_, on_event, thunk, initial_context, task) = event;
+            let Event(_, thunk, initial_context, task) = event;
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
                     if let Some(thunk_context) =
@@ -178,8 +166,23 @@ impl<'a> System<'a> for EventRuntime {
                 }
             } else if let Some(initial_context) = initial_context.take() {
                 println!("begin event: {}, {}", &event_name, initial_context.as_ref().hash_code());
-                let handle = on_event(entity, &thunk, &initial_context, status_sender.clone(), runtime.handle());
-                *task = Some(handle);
+                let thunk = thunk.clone();
+                *task = Some(runtime.spawn(async move { 
+                    let mut initial_context = initial_context.clone();
+                    let thunk = thunk.clone();
+                    let Thunk(.., thunk) = thunk;
+                    if let Some(handle) = thunk(&mut initial_context) {
+                        match handle.await {
+                            Ok(_) => {
+                                
+                            },
+                            Err(_) => {
+                                
+                            },
+                        }
+                    }
+                    initial_context
+                }));
             }
         }
     }

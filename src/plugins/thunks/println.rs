@@ -2,7 +2,6 @@ use crate::plugins::Plugin;
 use super::ThunkContext;
 use specs::Component;
 use specs::storage::DenseVecStorage;
-use tokio::runtime::Handle;
 use tokio::task::JoinHandle;
 
 #[derive(Default, Component)]
@@ -18,7 +17,7 @@ impl Plugin<ThunkContext> for Println {
         "Can be used to debug attributes passed as input to this thunk."
     }
 
-    fn call_with_context(context: &mut ThunkContext, _: Option<Handle>) -> Option<JoinHandle<()>> {
+    fn call_with_context(context: &mut ThunkContext) -> Option<JoinHandle<()>> {
         context.accept("thunk", |a| {
             a.is_stable()
         });

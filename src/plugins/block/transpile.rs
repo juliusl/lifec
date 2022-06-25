@@ -1,6 +1,6 @@
 use std::fs;
 
-use tokio::{runtime::Handle, task::JoinHandle};
+use tokio::task::JoinHandle;
 
 use crate::plugins::Plugin;
 
@@ -13,7 +13,7 @@ impl Plugin<BlockContext> for Transpile {
         "transpile"
     }
 
-    fn call_with_context(context: &mut BlockContext, _: Option<Handle>) -> Option<JoinHandle<()>> {
+    fn call_with_context(context: &mut BlockContext) -> Option<JoinHandle<()>> {
         if let Some(output_file) = context.get_block("file") {
             if let Some(path) = output_file.find_text("runmd_path") {
                 if let Some(content) = context.transpile().ok() {
