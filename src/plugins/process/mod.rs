@@ -1,9 +1,10 @@
-use super::{Plugin, ThunkContext, BlockContext};
+use super::{Plugin, ThunkContext, BlockContext, Engine};
 use crate::{AttributeGraph, RuntimeDispatcher, RuntimeState};
 use atlier::system::Value;
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 use specs::{Component, HashMapStorage};
+use tokio::{runtime::Handle, task::JoinHandle};
 use std::{
     fmt::Display,
     process::{Command, Output}
@@ -41,6 +42,14 @@ impl Process {
     }
 }
 
+struct Start;
+
+impl Engine<Process> for Start {
+    fn event_name() -> &'static str {
+        "start"
+    }
+}
+
 impl Plugin<ThunkContext> for Process {
     fn symbol() -> &'static str {
         "process"
@@ -50,7 +59,13 @@ impl Plugin<ThunkContext> for Process {
         "Executes a new command w/ an OS process."
     }
 
-    fn call_with_context(context: &mut super::ThunkContext) {
+    fn call_with_context(context: &mut super::ThunkContext, handle: Option<Handle>) -> Option<JoinHandle<()>> {
+        if let Some(handle) = handle {
+            handle.block_on(async {
+                
+            });
+        }
+
         if let Some(process) = context
             .as_ref()
             .find_block("", "form")
@@ -87,6 +102,8 @@ impl Plugin<ThunkContext> for Process {
                 }
             }
         }
+    
+        None
     }
 }
 

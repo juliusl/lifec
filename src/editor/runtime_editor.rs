@@ -1,10 +1,13 @@
 use std::collections::HashMap;
 
-use imgui::{Window, MenuItem, ChildWindow};
-use specs::{Component, Entities, System, ReadStorage, Join, Entity};
+use imgui::{ChildWindow, MenuItem, Window};
+use specs::{Component, Entities, Entity, Join, ReadStorage, System, WriteStorage};
 
 use super::App;
-use crate::{Runtime, RuntimeState, plugins::{Project, Thunk, ThunkContext, BlockContext}};
+use crate::{
+    plugins::{BlockContext, Event, Project, Thunk, ThunkContext},
+    Runtime, RuntimeState,
+};
 
 #[derive(Clone)]
 pub struct RuntimeEditor<S>
@@ -15,6 +18,7 @@ where
     project: Project,
     calls: HashMap<Entity, Thunk>,
     blocks: HashMap<Entity, BlockContext>,
+    events: HashMap<String, Entity>,
 }
 
 impl<S> RuntimeEditor<S>
@@ -22,12 +26,19 @@ where
     S: RuntimeState,
 {
     pub fn new(runtime: Runtime<S>) -> Self {
-        let state = runtime.clone().state.unwrap_or_default().state().as_ref().clone();
+        let state = runtime
+            .clone()
+            .state
+            .unwrap_or_default()
+            .state()
+            .as_ref()
+            .clone();
         Self {
             _runtime: runtime,
             project: Project::from(state),
             calls: HashMap::default(),
             blocks: HashMap::default(),
+            events: HashMap::default(),
         }
     }
 }
@@ -40,18 +51,25 @@ where
         Entities<'a>,
         ReadStorage<'a, Thunk>,
         ReadStorage<'a, BlockContext>,
+        WriteStorage<'a, Event>,
     );
 
     /// The runtime editor maintains a vector of sections that it displays
     /// This system coordinates updates to those sections, as well as initialization
-    fn run(&mut self, (entities, calls, blocks): Self::SystemData) {
-        for (entity, call, block) in (&entities, calls.maybe(), blocks.maybe()).join() {
+    fn run(&mut self, (entities, calls, blocks, events): Self::SystemData) {
+        for (entity, call, block, event) in
+            (&entities, calls.maybe(), blocks.maybe(), events.maybe()).join()
+        {
             if let Some(call) = call {
                 self.calls.insert(entity, call.clone());
             }
 
             if let Some(block) = block {
                 self.blocks.insert(entity, block.clone());
+            }
+
+            if let Some(event) = event {
+                self.events.insert(event.to_string(), entity);
             }
         }
     }
@@ -67,6 +85,7 @@ where
             project: Default::default(),
             calls: HashMap::default(),
             blocks: HashMap::default(),
+            events: HashMap::default(),
         }
     }
 }
@@ -92,16 +111,22 @@ where
                 ui.menu_bar(|| {
                     project.edit_project_menu(ui);
 
-                    ui.menu("Plugins", ||{
+                    ui.menu("Plugins", || {
                         for (entity, call) in self.calls.iter() {
                             if let Some(block) = self.blocks.get(entity) {
-                                let label = format!("Call thunk {} {} - entity: {}", call.symbol().as_ref(), block.block_name, entity.id());
+                                let Thunk(symbol, thunk) = call; 
+                                let label = format!(
+                                    "Call thunk {} {} - entity: {}",
+                                    symbol,
+                                    block.block_name,
+                                    entity.id()
+                                );
                                 if MenuItem::new(label).build(ui) {
                                     let mut context = ThunkContext(block.clone());
-                                    call.call(&mut context);
+                                    thunk(&mut context, None);
                                 }
                                 if ui.is_item_hovered() {
-                                    ui.tooltip(||{
+                                    ui.tooltip(|| {
                                         block.clone().edit_block_tooltip_view(false, ui);
                                     });
                                 }
@@ -114,28 +139,30 @@ where
                     for (_, block) in project.iter_block_mut().enumerate() {
                         let (block_name, block) = block;
 
-                       let thunk_symbol = if let Some(thunk) = block.get_block("thunk") {
+                        let thunk_symbol = if let Some(thunk) = block.get_block("thunk") {
                             thunk.find_text("thunk_symbol")
                         } else {
-                            None 
+                            None
                         };
 
                         let thunk_symbol = thunk_symbol.unwrap_or("entity".to_string());
 
-                        if let Some(token) = ui.tab_item(format!("{} {}", thunk_symbol, block_name)) {
+                        if let Some(token) = ui.tab_item(format!("{} {}", thunk_symbol, block_name))
+                        {
                             ui.group(|| {
                                 block.edit_block_view(true, ui);
-                                ChildWindow::new(&format!("table_view_{}", block_name)).size([0.0, 0.0]).build(ui, ||{
-                                    block.edit_block_table_view(ui);
-                                });
+                                ChildWindow::new(&format!("table_view_{}", block_name))
+                                    .size([0.0, 0.0])
+                                    .build(ui, || {
+                                        block.edit_block_table_view(ui);
+                                    });
                             });
 
                             token.end();
                         }
-                   }
-                   tabbar.end();
+                    }
+                    tabbar.end();
                 }
             });
     }
 }
-

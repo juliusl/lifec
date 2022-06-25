@@ -327,7 +327,7 @@ impl Extension for Node {
         NodeSync::<WriteFiles>::configure_app_systems(builder);
     }
 
-    fn on_ui(&mut self, app_world: &World, ui: &imgui::Ui) {
+    fn on_ui(&mut self, _: &World, ui: &imgui::Ui) {
         let mut frame = Render::next_frame(ui);
 
         let mut size = [800.0, 600.0];
@@ -699,12 +699,12 @@ where
         dispatcher.add(EventRuntime::default(), "event_runtime", &[ &system_name ]);
     }
 
-    fn on_ui(&'_ mut self, _app_world: &World, _ui: &'_ imgui::Ui<'_>) {
+    fn on_ui(&'_ mut self, _: &World, _: &'_ imgui::Ui<'_>) {
     }
 
     fn on_window_event(&'_ mut self, _: &World, _: &'_ atlier::system::WindowEvent<'_>) {
     }
 
-    fn on_run(&'_ mut self, app_world: &World) {
+    fn on_run(&'_ mut self, _: &World) {
     }
 }

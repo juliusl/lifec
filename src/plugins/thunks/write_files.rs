@@ -3,6 +3,8 @@ use super::ThunkContext;
 use atlier::prelude::Value;
 use specs::storage::DenseVecStorage;
 use specs::Component;
+use tokio::runtime::Handle;
+use tokio::task::JoinHandle;
 
 #[derive(Component, Clone, Default)]
 #[storage(DenseVecStorage)]
@@ -17,7 +19,7 @@ impl Plugin<ThunkContext> for WriteFiles {
         "Writes any input binary vector value to a file."
     }
 
-    fn call_with_context(context: &mut ThunkContext) {
+    fn call_with_context(context: &mut ThunkContext, _: Option<Handle>) -> Option<JoinHandle<()>> {
         for (file_name, value) in context
             .clone()
             .as_ref()
@@ -49,6 +51,8 @@ impl Plugin<ThunkContext> for WriteFiles {
             println!("Setting parent dir {}", dir);
             context.publish(|a| a.add_text_attr("parent_dir", dir));
         }
+
+        None
     }
 }
 

@@ -1,11 +1,14 @@
 use std::time::Duration;
 
+use imgui::Window;
 use lifec::plugins::{Event, EventRuntime, ProgressBar, Plugin, Progress, ThunkContext, Engine};
 use lifec::{editor::*, AttributeGraph, Runtime};
 use specs::storage::DenseVecStorage;
 use specs::{
     Component, DispatcherBuilder, Entities, Join, ReadStorage, RunNow, System, World, WriteStorage,
 };
+use tokio::runtime::Handle;
+use tokio::task::JoinHandle;
 use tokio::time::{sleep, Instant};
 
 fn main() {
@@ -27,36 +30,40 @@ impl Plugin<ThunkContext> for Timer {
         "timer"
     }
 
-    fn call_with_context(_: &mut ThunkContext) {
+    fn call_with_context(_: &mut ThunkContext, _: Option<Handle>) -> Option<JoinHandle<()>> {
         println!("timer finished");
+
+        None
     }
 }
 
-impl Engine for Timer {
+impl Engine<Timer> for Timer {
     fn event_name() -> &'static str {
-        "start_timer"
+        "start"
     }
 
     fn event() -> Event {
-        Event::from_plugin_with::<Self>(Self::event_name(), 
-              |entity, thunk, initial_context, _status_sender, handle| {
+        Event::from_plugin::<Self>(Self::event_name(), 
+              |entity, thunk, initial_context, status_sender, handle| {
                   let thunk = thunk.clone();
                   let initial_context = initial_context.clone();
+                  let thunk_handle = handle.clone();
                   handle.spawn(async move {
-                      let progress_bar = ProgressBar(_status_sender);
-                      progress_bar.update_status(entity, "timer started", 0.01).await;
-                      if let Some(Value::Int(duration)) = initial_context.as_ref().find_attr_value("duration") {
-                          progress_bar.update_status(entity, "duration found", 0.01).await;
+                      let progress_bar = ProgressBar(status_sender);
+                      progress_bar.update(entity, "timer started", 0.01).await;
+                      if let Some(duration) = initial_context.as_ref().find_int("duration") {
+                          progress_bar.update(entity, "duration found", 0.01).await;
                           let start = Instant::now();
-                          for i in 1..*duration + 1 {
+                          for i in 1..duration + 1 {
                               sleep(Duration::from_secs(1)).await;
-                              progress_bar.update_status(entity, format!("elapsed {:?}", start.elapsed()), i as f32/ (*duration as f32)).await;
+                              let progress = i as f32/ (duration as f32);
+                              progress_bar.update(entity, format!("elapsed {:?} {} %", start.elapsed(), progress*100.0), progress).await;
                           }
                       } else {
                           sleep(Duration::from_secs(10)).await;
                       }
-                      progress_bar.update_status(entity, "timer completed", 1.0).await;
-                      thunk.call(&mut initial_context.clone());
+                      progress_bar.update(entity, "timer completed", 1.0).await;
+                      thunk.start(&mut initial_context.clone(), thunk_handle).await;
                       ThunkContext::default()
                   })
               })
@@ -74,18 +81,26 @@ impl Extension for Timer {
         EventRuntime::configure_app_systems(dispatcher);
     }
 
-    fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
-        ui.text(&self.1);
-        if ui.button("fire") {
-            self.0 = true;
-        }
-
-        if let Some(progress) = &self.2 {
-            progress.show(ui);
-        }
+    fn on_ui(&'_ mut self, _: &World, ui: &'_ imgui::Ui<'_>) {
+        Window::new("Timer").size([800.0, 600.0], imgui::Condition::Appearing).build(ui, ||{
+            ui.text(&self.1);
+            if ui.button("fire") {
+                self.0 = true;
+            }
+    
+            if let Some(progress) = &self.2 {
+                progress.show(ui);
+            }
+        });
     }
 
-    fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {
+    fn on_window_event(&'_ mut self, _: &World, event: &'_ WindowEvent<'_>) {
+        match  event {
+            WindowEvent::DroppedFile(file) => {
+                println!("File dropped {:?}", file);
+            },
+            _ => {}
+        }
     }
 
     fn on_run(&'_ mut self, app_world: &World) {
@@ -120,41 +135,3 @@ impl<'a> System<'a> for Timer {
         }
     }
 }
-
-// ui.same_line();
-// if ui.button("Compress state") {
-//     use compression::prelude::*;
-//     match std::fs::read(format!("{}.json", "projects")) {
-//         Ok(serialized) => {
-//             let compressed = serialized
-//                 .encode(&mut BZip2Encoder::new(9), Action::Finish)
-//                 .collect::<Result<Vec<_>, _>>()
-//                 .unwrap();
-
-//             if let Some(_) = std::fs::write("projects.json.bzip2", compressed).ok() {
-//                 println!("compressed");
-//             }
-//         }
-//         Err(_) => {}
-//     }
-// }
-
-// ui.same_line();
-// if ui.button("Decompress state") {
-//     use compression::prelude::*;
-//     match std::fs::read(format!("{}.json.bzip2", "projects")) {
-//         Ok(compressed) => {
-//             let decompressed = compressed
-//                 .decode(&mut BZip2Decoder::new())
-//                 .collect::<Result<Vec<_>, _>>()
-//                 .unwrap();
-
-//             if let Some(_) =
-//                 std::fs::write("projects.json.bzip2.json", decompressed).ok()
-//             {
-//                 println!("decompressed");
-//             }
-//         }
-//         Err(_) => {}
-//     }
-// }

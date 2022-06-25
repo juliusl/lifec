@@ -1,7 +1,9 @@
-use crate::plugins::{Plugin, Project};
+use crate::plugins::Plugin;
 use super::ThunkContext;
 use specs::Component;
 use specs::storage::DenseVecStorage;
+use tokio::runtime::Handle;
+use tokio::task::JoinHandle;
 
 #[derive(Default, Component)]
 #[storage(DenseVecStorage)]
@@ -16,7 +18,7 @@ impl Plugin<ThunkContext> for Println {
         "Can be used to debug attributes passed as input to this thunk."
     }
 
-    fn call_with_context(context: &mut ThunkContext) {
+    fn call_with_context(context: &mut ThunkContext, _: Option<Handle>) -> Option<JoinHandle<()>> {
         context.accept("thunk", |a| {
             a.is_stable()
         });
@@ -30,5 +32,7 @@ impl Plugin<ThunkContext> for Println {
             });
 
         context.publish(|a| a.add_bool_attr("printed", true));
+
+        None
     }
 }

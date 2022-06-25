@@ -10,7 +10,8 @@ use std::{
     fmt::Display,
     fs,
     hash::{Hash, Hasher},
-    str::from_utf8, path::PathBuf,
+    path::PathBuf,
+    str::from_utf8,
 };
 
 /// Attribute graph is a component that indexes attributes for an entity
@@ -56,15 +57,20 @@ impl From<Attribute> for AttributeGraph {
 }
 
 impl AttributeGraph {
-    /// ends block mode, and puts the graph back to its initial root 
+    /// ends block mode, and puts the graph back to its initial root
     pub fn root_mut(&mut self) -> &mut Self {
-        self.dispatch_mut("```").expect("should be able to end block mode");
+        self.dispatch_mut("```")
+            .expect("should be able to end block mode");
         self
     }
 
     /// writes a binary vector in graph with attr_name to path
     /// tries to create parent directories in path before writing the file
-    pub fn write_file_as(&self, path: impl AsRef<str>, attr_name: impl AsRef<str>) -> std::io::Result<()> {
+    pub fn write_file_as(
+        &self,
+        path: impl AsRef<str>,
+        attr_name: impl AsRef<str>,
+    ) -> std::io::Result<()> {
         let path_buf = PathBuf::from(path.as_ref());
 
         if let Some(parent) = path_buf.parent() {
@@ -75,9 +81,9 @@ impl AttributeGraph {
             fs::write(path.as_ref(), contents)
         } else {
             Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound, 
-                format!("could not find binary attribute {}", attr_name.as_ref()))
-            )
+                std::io::ErrorKind::NotFound,
+                format!("could not find binary attribute {}", attr_name.as_ref()),
+            ))
         }
     }
 
@@ -92,10 +98,10 @@ impl AttributeGraph {
         match fs::read_to_string(path.as_ref()) {
             Ok(content) => {
                 self.add_file_with(path, content);
-            },
+            }
             Err(err) => {
                 eprintln!("file not added {}", err);
-            },
+            }
         }
     }
 
@@ -137,7 +143,12 @@ impl AttributeGraph {
     }
 
     /// add message to graph that can be dispatched with apply(..)
-    pub fn add_message(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>, message: impl AsRef<str>) {
+    pub fn add_message(
+        &mut self,
+        name: impl AsRef<str>,
+        symbol: impl AsRef<str>,
+        message: impl AsRef<str>,
+    ) {
         self.define(name.as_ref(), symbol.as_ref())
             .edit_as(Value::BinaryVector(message.as_ref().as_bytes().to_vec()));
     }
@@ -271,8 +282,8 @@ impl AttributeGraph {
         attr_name: impl AsRef<str>,
         ui: &imgui::Ui,
     ) {
-        if let Some(Value::Float(width)) = self.find_attr_value("edit_width") {
-            ui.set_next_item_width(*width);
+        if let Some(width) = self.find_float("edit_width") {
+            ui.set_next_item_width(width);
         } else {
             ui.set_next_item_width(0.0);
         }
@@ -620,6 +631,28 @@ impl AttributeGraph {
         self.find_attr_value(with_name).and_then(|n| {
             if let Value::TextBuffer(text) = n {
                 Some(text.to_string())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Finds an int value of an attribute
+    pub fn find_int(&self, with_name: impl AsRef<str>) -> Option<i32> {
+        self.find_attr_value(with_name).and_then(|n| {
+            if let Value::Int(int) = n {
+                Some(*int)
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Finds a float value of an attribute
+    pub fn find_float(&self, with_name: impl AsRef<str>) -> Option<f32> {
+        self.find_attr_value(with_name).and_then(|n| {
+            if let Value::Float(float) = n {
+                Some(*float)
             } else {
                 None
             }
@@ -1926,7 +1959,7 @@ fn test_block_context() {
     let main_elm = graph.find_block("Main.elm", "file").expect("exists");
     println!("{}", main_elm.save().expect("exists"));
 
-    let commited_main_elm = main_elm.commit(|_|{});
+    let commited_main_elm = main_elm.commit(|_| {});
     let attr: Option<Attribute> = commited_main_elm.to_attribute();
     println!("{:?}", attr);
 
@@ -2237,18 +2270,23 @@ pub enum AttributeGraphElements {
     #[token(".INT_RANGE", graph_lexer::from_int_range)]
     IntRange(Value),
     /// float element parses remaining as f32
+    #[token(".float", graph_lexer::from_float)]
     #[token(".FLOAT", graph_lexer::from_float)]
     Float(Value),
     /// float pair element parses reamining as 2 comma delimitted f32's
+    #[token(".float2", graph_lexer::from_float_pair)]
     #[token(".FLOAT_PAIR", graph_lexer::from_float_pair)]
     FloatPair(Value),
     /// float range element parses remaining as 3 comma delimitted f32's
+    #[token(".float3", graph_lexer::from_float_range)]
     #[token(".FLOAT_RANGE", graph_lexer::from_float_range)]
     FloatRange(Value),
     /// binary vector element parses remaining as 3 comma delimitted f32's
+    #[token(".base64", graph_lexer::from_binary_vector_base64)]
     #[token(".BINARY_VECTOR", graph_lexer::from_binary_vector_base64)]
     BinaryVector(Value),
     /// empty element parses
+    #[token(".empty")]
     #[token(".EMPTY")]
     Empty,
     /// entity ids should be parsed before symbols

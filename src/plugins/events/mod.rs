@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use atlier::system::Extension;
 use atlier::system::WindowEvent;
 use imgui::Ui;
@@ -7,6 +9,7 @@ use tokio::{
     task::JoinHandle, sync::{self, mpsc::{self, Sender}},
 };
 
+use super::Engine;
 use super::{Plugin, Thunk, ThunkContext};
 use specs::storage::VecStorage;
 use specs::storage::HashMapStorage;
@@ -22,33 +25,32 @@ pub struct Event(
     Option<JoinHandle<ThunkContext>>,
 );
 
+impl Display for Event {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}_", self.0)?;
+        write!(f, "{}", self.2.0)?;
+        Ok(())
+    }
+}
+
 impl Event {
     /// creates an event component, wrapping the thunk call in a tokio task
-    pub fn from_plugin<P>(event_name: &'static str) -> Self
+    pub fn from_engine_plugin<E, P>(event_name: &'static str) -> Self
     where
         P: Plugin<ThunkContext> + Component + Default + Send,
-        <P as Component>::Storage: Default,
+        E: Engine<P>
     {
-        Self::from_plugin_with::<P>(event_name, |_, thunk, initial_context, _, handle| {
-            let thunk = thunk.clone();
-            let initial_context = initial_context.clone();
-            handle.spawn(async move {
-                let mut context = initial_context;
-                thunk.call(&mut context);
-                context
-            })
-        })
+        Self::from_plugin::<P>(event_name, E::on_event)
     }
 
     /// creates an event component, with a task created with on_event
     /// a handle to the tokio runtime is passed to this function to customize the task spawning
-    pub fn from_plugin_with<P>(
+    pub fn from_plugin<P>(
         event_name: &'static str,
         on_event: fn(Entity, &Thunk, &ThunkContext, Sender<StatusUpdate>, &Handle) -> JoinHandle<ThunkContext>,
     ) -> Self
     where
         P: Plugin<ThunkContext> + Component + Default + Send,
-        <P as Component>::Storage: Default,
     {
         Self(event_name, on_event, Thunk::from_plugin::<P>(), None, None)
     }
@@ -126,16 +128,12 @@ impl Progress {
 pub struct ProgressBar(pub Sender<StatusUpdate>);
 
 impl ProgressBar {
-    pub async fn update_status(&self, entity: Entity, status: impl AsRef<str>, progress: f32) {
+    pub async fn update(&self, entity: Entity, status: impl AsRef<str>, progress: f32) {
         let ProgressBar(sender) = self;
 
         match sender.send((entity, progress, status.as_ref().to_string())).await {
-            Ok(_) => {
-
-            },
-            Err(_) => {
-                
-            },
+            Ok(_) => {},
+            Err(_) => {},
         }
     }
 }
@@ -159,7 +157,8 @@ impl<'a> System<'a> for EventRuntime {
 
     fn run(&mut self, (runtime, status_sender, entities, mut events, mut contexts): Self::SystemData) {
         for (entity, event) in (&entities, &mut events).join() {
-            let Event(event_name, on_event, thunk, initial_context, task) = event;
+            let event_name = event.to_string();
+            let Event(_, on_event, thunk, initial_context, task) = event;
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
                     if let Some(thunk_context) =
@@ -167,10 +166,10 @@ impl<'a> System<'a> for EventRuntime {
                     {
                         match contexts.insert(entity, thunk_context) {
                             Ok(_) => {
-                                println!("completed: {}", event_name);
+                                println!("completed: {}", &event_name);
                             }
                             Err(err) => {
-                                eprintln!("error completing: {}, {}", event_name, err);
+                                eprintln!("error completing: {}, {}", &event_name, err);
                             }
                         }
                     }
@@ -178,7 +177,7 @@ impl<'a> System<'a> for EventRuntime {
                     *task = Some(current_task);
                 }
             } else if let Some(initial_context) = initial_context.take() {
-                println!("event starting: {}, {}", event_name, initial_context.as_ref().hash_code());
+                println!("begin event: {}, {}", &event_name, initial_context.as_ref().hash_code());
                 let handle = on_event(entity, &thunk, &initial_context, status_sender.clone(), runtime.handle());
                 *task = Some(handle);
             }
