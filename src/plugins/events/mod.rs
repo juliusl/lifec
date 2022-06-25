@@ -5,11 +5,10 @@ use atlier::system::WindowEvent;
 use imgui::Ui;
 use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage, Entity};
 use tokio::{
-    runtime::{Handle, Runtime},
+    runtime:: Runtime,
     task::JoinHandle, sync::{self, mpsc::{self, Sender}},
 };
 
-use super::Engine;
 use super::thunks::StatusUpdate;
 use super::{Plugin, Thunk, ThunkContext};
 use specs::storage::VecStorage;
@@ -167,8 +166,12 @@ impl<'a> System<'a> for EventRuntime {
             } else if let Some(initial_context) = initial_context.take() {
                 println!("begin event: {}, {}", &event_name, initial_context.as_ref().hash_code());
                 let thunk = thunk.clone();
+                let status_sender = status_sender.clone();
+                let runtime_handle = runtime.handle().clone();
                 *task = Some(runtime.spawn(async move { 
                     let mut initial_context = initial_context.clone();
+                    let status_updates = status_sender.clone();
+                    initial_context.enable_async(runtime_handle, Some(status_updates));
                     let thunk = thunk.clone();
                     let Thunk(.., thunk) = thunk;
                     if let Some(handle) = thunk(&mut initial_context) {
@@ -180,6 +183,8 @@ impl<'a> System<'a> for EventRuntime {
                                 
                             },
                         }
+                    } else {
+                        println!("event completed: {}", &event_name);
                     }
                     initial_context
                 }));

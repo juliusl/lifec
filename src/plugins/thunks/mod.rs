@@ -32,27 +32,6 @@ impl Thunk {
         Self(P::symbol(), P::call_with_context)
     }
 
-    pub async fn start(&self, context: &mut ThunkContext, handle: Handle) {
-        let Thunk(symbol, thunk) = self;
-
-        context.handle = Some(handle.clone());
-
-        if let Some(join_handle) = thunk(context) {
-            match join_handle.await {
-                Ok(_) => {
-                    context.block.update_block("thunk", |t| {
-                        t.add_text_attr("thunk_symbol", symbol.to_string());
-                    });
-                },
-                Err(err) => {
-                    context.block.update_block("thunk", |t| {
-                        t.add_text_attr("error", format!("error {}", err));
-                    });
-                },
-            }
-        }
-    }
-
     pub fn show(&self, context: &mut ThunkContext, ui: &Ui) {
         ui.set_next_item_width(130.0);
         if ui.button(context.label(self.0)) {
@@ -98,6 +77,12 @@ impl AsMut<AttributeGraph> for ThunkContext {
 }
 
 impl ThunkContext {
+    /// enable async features for the context
+    pub fn enable_async(&mut self, handle: Handle, status_updates: Option<Sender<StatusUpdate>>) {
+        self.handle = Some(handle);
+        self.status_updates = status_updates;
+    }
+
     pub fn handle(&self) -> Option<Handle> {
         self.handle.as_ref().and_then(|h| Some(h.clone()))
     }
