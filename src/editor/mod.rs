@@ -8,6 +8,7 @@ pub use atlier::system::App;
 pub use atlier::system::Attribute;
 pub use atlier::system::Extension;
 pub use atlier::system::Value;
+pub use atlier::system::WindowEvent;
 pub use runtime_editor::RuntimeEditor;
 
 /// open a runtime editor for an attribute graph, and extension

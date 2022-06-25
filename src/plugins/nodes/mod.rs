@@ -475,7 +475,12 @@ impl Extension for Node {
 
                 detatch.pop();
             });
+    }
 
+    fn on_window_event(&'_ mut self, _: &World, _: &'_ atlier::system::WindowEvent<'_>) {
+    }
+
+    fn on_run(&'_ mut self, app_world: &World) {
         self.run_now(app_world);
     }
 }
@@ -695,5 +700,11 @@ where
     }
 
     fn on_ui(&'_ mut self, _app_world: &World, _ui: &'_ imgui::Ui<'_>) {
+    }
+
+    fn on_window_event(&'_ mut self, _: &World, _: &'_ atlier::system::WindowEvent<'_>) {
+    }
+
+    fn on_run(&'_ mut self, app_world: &World) {
     }
 }

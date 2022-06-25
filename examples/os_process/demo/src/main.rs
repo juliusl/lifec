@@ -84,8 +84,14 @@ impl Extension for Timer {
             progress.show(ui);
         }
 
-        EventRuntime{}.on_ui(app_world, ui);
         self.run_now(app_world);
+    }
+
+    fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {
+    }
+
+    fn on_run(&'_ mut self, app_world: &World) {
+        EventRuntime{}.on_run(app_world);
     }
 }
 

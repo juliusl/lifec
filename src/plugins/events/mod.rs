@@ -1,4 +1,5 @@
 use atlier::system::Extension;
+use atlier::system::WindowEvent;
 use imgui::Ui;
 use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage, Entity};
 use tokio::{
@@ -83,16 +84,24 @@ impl Extension for EventRuntime {
         dispatcher.add(EventRuntime::default(), "event_runtime", &[]);
     }
 
-    fn on_ui(&'_ mut self, world: &specs::World, _: &'_ imgui::Ui<'_>) {
-       let mut rx = world.write_resource::<tokio::sync::mpsc::Receiver<StatusUpdate>>();
-       let mut progress = world.write_storage::<Progress>();
+    fn on_ui(&'_ mut self, _: &specs::World, _: &'_ imgui::Ui<'_>) {
+        // No-op
+    }
 
-       if let Some(msg) =  rx.try_recv().ok() {
-            match progress.insert(msg.0, Progress(msg.1, msg.2)) {
-                Ok(_) => {},
-                Err(_) => {},
-            }
-       }
+    fn on_window_event(&'_ mut self, _: &specs::World, _: &'_ WindowEvent<'_>) {
+        // No-op
+    }
+
+    fn on_run(&'_ mut self, app_world: &specs::World) {
+        let mut rx = app_world.write_resource::<tokio::sync::mpsc::Receiver<StatusUpdate>>();
+        let mut progress = app_world.write_storage::<Progress>();
+ 
+        if let Some(msg) =  rx.try_recv().ok() {
+             match progress.insert(msg.0, Progress(msg.1, msg.2)) {
+                 Ok(_) => {},
+                 Err(_) => {},
+             }
+        }
     }
 }
 
@@ -158,7 +167,7 @@ impl<'a> System<'a> for EventRuntime {
                     {
                         match contexts.insert(entity, thunk_context) {
                             Ok(_) => {
-                                println!("completed {}", event_name);
+                                println!("completed: {}", event_name);
                             }
                             Err(err) => {
                                 eprintln!("error completing: {}, {}", event_name, err);
@@ -169,7 +178,7 @@ impl<'a> System<'a> for EventRuntime {
                     *task = Some(current_task);
                 }
             } else if let Some(initial_context) = initial_context.take() {
-                println!("event started {}, {}", event_name, initial_context.as_ref().hash_code());
+                println!("event starting: {}, {}", event_name, initial_context.as_ref().hash_code());
                 let handle = on_event(entity, &thunk, &initial_context, status_sender.clone(), runtime.handle());
                 *task = Some(handle);
             }

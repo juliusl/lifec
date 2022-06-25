@@ -95,10 +95,17 @@ pub mod demo {
         fn configure_app_systems(_: &mut specs::DispatcherBuilder) {
         }
 
-
         fn on_ui(&mut self, app_world: &specs::World, ui: &imgui::Ui) {
             let mut render = Render::next_frame(ui);
             render.render_now(app_world);
+        }
+
+        fn on_window_event(&'_ mut self, _: &specs::World, _: &'_ atlier::system::WindowEvent<'_>) {
+            // No-op
+        }
+
+        fn on_run(&'_ mut self, _: &specs::World) {
+            // No-op
         }
     }
 }
