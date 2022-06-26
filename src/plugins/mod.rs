@@ -66,9 +66,9 @@ where
     /// Parses entity from a .runmd file and add's T as a component from the parsed graph.
     /// Calls handle to handle any actions on the graph before T::from(graph)
     /// Calls init to complete building the entity.
-    fn parse_entity(path: impl AsRef<str>, world: &mut World, handle: impl FnOnce(&mut AttributeGraph), init: impl Fn(EntityBuilder) -> Entity) -> Option<Entity> {
+    fn parse_entity(path: impl AsRef<str>, world: &mut World, setup: impl FnOnce(&mut AttributeGraph), init: impl FnOnce(EntityBuilder) -> Entity) -> Option<Entity> {
         if let Some(mut graph) = AttributeGraph::load_from_file(path) {
-            handle(&mut graph);
+            setup(&mut graph);
             let context = T::from(graph);
 
             let entity = world.create_entity().with(context);
@@ -90,6 +90,11 @@ where
     /// Setup graph
     fn setup(_: &mut AttributeGraph);
 
+    /// Initialize entity
+    fn init(entity: EntityBuilder) -> EntityBuilder {
+        entity
+    }
+
     /// Returns an event that runs the engine 
     fn event() -> Event {
         Event::from_plugin::<P>(Self::event_name())
@@ -97,8 +102,8 @@ where
 
     /// Parses a .runmd plugin entity, and then sets up the entity's event component
     fn parse_engine(path: impl AsRef<str>, world: &mut World) -> Option<Entity> {
-        P::parse_entity(path, world, Self::setup, |entity|{
-            entity.with(Self::event()).build()
+        P::parse_entity(path, world, Self::setup, |entity| {
+            Self::init(entity.with(Self::event())).build()
         })
     }
 }

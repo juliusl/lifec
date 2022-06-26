@@ -38,8 +38,8 @@ impl Extension for Progress {
         dispatcher.add(EventRuntime::default(), "event_runtime", &[]);
     }
 
-    fn on_ui(&'_ mut self, _: &specs::World, _: &'_ imgui::Ui<'_>) {
-        // No-op
+    fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {
+        self.display_ui(ui);
     }
 
     fn on_window_event(&'_ mut self, _: &specs::World, _: &'_ WindowEvent<'_>) {
