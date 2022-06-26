@@ -1,11 +1,11 @@
 use std::cell::RefCell;
-
-use super::{Plugin, Thunk};
-use crate::AttributeGraph;
 use imgui::Ui;
 use specs::storage::DenseVecStorage;
 use specs::{Component, Join, ReadStorage, RunNow, System, World, WriteStorage};
 use tokio::task::JoinHandle;
+
+use super::{Plugin, Thunk};
+use crate::AttributeGraph;
 
 /// For rendering a ui frame that can mutate state
 #[derive(Clone, Component)]

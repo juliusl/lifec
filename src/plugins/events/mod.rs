@@ -1,18 +1,19 @@
 use std::fmt::Display;
-
-use atlier::system::App;
 use atlier::system::Extension;
 use atlier::system::WindowEvent;
 use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage};
 use tokio::{
-    runtime:: Runtime,
-    task::JoinHandle, sync::{self, mpsc::{self, Sender}},
+    runtime::Runtime,
+    sync::{
+        self,
+        mpsc::{self, Sender},
+    },
+    task::JoinHandle,
 };
 
 use super::thunks::StatusUpdate;
 use super::{Plugin, Thunk, ThunkContext};
 use specs::storage::VecStorage;
-use specs::storage::HashMapStorage;
 
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
 #[derive(Component)]
@@ -27,7 +28,7 @@ pub struct Event(
 impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}_", self.0)?;
-        write!(f, "{}", self.1.0)?;
+        write!(f, "{}", self.1 .0)?;
         Ok(())
     }
 }
@@ -35,9 +36,7 @@ impl Display for Event {
 impl Event {
     /// creates an event component, with a task created with on_event
     /// a handle to the tokio runtime is passed to this function to customize the task spawning
-    pub fn from_plugin<P>(
-        event_name: &'static str,
-    ) -> Self
+    pub fn from_plugin<P>(event_name: &'static str) -> Self
     where
         P: Plugin<ThunkContext> + Component + Default + Send,
     {
@@ -68,7 +67,6 @@ impl Extension for EventRuntime {
     fn configure_app_world(world: &mut specs::World) {
         world.register::<Event>();
         world.register::<ThunkContext>();
-        world.register::<Progress>();
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
@@ -83,41 +81,14 @@ impl Extension for EventRuntime {
         // No-op
     }
 
-    fn on_run(&'_ mut self, app_world: &specs::World) {
-        let mut rx = app_world.write_resource::<tokio::sync::mpsc::Receiver<StatusUpdate>>();
-        let mut progress = app_world.write_storage::<Progress>();
- 
-        if let Some((entity, p, s)) =  rx.try_recv().ok() {
-             match progress.insert(entity, Progress(p, s)) {
-                 Ok(_) => {},
-                 Err(_) => {},
-             }
-        }
+    fn on_run(&'_ mut self, _: &specs::World) {
+        // No-op
     }
 }
 
 impl SetupHandler<Runtime> for EventRuntime {
     fn setup(world: &mut specs::World) {
         world.insert(Runtime::new().unwrap());
-    }
-}
-
-#[derive(Component, Clone)]
-#[storage(HashMapStorage)]
-pub struct Progress(f32, String);
-
-impl App for Progress {
-    fn name() -> &'static str {
-        "progress_bar"
-    }
-
-    fn edit_ui(&mut self, _: &imgui::Ui) {
-    }
-
-    fn display_ui(&self, ui: &imgui::Ui) {
-        imgui::ProgressBar::new(self.0) 
-            .overlay_text(self.1.to_string())
-            .build(ui);
     }
 }
 
@@ -138,18 +109,20 @@ impl<'a> System<'a> for EventRuntime {
         WriteStorage<'a, ThunkContext>,
     );
 
-    fn run(&mut self, (runtime, status_sender, entities, mut events, mut contexts): Self::SystemData) {
+    fn run(
+        &mut self,
+        (runtime, status_sender, entities, mut events, mut contexts): Self::SystemData,
+    ) {
         for (entity, event) in (&entities, &mut events).join() {
             let event_name = event.to_string();
             let Event(_, thunk, initial_context, task) = event;
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
-                    if let Some(thunk_context) =
-                        runtime.block_on(async move { current_task.await.ok() })
+                    if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() })
                     {
                         match contexts.insert(entity, thunk_context) {
                             Ok(_) => {
-                                println!("completed: {}", &event_name);
+                                // println!("completed: {}", &event_name);
                             }
                             Err(err) => {
                                 eprintln!("error completing: {}, {}", &event_name, err);
@@ -160,25 +133,60 @@ impl<'a> System<'a> for EventRuntime {
                     *task = Some(current_task);
                 }
             } else if let Some(initial_context) = initial_context.take() {
-                println!("begin event: {}, {}", &event_name, initial_context.as_ref().hash_code());
+                println!(
+                    "begin event: {}, {}",
+                    &event_name,
+                    initial_context.as_ref().hash_code()
+                );
                 let thunk = thunk.clone();
                 let status_sender = status_sender.clone();
                 let runtime_handle = runtime.handle().clone();
-                *task = Some(runtime.spawn(async move { 
-                    let Thunk(.., thunk) = thunk.clone();
-                    let status_updates = status_sender.clone();
-                    let mut initial_context = initial_context.clone();
-                    initial_context.enable_async(entity, runtime_handle, Some(status_updates));
+                let mut context =
+                    initial_context.enable_async(entity, runtime_handle, Some(status_sender));
+                *task = Some(runtime.spawn(async move {
+                    let Thunk(thunk_name, thunk) = thunk;
+                    context
+                        .update_progress(
+                            format!(
+                                "event received: {}, {}",
+                                &event_name,
+                                initial_context.as_ref().hash_code()
+                            ),
+                            0.0,
+                        )
+                        .await;
+                    if let Some(handle) = thunk(&mut context) {
+                        context
+                            .update_progress(format!("{} is being called", thunk_name), 0.0)
+                            .await;
 
-                    if let Some(handle) = thunk(&mut initial_context) {
                         match handle.await {
-                            Ok(_) => {},
-                            Err(_) => {},
+                            Ok(updated_context) => {
+                                context
+                                    .update_progress(format!("completed: {}", &event_name), 1.0)
+                                    .await;
+                                updated_context
+                            }
+                            Err(err) => {
+                                context.error(|g| {
+                                    g.with_text("event_runtime", format!("{}", err));
+                                });
+                                context
+                                    .update_progress(
+                                        format!("event error: {}, {}", &event_name, err),
+                                        1.0,
+                                    )
+                                    .await;
+                                context
+                            }
                         }
                     } else {
-                        println!("event completed: {}", &event_name);
+                        // This means that the event completed without spawning any tasks
+                        context
+                            .update_progress(format!("completed: {}", &event_name), 1.0)
+                            .await;
+                        context
                     }
-                    initial_context
                 }));
             }
         }

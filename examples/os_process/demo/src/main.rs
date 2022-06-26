@@ -1,14 +1,13 @@
 use std::time::Duration;
 
-use imgui::Window;
-use lifec::plugins::{Engine, Event, EventRuntime, Plugin, Progress, ThunkContext};
+use lifec::plugins::{Engine, Event, EventRuntime, Plugin,  ThunkContext};
 use lifec::{editor::*, AttributeGraph, Runtime};
 use specs::storage::DenseVecStorage;
 use specs::{
     Component, DispatcherBuilder, Entities, Join, ReadStorage, RunNow, System, World, WriteStorage,
 };
 use tokio::task::JoinHandle;
-use tokio::time::{sleep, Instant};
+use tokio::time::Instant;
 
 fn main() {
     if let Some(file) = AttributeGraph::load_from_file("test_demo.runmd") {
@@ -33,26 +32,28 @@ impl Plugin<ThunkContext> for Timer {
         thunk_context.clone().task(|| {
             let tc = thunk_context.clone();
             async move {
-                tc.update_progress("timer started", 0.01).await;
-
-                let mut duration = 10;
+                let mut duration = 5;
                 if let Some(d) = tc.as_ref().find_int("duration") {
-                    tc.update_progress("duration found", 0.01).await;
+                    tc.update_progress("duration found", 0.0).await;
                     duration = d;
                 }
 
                 let start = Instant::now();
-                for i in 1..duration + 1 {
-                    sleep(Duration::from_secs(1)).await;
-                    let progress = i as f32 / (duration as f32);
-                    tc.update_progress(
-                        format!("elapsed {:?} {} %", start.elapsed(), progress * 100.0),
-                        progress,
-                    )
-                    .await;
+                let duration = duration as u64;
+                loop {
+                    let elapsed = start.elapsed();
+                    let progress =  elapsed.as_secs_f32() / Duration::from_secs(duration).as_secs_f32();
+                    if progress < 1.0 {
+                        tc.update_progress(
+                            format!("elapsed {:?}", elapsed),
+                            progress,
+                        )
+                        .await;
+                    } else {
+                        break;
+                    }
                 }
 
-                tc.update_progress("timer completed", 1.0).await;
                 None
             }
         })
@@ -64,16 +65,13 @@ impl Engine<Timer> for Timer {
         "start"
     }
 
-    fn event() -> Event {
-        Event::from_plugin::<Self>(Self::event_name())
-    }
-
     fn setup(_: &mut AttributeGraph) {}
 }
 
 impl Extension for Timer {
     fn configure_app_world(world: &mut World) {
         EventRuntime::configure_app_world(world);
+        world.register::<Progress>();
 
         let mut initial_context = ThunkContext::default();
         initial_context.as_mut().add_int_attr("duration", 5);
@@ -81,6 +79,7 @@ impl Extension for Timer {
             .create_entity()
             .with(initial_context)
             .with(Timer::event())
+            .with(Progress::default())
             .build();
     }
 
@@ -89,18 +88,13 @@ impl Extension for Timer {
     }
 
     fn on_ui(&'_ mut self, _: &World, ui: &'_ imgui::Ui<'_>) {
-        Window::new("Timer")
-            .size([800.0, 600.0], imgui::Condition::Appearing)
-            .build(ui, || {
-                ui.text(&self.1);
-                if ui.button("fire") {
-                    self.0 = true;
-                }
+        self.0 = ui.button(format!("{} {}", Timer::event_name(), Timer::symbol()));
+        ui.same_line();
+        ui.text(&self.1);
 
-                if let Some(progress) = &self.2 {
-                    progress.display_ui(ui);
-                }
-            });
+        if let Some(progress) = &self.2 {
+            progress.display_ui(ui);
+        }
     }
 
     fn on_window_event(&'_ mut self, _: &World, event: &'_ WindowEvent<'_>) {
@@ -113,8 +107,11 @@ impl Extension for Timer {
     }
 
     fn on_run(&'_ mut self, app_world: &World) {
+        if let Some(progress) = self.2.as_mut() {
+            progress.on_run(app_world);
+        }
+
         self.run_now(app_world);
-        EventRuntime {}.on_run(app_world);
     }
 }
 

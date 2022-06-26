@@ -7,7 +7,6 @@ pub use block::Project;
 mod events;
 pub use events::Event;
 pub use events::EventRuntime;
-pub use events::Progress;
 
 mod nodes;
 pub use nodes::Node;
@@ -21,6 +20,7 @@ pub use thunks::Println;
 pub use thunks::ThunkContext;
 pub use thunks::WriteFiles;
 pub use thunks::Thunk;
+pub use thunks::StatusUpdate;
 
 pub mod demos {
     pub use super::thunks::demo::*;

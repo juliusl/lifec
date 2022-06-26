@@ -134,20 +134,24 @@ impl ThunkContext {
 
     /// enable async features for the context
     pub fn enable_async(
-        &mut self,
+        &self,
         entity: Entity,
         handle: Handle,
         status_updates: Option<Sender<StatusUpdate>>,
-    ) {
-        self.entity = Some(entity);
-        self.handle = Some(handle);
-        self.status_updates = status_updates;
+    ) -> ThunkContext {
+        let mut async_enabled = self.clone();
+        async_enabled.entity = Some(entity);
+        async_enabled.handle = Some(handle);
+        async_enabled.status_updates = status_updates;
+        async_enabled
     }
 
+    /// returns a handle to a tokio runtime
     pub fn handle(&self) -> Option<Handle> {
         self.handle.as_ref().and_then(|h| Some(h.clone()))
     }
 
+    /// returns the thunk_symbol that was called with this context
     pub fn symbol(&self) -> Option<String> {
         if let Some(thunk) = self.block.get_block("thunk") {
             thunk.find_text("thunk_symbol")
@@ -181,6 +185,7 @@ impl ThunkContext {
         }
     }
 
+    /// Formats a label that is unique to this state
     pub fn label(&self, label: impl AsRef<str>) -> impl AsRef<str> {
         format!(
             "{} {:#2x}",
