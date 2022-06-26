@@ -48,6 +48,9 @@ impl Engine<Process> for Start {
     fn event_name() -> &'static str {
         "start"
     }
+
+    fn setup(_: &mut AttributeGraph) {    
+    }
 }
 
 impl Plugin<ThunkContext> for Process {
@@ -59,7 +62,7 @@ impl Plugin<ThunkContext> for Process {
         "Executes a new command w/ an OS process."
     }
 
-    fn call_with_context(context: &mut super::ThunkContext) -> Option<JoinHandle<()>> {
+    fn call_with_context(context: &mut super::ThunkContext) -> Option<JoinHandle<ThunkContext>> {
         if let Some(handle) = context.handle() {
             handle.block_on(async {
                 

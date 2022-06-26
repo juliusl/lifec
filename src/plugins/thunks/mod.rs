@@ -22,7 +22,7 @@ use super::{BlockContext, Plugin};
 /// Thunk is a function that can be passed around for the system to call later
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
-pub struct Thunk(pub &'static str, pub fn(&mut ThunkContext) -> Option<JoinHandle<()>>);
+pub struct Thunk(pub &'static str, pub fn(&mut ThunkContext) -> Option<JoinHandle<ThunkContext>>);
 
 impl Thunk {
     pub fn from_plugin<P>() -> Self
@@ -41,7 +41,7 @@ impl Thunk {
     }
 }
 
-
+/// StatusUpdate for stuff like progress bars
 pub type StatusUpdate = (Entity, f32, String);
 
 /// ThunkContext provides common methods for updating the underlying state graph,
@@ -50,14 +50,16 @@ pub type StatusUpdate = (Entity, f32, String);
 #[storage(DenseVecStorage)]
 pub struct ThunkContext { 
     pub block: BlockContext,
-    handle: Option<Handle>,
-    status_updates: Option<Sender<StatusUpdate>>
+    pub entity: Option<Entity>,
+    pub handle: Option<Handle>,
+    pub status_updates: Option<Sender<StatusUpdate>>
 }
 
 impl From<AttributeGraph> for ThunkContext {
     fn from(g: AttributeGraph) -> Self {
         Self {
             block: BlockContext::from(g),
+            entity: None,
             handle: None,
             status_updates: None,
         }
@@ -78,7 +80,8 @@ impl AsMut<AttributeGraph> for ThunkContext {
 
 impl ThunkContext {
     /// enable async features for the context
-    pub fn enable_async(&mut self, handle: Handle, status_updates: Option<Sender<StatusUpdate>>) {
+    pub fn enable_async(&mut self, entity: Entity, handle: Handle, status_updates: Option<Sender<StatusUpdate>>) {
+        self.entity = Some(entity);
         self.handle = Some(handle);
         self.status_updates = status_updates;
     }

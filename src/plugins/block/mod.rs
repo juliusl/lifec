@@ -5,7 +5,7 @@ use transpile::Transpile;
 mod project;
 pub use project::Project;
 
-use crate::{AttributeGraph, RuntimeDispatcher};
+use crate::AttributeGraph;
 use atlier::system::{Attribute, Value};
 use imgui::{ChildWindow, MenuItem, Ui};
 use specs::storage::DenseVecStorage;
@@ -19,8 +19,8 @@ use super::Plugin;
 #[derive(Debug, Component, Default, Clone, Hash, PartialEq, Serialize, Deserialize)]
 #[storage(DenseVecStorage)]
 pub struct BlockContext {
-    graph: AttributeGraph,
     pub block_name: String,
+    graph: AttributeGraph,
     block_symbols: BTreeSet<String>,
     max_block_id: u32,
 }
@@ -534,6 +534,8 @@ add debug_out .BOOL true
 
 #[test]
 fn test_event() {
+    use crate::RuntimeDispatcher;
+    
     let mut sh_test = AttributeGraph::from(0);
     let sh_test_test = r#"
     ``` sh_test publish

@@ -169,19 +169,15 @@ impl<'a> System<'a> for EventRuntime {
                 let status_sender = status_sender.clone();
                 let runtime_handle = runtime.handle().clone();
                 *task = Some(runtime.spawn(async move { 
-                    let mut initial_context = initial_context.clone();
+                    let Thunk(.., thunk) = thunk.clone();
                     let status_updates = status_sender.clone();
-                    initial_context.enable_async(runtime_handle, Some(status_updates));
-                    let thunk = thunk.clone();
-                    let Thunk(.., thunk) = thunk;
+                    let mut initial_context = initial_context.clone();
+                    initial_context.enable_async(entity, runtime_handle, Some(status_updates));
+
                     if let Some(handle) = thunk(&mut initial_context) {
                         match handle.await {
-                            Ok(_) => {
-                                
-                            },
-                            Err(_) => {
-                                
-                            },
+                            Ok(_) => {},
+                            Err(_) => {},
                         }
                     } else {
                         println!("event completed: {}", &event_name);

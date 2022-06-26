@@ -45,7 +45,7 @@ where
     fn symbol() -> &'static str;
 
     /// implement call_with_context to allow for static extensions of attribute graph
-    fn call_with_context(context: &mut T) -> Option<JoinHandle<()>>;
+    fn call_with_context(context: &mut T) -> Option<JoinHandle<T>>;
 
     /// Returns a short string description for this plugin
     fn description() -> &'static str {
@@ -88,13 +88,12 @@ where
     /// The name of the event this engine produces
     fn event_name() -> &'static str;
 
+    /// Setup graph
+    fn setup(_: &mut AttributeGraph);
+
     /// Returns an event that runs the engine 
     fn event() -> Event {
         Event::from_plugin::<P>(Self::event_name())
-    }
-
-    /// Setup initial graph
-    fn setup(_: &mut AttributeGraph) {
     }
 
     /// Parses a .runmd plugin entity, and then sets up the entity's event component

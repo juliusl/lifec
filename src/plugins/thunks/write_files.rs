@@ -18,7 +18,7 @@ impl Plugin<ThunkContext> for WriteFiles {
         "Writes any input binary vector value to a file."
     }
 
-    fn call_with_context(context: &mut ThunkContext) -> Option<JoinHandle<()>> {
+    fn call_with_context(context: &mut ThunkContext) -> Option<JoinHandle<ThunkContext>> {
         for (file_name, value) in context
             .clone()
             .as_ref()

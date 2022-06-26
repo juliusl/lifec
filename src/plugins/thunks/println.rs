@@ -17,7 +17,7 @@ impl Plugin<ThunkContext> for Println {
         "Can be used to debug attributes passed as input to this thunk."
     }
 
-    fn call_with_context(context: &mut ThunkContext) -> Option<JoinHandle<()>> {
+    fn call_with_context(context: &mut ThunkContext) -> Option<JoinHandle<ThunkContext>> {
         context.accept("thunk", |a| {
             a.is_stable()
         });

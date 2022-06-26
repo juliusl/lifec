@@ -94,7 +94,7 @@ where
         "render"
     }
 
-    fn call_with_context(_: &mut Context) -> Option<JoinHandle<()>> {
+    fn call_with_context(_: &mut Context) -> Option<JoinHandle<Context>> {
         None
     }
 }
