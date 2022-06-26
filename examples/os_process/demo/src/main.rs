@@ -44,8 +44,9 @@ impl Plugin<ThunkContext> for Timer {
                     let elapsed = start.elapsed();
                     let progress =  elapsed.as_secs_f32() / Duration::from_secs(duration).as_secs_f32();
                     if progress < 1.0 {
+                        //tc.update_status_only(format!("elapsed {:?}", elapsed)).await;
                         tc.update_progress(
-                            format!("elapsed {:?}", elapsed),
+                            format!("elapsed {} ms", elapsed.as_millis()),
                             progress,
                         )
                         .await;
@@ -95,6 +96,8 @@ impl Extension for Timer {
         if let Some(progress) = &self.2 {
             progress.display_ui(ui);
         }
+
+        ui.show_demo_window(&mut true);
     }
 
     fn on_window_event(&'_ mut self, _: &World, event: &'_ WindowEvent<'_>) {

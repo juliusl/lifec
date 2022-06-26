@@ -16,12 +16,15 @@ impl App for Progress {
     fn edit_ui(&mut self, _: &imgui::Ui) {}
 
     fn display_ui(&self, ui: &imgui::Ui) {
-        let Progress(progress, ..) = self;
+        let Progress(progress, status) = self;
         if *progress > 0.0 {
-            imgui::ProgressBar::new(self.0)
-                .overlay_text(format!("{:.4} %", self.0 * 100.0))
+            imgui::ProgressBar::new(*progress)
+                .overlay_text(format!("{:.4} %", progress * 100.0))
                 .build(ui);
-            ui.text(format!("{}", self.1));
+        }
+
+        if !status.is_empty() {
+            ui.text(format!("{}", status));
         }
     }
 }

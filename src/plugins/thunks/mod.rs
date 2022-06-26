@@ -59,13 +59,25 @@ pub struct ThunkContext {
     pub status_updates: Option<Sender<StatusUpdate>>,
 }
 
+/// This block has all the async related features
 impl ThunkContext {
+    /// enable async features for the context
+    pub fn enable_async(
+        &self,
+        entity: Entity,
+        handle: Handle,
+        status_updates: Option<Sender<StatusUpdate>>,
+    ) -> ThunkContext {
+        let mut async_enabled = self.clone();
+        async_enabled.entity = Some(entity);
+        async_enabled.handle = Some(handle);
+        async_enabled.status_updates = status_updates;
+        async_enabled
+    }
+
     /// If async is enabled on the thunk context, this will spawn the task
     /// otherwise, this call will result in a no-op
-    pub fn task<F>(
-        &self,
-        task: impl FnOnce() -> F,
-    ) -> Option<JoinHandle<ThunkContext>>
+    pub fn task<F>(&self, task: impl FnOnce() -> F) -> Option<JoinHandle<ThunkContext>>
     where
         F: Future<Output = Option<ThunkContext>> + Send + 'static,
     {
@@ -76,7 +88,7 @@ impl ThunkContext {
         {
             let default_return = self.clone();
             let future = (task)();
-            
+
             Some(handle.spawn(async {
                 if let Some(next) = future.await {
                     next
@@ -87,6 +99,29 @@ impl ThunkContext {
         } else {
             None
         }
+    }
+
+    /// optionally, update progress of the thunk execution
+    pub async fn update_progress(&self, status: impl AsRef<str>, progress: f32) {
+        if let ThunkContext {
+            status_updates: Some(status_updates),
+            entity: Some(entity),
+            ..
+        } = self
+        {
+            match status_updates
+                .send((*entity, progress, status.as_ref().to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+    }
+
+      /// optionally, update status of the thunk execution
+      pub async fn update_status_only(&self, status: impl AsRef<str>) {
+        self.update_progress(status, 0.0).await;
     }
 }
 
@@ -114,38 +149,6 @@ impl AsMut<AttributeGraph> for ThunkContext {
 }
 
 impl ThunkContext {
-    /// optionally, update progress of the thunk execution
-    pub async fn update_progress(&self, status: impl AsRef<str>, progress: f32) {
-        if let ThunkContext {
-            status_updates: Some(status_updates),
-            entity: Some(entity),
-            ..
-        } = self
-        {
-            match status_updates
-                .send((*entity, progress, status.as_ref().to_string()))
-                .await
-            {
-                Ok(_) => {}
-                Err(_) => {}
-            }
-        }
-    }
-
-    /// enable async features for the context
-    pub fn enable_async(
-        &self,
-        entity: Entity,
-        handle: Handle,
-        status_updates: Option<Sender<StatusUpdate>>,
-    ) -> ThunkContext {
-        let mut async_enabled = self.clone();
-        async_enabled.entity = Some(entity);
-        async_enabled.handle = Some(handle);
-        async_enabled.status_updates = status_updates;
-        async_enabled
-    }
-
     /// returns a handle to a tokio runtime
     pub fn handle(&self) -> Option<Handle> {
         self.handle.as_ref().and_then(|h| Some(h.clone()))
