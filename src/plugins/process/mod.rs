@@ -34,7 +34,7 @@ impl Plugin<ThunkContext> for Process {
     }
 
     fn call_with_context(context: &mut super::ThunkContext) -> Option<JoinHandle<ThunkContext>> {
-        context.clone().task(|_| {
+        context.clone().task(|| {
             let mut tc = context.clone();
             async move {
                 if let Some(command) = tc.as_ref().find_text("command") {

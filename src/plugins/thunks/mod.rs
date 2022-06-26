@@ -49,7 +49,7 @@ impl Thunk {
 pub type StatusUpdate = (Entity, f32, String);
 
 /// ThunkContext provides common methods for updating the underlying state graph,
-/// in the context of a thunk.
+/// in the context of a thunk. If async is enabled, then the context will have a handle to the tokio runtime.
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
@@ -60,21 +60,22 @@ pub struct ThunkContext {
 }
 
 impl ThunkContext {
+    /// If async is enabled on the thunk context, this will spawn the task
+    /// otherwise, this call will result in a no-op
     pub fn task<F>(
         &self,
-        task: impl FnOnce(Entity) -> F,
+        task: impl FnOnce() -> F,
     ) -> Option<JoinHandle<ThunkContext>>
     where
         F: Future<Output = Option<ThunkContext>> + Send + 'static,
     {
         if let Self {
-            entity: Some(entity),
             handle: Some(handle),
             ..
-        } = &self.clone()
+        } = self
         {
             let default_return = self.clone();
-            let future = (task)(entity.clone());
+            let future = (task)();
             
             Some(handle.spawn(async {
                 if let Some(next) = future.await {
@@ -114,14 +115,15 @@ impl AsMut<AttributeGraph> for ThunkContext {
 
 impl ThunkContext {
     /// optionally, update progress of the thunk execution
-    pub async fn update_progress(&self, entity: Entity, status: impl AsRef<str>, progress: f32) {
+    pub async fn update_progress(&self, status: impl AsRef<str>, progress: f32) {
         if let ThunkContext {
             status_updates: Some(status_updates),
+            entity: Some(entity),
             ..
         } = self
         {
             match status_updates
-                .send((entity, progress, status.as_ref().to_string()))
+                .send((*entity, progress, status.as_ref().to_string()))
                 .await
             {
                 Ok(_) => {}
