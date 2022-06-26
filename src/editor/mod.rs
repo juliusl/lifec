@@ -42,3 +42,54 @@ pub fn unique_title(title: impl AsRef<str>) -> String {
 
     format!("{}_{:#04x}", title.as_ref(), rng.gen::<u16>())
 }
+
+/// encapsulates common widget pattern
+struct Widget<A>(Entity, Option<A>)
+where
+    A: App + Component;
+
+impl<A> Extension for Widget<A> 
+where
+    A: App + Component + Clone + for<'a> System<'a>,
+    <A as Component>::Storage: Default
+{
+    fn configure_app_world(world: &mut World) {
+       world.register::<A>();
+    }
+
+    fn configure_app_systems(_: &mut DispatcherBuilder) {
+        //
+    }
+
+    fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
+        let mut apps = app_world.write_component::<A>();
+
+        if let Widget(entity,None) = self {
+            if let Some(app) = apps.get_mut(*entity) {
+                self.1 = Some(app.clone());
+            }
+        } else if let Widget(entity, Some(app)) = self {
+            app.edit_ui(ui);
+            app.display_ui(ui);
+
+            match apps.insert(*entity, app.clone()) {
+                Ok(_) => {
+                    
+                },
+                Err(_) => {
+
+                },
+            }
+        }
+    }
+
+    fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {
+        //todo!()
+    }
+
+    fn on_run(&'_ mut self, app_world: &World) {
+        if let Self(.., Some(app)) = self {
+            app.run_now(app_world);
+        }
+    }
+}
