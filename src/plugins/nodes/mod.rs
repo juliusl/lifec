@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 #[storage(DenseVecStorage)]
 pub struct LinkContext {
     pub block: BlockContext,
-    entity: Option<Entity>,
+    _entity: Option<Entity>,
     link: Option<Link>
 }
 

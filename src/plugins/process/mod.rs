@@ -1,14 +1,14 @@
-use super::{Plugin, ThunkContext, BlockContext, Engine};
+use super::{BlockContext, Plugin, ThunkContext};
 use crate::{AttributeGraph, RuntimeDispatcher, RuntimeState};
-use atlier::system::Value;
+use atlier::system::{Value, Extension};
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize};
 use specs::{Component, HashMapStorage};
-use tokio::{task::JoinHandle};
 use std::{
     fmt::Display,
-    process::{Command, Output}
+    process::{Command, Output},
 };
+use tokio::task::JoinHandle;
 
 #[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
 #[storage(HashMapStorage)]
@@ -24,35 +24,6 @@ pub struct Process {
     start_time: Option<DateTime<Utc>>,
 }
 
-impl Process {
-    fn command(&self) -> Option<String> {
-        if let Some(form) = self.block.get_block("form") {
-            form.find_text("command")
-        } else {
-            None 
-        }
-    }
-
-    fn debug_out_enabled(&self) -> Option<bool> {
-        if let Some(form) = self.block.get_block("form") {
-            form.is_enabled("debug_out")
-        } else {
-            None
-        }
-    }
-}
-
-struct Start;
-
-impl Engine<Process> for Start {
-    fn event_name() -> &'static str {
-        "start"
-    }
-
-    fn setup(_: &mut AttributeGraph) {    
-    }
-}
-
 impl Plugin<ThunkContext> for Process {
     fn symbol() -> &'static str {
         "process"
@@ -63,50 +34,63 @@ impl Plugin<ThunkContext> for Process {
     }
 
     fn call_with_context(context: &mut super::ThunkContext) -> Option<JoinHandle<ThunkContext>> {
-        if let Some(handle) = context.handle() {
-            handle.block_on(async {
-                
-            });
-        }
+        context.clone().task(|_| {
+            let mut tc = context.clone();
+            async move {
+                if let Some(command) = tc.as_ref().find_text("command") {
+                    // Creating a new tokio command 
+                    let mut command_task = tokio::process::Command::new(&command);                    
+                    
+                    // TODO: Handle args, and env
 
-        if let Some(process) = context
-            .as_ref()
-            .find_block("", "form")
-            .and_then(|a| Some(Self::from(a)))
-        {
-            if let Some(command) = process.command() {
-                match process.interpret_command(&command, Process::handle_output) {
-                    Ok(output) => {
-                        if let Some(true) = process.debug_out_enabled() {
-                            println!("{:?}", &output.stdout.as_ref().and_then(|o| String::from_utf8(o.to_vec()).ok()));
-                        }
+                    let start_time = Some(Utc::now());
+                    if let Some(output) = command_task.output().await.ok() {
                         
-                        // publish the result
-                        context.publish(|publish_block| {
+                        // Completed process, publish result
+                        tc.publish(|publish_block| {
+                            let timestamp_utc = Some(Utc::now().to_string());
+                            let timestamp_local = Some(Local::now().to_string());
+                            let elapsed = start_time
+                                .and_then(|s| Some(Utc::now() - s))
+                                .and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
                             publish_block
-                                .with_text("command", command)
-                                .with_int("code", output.code.unwrap_or_default())
-                                .with_binary("stdout", output.stdout.unwrap_or_default())
-                                .with_binary("stderr", process.stdout.unwrap_or_default())
-                                .with_text("timestamp_local", output.timestamp_local.unwrap_or_default())
-                                .with_text("timestamp_utc", output.timestamp_utc.unwrap_or_default())
-                                .with_text("elapsed", output.elapsed.unwrap_or_default())
+                                .with_text("command", &command)
+                                .with_int("code", output.status.code().unwrap_or_default())
+                                .with_binary("stdout", output.stdout)
+                                .with_binary("stderr", output.stderr)
+                                .with_text("timestamp_local", timestamp_local.unwrap_or_default())
+                                .with_text("timestamp_utc", timestamp_utc.unwrap_or_default())
+                                .with_text("elapsed", elapsed.unwrap_or_default())
                                 .with_bool("called", true);
                         });
-
-                        context.as_mut().find_remove("error");
-                    }
-                    Err(e) => {
-                        if let Some(true) = process.as_ref().is_enabled("debug_out") {
-                            eprintln!("{:?}", &e);
-                        }
-                        context.error(|a| a.add_text_attr("error", format!("Error: {:?}", e)))
                     }
                 }
+                Some(tc)
             }
-        }
-    
-        None
+        })
+    }
+}
+
+
+impl Extension for Process {
+    fn configure_app_world(_: &mut specs::World) {
+        todo!()
+    }
+
+    fn configure_app_systems(_: &mut specs::DispatcherBuilder) {
+        todo!()
+    }
+
+    fn on_ui(&'_ mut self, _: &specs::World, _: &'_ imgui::Ui<'_>) {
+        todo!()
+    }
+
+    fn on_window_event(&'_ mut self, _: &specs::World, _: &'_ atlier::system::WindowEvent<'_>) {
+        todo!()
+    }
+
+    fn on_run(&'_ mut self, _: &specs::World) {
+        todo!()
     }
 }
 

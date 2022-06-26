@@ -102,7 +102,10 @@ where
         &[1500.0, 720.0]
     }
 
-    fn show_editor(&mut self, ui: &imgui::Ui) {
+    fn display_ui(&self, _: &imgui::Ui) {        
+    }
+
+    fn edit_ui(&mut self, ui: &imgui::Ui) {
         Window::new(Self::name())
             .size(*Self::window_size(), imgui::Condition::Appearing)
             .menu_bar(true)

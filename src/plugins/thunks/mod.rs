@@ -1,15 +1,16 @@
+use std::future::Future;
 
 use crate::AttributeGraph;
 use atlier::system::Attribute;
 use imgui::Ui;
-use specs::{storage::DenseVecStorage, Entity};
 use specs::Component;
+use specs::{storage::DenseVecStorage, Entity};
 
 mod println;
 pub use println::Println;
 
 mod write_files;
-use tokio::{runtime::Handle, task::JoinHandle, sync::mpsc::Sender};
+use tokio::{runtime::Handle, sync::mpsc::Sender, task::JoinHandle};
 pub use write_files::WriteFiles;
 
 pub mod demo {
@@ -22,7 +23,10 @@ use super::{BlockContext, Plugin};
 /// Thunk is a function that can be passed around for the system to call later
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
-pub struct Thunk(pub &'static str, pub fn(&mut ThunkContext) -> Option<JoinHandle<ThunkContext>>);
+pub struct Thunk(
+    pub &'static str,
+    pub fn(&mut ThunkContext) -> Option<JoinHandle<ThunkContext>>,
+);
 
 impl Thunk {
     pub fn from_plugin<P>() -> Self
@@ -48,11 +52,41 @@ pub type StatusUpdate = (Entity, f32, String);
 /// in the context of a thunk.
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
-pub struct ThunkContext { 
+pub struct ThunkContext {
     pub block: BlockContext,
     pub entity: Option<Entity>,
     pub handle: Option<Handle>,
-    pub status_updates: Option<Sender<StatusUpdate>>
+    pub status_updates: Option<Sender<StatusUpdate>>,
+}
+
+impl ThunkContext {
+    pub fn task<F>(
+        &self,
+        task: impl FnOnce(Entity) -> F,
+    ) -> Option<JoinHandle<ThunkContext>>
+    where
+        F: Future<Output = Option<ThunkContext>> + Send + 'static,
+    {
+        if let Self {
+            entity: Some(entity),
+            handle: Some(handle),
+            ..
+        } = &self.clone()
+        {
+            let default_return = self.clone();
+            let future = (task)(entity.clone());
+            
+            Some(handle.spawn(async {
+                if let Some(next) = future.await {
+                    next
+                } else {
+                    default_return
+                }
+            }))
+        } else {
+            None
+        }
+    }
 }
 
 impl From<AttributeGraph> for ThunkContext {
@@ -79,8 +113,30 @@ impl AsMut<AttributeGraph> for ThunkContext {
 }
 
 impl ThunkContext {
+    /// optionally, update progress of the thunk execution
+    pub async fn update_progress(&self, entity: Entity, status: impl AsRef<str>, progress: f32) {
+        if let ThunkContext {
+            status_updates: Some(status_updates),
+            ..
+        } = self
+        {
+            match status_updates
+                .send((entity, progress, status.as_ref().to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+    }
+
     /// enable async features for the context
-    pub fn enable_async(&mut self, entity: Entity, handle: Handle, status_updates: Option<Sender<StatusUpdate>>) {
+    pub fn enable_async(
+        &mut self,
+        entity: Entity,
+        handle: Handle,
+        status_updates: Option<Sender<StatusUpdate>>,
+    ) {
         self.entity = Some(entity);
         self.handle = Some(handle);
         self.status_updates = status_updates;
@@ -124,6 +180,10 @@ impl ThunkContext {
     }
 
     pub fn label(&self, label: impl AsRef<str>) -> impl AsRef<str> {
-        format!("{} {:#2x}", label.as_ref(), self.as_ref().hash_code() as u16 )
+        format!(
+            "{} {:#2x}",
+            label.as_ref(),
+            self.as_ref().hash_code() as u16
+        )
     }
 }

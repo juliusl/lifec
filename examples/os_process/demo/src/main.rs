@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use imgui::Window;
-use lifec::plugins::{Event, EventRuntime, ProgressBar, Plugin, Progress, ThunkContext, Engine};
+use lifec::plugins::{Event, EventRuntime, Plugin, Progress, ThunkContext, Engine};
 use lifec::{editor::*, AttributeGraph, Runtime};
 use specs::storage::DenseVecStorage;
 use specs::{
@@ -30,31 +30,28 @@ impl Plugin<ThunkContext> for Timer {
     }
 
     fn call_with_context(thunk_context: &mut ThunkContext) -> Option<JoinHandle<ThunkContext>> {
-        if let ThunkContext { entity: Some(entity), handle: Some(handle), status_updates: Some(status_updates), .. } = thunk_context.clone() {
-            let handle = handle.clone();
-            let thunk_context = thunk_context.clone();
-            let task = handle.spawn(async move {
-                let progress_bar = ProgressBar(status_updates);
-                progress_bar.update(entity, "timer started", 0.01).await;
-                if let Some(duration) = thunk_context.as_ref().find_int("duration") {
-                    progress_bar.update(entity, "duration found", 0.01).await;
-                    let start = Instant::now();
-                    for i in 1..duration + 1 {
-                        sleep(Duration::from_secs(1)).await;
-                        let progress = i as f32/ (duration as f32);
-                        progress_bar.update(entity, format!("elapsed {:?} {} %", start.elapsed(), progress*100.0), progress).await;
-                    }
-                } else {
-                    sleep(Duration::from_secs(10)).await;
+        thunk_context.clone().task(|entity| {
+            let tc = thunk_context.clone();
+            async move {
+                tc.update_progress(entity, "timer started", 0.01).await;
+                
+                let mut duration = 10;
+                if let Some(d) = tc.as_ref().find_int("duration") {
+                    tc.update_progress(entity, "duration found", 0.01).await;
+                   duration = d;
                 }
-                progress_bar.update(entity, "timer completed", 1.0).await;
-                thunk_context
-            });
 
-            Some(task)
-        } else {
-            None
-        }
+                let start = Instant::now();
+                for i in 1..duration + 1 {
+                    sleep(Duration::from_secs(1)).await;
+                    let progress = i as f32/ (duration as f32);
+                    tc.update_progress(entity, format!("elapsed {:?} {} %", start.elapsed(), progress*100.0), progress).await;
+                }
+                
+                tc.update_progress(entity, "timer completed", 1.0).await;
+                None
+            }
+        })
     }
 }
 
@@ -76,7 +73,12 @@ impl Extension for Timer {
     fn configure_app_world(world: &mut World) {
         EventRuntime::configure_app_world(world);
 
-        world.create_entity().with(Timer::event()).build();
+        let mut initial_context = ThunkContext::default();
+        initial_context.as_mut().add_int_attr("duration", 5);
+        world.create_entity()
+            .with(initial_context)
+            .with(Timer::event())
+            .build();
     }
 
     fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
@@ -91,7 +93,7 @@ impl Extension for Timer {
             }
     
             if let Some(progress) = &self.2 {
-                progress.show(ui);
+                progress.display_ui(ui);
             }
         });
     }

@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
+use atlier::system::App;
 use atlier::system::Extension;
 use atlier::system::WindowEvent;
-use imgui::Ui;
-use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage, Entity};
+use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage};
 use tokio::{
     runtime:: Runtime,
     task::JoinHandle, sync::{self, mpsc::{self, Sender}},
@@ -87,8 +87,8 @@ impl Extension for EventRuntime {
         let mut rx = app_world.write_resource::<tokio::sync::mpsc::Receiver<StatusUpdate>>();
         let mut progress = app_world.write_storage::<Progress>();
  
-        if let Some(msg) =  rx.try_recv().ok() {
-             match progress.insert(msg.0, Progress(msg.1, msg.2)) {
+        if let Some((entity, p, s)) =  rx.try_recv().ok() {
+             match progress.insert(entity, Progress(p, s)) {
                  Ok(_) => {},
                  Err(_) => {},
              }
@@ -106,22 +106,18 @@ impl SetupHandler<Runtime> for EventRuntime {
 #[storage(HashMapStorage)]
 pub struct Progress(f32, String);
 
-impl Progress {
-    pub fn show(&self, ui: &Ui) {
-        imgui::ProgressBar::new(self.0) .overlay_text(self.1.to_string()).build(ui);
+impl App for Progress {
+    fn name() -> &'static str {
+        "progress_bar"
     }
-}
 
-pub struct ProgressBar(pub Sender<StatusUpdate>);
+    fn edit_ui(&mut self, _: &imgui::Ui) {
+    }
 
-impl ProgressBar {
-    pub async fn update(&self, entity: Entity, status: impl AsRef<str>, progress: f32) {
-        let ProgressBar(sender) = self;
-
-        match sender.send((entity, progress, status.as_ref().to_string())).await {
-            Ok(_) => {},
-            Err(_) => {},
-        }
+    fn display_ui(&self, ui: &imgui::Ui) {
+        imgui::ProgressBar::new(self.0) 
+            .overlay_text(self.1.to_string())
+            .build(ui);
     }
 }
 

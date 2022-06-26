@@ -2232,9 +2232,8 @@ pub enum AttributeGraphEvents {
     #[token("#")]
     Comment,
     /// Usage:
-    /// ```
     /// add test_attr .TEXT remaining text is the value
-    /// ```
+    /// 
     #[token("```")]
     BlockDelimitter,
     // Logos requires one token variant to handle errors,
