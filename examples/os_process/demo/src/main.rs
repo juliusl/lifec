@@ -3,11 +3,10 @@ use std::time::Duration;
 
 use lifec::plugins::{Engine, Event, EventRuntime, Plugin, ThunkContext};
 use lifec::{editor::*, AttributeGraph, Runtime};
-use specs::storage::{self, DenseVecStorage};
+use specs::storage::DenseVecStorage;
 use specs::{
     Component, DispatcherBuilder, Entities, Join, ReadStorage, RunNow, System, World, WriteStorage,
 };
-use tokio::pin;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
@@ -47,7 +46,6 @@ impl Plugin<ThunkContext> for Timer {
                     let progress =
                         elapsed.as_secs_f32() / Duration::from_secs(duration).as_secs_f32();
                     if progress < 1.0 {
-                        //tc.update_status_only(format!("elapsed {:?}", elapsed)).await;
                         tc.update_progress(format!("elapsed {} ms", elapsed.as_millis()), progress)
                             .await;
                     } else {
@@ -77,7 +75,7 @@ impl Engine<Timer> for Timer {
 
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
-struct StartEvent<E, P>(bool, String, fn(E, P))
+struct StartEvent<E, P>(bool, &'static str, fn(E, P))
 where
     E: Engine<P> + Send + Sync + Any,
     P: Plugin<ThunkContext> + Component + Send + Default,
@@ -158,14 +156,14 @@ where
             }
 
             if event.is_running() {
-                self.1 = "Running".to_string();
+                self.1 = "Running";
             } else {
-                self.1 = "Stopped".to_string();
+                self.1 = "Completed";
             }
 
             if let Some(entity) = context.entity {
                 if let Some(start_event) = start_events.get_mut(entity) {
-                    start_event.1 = self.1.to_string();
+                    start_event.1 = self.1;
                 }
             }
         }

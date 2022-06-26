@@ -47,6 +47,12 @@ impl Event {
     pub fn fire(&mut self, thunk_context: ThunkContext) {
         self.2 = Some(thunk_context);
 
+        // cancel any current task
+        self.cancel();
+    }
+
+    /// cancel any ongoing task spawned by this event
+    pub fn cancel(&mut self) {
         if let Some(task) = self.3.as_mut() {
             eprintln!("aborting existing task");
             task.abort();
