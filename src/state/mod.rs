@@ -1978,12 +1978,15 @@ fn test_attribute_graph_dispatcher() {
     add test_attr             .text testing text attr
     add test_attr_empty       .EMPTY
     add test_attr_bool        .BOOL true
+    add test_attr_enabled     .enable
+    add test_attr_disabled    .disable
     add test_attr_int         .INT 510982
     add test_attr_int_pair    .INT_PAIR 5000, 1200
     add test_attr_int_range   .INT_RANGE 500, 0, 1000
     add test_attr_float       .FLOAT 510982.12
     add test_attr_float_pair  .FLOAT_PAIR 5000.0, 1200.12
     add test_attr_float_range .FLOAT_RANGE 500.0, 0.0, 1000.0
+    add test_attr_bin         .bin dGVzdCB2YWx1ZXM=
     import 10 test_attr       .TEXT this value is imported
     define test_attr node
     #
@@ -2013,6 +2016,9 @@ fn test_attribute_graph_dispatcher() {
     assert!(graph.contains_attribute("test_attr_float_range"));
     assert!(graph.contains_attribute("test_attr_empty"));
     assert!(graph.contains_attribute("test_attr_bool"));
+    assert!(graph.contains_attribute("test_attr_disabled"));
+    assert!(graph.contains_attribute("test_attr_enabled"));
+    assert!(graph.contains_attribute("test_attr_bin"));
     assert!(graph.contains_attribute("test_attr::node"));
     assert!(graph.contains_attribute("new_text_attr::node"));
     assert!(!graph.contains_attribute("new_text_attr"));
@@ -2057,6 +2063,19 @@ fn test_attribute_graph_dispatcher() {
     assert_eq!(
         Some(&Value::Bool(true)),
         graph.find_attr_value("test_attr_bool")
+    );
+
+    assert_eq!(
+        Some(&Value::Bool(true)),
+        graph.find_attr_value("test_attr_enabled")
+    );
+    assert_eq!(
+        Some(&Value::Bool(false)),
+        graph.find_attr_value("test_attr_disabled")
+    );
+    assert_eq!(
+        Some(&Value::BinaryVector(b"test values".to_vec())),
+        graph.find_attr_value("test_attr_bin")
     );
 
     assert_eq!(
@@ -2253,6 +2272,8 @@ pub enum AttributeGraphElements {
     #[token(".TEXT", graph_lexer::from_text)]
     Text(Value),
     /// bool element parses remaining as bool
+    #[token(".enable", |_| Value::Bool(true))]
+    #[token(".disable", |_| Value::Bool(false))]
     #[token(".bool", graph_lexer::from_bool)]
     #[token(".BOOL", graph_lexer::from_bool)]
     Bool(Value),
@@ -2281,6 +2302,7 @@ pub enum AttributeGraphElements {
     #[token(".FLOAT_RANGE", graph_lexer::from_float_range)]
     FloatRange(Value),
     /// binary vector element parses remaining as 3 comma delimitted f32's
+    #[token(".bin", graph_lexer::from_binary_vector_base64)]
     #[token(".base64", graph_lexer::from_binary_vector_base64)]
     #[token(".BINARY_VECTOR", graph_lexer::from_binary_vector_base64)]
     BinaryVector(Value),
@@ -2291,8 +2313,8 @@ pub enum AttributeGraphElements {
     /// entity ids should be parsed before symbols
     #[regex("[0-9]+", priority = 3, callback = graph_lexer::from_entity)]
     Entity(u32),
-    /// symbols must start with a character, and is composed of lowercase characters, digits, underscores, and colons
-    #[regex("#[A-Za-z_.0-9]+", graph_lexer::from_string)]
+    /// names have more relaxed rules
+    #[regex("#[A-Za-z_.-/0-9]+", graph_lexer::from_string)]
     Name(String),
     /// symbols must start with a character, and is composed of lowercase characters, digits, underscores, and colons
     #[regex("[a-z]+[a-z_:0-9]*", graph_lexer::from_string)]
