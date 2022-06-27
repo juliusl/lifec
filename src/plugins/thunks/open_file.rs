@@ -18,11 +18,7 @@ impl Plugin<ThunkContext> for OpenFile {
     }
 
     fn description() -> &'static str {
-        "Open and reads a file to a string, and then imports as an attribute."
-    }
-
-    fn config(context: &mut ThunkContext) {
-        context.as_mut().add_text_attr("file_src", ".runmd");
+        "Open and reads a file to a string, and then imports to a binary attribute."
     }
 
     fn call_with_context(context: &mut ThunkContext) -> Option<tokio::task::JoinHandle<ThunkContext>> {

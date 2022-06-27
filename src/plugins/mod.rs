@@ -52,8 +52,6 @@ where
     /// Returns the symbol name representing this plugin
     fn symbol() -> &'static str;
 
-    fn config(_context: &mut T) {}
-
     /// implement call_with_context to allow for static extensions of attribute graph
     fn call_with_context(context: &mut T) -> Option<JoinHandle<T>>;
 
