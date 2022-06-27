@@ -1,12 +1,7 @@
-use atlier::system::{App, Extension, WindowEvent};
 use specs::storage::DenseVecStorage;
-use specs::{
-    Builder, Component, DispatcherBuilder, Entities, Entity, Join, ReadStorage, System, World,
-    WorldExt, WriteStorage,
-};
 
 use super::ProgressStatusBar;
-use crate::plugins::{Engine, Event, EventRuntime, ThunkContext};
+use crate::plugins::*;
 
 #[derive(Clone, Default)]
 pub struct Start;

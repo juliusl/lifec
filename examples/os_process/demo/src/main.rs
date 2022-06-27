@@ -1,11 +1,7 @@
 use std::time::Duration;
 
-use lifec::plugins::{Engine, EventRuntime, Plugin, ThunkContext};
-use lifec::{editor::*, AttributeGraph, Runtime};
+use lifec::{plugins::*, editor::*, AttributeGraph, Runtime};
 use specs::storage::DenseVecStorage;
-use specs::{
-    Component, DispatcherBuilder, Entities, Join, ReadStorage, System, World, WriteStorage,
-};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
@@ -21,10 +17,7 @@ fn main() {
 
 #[derive(Default, Component, Clone)]
 #[storage(DenseVecStorage)]
-struct Timer(
-    Option<StartButton>, 
-    Option<ProgressStatusBar>
-);
+struct Timer(Option<StartButton>, Option<ProgressStatusBar>);
 
 impl Plugin<ThunkContext> for Timer {
     fn symbol() -> &'static str {
@@ -51,7 +44,8 @@ impl Plugin<ThunkContext> for Timer {
                         tc.update_progress(format!("elapsed {} ms", elapsed.as_millis()), progress)
                             .await;
                     } else {
-                        tc.as_mut().add_text_attr("elapsed", format!("{:?}", elapsed));
+                        tc.as_mut()
+                            .add_text_attr("elapsed", format!("{:?}", elapsed));
                         break;
                     }
                 }
@@ -71,17 +65,19 @@ impl Extension for Timer {
 
         let mut initial_context = ThunkContext::default();
         initial_context.as_mut().add_int_attr("duration", 5);
-        Start::init(world
-            .create_entity()
-            .with(initial_context)
-            .with(Start::event::<Timer>())
-            .with(Timer::default())
-        ).build();
+        Start::init(
+            world
+                .create_entity()
+                .with(initial_context)
+                .with(Start::event::<Timer>())
+                .with(Timer::default()),
+        )
+        .build();
     }
 
     fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
         StartButton::configure_app_systems(dispatcher);
-        dispatcher.add(TimerSystem{}, "timer_system", &[])
+        dispatcher.add(TimerSystem {}, "timer_system", &[])
     }
 
     fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
@@ -98,8 +94,7 @@ impl Extension for Timer {
         }
     }
 
-    fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {
-    }
+    fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {}
 
     fn on_run(&'_ mut self, _: &World) {
         //
@@ -117,7 +112,14 @@ impl<'a> System<'a> for TimerSystem {
     );
 
     fn run(&mut self, (entities, mut timers, start_events, progress): Self::SystemData) {
-        for (_, timer, start_event, progress) in (&entities, &mut timers, start_events.maybe(), progress.maybe()).join() {
+        for (_, timer, start_event, progress) in (
+            &entities,
+            &mut timers,
+            start_events.maybe(),
+            progress.maybe(),
+        )
+            .join()
+        {
             if let Some(start_event) = start_event {
                 timer.0 = Some(start_event.clone());
             }
