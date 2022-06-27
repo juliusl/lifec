@@ -1,4 +1,6 @@
-use specs::{Component, storage};
+use std::path::PathBuf;
+
+use specs::Component;
 use tokio::fs;
 
 use crate::plugins::*;
@@ -29,9 +31,12 @@ impl Plugin<ThunkContext> for OpenFile {
             async {
                 if let Some(file_src) = tc.as_ref().find_text("file_src") {
                     tc.update_status_only("file source found").await;
-                    if let Some(content) = fs::read_to_string(&file_src).await.ok() {
+
+                    let path_buf = PathBuf::from(file_src);
+
+                    if let Some(content) = fs::read_to_string(&path_buf).await.ok() {
                         tc.update_status_only("read content, writing to block").await;
-                        if tc.block.add_block(file_src, |c| {
+                        if tc.block.add_block(path_buf.file_name().unwrap_or_default().to_str().unwrap_or_default(), |c| {
                             c.add_binary_attr("content", content.as_bytes());
                         }) {
                             tc.update_status_only("added file").await;

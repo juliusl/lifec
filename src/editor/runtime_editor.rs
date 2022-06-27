@@ -1,18 +1,37 @@
 use atlier::system::Extension;
 use imgui::Window;
-use crate::{Runtime, plugins::{Process, OpenFile}};
+use specs::{WorldExt, World, Entity};
+use crate::{Runtime, plugins::{Process, OpenFile, Engine, ThunkContext, Event}};
 use super::{List, Task, Call, Timer};
 
 #[derive(Clone)]
 pub struct RuntimeEditor
 {
     runtime: Runtime,
-    files: Vec<String>
+}
+
+impl RuntimeEditor {
+    /// Schedule an event on the runtime
+    pub fn schedule(&mut self, world: &World, event: &Event, config: impl FnOnce(&mut ThunkContext)) -> Option<Entity> {
+        if let Some(entity) = self.runtime.create(world, event, |_|{}) {
+            let mut contexts = world.write_component::<ThunkContext>();
+            let mut events = world.write_component::<Event>();
+            if let Some(tc) = contexts.get_mut(entity) {
+                config(tc);
+                if let Some(event) = events.get_mut(entity) { 
+                    event.fire(tc.clone());
+                    return Some(entity);
+                }
+            }
+        }
+
+        None
+    }
 }
 
 impl Default for RuntimeEditor {
     fn default() -> Self {
-        let mut default = Self { runtime: Default::default(), files: Default::default() };
+        let mut default = Self { runtime: Default::default() };
         default.runtime.install::<Call, Timer>();
         default.runtime.install::<Call, Process>();
         default.runtime.install::<Call, OpenFile>();
@@ -35,18 +54,19 @@ impl Extension for RuntimeEditor
         Window::new("Tasks").size([800.0, 600.0], imgui::Condition::Appearing).build(ui, ||{
             List::<Task>::default().on_ui(app_world, ui);
         });
-
-        Window::new("Files").size([800.0, 600.0], imgui::Condition::Appearing).build(ui, ||{
-            for file in self.files.iter() {
-                ui.text(file);
-            }
-        });
     }
 
-    fn on_window_event(&'_ mut self, _: &specs::World, event: &'_ atlier::system::WindowEvent<'_>) {
+    fn on_window_event(&'_ mut self, world: &specs::World, event: &'_ atlier::system::WindowEvent<'_>) {
         match event {
             atlier::system::WindowEvent::DroppedFile(file) => {
-                self.files.push(format!("{:?}", &file));
+                let file_src = format!("{:?}", &file);
+
+                self.schedule(world,&Call::event::<OpenFile>(),  |tc| {
+                    tc.as_mut().add_text_attr("file_src", file_src.trim_matches('"'));
+                }).and_then(|e| 
+                    // TODO retrieve result and push as message
+                    Some(println!("open file scheduled for {:?}", e))
+                );
             },
             _ => {}
         }

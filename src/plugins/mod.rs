@@ -134,7 +134,7 @@ pub trait Engine {
     }
 
     /// Creates an instance of this engine
-    fn create<P>(world: &World, config: fn(&mut ThunkContext))
+    fn create<P>(world: &World, config: fn(&mut ThunkContext)) -> Entity
     where
         P: Plugin<ThunkContext> + Component + Send + Default,
     {
@@ -161,6 +161,8 @@ pub trait Engine {
             Ok(_) => {}
             Err(_) => {}
         }
+
+        entity
     }
 
     /// Returns an event that runs the engine

@@ -1,7 +1,7 @@
 use atlier::system::App;
 use imgui::{ChildWindow, Window};
 use plugins::{Engine, Plugin, Project, ThunkContext, Event};
-use specs::{Component, System, World};
+use specs::{Component, System, World, Entity};
 use std::fmt::Display;
 use std::{any::Any, collections::BTreeMap};
 
@@ -131,16 +131,14 @@ pub trait RuntimeState:
 #[derive(Clone)]
 pub struct Runtime {
     project: Project,
-    creators: BTreeMap<String, fn(&World, fn(&mut ThunkContext))>,
-    config: BTreeMap<String, fn(&mut ThunkContext)>,
+    create: BTreeMap<String, fn(&World, fn(&mut ThunkContext)) -> Entity>,
 }
 
 impl Default for Runtime {
     fn default() -> Self {
         Self {
             project: Default::default(),
-            creators: BTreeMap::default(),
-            config: BTreeMap::default(),
+            create: BTreeMap::default(),
         }
     }
 }
@@ -150,8 +148,7 @@ impl Runtime {
     pub fn new(project: Project) -> Self {
         Self {
             project,
-            creators: BTreeMap::default(),
-            config: BTreeMap::default(),
+            create: BTreeMap::default(),
         }
     }
 
@@ -162,21 +159,20 @@ impl Runtime {
         P: Plugin<ThunkContext> + Component + Send + Default,
     {
         let event = E::event::<P>();
-        self.creators.insert(event.to_string(), E::create::<P>);
-        self.config.insert(event.to_string(), P::config);
+        self.create.insert(event.to_string(), E::create::<P>);
 
         println!("installed {}", event.to_string());
     }
 
     /// initialize and configure an instance of an installed engine, corresponding to an event
     /// this is a no-op if the corresponding engine is not installed
-    pub fn create(&self, world: &World, event: &Event) {
+    pub fn create(&self, world: &World, event: &Event, config_fn: fn(&mut ThunkContext)) -> Option<Entity> {
         let key = event.to_string();
-        let init_fn = self.creators.get(&key);
-        let config_fn = self.config.get(&key);
 
-        if let (Some(create_fn), Some(config_fn)) = (init_fn, config_fn) {
-            create_fn(world, *config_fn);
+        if let Some(create_fn) = self.create.get(&key) {
+            Some((create_fn)(world, config_fn))
+        } else {
+            None
         }
     }
 
