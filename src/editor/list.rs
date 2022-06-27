@@ -8,15 +8,33 @@ pub struct List<Item>(fn(&mut ThunkContext, &mut Item, &World, &Ui))
 where
     Item: Extension + Component;
 
+impl<Item> List<Item>
+where
+    Item: Extension + Component 
+{
+    pub fn edit_attr_table() -> Self {
+        List::<Item>(|context, item, world, ui| {
+            context.as_mut().edit_attr_table(ui);
+            item.on_ui(world, ui);
+        })
+    }
+
+    pub fn edit_attr_form() -> Self {
+        List::<Item>(|context, item, world, ui| {
+            for attr in context.as_mut().iter_mut_attributes() {
+                attr.edit_value(format!("{} {}", attr.name(), attr.id()), ui);
+            }
+            item.on_ui(world, ui);
+        })
+    }
+}
+
 impl<Item> Default for List<Item>
 where
     Item: Extension + Component,
 {
     fn default() -> Self {
-        Self(|context, item, world, ui| {
-            context.as_mut().edit_attr_table(ui);
-            item.on_ui(world, ui);
-        })
+       Self::edit_attr_form()
     }
 }
 
@@ -40,6 +58,7 @@ where
         for (context, item) in (&mut contexts, &mut items).join() {
             let List(layout) = self;
             (layout)(context, item, app_world, ui);
+            ui.new_line();
         }
     }
 

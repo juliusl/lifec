@@ -1,10 +1,9 @@
-
-use std::any::Any;
-use std::fmt::Display;
 use atlier::system::App;
-use imgui::{Window, ChildWindow};
-use plugins::Project;
-use specs::System;
+use imgui::{ChildWindow, Window};
+use plugins::{Engine, Plugin, Project, ThunkContext};
+use specs::{Component, System, World};
+use std::fmt::Display;
+use std::{any::Any, collections::BTreeMap};
 
 pub mod editor;
 pub mod plugins;
@@ -12,9 +11,9 @@ pub mod plugins;
 mod state;
 pub use state::AttributeGraph;
 
-pub trait RuntimeDispatcher: AsRef<AttributeGraph> + AsMut<AttributeGraph> 
+pub trait RuntimeDispatcher: AsRef<AttributeGraph> + AsMut<AttributeGraph>
 where
-    Self: Sized
+    Self: Sized,
 {
     type Error;
 
@@ -23,33 +22,42 @@ where
     fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error>;
 
     /// dispatch calls dispatch_mut on a clone of Self and returns the clone
-    fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error> 
+    fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error>
     where
-        Self: Clone
+        Self: Clone,
     {
         let mut next = self.to_owned();
         match next.dispatch_mut(msg) {
-            Ok(_) => {
-                Ok(next.to_owned())
-            },
+            Ok(_) => Ok(next.to_owned()),
             Err(err) => Err(err),
         }
     }
 
-    fn batch(&self, msgs: impl AsRef<str>) -> Result<Self, Self::Error> 
-    where 
-        Self: Clone
+    fn batch(&self, msgs: impl AsRef<str>) -> Result<Self, Self::Error>
+    where
+        Self: Clone,
     {
         let mut next = self.clone();
-        for message in msgs.as_ref().trim().lines().filter(|line| !line.trim().is_empty()) {
-             next = next.dispatch(message)?;
+        for message in msgs
+            .as_ref()
+            .trim()
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+        {
+            next = next.dispatch(message)?;
         }
-    
+
         Ok(next)
     }
 
     fn batch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {
-        for message in msg.as_ref().trim().split("\n").map(|line| line.trim()).filter(|line| !line.is_empty()) {
+        for message in msg
+            .as_ref()
+            .trim()
+            .split("\n")
+            .map(|line| line.trim())
+            .filter(|line| !line.is_empty())
+        {
             self.dispatch_mut(message)?;
         }
         Ok(())
@@ -67,7 +75,9 @@ where
     }
 }
 
-pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + From<AttributeGraph> {
+pub trait RuntimeState:
+    Any + Sized + Clone + Sync + Default + Send + Display + From<AttributeGraph>
+{
     type Dispatcher: RuntimeDispatcher;
 
     // /// try to save the current state to a String
@@ -111,46 +121,88 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + 
     /// merge_with merges a clone of self with other
     fn merge_with(&self, other: &Self) -> Self {
         let mut next = self.clone();
-        
-        next.state_mut()
-            .merge(other.state());
-        
+
+        next.state_mut().merge(other.state());
+
         next
     }
 }
 
-#[derive(Clone, Default)]
-pub struct Runtime
-{
+#[derive(Clone)]
+pub struct Runtime {
     project: Project,
+    initializers: BTreeMap<String, fn(&mut World, fn(&mut ThunkContext))>,
+    config: BTreeMap<String, fn(&mut ThunkContext)>,
+}
+
+impl Default for Runtime {
+    fn default() -> Self {
+        Self {
+            project: Default::default(),
+            initializers: BTreeMap::default(),
+            config: BTreeMap::default(),
+        }
+    }
 }
 
 impl Runtime {
     /// returns a runtime from a project
     pub fn new(project: Project) -> Self {
-        Self { project }
+        Self {
+            project,
+            initializers: BTreeMap::default(),
+            config: BTreeMap::default(),
+        }
+    }
+
+    /// install an engine into the runtime
+    pub fn install<E, P>(&mut self)
+    where
+        E: Engine,
+        P: Plugin<ThunkContext> + Component + Send + Default,
+    {
+        let event = E::event::<P>();
+        self.initializers.insert(event.to_string(), E::init::<P>);
+        self.config.insert(event.to_string(), P::config);
+
+        println!("installed {}", event.to_string());
+    }
+
+    /// initialize and configure an instance of an installed engine, corresponding to an event
+    /// this is a no-op if the corresponding engine is not installed
+    pub fn create<E, P>(&self, world: &mut World) 
+    where
+        E: Engine,
+        P: Plugin<ThunkContext> + Component + Send + Default
+    {
+        let event = E::event::<P>();
+        let key = event.to_string();
+        let init_fn = self.initializers.get(&key);
+        let config_fn = self.config.get(&key);
+
+        if let (Some(init_fn), Some(config_fn)) = (init_fn, config_fn) {
+            init_fn(world, *config_fn);
+        }
     }
 
     /// returns a runtime state generated from the current project
-    pub fn state<S>(&self) -> S 
+    pub fn state<S>(&self) -> S
     where
-        S: RuntimeState
+        S: RuntimeState,
     {
         S::from(self.project.as_ref().clone())
     }
 }
 
-impl<'a> System<'a> for Runtime
-{
-    type SystemData = ();
+impl<'a> System<'a> for Runtime {
+    type SystemData = (
+    );
 
     fn run(&mut self, _: Self::SystemData) {
-        //
     }
 }
 
-impl App for Runtime
-{
+impl App for Runtime {
     fn name() -> &'static str {
         "runtime"
     }
@@ -160,7 +212,10 @@ impl App for Runtime
     }
 
     fn edit_ui(&mut self, ui: &imgui::Ui) {
-        Window::new(format!("Runtime - hash: {}", self.project.as_ref().hash_code()))
+        Window::new(format!(
+            "Runtime - hash: {}",
+            self.project.as_ref().hash_code()
+        ))
         .size(*Self::window_size(), imgui::Condition::Appearing)
         .menu_bar(true)
         .build(ui, || {
@@ -181,8 +236,7 @@ impl App for Runtime
 
                     let thunk_symbol = thunk_symbol.unwrap_or("entity".to_string());
 
-                    if let Some(token) = ui.tab_item(format!("{} {}", thunk_symbol, block_name))
-                    {
+                    if let Some(token) = ui.tab_item(format!("{} {}", thunk_symbol, block_name)) {
                         ui.group(|| {
                             block.edit_block_view(true, ui);
                             ChildWindow::new(&format!("table_view_{}", block_name))
@@ -200,6 +254,5 @@ impl App for Runtime
         });
     }
 
-    fn display_ui(&self, _: &imgui::Ui) {
-    }
+    fn display_ui(&self, _: &imgui::Ui) {}
 }

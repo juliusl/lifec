@@ -9,6 +9,9 @@ use specs::{storage::DenseVecStorage, Entity};
 mod println;
 pub use println::Println;
 
+mod open_file;
+pub use open_file::OpenFile;
+
 mod write_files;
 use tokio::{runtime::Handle, sync::mpsc::Sender, task::JoinHandle};
 pub use write_files::WriteFiles;

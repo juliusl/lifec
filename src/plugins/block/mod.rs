@@ -132,6 +132,10 @@ impl BlockContext {
         if self.block_symbols.contains(block_symbol.as_ref()) {
             false
         } else {
+            if self.max_block_id < self.as_ref().entity() {
+                self.max_block_id = self.as_ref().entity();
+            }
+
             self.max_block_id += 1;
             let next = self.max_block_id;
 

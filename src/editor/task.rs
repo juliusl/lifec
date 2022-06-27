@@ -12,7 +12,7 @@ pub struct Task(Option<StartButton>, Option<ProgressStatusBar>);
 impl Extension for Task {
     fn configure_app_world(world: &mut World) {
         EventRuntime::configure_app_world(world);
-        world.register::<StartButton>();
+        StartButton::configure_app_world(world);
         world.register::<ProgressStatusBar>();
         world.register::<Task>();
     }

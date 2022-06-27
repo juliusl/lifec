@@ -1,8 +1,8 @@
-pub use specs::{
-    Builder, Component, DispatcherBuilder, Entities, Entity, Join, ReadStorage, System, World,
-    WorldExt, WriteStorage, EntityBuilder,
-};
 pub use atlier::system::{App, Extension, WindowEvent};
+pub use specs::{
+    Builder, Component, DispatcherBuilder, Entities, Entity, EntityBuilder, Join, ReadStorage,
+    System, World, WorldExt, WriteStorage,
+};
 
 mod block;
 pub use block::BlockContext;
@@ -20,6 +20,7 @@ mod process;
 pub use process::Process;
 
 mod thunks;
+pub use thunks::OpenFile;
 pub use thunks::Println;
 pub use thunks::StatusUpdate;
 pub use thunks::Thunk;
@@ -50,6 +51,8 @@ where
 {
     /// Returns the symbol name representing this plugin
     fn symbol() -> &'static str;
+
+    fn config(_context: &mut T) {}
 
     /// implement call_with_context to allow for static extensions of attribute graph
     fn call_with_context(context: &mut T) -> Option<JoinHandle<T>>;
@@ -103,9 +106,61 @@ pub trait Engine {
         // Note: Left as an extension point, but mainly shouldn't be needed
     }
 
-    /// Initialize entity
-    fn init(entity: EntityBuilder) -> EntityBuilder {
-        entity
+    /// Initialize event for entity
+    fn init_event(entity: EntityBuilder, event: Event) -> EntityBuilder {
+        entity.with(event)
+    }
+
+    /// Create an event with an entity
+    fn create_event(_: Entity, _: &World) {}
+
+    /// Initialize an instance of this engine
+    fn init<P>(world: &mut World, config: fn(&mut ThunkContext))
+    where
+        P: Plugin<ThunkContext> + Component + Send + Default,
+    {
+        let mut initial_context = ThunkContext::default();
+        config(&mut initial_context);
+        let entity = Self::init_event(world.create_entity(), Self::event::<P>()).build();
+        initial_context.as_mut().set_parent_entity(entity);
+
+        match world
+            .write_component::<ThunkContext>()
+            .insert(entity, initial_context)
+        {
+            Ok(_) => {}
+            Err(_) => {}
+        }
+    }
+
+    /// Creates an instance of this engine
+    fn create<P>(world: &World, config: fn(&mut ThunkContext))
+    where
+        P: Plugin<ThunkContext> + Component + Send + Default,
+    {
+        let entities = world.entities();
+        let mut events = world.write_component::<Event>();
+
+        let entity = entities.create();
+
+        match events.insert(entity, Self::event::<P>()) {
+            Ok(_) => {}
+            Err(_) => {}
+        }
+
+        Self::create_event(entity, world);
+
+        let mut initial_context = ThunkContext::default();
+        config(&mut initial_context);
+        initial_context.as_mut().set_parent_entity(entity);
+
+        match world
+            .write_component::<ThunkContext>()
+            .insert(entity, initial_context)
+        {
+            Ok(_) => {}
+            Err(_) => {}
+        }
     }
 
     /// Returns an event that runs the engine
@@ -122,7 +177,7 @@ pub trait Engine {
         P: Plugin<ThunkContext> + Component + Send + Default,
     {
         P::parse_entity(path, world, Self::setup, |entity| {
-            Self::init(entity.with(Self::event::<P>())).build()
+            Self::init_event(entity, Self::event::<P>()).build()
         })
     }
 }
