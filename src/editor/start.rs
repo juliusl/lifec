@@ -52,7 +52,7 @@ impl<'a> System<'a> for Start {
                     .unwrap_or("Completed".to_string());
             }
 
-            // Sets part of the label
+            // Sets the label for this button
             start_button.2 = event.to_string();
 
             // Sets the owning entity
@@ -63,7 +63,7 @@ impl<'a> System<'a> for Start {
 
 #[derive(Component, Clone, Default)]
 #[storage(DenseVecStorage)]
-pub struct StartButton(pub bool, String, String, pub Option<Entity>);
+pub struct StartButton(bool, String, String, Option<Entity>);
 
 impl App for StartButton {
     fn name() -> &'static str {
