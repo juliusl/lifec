@@ -88,8 +88,11 @@ impl Extension for Timer {
         let mut timers = app_world.write_component::<Timer>();
 
         for timer in timers.as_mut_slice() {
-            if let Timer(Some(start_button), Some(progress_status_bar)) = timer {
+            if let Timer(Some(start_button), ..) = timer {
                 start_button.on_ui(app_world, ui);
+            }
+
+            if let Timer(.., Some(progress_status_bar)) = timer {
                 progress_status_bar.on_ui(app_world, ui);
             }
         }

@@ -8,7 +8,7 @@ use specs::{
 use super::ProgressStatusBar;
 use crate::plugins::{Engine, Event, EventRuntime, ThunkContext};
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Start;
 
 impl Engine for Start {
@@ -83,12 +83,12 @@ impl App for StartButton {
 }
 
 impl Extension for StartButton {
-    fn configure_app_world(_: &mut World) {
-        // todo!()
+    fn configure_app_world(world: &mut World) {
+        world.register::<StartButton>();
     }
 
     fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
-        dispatcher.add(Start {}, "start_event", &[]);
+        dispatcher.add(Start::default(), "start_event", &[]);
         dispatcher.add(
             EventRuntime::default(),
             "start_event_runtime",
@@ -99,15 +99,15 @@ impl Extension for StartButton {
     fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
         if let Self(.., Some(entity)) = self {
             let mut components = app_world.write_component::<Self>();
-            if let Some(start_event) = components.get_mut(*entity) {
-                start_event.edit_ui(ui);
-                start_event.display_ui(ui);
+            if let Some(start_button) = components.get_mut(*entity) {
+                start_button.edit_ui(ui);
+                start_button.display_ui(ui);
             }
         }
     }
 
     fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {
-        //todo!()
+        // No-op
     }
 
     fn on_run(&'_ mut self, _: &World) {
