@@ -1,6 +1,6 @@
 use atlier::system::App;
 use imgui::{ChildWindow, Window};
-use plugins::{Engine, Plugin, Project, ThunkContext};
+use plugins::{Engine, Plugin, Project, ThunkContext, Event};
 use specs::{Component, System, World};
 use std::fmt::Display;
 use std::{any::Any, collections::BTreeMap};
@@ -131,7 +131,7 @@ pub trait RuntimeState:
 #[derive(Clone)]
 pub struct Runtime {
     project: Project,
-    initializers: BTreeMap<String, fn(&mut World, fn(&mut ThunkContext))>,
+    creators: BTreeMap<String, fn(&World, fn(&mut ThunkContext))>,
     config: BTreeMap<String, fn(&mut ThunkContext)>,
 }
 
@@ -139,7 +139,7 @@ impl Default for Runtime {
     fn default() -> Self {
         Self {
             project: Default::default(),
-            initializers: BTreeMap::default(),
+            creators: BTreeMap::default(),
             config: BTreeMap::default(),
         }
     }
@@ -150,7 +150,7 @@ impl Runtime {
     pub fn new(project: Project) -> Self {
         Self {
             project,
-            initializers: BTreeMap::default(),
+            creators: BTreeMap::default(),
             config: BTreeMap::default(),
         }
     }
@@ -162,7 +162,7 @@ impl Runtime {
         P: Plugin<ThunkContext> + Component + Send + Default,
     {
         let event = E::event::<P>();
-        self.initializers.insert(event.to_string(), E::init::<P>);
+        self.creators.insert(event.to_string(), E::create::<P>);
         self.config.insert(event.to_string(), P::config);
 
         println!("installed {}", event.to_string());
@@ -170,18 +170,13 @@ impl Runtime {
 
     /// initialize and configure an instance of an installed engine, corresponding to an event
     /// this is a no-op if the corresponding engine is not installed
-    pub fn create<E, P>(&self, world: &mut World) 
-    where
-        E: Engine,
-        P: Plugin<ThunkContext> + Component + Send + Default
-    {
-        let event = E::event::<P>();
+    pub fn create(&self, world: &World, event: &Event) {
         let key = event.to_string();
-        let init_fn = self.initializers.get(&key);
+        let init_fn = self.creators.get(&key);
         let config_fn = self.config.get(&key);
 
-        if let (Some(init_fn), Some(config_fn)) = (init_fn, config_fn) {
-            init_fn(world, *config_fn);
+        if let (Some(create_fn), Some(config_fn)) = (init_fn, config_fn) {
+            create_fn(world, *config_fn);
         }
     }
 
