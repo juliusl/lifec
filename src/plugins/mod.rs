@@ -94,7 +94,10 @@ pub trait Engine {
     fn event_name() -> &'static str;
 
     /// Setup graph
-    fn setup(_: &mut AttributeGraph);
+    fn setup(_: &mut AttributeGraph) {
+        // No-op
+        // Note: Left as an extension point, but mainly shouldn't be needed
+    }
 
     /// Initialize entity
     fn init(entity: EntityBuilder) -> EntityBuilder {

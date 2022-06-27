@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use lifec::plugins::{Engine, Event, EventRuntime, Plugin, ThunkContext};
+use lifec::plugins::{Engine, Event, EventRuntime, Plugin, ThunkContext, Process};
 use lifec::{editor::*, AttributeGraph, Runtime};
 use specs::storage::DenseVecStorage;
 use specs::{
-    Component, DispatcherBuilder, Entities, Join, ReadStorage, RunNow, System, World, WriteStorage,
+    Component, DispatcherBuilder, Entities, Join, ReadStorage, RunNow, System, World, WriteStorage, Entity,
 };
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
@@ -21,7 +21,10 @@ fn main() {
 
 #[derive(Default, Component, Clone)]
 #[storage(DenseVecStorage)]
-struct Timer(Option<StartEvent<Timer>>, Option<Progress>);
+struct Timer(
+    Option<StartEvent>, 
+    Option<Progress>
+);
 
 impl Plugin<ThunkContext> for Timer {
     fn symbol() -> &'static str {
@@ -65,63 +68,50 @@ impl Engine for Start {
     fn event_name() -> &'static str {
         "start"
     }
+}
 
-    fn setup(_: &mut AttributeGraph) {
-       // graph.with_bool("enabled", false);
+impl<'a> System<'a> for Start {
+    type SystemData = (
+        WriteStorage<'a, StartEvent>,
+        ReadStorage<'a, ThunkContext>,
+        WriteStorage<'a, Event>,
+    );
+
+    fn run(&mut self, (mut start_events, contexts, mut events): Self::SystemData) {
+        for (start_event, context, event) in (&mut start_events, &contexts, &mut events).join() {
+            if start_event.0 {
+                event.fire(context.clone());
+                start_event.0 = false;
+            }
+
+            if event.is_running() {
+                start_event.1 = "Running";
+            } else {
+                start_event.1 = "Completed";
+            }
+        }
     }
 }
 
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
-struct StartEvent<P>(bool, &'static str, fn(P))
-where
-    P: Plugin<ThunkContext> + Component + Send + Default,
-    <P as Component>::Storage: Default;
+struct StartEvent(bool, &'static str, Option<Entity>);
 
-impl<P> Default for StartEvent<P>
-where
-    P: Plugin<ThunkContext> + Component + Send + Default,
-    <P as Component>::Storage: Default,
+impl Default for StartEvent
 {
     fn default() -> Self {
-        Self(Default::default(), Default::default(), |_| {})
+        Self(Default::default(), Default::default(), None)
     }
 }
 
-impl<P> Extension for StartEvent<P>
-where
-    P: Plugin<ThunkContext> + Component + Send + Default,
-    <P as Component>::Storage: Default,
-{
-    fn configure_app_world(world: &mut World) {
-        world.register::<P>();
-    }
-
-    fn configure_app_systems(_: &mut DispatcherBuilder) {}
-
-    fn on_ui(&'_ mut self, _: &World, ui: &'_ imgui::Ui<'_>) {
-        self.edit_ui(ui);
-        self.display_ui(ui);
-    }
-
-    fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {}
-
-    fn on_run(&'_ mut self, world: &World) {
-        self.run_now(world);
-    }
-}
-
-impl <P> App for StartEvent<P> 
-where
-    P: Plugin<ThunkContext> + Component + Send + Default,
-    <P as Component>::Storage: Default
+impl App for StartEvent
 {
     fn name() -> &'static str {
         "start_event"
     }
 
     fn edit_ui(&mut self, ui: &imgui::Ui) {
-        self.0 = ui.button(format!("start {}", P::symbol()));
+        self.0 = ui.button(format!("start"));
     }
 
     fn display_ui(&self, ui: &imgui::Ui) {
@@ -130,43 +120,38 @@ where
     }
 }
 
-impl<'a, P> System<'a> for StartEvent<P> 
-where
-    P: Plugin<ThunkContext> + Component + Send + Default,
-    <P as Component>::Storage: Default,
-{
-    type SystemData = (
-        ReadStorage<'a, ThunkContext>,
-        WriteStorage<'a, Event>,
-        WriteStorage<'a, StartEvent<P>>,
-    );
+impl Extension for StartEvent {
+    fn configure_app_world(_: &mut World) {
+        // todo!()
+    }
 
-    fn run(&mut self, (thunk_contexts, mut events, mut start_events): Self::SystemData) {
-        for (context, event) in (&thunk_contexts, &mut events).join() {
-            if self.0 {
-                event.fire(context.clone());
-                self.0 = false;
-            }
+    fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
+        dispatcher.add(Start{}, "start_event", &[]);
+    }
 
-            if event.is_running() {
-                self.1 = "Running";
-            } else {
-                self.1 = "Completed";
-            }
-
-            if let Some(entity) = context.entity {
-                if let Some(start_event) = start_events.get_mut(entity) {
-                    start_event.1 = self.1;
-                }
+    fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
+        if let Self(.., Some(entity)) = self {
+            let mut components =  app_world.write_component::<Self>();
+            if let Some(start_event) = components.get_mut(*entity) {
+                start_event.edit_ui(ui);
+                start_event.display_ui(ui);
             }
         }
+    }
+
+    fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {
+        //todo!()
+    }
+
+    fn on_run(&'_ mut self, _: &World) {
+        //todo!()
     }
 }
 
 impl Extension for Timer {
     fn configure_app_world(world: &mut World) {
         EventRuntime::configure_app_world(world);
-        world.register::<StartEvent<Self>>();
+        world.register::<StartEvent>();
         world.register::<Progress>();
 
         let mut initial_context = ThunkContext::default();
@@ -175,12 +160,13 @@ impl Extension for Timer {
             .create_entity()
             .with(initial_context)
             .with(Start::event::<Timer>())
-            .with(StartEvent::<Timer>::default())
+            .with(StartEvent::default())
             .with(Progress::default())
             .build();
     }
 
     fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
+        StartEvent::configure_app_systems(dispatcher);
         EventRuntime::configure_app_systems(dispatcher);
     }
 
@@ -202,10 +188,6 @@ impl Extension for Timer {
     }
 
     fn on_run(&'_ mut self, app_world: &World) {
-        if let Some(start_event) = self.0.as_mut() {
-            start_event.on_run(app_world);
-        }
-
         if let Some(progress) = self.1.as_mut() {
             progress.on_run(app_world);
         }
@@ -217,14 +199,16 @@ impl Extension for Timer {
 impl<'a> System<'a> for Timer {
     type SystemData = (
         Entities<'a>,
-        ReadStorage<'a, StartEvent<Timer>>,
+        ReadStorage<'a, StartEvent>,
         ReadStorage<'a, Progress>,
     );
 
     fn run(&mut self, (entities, start_events, progress): Self::SystemData) {
-        for (_, start_event, progress) in (&entities, start_events.maybe(), progress.maybe()).join() {
+        for (entity, start_event, progress) in (&entities, start_events.maybe(), progress.maybe()).join() {
             if let Some(start_event) = start_event {
-                self.0 = Some(start_event.clone());
+                let mut start_event = start_event.clone();
+                start_event.2 = Some(entity);
+                self.0 = Some(start_event);
             }
             if let Some(progress) = progress {
                 self.1 = Some(progress.clone());
