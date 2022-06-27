@@ -38,8 +38,9 @@ impl Extension for ProgressStatusBar {
         dispatcher.add(EventRuntime::default(), "progress_status_bar/event_runtime", &[]);
     }
 
-    fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {
+    fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
         self.display_ui(ui);
+        self.on_run(app_world);
     }
 
     fn on_window_event(&'_ mut self, _: &specs::World, _: &'_ WindowEvent<'_>) {
@@ -51,7 +52,6 @@ impl Extension for ProgressStatusBar {
         let mut progress = app_world.write_storage::<ProgressStatusBar>();
 
         if let Some((entity, p, s)) = rx.try_recv().ok() {
-            println!("{:?} {:.4} {}", entity, p, s);
             match progress.insert(entity, ProgressStatusBar(p, s)) {
                 Ok(_) => {}
                 Err(_) => {}
