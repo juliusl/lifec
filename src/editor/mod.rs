@@ -44,9 +44,19 @@ pub fn unique_title(title: impl AsRef<str>) -> String {
 }
 
 /// encapsulates common widget pattern
-struct Widget<A>(Entity, Option<A>)
+#[derive(Clone)]
+pub struct Widget<A>(Entity, Option<A>)
 where
     A: App + Component;
+
+impl<A> From<Entity> for Widget<A>
+where
+    A: App + Component
+{
+    fn from(entity: Entity) -> Self {
+       Widget(entity, None)
+    }
+}
 
 impl<A> Extension for Widget<A> 
 where

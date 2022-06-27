@@ -17,10 +17,10 @@ pub use process::Process;
 
 mod thunks;
 pub use thunks::Println;
+pub use thunks::StatusUpdate;
+pub use thunks::Thunk;
 pub use thunks::ThunkContext;
 pub use thunks::WriteFiles;
-pub use thunks::Thunk;
-pub use thunks::StatusUpdate;
 
 pub mod demos {
     pub use super::thunks::demo::*;
@@ -34,11 +34,15 @@ use tokio::task::JoinHandle;
 
 use crate::AttributeGraph;
 
-
 /// This trait is to facilitate extending working with the attribute graph
 pub trait Plugin<T>
 where
-    T: AsRef<AttributeGraph> + AsMut<AttributeGraph> + From<AttributeGraph> + Component + Send + Sync,
+    T: AsRef<AttributeGraph>
+        + AsMut<AttributeGraph>
+        + From<AttributeGraph>
+        + Component
+        + Send
+        + Sync,
 {
     /// Returns the symbol name representing this plugin
     fn symbol() -> &'static str;
@@ -66,7 +70,12 @@ where
     /// Parses entity from a .runmd file and add's T as a component from the parsed graph.
     /// Calls handle to handle any actions on the graph before T::from(graph)
     /// Calls init to complete building the entity.
-    fn parse_entity(path: impl AsRef<str>, world: &mut World, setup: impl FnOnce(&mut AttributeGraph), init: impl FnOnce(EntityBuilder) -> Entity) -> Option<Entity> {
+    fn parse_entity(
+        path: impl AsRef<str>,
+        world: &mut World,
+        setup: impl FnOnce(&mut AttributeGraph),
+        init: impl FnOnce(EntityBuilder) -> Entity,
+    ) -> Option<Entity> {
         if let Some(mut graph) = AttributeGraph::load_from_file(path) {
             setup(&mut graph);
             let context = T::from(graph);
@@ -80,10 +89,7 @@ where
 }
 
 /// The engine trait is to enable an event struct to be created which handles the dynamics for an entity
-pub trait Engine<P>
-where
-    P: Plugin<ThunkContext> + Component + Send + Default,
-{
+pub trait Engine {
     /// The name of the event this engine produces
     fn event_name() -> &'static str;
 
@@ -95,15 +101,21 @@ where
         entity
     }
 
-    /// Returns an event that runs the engine 
-    fn event() -> Event {
+    /// Returns an event that runs the engine
+    fn event<P>() -> Event
+    where
+        P: Plugin<ThunkContext> + Component + Send + Default,
+    {
         Event::from_plugin::<P>(Self::event_name())
     }
 
     /// Parses a .runmd plugin entity, and then sets up the entity's event component
-    fn parse_engine(path: impl AsRef<str>, world: &mut World) -> Option<Entity> {
+    fn parse_engine<P>(path: impl AsRef<str>, world: &mut World) -> Option<Entity>
+    where
+        P: Plugin<ThunkContext> + Component + Send + Default,
+    {
         P::parse_entity(path, world, Self::setup, |entity| {
-            Self::init(entity.with(Self::event())).build()
+            Self::init(entity.with(Self::event::<P>())).build()
         })
     }
 }

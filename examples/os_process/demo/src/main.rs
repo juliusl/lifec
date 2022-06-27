@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::time::Duration;
 
 use lifec::plugins::{Engine, Event, EventRuntime, Plugin, ThunkContext};
@@ -22,7 +21,7 @@ fn main() {
 
 #[derive(Default, Component, Clone)]
 #[storage(DenseVecStorage)]
-struct Timer(Option<StartEvent<Timer, Timer>>, Option<Progress>);
+struct Timer(Option<StartEvent<Timer>>, Option<Progress>);
 
 impl Plugin<ThunkContext> for Timer {
     fn symbol() -> &'static str {
@@ -59,42 +58,38 @@ impl Plugin<ThunkContext> for Timer {
     }
 }
 
-impl Engine<Timer> for Timer {
+#[derive(Clone)]
+struct Start;
+
+impl Engine for Start {
     fn event_name() -> &'static str {
         "start"
     }
 
-    fn setup(_: &mut AttributeGraph) {}
-
-    fn init(entity: specs::EntityBuilder) -> specs::EntityBuilder {
-        entity
-            .with(StartEvent::<Timer, Timer>::default())
-            .with(Progress::default())
+    fn setup(_: &mut AttributeGraph) {
+       // graph.with_bool("enabled", false);
     }
 }
 
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
-struct StartEvent<E, P>(bool, &'static str, fn(E, P))
+struct StartEvent<P>(bool, &'static str, fn(P))
 where
-    E: Engine<P> + Send + Sync + Any,
     P: Plugin<ThunkContext> + Component + Send + Default,
     <P as Component>::Storage: Default;
 
-impl<E, P> Default for StartEvent<E, P>
+impl<P> Default for StartEvent<P>
 where
-    E: Engine<P> + Send + Sync + Any,
     P: Plugin<ThunkContext> + Component + Send + Default,
     <P as Component>::Storage: Default,
 {
     fn default() -> Self {
-        Self(Default::default(), Default::default(), |_, _| {})
+        Self(Default::default(), Default::default(), |_| {})
     }
 }
 
-impl<E, P> Extension for StartEvent<E, P>
+impl<P> Extension for StartEvent<P>
 where
-    E: Engine<P> + Send + Sync + Any,
     P: Plugin<ThunkContext> + Component + Send + Default,
     <P as Component>::Storage: Default,
 {
@@ -116,9 +111,8 @@ where
     }
 }
 
-impl <E, P> App for StartEvent<E, P> 
+impl <P> App for StartEvent<P> 
 where
-    E: Engine<P> + Send + Sync + Any,
     P: Plugin<ThunkContext> + Component + Send + Default,
     <P as Component>::Storage: Default
 {
@@ -127,7 +121,7 @@ where
     }
 
     fn edit_ui(&mut self, ui: &imgui::Ui) {
-        self.0 = ui.button(format!("{} {}", E::event_name(), P::symbol()));
+        self.0 = ui.button(format!("start {}", P::symbol()));
     }
 
     fn display_ui(&self, ui: &imgui::Ui) {
@@ -136,16 +130,15 @@ where
     }
 }
 
-impl<'a, E, P> System<'a> for StartEvent<E, P> 
+impl<'a, P> System<'a> for StartEvent<P> 
 where
-    E: Engine<P> + Send + Sync + Any,
     P: Plugin<ThunkContext> + Component + Send + Default,
     <P as Component>::Storage: Default,
 {
     type SystemData = (
         ReadStorage<'a, ThunkContext>,
         WriteStorage<'a, Event>,
-        WriteStorage<'a, StartEvent<E, P>>,
+        WriteStorage<'a, StartEvent<P>>,
     );
 
     fn run(&mut self, (thunk_contexts, mut events, mut start_events): Self::SystemData) {
@@ -173,7 +166,7 @@ where
 impl Extension for Timer {
     fn configure_app_world(world: &mut World) {
         EventRuntime::configure_app_world(world);
-        world.register::<StartEvent<Self, Self>>();
+        world.register::<StartEvent<Self>>();
         world.register::<Progress>();
 
         let mut initial_context = ThunkContext::default();
@@ -181,8 +174,8 @@ impl Extension for Timer {
         world
             .create_entity()
             .with(initial_context)
-            .with(Timer::event())
-            .with(StartEvent::<Timer, Timer>::default())
+            .with(Start::event::<Timer>())
+            .with(StartEvent::<Timer>::default())
             .with(Progress::default())
             .build();
     }
@@ -224,7 +217,7 @@ impl Extension for Timer {
 impl<'a> System<'a> for Timer {
     type SystemData = (
         Entities<'a>,
-        ReadStorage<'a, StartEvent<Self, Self>>,
+        ReadStorage<'a, StartEvent<Timer>>,
         ReadStorage<'a, Progress>,
     );
 
