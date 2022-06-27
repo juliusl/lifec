@@ -27,7 +27,7 @@ pub struct Event(
 
 impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}_", self.0)?;
+        write!(f, "{} ", self.0)?;
         write!(f, "{}", self.1 .0)?;
         Ok(())
     }

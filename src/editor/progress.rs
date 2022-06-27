@@ -6,17 +6,17 @@ use crate::plugins::{EventRuntime, StatusUpdate};
 
 #[derive(Component, Clone, Default)]
 #[storage(HashMapStorage)]
-pub struct Progress(pub f32, pub String);
+pub struct ProgressStatusBar(pub f32, pub String);
 
-impl App for Progress {
+impl App for ProgressStatusBar {
     fn name() -> &'static str {
-        "progress"
+        "progress_status_bar"
     }
 
     fn edit_ui(&mut self, _: &imgui::Ui) {}
 
     fn display_ui(&self, ui: &imgui::Ui) {
-        let Progress(progress, status) = self;
+        let ProgressStatusBar(progress, status) = self;
         if *progress > 0.0 {
             imgui::ProgressBar::new(*progress)
                 .overlay_text(format!("{:.4} %", progress * 100.0))
@@ -29,13 +29,13 @@ impl App for Progress {
     }
 }
 
-impl Extension for Progress {
+impl Extension for ProgressStatusBar {
     fn configure_app_world(world: &mut specs::World) {
-        world.register::<Progress>();
+        world.register::<ProgressStatusBar>();
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
-        dispatcher.add(EventRuntime::default(), "event_runtime", &[]);
+        dispatcher.add(EventRuntime::default(), "progress_status_bar/event_runtime", &[]);
     }
 
     fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {
@@ -48,11 +48,11 @@ impl Extension for Progress {
 
     fn on_run(&'_ mut self, app_world: &specs::World) {
         let mut rx = app_world.write_resource::<tokio::sync::mpsc::Receiver<StatusUpdate>>();
-        let mut progress = app_world.write_storage::<Progress>();
+        let mut progress = app_world.write_storage::<ProgressStatusBar>();
 
         if let Some((entity, p, s)) = rx.try_recv().ok() {
             println!("{:?} {:.4} {}", entity, p, s);
-            match progress.insert(entity, Progress(p, s)) {
+            match progress.insert(entity, ProgressStatusBar(p, s)) {
                 Ok(_) => {}
                 Err(_) => {}
             }

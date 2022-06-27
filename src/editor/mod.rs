@@ -2,7 +2,11 @@ mod runtime_editor;
 pub use runtime_editor::RuntimeEditor;
 
 mod progress;
-pub use progress::Progress;
+pub use progress::ProgressStatusBar;
+
+mod start;
+pub use start::StartButton;
+pub use start::Start;
 
 use atlier::system::start_editor_from;
 use rand::Rng;
@@ -60,7 +64,7 @@ where
 
 impl<A> Extension for Widget<A> 
 where
-    A: App + Component + Clone + for<'a> System<'a>,
+    A: App + Component + Clone,
     <A as Component>::Storage: Default
 {
     fn configure_app_world(world: &mut World) {
@@ -68,38 +72,20 @@ where
     }
 
     fn configure_app_systems(_: &mut DispatcherBuilder) {
-        //
     }
 
     fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
-        let mut apps = app_world.write_component::<A>();
-
-        if let Widget(entity,None) = self {
-            if let Some(app) = apps.get_mut(*entity) {
-                self.1 = Some(app.clone());
-            }
-        } else if let Widget(entity, Some(app)) = self {
+        let Self(entity, ..) = self;
+        let mut components =  app_world.write_component::<A>();
+        if let Some(app) = components.get_mut(*entity) {
             app.edit_ui(ui);
             app.display_ui(ui);
-
-            match apps.insert(*entity, app.clone()) {
-                Ok(_) => {
-                    
-                },
-                Err(_) => {
-
-                },
-            }
         }
     }
 
     fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {
-        //todo!()
     }
 
-    fn on_run(&'_ mut self, app_world: &World) {
-        if let Self(.., Some(app)) = self {
-            app.run_now(app_world);
-        }
+    fn on_run(&'_ mut self, _: &World) {
     }
 }
