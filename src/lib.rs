@@ -1,14 +1,15 @@
 
 use std::any::Any;
 use std::fmt::Display;
-pub mod editor;
-pub mod plugins;
-
-mod state;
 use atlier::system::App;
 use imgui::{Window, ChildWindow};
 use plugins::Project;
 use specs::System;
+
+pub mod editor;
+pub mod plugins;
+
+mod state;
 pub use state::AttributeGraph;
 
 pub trait RuntimeDispatcher: AsRef<AttributeGraph> + AsMut<AttributeGraph> 
@@ -119,33 +120,27 @@ pub trait RuntimeState: Any + Sized + Clone + Sync + Default + Send + Display + 
 }
 
 #[derive(Clone, Default)]
-pub struct Runtime<S> 
-where
-    S: RuntimeState 
+pub struct Runtime
 {
-    state: S,
     project: Project,
 }
 
-impl<S> Runtime<S> 
-where
-    S: RuntimeState {
+impl Runtime {
+    /// returns a runtime from a project
     pub fn new(project: Project) -> Self {
-        Self { state: S::from(project.as_ref().clone()), project }
+        Self { project }
     }
 
-    pub fn state(&self) -> &S {
-        &self.state
-    }
-
-    pub fn state_mut(&mut self) -> &mut S {
-        &mut self.state
+    /// returns a runtime state generated from the current project
+    pub fn state<S>(&self) -> S 
+    where
+        S: RuntimeState
+    {
+        S::from(self.project.as_ref().clone())
     }
 }
 
-impl<'a, S> System<'a> for Runtime<S> 
-where
-    S: RuntimeState
+impl<'a> System<'a> for Runtime
 {
     type SystemData = ();
 
@@ -154,9 +149,7 @@ where
     }
 }
 
-impl<S> App for Runtime<S>
-where
-    S: RuntimeState  
+impl App for Runtime
 {
     fn name() -> &'static str {
         "runtime"

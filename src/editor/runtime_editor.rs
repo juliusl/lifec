@@ -1,20 +1,13 @@
 use atlier::system::Extension;
-use specs::{Component};
-use crate::{
-    RuntimeState, Runtime,
-};
+use crate::Runtime;
 
 #[derive(Clone, Default)]
-pub struct RuntimeEditor<S>
-where
-    S: RuntimeState,
+pub struct RuntimeEditor
 {
-    _runtime: Runtime<S>
+    _runtime: Runtime
 }
 
-impl<S> Extension for RuntimeEditor<S> 
-where
-    S: RuntimeState + Component,
+impl Extension for RuntimeEditor 
 {
     fn configure_app_world(_: &mut specs::World) {
        

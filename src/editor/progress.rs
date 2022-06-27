@@ -52,6 +52,7 @@ impl Extension for ProgressStatusBar {
         let mut progress = app_world.write_storage::<ProgressStatusBar>();
 
         if let Some((entity, p, s)) = rx.try_recv().ok() {
+           println!("{}", s);
             match progress.insert(entity, ProgressStatusBar(p, s)) {
                 Ok(_) => {}
                 Err(_) => {}

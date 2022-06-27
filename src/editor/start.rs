@@ -86,7 +86,7 @@ impl Extension for StartButton {
         dispatcher.add(Start::default(), "start_event", &[]);
         dispatcher.add(
             EventRuntime::default(),
-            "start_event_runtime",
+            "start_button/event_runtime",
             &["start_event"],
         );
     }
