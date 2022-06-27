@@ -1340,19 +1340,6 @@ impl RuntimeState for AttributeGraph {
     fn dispatcher_mut(&mut self) -> &mut Self::Dispatcher {
         self
     }
-
-    fn setup_runtime(&mut self, runtime: &mut crate::Runtime<Self>) {
-        runtime.with_call("dispatch", |s, e| {
-            if let Some(msg) = e.and_then(|e| e.read_payload()) {
-                match s.dispatch(&msg) {
-                    Ok(next) => (Some(next), "{ ok;; }".to_string()),
-                    Err(_) => (None, "{ error;; }".to_string()),
-                }
-            } else {
-                (None, "{ exit;; }".to_string())
-            }
-        });
-    }
 }
 
 impl RuntimeDispatcher for AttributeGraph {

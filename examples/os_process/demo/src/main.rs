@@ -9,7 +9,7 @@ fn main() {
     if let Some(file) = AttributeGraph::load_from_file("test_demo.runmd") {
         open(
             "demo",
-            RuntimeEditor::new(Runtime::from(file)),
+            Runtime::<AttributeGraph>::new(Project::from(file)),
             Timer::default(),
         );
     }
@@ -65,14 +65,20 @@ impl Extension for Timer {
 
         let mut initial_context = ThunkContext::default();
         initial_context.as_mut().add_int_attr("duration", 5);
-        Start::init(
+        let entity = Start::init(
             world
                 .create_entity()
-                .with(initial_context)
                 .with(Start::event::<Timer>())
                 .with(Timer::default()),
         )
         .build();
+
+        initial_context.entity = Some(entity);
+
+        match world.write_component::<ThunkContext>().insert(entity, initial_context) {
+            Ok(_) => {},
+            Err(_) => {},
+        }
     }
 
     fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
@@ -80,25 +86,30 @@ impl Extension for Timer {
         dispatcher.add(TimerSystem {}, "timer_system", &[])
     }
 
-    fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
+    fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {        
+        let mut contexts = app_world.write_component::<ThunkContext>();
         let mut timers = app_world.write_component::<Timer>();
+        
+        for context in contexts.as_mut_slice() {
+            context.as_mut().edit_attr_table(ui);
 
-        for timer in timers.as_mut_slice() {
-            if let Timer(Some(start_button), ..) = timer {
-                start_button.on_ui(app_world, ui);
-            }
-
-            if let Timer(.., Some(progress_status_bar)) = timer {
-                progress_status_bar.on_ui(app_world, ui);
+            if let Some(entity) = context.entity { 
+                if let Some(timer) = timers.get_mut(entity) {
+                    if let Timer(Some(start_button), ..) = timer {
+                        start_button.on_ui(app_world, ui);
+                    }
+        
+                    if let Timer(.., Some(progress_status_bar)) = timer {
+                        progress_status_bar.on_ui(app_world, ui);
+                    }
+                }
             }
         }
     }
 
     fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {}
 
-    fn on_run(&'_ mut self, _: &World) {
-        //
-    }
+    fn on_run(&'_ mut self, _: &World) {}
 }
 
 struct TimerSystem;
