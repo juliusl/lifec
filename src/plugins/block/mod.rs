@@ -123,7 +123,7 @@ impl BlockContext {
         }
     }
 
-    /// adds a new block, returns true if a new block was added, does not call configure if the block exists
+    /// adds a new block, returns true if a new block was added, does not call configure if the block already exists
     pub fn add_block(
         &mut self,
         block_symbol: impl AsRef<str>,
@@ -134,6 +134,10 @@ impl BlockContext {
         } else {
             if self.max_block_id < self.as_ref().entity() {
                 self.max_block_id = self.as_ref().entity();
+            }
+
+            if self.block_name.is_empty() {
+                self.block_name = format!("{}", self.as_ref().hash_code());
             }
 
             self.max_block_id += 1;
@@ -437,7 +441,7 @@ impl BlockContext {
     }
 
     /// creates an iter on all the block attributes skipping block specific attrs
-    fn iter_block_attrs_mut(block: &mut AttributeGraph) -> impl Iterator<Item = &mut Attribute> {
+    pub fn iter_block_attrs_mut(block: &mut AttributeGraph) -> impl Iterator<Item = &mut Attribute> {
         block
             .iter_mut_attributes()
             .filter(|a| {

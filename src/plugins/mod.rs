@@ -21,6 +21,7 @@ pub use process::Process;
 
 mod thunks;
 pub use thunks::OpenFile;
+pub use thunks::OpenDir;
 pub use thunks::Println;
 pub use thunks::StatusUpdate;
 pub use thunks::Thunk;

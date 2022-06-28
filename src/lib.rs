@@ -1,5 +1,5 @@
 use atlier::system::App;
-use imgui::{ChildWindow, Window};
+use imgui::{ChildWindow, Window, Ui};
 use plugins::{Engine, Plugin, Project, ThunkContext, Event};
 use specs::{Component, System, World, Entity};
 use std::fmt::Display;
@@ -193,6 +193,18 @@ impl<'a> System<'a> for Runtime {
     }
 }
 
+impl Runtime {
+    fn menu(&mut self, ui: &Ui) {
+        ui.menu("Edit", ||{
+            for (event_name, _) in self.create.iter() {
+                ui.menu(event_name, || {
+
+                })
+            }
+        });
+    }
+}
+
 impl App for Runtime {
     fn name() -> &'static str {
         "runtime"
@@ -210,11 +222,14 @@ impl App for Runtime {
         .size(*Self::window_size(), imgui::Condition::Appearing)
         .menu_bar(true)
         .build(ui, || {
-            let project = &mut self.project;
             ui.menu_bar(|| {
+                let project = &mut self.project;
                 project.edit_project_menu(ui);
+
+                self.menu(ui);
             });
 
+            let project = &mut self.project;
             if let Some(tabbar) = ui.tab_bar("runtime_tabs") {
                 for (_, block) in project.iter_block_mut().enumerate() {
                     let (block_name, block) = block;

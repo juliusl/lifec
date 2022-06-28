@@ -1,8 +1,12 @@
-use lifec::{plugins::*, editor::*, AttributeGraph, Runtime};
+use lifec::{plugins::*, editor::{*, runtime_editor::Receiver}, Runtime, AttributeGraph};
 
 fn main() {
-    if let Some(file) = AttributeGraph::load_from_file("test_demo.runmd") {
-        let runtime = Runtime::new(Project::from(file));
+    if let Some(file) = AttributeGraph::load_from_file("drag_drop_example.runmd") {
+        let mut runtime = Runtime::new(Project::from(file));
+        runtime.install::<Call, Timer>();
+        runtime.install::<Call, Process>();
+        runtime.install::<Call, OpenFile>();
+        runtime.install::<Call, OpenDir>();
         open(
             "demo",
             runtime,
@@ -12,22 +16,11 @@ fn main() {
 }
 
 #[derive(Default)]
-struct Demo(RuntimeEditor);
+struct Demo(RuntimeEditor, Option<Receiver<Entity>>);
 
 impl Extension for Demo {
     fn configure_app_world(world: &mut World) {
         RuntimeEditor::configure_app_world(world);
-        Call::init::<Timer>(world, |config| {
-            config.as_mut().add_int_attr("duration", 5);
-        });
-        
-        Call::init::<Process>(world, |config| {
-            config.as_mut().add_text_attr("command", "cargo help");
-        });
-
-        Call::init::<OpenFile>(world, |config| {
-            config.as_mut().add_text_attr("file_src", "test_demo.runmd");
-        });
     }
 
     fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
@@ -41,16 +34,18 @@ impl Extension for Demo {
             });
         }
 
-        let Demo(editor) = self;
+        let Demo(editor, ..) = self;
         editor.on_ui(app_world, ui);
     }
 
     fn on_window_event(&'_ mut self, app_world: &World, event: &'_ WindowEvent<'_>) {
-        let Demo(editor) = self;
+        let Demo(editor, ..) = self;
         editor.on_window_event(app_world, event);
     }
 
-    fn on_run(&'_ mut self, _: &World) {
-    }
+    fn on_run(&'_ mut self, world: &World) {
+        self.0.on_run(world);
+     
+    }  
 }
 

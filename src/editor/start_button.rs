@@ -8,7 +8,7 @@ use super::Call;
 /// This button is to start actions that take computation time
 #[derive(Component, Clone, Default)]
 #[storage(DenseVecStorage)]
-pub struct StartButton(pub bool, pub String, pub String, pub Option<Entity>);
+pub struct StartButton(pub Option<bool>, pub String, pub String, pub Option<Entity>);
 
 impl App for StartButton {
     fn name() -> &'static str {
@@ -16,8 +16,10 @@ impl App for StartButton {
     }
 
     fn edit_ui(&mut self, ui: &imgui::Ui) {
-        if let Self(.., label, Some(entity)) = self {
-            self.0 = ui.button(format!("{} {}", label, entity.id()));
+        if let Self(pressed, .., label, Some(entity)) = self {
+            if ui.button(format!("{} {}", label, entity.id())) {
+               *pressed = Some(true);
+            }
         }
     }
 

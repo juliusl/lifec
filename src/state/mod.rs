@@ -1,4 +1,4 @@
-use crate::{editor::unique_title, RuntimeDispatcher, RuntimeState};
+use crate::{RuntimeDispatcher, RuntimeState};
 use atlier::system::{Attribute, Value};
 use imgui::TableFlags;
 use logos::Logos;
@@ -342,52 +342,44 @@ impl AttributeGraph {
             token.end()
         }
 
-        if let Some(token) = ui.begin_menu("Edit") {
-            if let Some(token) = ui.begin_menu("Add new attribute") {
-                if imgui::MenuItem::new("Text").build(ui) {
-                    self.add_text_attr(unique_title("text"), "");
-                }
-
-                if imgui::MenuItem::new("Bool").build(ui) {
-                    self.add_bool_attr(unique_title("bool"), false);
-                }
-
-                if imgui::MenuItem::new("Int").build(ui) {
-                    self.add_int_attr(unique_title("int"), 0);
-                }
-
-                if imgui::MenuItem::new("Int pair").build(ui) {
-                    self.add_int_pair_attr(unique_title("int_pair"), &[0, 0]);
-                }
-
-                if imgui::MenuItem::new("Float").build(ui) {
-                    self.add_float_attr(unique_title("float"), 0.0);
-                }
-
-                if imgui::MenuItem::new("Float pair").build(ui) {
-                    self.add_float_pair_attr(unique_title("float_pair"), &[0.0, 0.0]);
-                }
-
-                if imgui::MenuItem::new("Empty").build(ui) {
-                    self.add_empty_attr(unique_title("empty"));
-                }
-
-                token.end();
-            }
-
-            ui.separator();
-            if let Some(token) = ui.begin_menu("Remove attribute..") {
-                for attr in self.clone().iter_attributes() {
-                    if imgui::MenuItem::new(format!("{}", attr)).build(ui) {
-                        self.remove(attr);
-                    }
-                }
-
-                token.end();
-            }
-
-            token.end()
-        }
+        // if let Some(token) = ui.begin_menu("Edit") {
+        //     if let Some(token) = ui.begin_menu("Add new attribute") {
+        //         if imgui::MenuItem::new("Text").build(ui) {
+        //             self.add_text_attr(unique_title("text"), "");
+        //         }
+        //         if imgui::MenuItem::new("Bool").build(ui) {
+        //             self.add_bool_attr(unique_title("bool"), false);
+        //         }
+        //         if imgui::MenuItem::new("Int").build(ui) {
+        //             self.add_int_attr(unique_title("int"), 0);
+        //         }
+        //         if imgui::MenuItem::new("Int pair").build(ui) {
+        //             self.add_int_pair_attr(unique_title("int_pair"), &[0, 0]);
+        //         }
+        //         if imgui::MenuItem::new("Float").build(ui) {
+        //             self.add_float_attr(unique_title("float"), 0.0);
+        //         }
+        //         if imgui::MenuItem::new("Float pair").build(ui) {
+        //             self.add_float_pair_attr(unique_title("float_pair"), &[0.0, 0.0]);
+        //         }
+        //         if imgui::MenuItem::new("Empty").build(ui) {
+        //             self.add_empty_attr(unique_title("empty"));
+        //         }
+        //         token.end();
+        //     }
+        //     ui.separator();
+        //     if let Some(token) = ui.begin_menu("Remove attribute..") {
+        //         for attr in self.clone().iter_attributes() {
+        //             if imgui::MenuItem::new(format!("{}", attr)).build(ui) {
+        //                 self.remove(attr);
+        //             }
+        //         }
+        //         token.end();
+        //     }
+        //     token.end()
+        // }
+   
+   
     }
 
     /// This method shows an attribute table
@@ -474,6 +466,81 @@ impl AttributeGraph {
             token.end();
         }
     }
+
+
+       /// This method shows an attribute table
+       pub fn edit_attr_short_table(&mut self, ui: &imgui::Ui) {
+        if let Some(token) = ui.begin_table_with_flags(
+            format!("Attribute Graph Table {}", self.entity),
+            3,
+            TableFlags::RESIZABLE | TableFlags::SORTABLE,
+        ) {
+            ui.table_setup_column("Name");
+            ui.table_setup_column("Value");
+            ui.table_setup_column("State");
+            ui.table_headers_row();
+
+            let clone = self.clone();
+            let mut attrs: Vec<&Attribute> = clone.iter_attributes().collect();
+
+            if let Some(mut sorting) = ui.table_sort_specs_mut() {
+                attrs.sort_by(|a, b| {
+                    let mut order = a.cmp(b);
+                    for spec in sorting.specs().iter() {
+                        order = match spec.column_idx() {
+                            0 => a.name().cmp(b.name()),
+                            1 => a.value().cmp(b.value()),
+                            2 => a.is_stable().cmp(&b.is_stable()),
+                            _ => a.cmp(b)
+                        };
+                        if let Some(dir) = spec.sort_direction() {
+                            match dir {
+                                imgui::TableSortDirection::Descending => order = order.reverse(),
+                                _ => {}
+                            }
+                        }
+                    }
+                    order
+                });
+                sorting.set_sorted();
+            }
+
+            for attr in attrs {
+                if ui.table_next_column() {
+                    ui.text(attr.name());
+                }
+
+                if ui.table_next_column() {
+                    if attr.id() != self.entity() {
+                        ui.text(format!("imported {}", attr.id()));
+                    } else {
+                        self.edit_attr(attr.name(), attr.name(), ui);
+                    }
+                }
+
+                if ui.table_next_column() {
+                    if attr.is_stable() {
+                        ui.text("stable");
+                    } else {
+                        if attr
+                            .transient()
+                            .and_then(|(_, v)| if let Value::Empty = v { None } else { Some(()) })
+                            .is_some()
+                        {
+                            ui.text("transient");
+                        } else {
+                            ui.text("defined");
+                        }
+                    }
+                }
+
+                ui.table_next_row();
+            }
+
+            token.end();
+        }
+    }
+
 
     /// Copies all the values from other graph
     pub fn copy(&mut self, other: &AttributeGraph) {
@@ -1594,7 +1661,8 @@ impl AttributeGraph {
     fn on_add(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
         match (element_lexer.next(), element_lexer.next()) {
-            (Some(AttributeGraphElements::Symbol(name)), Some(value)) => match value {
+            (Some(AttributeGraphElements::Name(name)), Some(value))
+            | (Some(AttributeGraphElements::Symbol(name)), Some(value)) => match value {
                 AttributeGraphElements::Text(value)
                 | AttributeGraphElements::Int(value)
                 | AttributeGraphElements::Bool(value)
@@ -1960,8 +2028,20 @@ fn test_block_context() {
 fn test_attribute_graph_dispatcher() {
     let mut graph = AttributeGraph::from(0);
 
+    let mut next = AttributeGraphElements::lexer("#test_.attr2");
+    let next = next.next();
+    println!("{:?}", next);
+
+
     let test_messages = r#"
     ```
+    # <- Usually this is a comment
+    # but if you have an event such as `add` then you can start the next symbol w/ # to turn it into a name. 
+    # after that point, you don't need to continue to add # to lookup the attribute, # will automatically get dropped
+    # this implies that #test == test when defining a message
+    add #File.txt             .text testing #file.txt
+    add #test_.attr2          .text testing #test_.attr2
+    add test_attr2            .text testing .text test.attr
     add test_attr             .text testing text attr
     add test_attr_empty       .EMPTY
     add test_attr_bool        .BOOL true
@@ -1991,9 +2071,19 @@ fn test_attribute_graph_dispatcher() {
     "#;
 
     for message in test_messages.trim().split("\n") {
-        assert!(graph.dispatch_mut(message).is_ok());
+        match graph.dispatch_mut(message) {
+            Ok(_) => {
+                
+            },
+            Err(err) => assert!(false, "{:?}", err),
+        }
     }
 
+    println!("{}", graph);
+
+    assert!(graph.contains_attribute("File.txt"));
+    assert!(graph.contains_attribute("test_.attr2"));
+    assert!(graph.contains_attribute("test_attr2"));
     assert!(graph.contains_attribute("test_attr"));
     assert!(graph.contains_attribute("test_attr_int"));
     assert!(graph.contains_attribute("test_attr_int_pair"));
@@ -2024,6 +2114,20 @@ fn test_attribute_graph_dispatcher() {
         graph.find_attr_value("test_attr23")
     );
 
+    assert_eq!(
+        Some(&Value::TextBuffer(
+            "testing #file.txt".to_string()
+        )),
+        graph.find_attr_value("File.txt")
+    );
+
+    assert_eq!(
+        Some(&Value::TextBuffer(
+            "testing #test_.attr2".to_string()
+        )),
+        graph.find_attr_value("test_.attr2")
+    );
+
     // test edit/commit symbols
     let test_messages = r#"
     ```
@@ -2045,6 +2149,11 @@ fn test_attribute_graph_dispatcher() {
     assert_eq!(
         Some(&Value::TextBuffer("testing apply attr".to_string())),
         graph.find_attr_value("test_attr")
+    );
+
+    assert_eq!(
+        Some(&Value::TextBuffer("testing .text test.attr".to_string())),
+        graph.find_attr_value("test_attr2")
     );
 
     assert_eq!(
@@ -2300,12 +2409,12 @@ pub enum AttributeGraphElements {
     /// entity ids should be parsed before symbols
     #[regex("[0-9]+", priority = 3, callback = graph_lexer::from_entity)]
     Entity(u32),
-    /// names have more relaxed rules
-    #[regex("#[A-Za-z_.-/0-9]+", graph_lexer::from_string)]
-    Name(String),
     /// symbols must start with a character, and is composed of lowercase characters, digits, underscores, and colons
     #[regex("[a-z]+[a-z_:0-9]*", graph_lexer::from_string)]
     Symbol(String),
+    /// names have more relaxed rules
+    #[regex("[#][A-Za-z_.-/0-9]*", graph_lexer::from_string)]
+    Name(String),
     // Logos requires one token variant to handle errors,
     // it can be named anything you wish.
     #[error]

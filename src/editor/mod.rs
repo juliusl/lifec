@@ -1,4 +1,4 @@
-mod runtime_editor;
+pub mod runtime_editor;
 pub use runtime_editor::RuntimeEditor;
 
 mod progress;

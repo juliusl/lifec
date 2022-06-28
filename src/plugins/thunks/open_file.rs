@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Instant};
 
 use specs::Component;
 use tokio::fs;
@@ -24,21 +24,31 @@ impl Plugin<ThunkContext> for OpenFile {
     fn call_with_context(context: &mut ThunkContext) -> Option<tokio::task::JoinHandle<ThunkContext>> {
         context.clone().task(||{
             let mut tc = context.clone();
-            async {
+            async {            
+                let start = Instant::now();
                 if let Some(file_src) = tc.as_ref().find_text("file_src") {
                     tc.update_status_only("file source found").await;
 
                     let path_buf = PathBuf::from(file_src);
+                    let file_name = path_buf.file_name().unwrap_or_default().to_str().unwrap_or_default();
 
-                    if let Some(content) = fs::read_to_string(&path_buf).await.ok() {
-                        tc.update_status_only("read content, writing to block").await;
-                        if tc.block.add_block(path_buf.file_name().unwrap_or_default().to_str().unwrap_or_default(), |c| {
-                            c.add_binary_attr("content", content.as_bytes());
-                        }) {
-                            tc.update_status_only("added file").await;
+                    // block names are usually strictly symbols, but with a # prefix the rules are more relaxed
+                    tc.block.block_name = format!("{}", file_name);
+
+                    if !tc.as_ref().contains_attribute("content") || tc.as_ref().is_enabled("refresh").unwrap_or_default() {
+                        if let Some(content) = fs::read_to_string(&path_buf).await.ok() {
+                            tc.update_status_only("read content, writing to block").await;
+                            if tc.block.add_block("file", |c| {
+                                c.add_binary_attr("content", content.as_bytes());
+                            }) {
+                                tc.update_status_only("added file").await;
+                            }
                         }
-                    }
+                    } else {
+                        tc.update_status_only("content found, refresh disabled, skipping read").await;
+                    } 
                 }
+                tc.as_mut().add_text_attr("elapsed", format!("{:?}", start.elapsed()));
                 Some(tc)
             }
         })

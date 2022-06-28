@@ -1,16 +1,16 @@
 use super::BlockContext;
 use crate::state::AttributeGraph;
 use crate::RuntimeDispatcher;
-use atlier::system::Value;
 use imgui::Ui;
 use specs::storage::HashMapStorage;
 use specs::Component;
 use std::collections::btree_map::IterMut;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Error;
 use std::fmt::Write;
+use std::hash::{Hash, Hasher};
 use std::fs;
-use std::str::from_utf8;
 
 #[derive(Debug, Default, Component, Clone)]
 #[storage(HashMapStorage)]
@@ -20,6 +20,16 @@ pub struct Project {
 }
 
 impl Project {
+    pub fn index_hash_code(&self) -> u64 {
+        let mut hasher = DefaultHasher::default();
+        let hasher = &mut hasher;
+        for (name, block) in self.block_index.iter() {
+            name.hash(hasher);
+            block.hash(hasher);
+        }
+        hasher.finish()
+    }
+
     pub fn transpile(&self) -> Result<String, Error> {
         let mut src = String::default();
 
@@ -155,15 +165,7 @@ impl Project {
                 ui.tooltip(|| {
                     ui.text("Preview:");
                     ui.disabled(true, || {
-                        block.as_mut().edit_form_block(ui);
-
-                        if let Some(Value::BinaryVector(journal)) =
-                            block.as_ref().find_attr_value("journal")
-                        {
-                            if let Some(journal) = from_utf8(journal).ok() {
-                                ui.text_wrapped(journal);
-                            }
-                        }
+                        block.edit_block_tooltip_view(false, ui);
                     });
                 });
             }

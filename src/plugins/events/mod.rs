@@ -1,7 +1,10 @@
-use std::fmt::Display;
 use atlier::system::Extension;
 use atlier::system::WindowEvent;
+use specs::Entity;
+use specs::World;
 use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage};
+use tokio::sync::broadcast;
+use std::fmt::Display;
 use tokio::{
     runtime::Runtime,
     sync::{
@@ -61,7 +64,33 @@ impl Event {
 
     /// returns true if task is running
     pub fn is_running(&self) -> bool {
-        self.3.is_some()
+        self.3
+            .as_ref()
+            .and_then(|j| Some(!j.is_finished()))
+            .unwrap_or_default()
+    }
+
+
+    /// subscribe to get a notification when the runtime editor has updated an entity
+    pub fn subscribe(world: &World) -> sync::broadcast::Receiver<Entity> {
+        let sender = world.write_resource::<sync::broadcast::Sender<Entity>>();
+
+        sender.subscribe()
+    }
+
+    /// receive the next updated thunkcontext from world, 
+    /// Note: this receives from the world's global receiver, to receive full broadcast, use Event::subscribe to get a receiver
+    pub fn receive(world: &World) -> Option<ThunkContext> {
+        let mut receiver = world.write_resource::<sync::broadcast::Receiver<Entity>>();
+        match receiver.try_recv() {
+            Ok(entity) => {
+                let contexts = world.read_component::<ThunkContext>();
+                contexts.get(entity).and_then(|c| Some(c.clone()))
+            }
+            Err(_) => {
+                None
+            }
+        }
     }
 }
 /// Event runtime handles various system related tasks, such as the progress system
@@ -106,10 +135,19 @@ impl SetupHandler<sync::mpsc::Sender<StatusUpdate>> for EventRuntime {
     }
 }
 
+impl SetupHandler<sync::broadcast::Sender<Entity>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = broadcast::channel::<Entity>(100);
+        world.insert(rx);
+        world.insert(tx);
+    }
+}
+
 impl<'a> System<'a> for EventRuntime {
     type SystemData = (
         Read<'a, Runtime, EventRuntime>,
         Read<'a, Sender<StatusUpdate>, EventRuntime>,
+        Read<'a, sync::broadcast::Sender<Entity>, EventRuntime>,
         Entities<'a>,
         WriteStorage<'a, Event>,
         WriteStorage<'a, ThunkContext>,
@@ -117,18 +155,17 @@ impl<'a> System<'a> for EventRuntime {
 
     fn run(
         &mut self,
-        (runtime, status_sender, entities, mut events, mut contexts): Self::SystemData,
+        (runtime, status_sender, updated_sender, entities, mut events, mut contexts): Self::SystemData,
     ) {
         for (entity, event) in (&entities, &mut events).join() {
             let event_name = event.to_string();
             let Event(_, thunk, initial_context, task) = event;
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
-                    if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() })
-                    {
+                    if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() }) {
                         match contexts.insert(entity, thunk_context) {
                             Ok(_) => {
-                                // println!("completed: {}", &event_name);
+                                updated_sender.send(entity).ok();
                             }
                             Err(err) => {
                                 eprintln!("error completing: {}, {}", &event_name, err);
@@ -152,13 +189,11 @@ impl<'a> System<'a> for EventRuntime {
                 *task = Some(runtime.spawn(async move {
                     let Thunk(thunk_name, thunk) = thunk;
                     context
-                        .update_status_only(
-                            format!(
-                                "event received: {}, {}",
-                                &event_name,
-                                initial_context.as_ref().hash_code()
-                            )
-                        )
+                        .update_status_only(format!(
+                            "event received: {}, {}",
+                            &event_name,
+                            initial_context.as_ref().hash_code()
+                        ))
                         .await;
                     if let Some(handle) = thunk(&mut context) {
                         context
@@ -177,9 +212,10 @@ impl<'a> System<'a> for EventRuntime {
                                     g.with_text("event_runtime", format!("{}", err));
                                 });
                                 context
-                                    .update_status_only(
-                                        format!("event error: {}, {}", &event_name, err),
-                                    )
+                                    .update_status_only(format!(
+                                        "event error: {}, {}",
+                                        &event_name, err
+                                    ))
                                     .await;
                                 context
                             }
