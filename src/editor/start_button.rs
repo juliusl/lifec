@@ -3,7 +3,7 @@ use specs::{World, DispatcherBuilder, Entity, Component};
 use specs::storage::DenseVecStorage;
 
 use crate::plugins::*;
-use super::Call;
+use super::{Call, Interpret};
 
 /// This button is to start actions that take computation time
 #[derive(Component, Clone, Default)]
@@ -44,6 +44,11 @@ impl Extension for StartButton {
             "start_button/event_runtime",
             &["start_button/call_event"],
         );
+
+        dispatcher.add(
+            Interpret::default(), 
+            "start_button/interpret_event", 
+            &["start_button/call_event"]);
     }
 
     fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
