@@ -13,14 +13,14 @@ pub use interpret::Interpret;
 mod start_button;
 pub use start_button::StartButton;
 
+mod next_button;
+pub use next_button::NextButton;
+
 mod task;
 pub use task::Task;
 
 mod list;
 pub use list::List;
-
-mod timer;
-pub use timer::Timer;
 
 mod sequencer;
 pub use sequencer::Sequencer;

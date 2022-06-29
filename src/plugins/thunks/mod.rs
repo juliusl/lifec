@@ -15,6 +15,9 @@ pub use open_file::OpenFile;
 mod open_dir;
 pub use open_dir::OpenDir;
 
+mod timer;
+pub use timer::Timer;
+
 mod write_files;
 use tokio::{runtime::Handle, sync::mpsc::Sender, task::JoinHandle};
 pub use write_files::WriteFiles;

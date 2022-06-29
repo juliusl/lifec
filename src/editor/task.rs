@@ -1,7 +1,7 @@
 use atlier::system::Extension;
 use specs::storage::HashMapStorage;
 use crate::plugins::*;
-use super::{StartButton, ProgressStatusBar};
+use super::{StartButton, ProgressStatusBar, NextButton, Sequencer};
 
 #[derive(Default, Component, Clone)]
 #[storage(HashMapStorage)]
@@ -13,11 +13,13 @@ impl Extension for Task {
         StartButton::configure_app_world(world);
         world.register::<ProgressStatusBar>();
         world.register::<Task>();
+        world.register::<NextButton>();
     }
 
     fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
         StartButton::configure_app_systems(dispatcher);
-        dispatcher.add(TaskSystem {}, "task_system", &[])
+        dispatcher.add(TaskSystem {}, "task_system", &[]);
+        dispatcher.add(Sequencer{}, "sequence_system", &["task_system",]);
     }
 
     fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {        

@@ -8,7 +8,16 @@ use super::{Call, Interpret};
 /// This button is to start actions that take computation time
 #[derive(Component, Clone, Default)]
 #[storage(DenseVecStorage)]
-pub struct StartButton(pub Option<bool>, pub String, pub String, pub Option<Entity>);
+pub struct StartButton(
+    /// Pressed
+    pub Option<bool>, 
+    /// Status
+    pub String, 
+    /// Label
+    pub String, 
+    /// Caller
+    pub Option<Entity>
+);
 
 impl App for StartButton {
     fn name() -> &'static str {

@@ -1,10 +1,9 @@
 use super::{Plugin, ThunkContext};
 use chrono::{Local, Utc};
-use serde::{Deserialize, Serialize};
 use specs::{Component, HashMapStorage};
 use tokio::task::JoinHandle;
 
-#[derive(Debug, Clone, Default, Component, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Component)]
 #[storage(HashMapStorage)]
 pub struct Process;
 
@@ -24,15 +23,18 @@ impl Plugin<ThunkContext> for Process {
                 if let Some(command) = tc.as_ref().find_text("command") {
                     // Creating a new tokio command
                     let parts: Vec<&str> = command.split(" ").collect();
+                    tc.update_progress(format!("``` {} process", tc.block.block_name), 0.10)
+                            .await;
                     if let Some(command) = parts.get(0) {
-                        tc.update_progress(format!("command: {}", command), 0.10)
+                        tc.update_progress(format!("add command .text {}", command), 0.10)
                             .await;
                         let mut command_task = tokio::process::Command::new(&command);
-                        for arg in parts.iter().skip(1) {
+                        for (el, arg) in parts.iter().skip(1).enumerate() {
                             command_task.arg(arg);
-                            tc.update_progress(format!("arg: {}", arg), 0.10)
+                            tc.update_progress(format!("add arg{}    .text {}", el, arg), 0.10)
                                 .await;
                         }
+                        tc.update_progress("```", 0.10).await;
                         tc.update_progress("running", 0.20).await;
                         let start_time = Some(Utc::now());
                         match command_task.output().await {
@@ -54,7 +56,6 @@ impl Plugin<ThunkContext> for Process {
                                     )
                                     .with_text("timestamp_utc", timestamp_utc.unwrap_or_default())
                                     .with_text("elapsed", elapsed.unwrap_or_default());
-                                tc.update_progress("completed", 1.0).await;
                             }
                             Err(err) => {
                                 tc.update_progress(format!("error {}", err), 0.0).await;

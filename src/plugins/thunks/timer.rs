@@ -4,7 +4,6 @@ use std::time::Instant;
 use specs::storage::DenseVecStorage;
 use tokio::task::JoinHandle;
 use crate::plugins::*;
-use crate::editor::*;
 
 #[derive(Default, Component, Clone)]
 #[storage(DenseVecStorage)]
