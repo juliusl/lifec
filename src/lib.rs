@@ -18,11 +18,11 @@ where
 {
     type Error;
 
-    /// dispatch_mut is a function that should take a string message that can mutate state
+    /// Dispatch_mut is a function that should take a string message that can mutate state
     /// and returns a result
     fn dispatch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error>;
 
-    /// dispatch calls dispatch_mut on a clone of Self and returns the clone
+    /// Dispatch calls dispatch_mut on a clone of Self and returns the clone
     fn dispatch(&self, msg: impl AsRef<str>) -> Result<Self, Self::Error>
     where
         Self: Clone,
@@ -34,6 +34,7 @@ where
         }
     }
 
+    /// Interpret several msgs w/ a clone of self
     fn batch(&self, msgs: impl AsRef<str>) -> Result<Self, Self::Error>
     where
         Self: Clone,
@@ -51,6 +52,7 @@ where
         Ok(next)
     }
 
+    /// Interpret several msgs, applying changes to self
     fn batch_mut(&mut self, msg: impl AsRef<str>) -> Result<(), Self::Error> {
         for message in msg
             .as_ref()
@@ -81,7 +83,7 @@ pub trait RuntimeState:
 {
     type Dispatcher: RuntimeDispatcher;
 
-    // /// try to save the current state to a String
+    /// Try to save the current state to a String
     fn save(&self) -> Option<String> {
         match serde_json::to_string(self.state()) {
             Ok(val) => Some(val),
@@ -89,7 +91,7 @@ pub trait RuntimeState:
         }
     }
 
-    /// load should take the serialized form of this state
+    /// Load should take the serialized form of this state
     /// and create a new instance of Self
     fn load(&self, init: impl AsRef<str>) -> Self {
         if let Some(attribute_graph) = serde_json::from_str::<AttributeGraph>(init.as_ref()).ok() {
@@ -157,7 +159,8 @@ impl Runtime {
         }
     }
 
-    /// returns the next thunk context that has been updated by the event runtime, if registered to broadcasts
+    /// Returns the next thunk context that has been updated by the event runtime, if registered to broadcasts.
+    /// Uses the plugin symbol as the subscriber key.
     pub fn listen<P>(&mut self, world: &World) -> Option<ThunkContext>
     where
         P: Plugin<ThunkContext>,
@@ -165,7 +168,7 @@ impl Runtime {
         self.listen_with(world, P::symbol())
     }
 
-    /// subscribe to thunk contexts updated from the event runtime
+    /// Subscribe to thunk contexts updates, with the plugin symbol as the subscriber key
     pub fn subscribe<P>(&mut self, world: &World)
     where
         P: Plugin<ThunkContext>,
@@ -173,7 +176,8 @@ impl Runtime {
         self.subscribe_with(world, P::symbol());
     }
 
-    /// returns the next thunk context that has been updated by the event runtime, if registered to broadcasts
+    /// Returns the next thunk context that has been updated by the event runtime, if registered to broadcasts
+    /// If the subscriber key did not exist, this method will subscribe_with the key so that the next call is successful.
     pub fn listen_with(
         &mut self,
         world: &World,
@@ -191,13 +195,12 @@ impl Runtime {
             // If not already subscribed, the plugin will miss any events it generated before calling listen
             // this is probably not too bad since this is called inside the loop, so in most situations, the subscriber will get a
             // chance to subscribe before it has a chance to make any changes
-            // TODO: Can add a way to subscribe in the runtime's system trait
             self.subscribe_with(world, with_key);
             None
         }
     }
 
-    /// subscribe to thunk contexts updated from the event runtime
+    /// Subscribe to thunk contexts updates, with a subscriber key
     pub fn subscribe_with(&mut self, world: &World, with_key: impl AsRef<str>) {
         self.receivers.insert(with_key.as_ref().to_string(), Event::subscribe(world));
     }
@@ -214,7 +217,7 @@ impl Runtime {
         println!("install event: {}", event.to_string());
     }
 
-    /// initialize and configure an event component and it's deps for a new entity, and insert into world.
+    /// Initialize and configure an event component and it's deps for a new entity, and insert into world.
     pub fn create(
         &self,
         world: &World,
@@ -230,6 +233,7 @@ impl Runtime {
         }
     }
 
+    /// Schedule a new event on this runtime, returns an entity if the event was created/started
     pub fn schedule(
         &mut self,
         world: &World,
@@ -251,6 +255,7 @@ impl Runtime {
         None
     }
 
+    /// TODO:
     pub fn sequence(&mut self, world: &World, _initial: ThunkContext, events: Vec<Event>) {
         let mut entities = vec![];
         for event in events.iter() {
