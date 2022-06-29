@@ -133,7 +133,7 @@ pub trait RuntimeState:
 pub struct Runtime {
     project: Project,
     /// Table for creating new event components
-    create_event: BTreeMap<String, fn(&World, fn(&mut ThunkContext)) -> Entity>,
+    create_event: BTreeMap<String, fn(&World, fn(&mut ThunkContext)) -> Option<Entity>>,
     receivers: HashMap<String, tokio::sync::broadcast::Receiver<Entity>>,
 }
 
@@ -224,7 +224,7 @@ impl Runtime {
         let key = event.to_string();
 
         if let Some(create_fn) = self.create_event.get(&key) {
-            Some((create_fn)(world, config_fn))
+            (create_fn)(world, config_fn)
         } else {
             None
         }

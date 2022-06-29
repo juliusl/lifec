@@ -102,12 +102,15 @@ pub trait Engine {
         // Note: Left as an extension point, but mainly shouldn't be needed
     }
 
-    /// Initialize event for entity
+    /// Initialize event for entity, this is called by init<P>
+    /// By default this method inserts the event as a component w/ the entity being built
+    /// Implement to additional logic. Note: that you must add the event component to the entity being built.
     fn init_event(entity: EntityBuilder, event: Event) -> EntityBuilder {
         entity.with(event)
     }
 
-    /// Create an event with an entity
+    /// Create an event with an entity, this is called by create<P>
+    /// By default this is a no-op. Implement to add additional logic to create<P>
     fn create_event(_: Entity, _: &World) {}
 
     /// Initialize an instance of this engine
@@ -130,7 +133,7 @@ pub trait Engine {
     }
 
     /// Creates an instance of this engine
-    fn create<P>(world: &World, config: fn(&mut ThunkContext)) -> Entity
+    fn create<P>(world: &World, config: fn(&mut ThunkContext)) -> Option<Entity>
     where
         P: Plugin<ThunkContext> + Component + Send + Default,
     {
@@ -140,25 +143,33 @@ pub trait Engine {
         let entity = entities.create();
 
         match events.insert(entity, Self::event::<P>()) {
-            Ok(_) => {}
-            Err(_) => {}
+            Ok(_) => {
+                Self::create_event(entity, world);
+
+                let mut initial_context = ThunkContext::default();
+                config(&mut initial_context);
+                initial_context.as_mut().set_parent_entity(entity);
+        
+                match world
+                    .write_component::<ThunkContext>()
+                    .insert(entity, initial_context)
+                {
+                    Ok(_) => {
+                        Some(entity)
+                    }
+                    Err(err) => {
+                        eprintln!("could not finish creating event {}, {}, src_desc: inserting context", P::symbol(), err);
+                        entities.delete(entity).ok();
+                        None
+                    }
+                }
+            }
+            Err(err) => {
+                eprintln!("could not finish creating event {}, {}, src_desc: inserting event", P::symbol(), err);
+                entities.delete(entity).ok();
+                None
+            }
         }
-
-        Self::create_event(entity, world);
-
-        let mut initial_context = ThunkContext::default();
-        config(&mut initial_context);
-        initial_context.as_mut().set_parent_entity(entity);
-
-        match world
-            .write_component::<ThunkContext>()
-            .insert(entity, initial_context)
-        {
-            Ok(_) => {}
-            Err(_) => {}
-        }
-
-        entity
     }
 
     /// Returns an event that runs the engine
