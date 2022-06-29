@@ -1,4 +1,4 @@
-use lifec::{plugins::*, editor::{*, runtime_editor::Receiver}, Runtime, AttributeGraph};
+use lifec::{plugins::*, editor::{*, runtime_editor::Receiver}, AttributeGraph};
 
 #[derive(Default)]
 struct Demo(RuntimeEditor, Option<Receiver<Entity>>);
@@ -13,12 +13,6 @@ impl Extension for Demo {
     }
 
     fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
-        if ui.button("create new process") {
-            Call::create::<Process>(app_world, |c| {
-                c.as_mut().add_text_attr("command", "echo hello world");
-            });
-        }
-
         let Demo(editor, ..) = self;
         editor.on_ui(app_world, ui);
 
@@ -39,18 +33,32 @@ impl Extension for Demo {
 
 fn main() {
     if let Some(file) = AttributeGraph::load_from_file("drag_drop_example.runmd") {
-        let mut runtime = Runtime::new(Project::from(file.clone()));
-        runtime.install::<Call, Timer>();
-        runtime.install::<Call, Process>();
-        runtime.install::<Call, OpenFile>();
-        runtime.install::<Call, OpenDir>();
         let mut demo = Demo::default();
         *demo.0.project_mut().as_mut() = file;
         demo.0.project_mut().reload_source();
         open(
             "demo",
-            runtime,
+            Demo::default(),
             demo,
         );
+    }
+}
+
+impl App for Demo {
+    fn name() -> &'static str {
+        "demo"
+    }
+
+    fn edit_ui(&mut self, _: &imgui::Ui) {
+    }
+
+    fn display_ui(&self, ui: &imgui::Ui) {
+    }
+}
+
+impl<'a> System<'a> for Demo {
+    type SystemData = ();
+
+    fn run(&mut self, _: Self::SystemData) {
     }
 }
