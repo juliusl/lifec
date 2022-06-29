@@ -97,7 +97,7 @@ impl AttributeGraph {
     pub fn add_file(&mut self, path: impl AsRef<str>) {
         match fs::read_to_string(path.as_ref()) {
             Ok(content) => {
-                self.add_file_with(path, content);
+                self.add_binary_attr(path, content);
             }
             Err(err) => {
                 eprintln!("file not added {}", err);
@@ -105,14 +105,9 @@ impl AttributeGraph {
         }
     }
 
-    /// adds a file with path and content
-    pub fn add_file_with(&mut self, path: impl AsRef<str>, content: impl AsRef<str>) {
-        self.add_binary_attr(path, content.as_ref());
-    }
-
-    /// finds a file attribute that was added with add_file
-    pub fn find_file(&self, path: impl AsRef<str>) -> Option<Vec<u8>> {
-        if let Some(Value::BinaryVector(content)) = self.find_attr_value(path) {
+    /// finds a attribute with binary value by name
+    pub fn find_binary(&self, with_name: impl AsRef<str>) -> Option<Vec<u8>> {
+        if let Some(Value::BinaryVector(content)) = self.find_attr_value(with_name) {
             Some(content.to_vec())
         } else {
             None
@@ -1453,7 +1448,7 @@ impl AttributeGraph {
         }
     }
 
-    fn next_block(&mut self, with_name: impl AsRef<str>, symbol_name: impl AsRef<str>) -> u32 {
+    pub fn next_block(&mut self, with_name: impl AsRef<str>, symbol_name: impl AsRef<str>) -> u32 {
         if let None = self.find_parent_block() {
             let parent_entity = self.entity() as i32;
 
@@ -1476,7 +1471,7 @@ impl AttributeGraph {
         self.entity
     }
 
-    fn end_block_mode(&mut self) {
+    pub fn end_block_mode(&mut self) {
         let last_block_id = self.entity.clone();
         if let Some(parent_block) = self.find_parent_block() {
             if let Some((_, Value::Int(parent_entity))) = parent_block.transient() {
@@ -1488,7 +1483,7 @@ impl AttributeGraph {
         }
     }
 
-    fn start_block_mode(&mut self, block_name: impl AsRef<str>, block_symbol: impl AsRef<str>) {
+    pub fn start_block_mode(&mut self, block_name: impl AsRef<str>, block_symbol: impl AsRef<str>) {
         let block_id = self.next_block(&block_name, &block_symbol);
 
         let block = self.define(&block_name, &block_symbol);
@@ -2410,7 +2405,7 @@ pub enum AttributeGraphElements {
     #[regex("[0-9]+", priority = 3, callback = graph_lexer::from_entity)]
     Entity(u32),
     /// symbols must start with a character, and is composed of lowercase characters, digits, underscores, and colons
-    #[regex("[a-z]+[a-z_:0-9]*", graph_lexer::from_string)]
+    #[regex("[a-z]+[a-z._:0-9]*", graph_lexer::from_string)]
     Symbol(String),
     /// names have more relaxed rules
     #[regex("[#][A-Za-z_.-/0-9]*", graph_lexer::from_string)]

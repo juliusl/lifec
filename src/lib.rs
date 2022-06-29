@@ -1,7 +1,8 @@
 use atlier::system::App;
 use imgui::{ChildWindow, Window, Ui};
 use plugins::{Engine, Plugin, Project, ThunkContext, Event};
-use specs::{Component, System, World, Entity};
+use specs::{Component, System, World, Entity, WorldExt};
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::{any::Any, collections::BTreeMap};
 
@@ -128,55 +129,91 @@ pub trait RuntimeState:
     }
 }
 
-#[derive(Clone)]
+/// Runtime provides access to the underlying project, and function tables for creating components
 pub struct Runtime {
     project: Project,
-    create: BTreeMap<String, fn(&World, fn(&mut ThunkContext)) -> Entity>,
+    /// Table for creating new event components
+    create_event: BTreeMap<String, fn(&World, fn(&mut ThunkContext)) -> Entity>,
+    receivers: HashMap<String, tokio::sync::broadcast::Receiver<Entity>>,
 }
 
 impl Default for Runtime {
     fn default() -> Self {
         Self {
             project: Default::default(),
-            create: BTreeMap::default(),
+            create_event: BTreeMap::default(),
+            receivers: HashMap::default(),
         }
     }
 }
 
 impl Runtime {
-    /// returns a runtime from a project
+    /// returns a runtime from a project, with no plugins installed
     pub fn new(project: Project) -> Self {
         Self {
             project,
-            create: BTreeMap::default(),
+            create_event: BTreeMap::default(),
+            receivers: HashMap::default(),
         }
     }
 
-    /// install an engine into the runtime
+    /// returns the next thunk context that has been updated by the event runtime, if registered to broadcasts
+    pub fn listen<P>(&mut self, world: &World) -> Option<ThunkContext> 
+    where
+        P: Plugin<ThunkContext>
+    {
+        if let Some(rx) = self.receivers.get_mut(P::symbol()) {
+            match rx.try_recv() {
+                Ok(entity) => {
+                    let contexts = world.read_component::<ThunkContext>();
+                    contexts.get(entity).and_then(|c| Some(c.clone()))
+                }
+                Err(_) => {
+                    None
+                }
+            }
+        } else {
+            // If not already subscribed, the plugin will miss any events it generated before calling listen
+            // this is probably not too bad since this is called inside the loop, so in most situations, the subscriber will get a 
+            // chance to subscribe before it has a chance to make any changes
+            // TODO: Can add a way to subscribe in the runtime's system trait
+            self.subscribe::<P>(world);
+            None
+        }
+    }
+
+    /// subscribe to thunk contexts updated from the event runtime
+    pub fn subscribe<P>(&mut self, world: &World) 
+    where
+        P: Plugin<ThunkContext>
+    {
+        self.receivers.insert(P::symbol().to_string(), Event::subscribe(world));
+    }
+
+    /// Install an engine into the runtime. An engine provides functions for creating new component instances.
     pub fn install<E, P>(&mut self)
     where
         E: Engine,
         P: Plugin<ThunkContext> + Component + Send + Default,
     {
         let event = E::event::<P>();
-        self.create.insert(event.to_string(), E::create::<P>);
+        self.create_event.insert(event.to_string(), E::create::<P>);
 
-        println!("installed {}", event.to_string());
+        println!("Runtime installed event: {}", event.to_string());
     }
 
-    /// initialize and configure an instance of an installed engine, corresponding to an event
-    /// this is a no-op if the corresponding engine is not installed
+    /// initialize and configure an event component and it's deps for a new entity, and insert into world.
     pub fn create(&self, world: &World, event: &Event, config_fn: fn(&mut ThunkContext)) -> Option<Entity> {
         let key = event.to_string();
 
-        if let Some(create_fn) = self.create.get(&key) {
+        if let Some(create_fn) = self.create_event.get(&key) {
             Some((create_fn)(world, config_fn))
         } else {
             None
         }
     }
 
-    /// returns a runtime state generated from the current project
+    /// Generate runtime_state from the underlying project graph
     pub fn state<S>(&self) -> S
     where
         S: RuntimeState,
@@ -196,7 +233,7 @@ impl<'a> System<'a> for Runtime {
 impl Runtime {
     fn menu(&mut self, ui: &Ui) {
         ui.menu("Edit", ||{
-            for (event_name, _) in self.create.iter() {
+            for (event_name, _) in self.create_event.iter() {
                 ui.menu(event_name, || {
 
                 })

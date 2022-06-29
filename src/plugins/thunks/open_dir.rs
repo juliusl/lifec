@@ -1,9 +1,10 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::from_utf8};
 
+use atlier::system::Value;
 use specs::Component;
 use tokio::fs;
 
-use crate::plugins::*;
+use crate::{plugins::{*, events::Listen}, RuntimeDispatcher, Runtime};
 use specs::storage::DenseVecStorage;
 
 use super::ThunkContext;
@@ -11,6 +12,37 @@ use super::ThunkContext;
 #[derive(Component, Default)]
 #[storage(DenseVecStorage)]
 pub struct OpenDir;
+
+impl Listen for OpenDir {
+    fn listen(runtime: &mut Runtime, world: &World) -> Option<AttributeGraph> {
+        if let Some(next) = runtime.listen::<Self>(world) {
+            // listen for file_dir events, and ingest files
+            if let Some(file_dir) = next
+                .as_ref()
+                .find_text("file_dir")
+                .and_then(|dir| Some(PathBuf::from(dir)))
+            {
+                let mut unwrapping = AttributeGraph::from(0);
+
+                for (file_name, content) in next.as_ref().find_symbol_values("file") {
+                    let mut file_src = file_dir.clone();
+                    file_src.set_file_name(file_name.trim_end_matches("::file"));
+
+                    if let Value::BinaryVector(vec) = content {
+                        if let Some(content) = from_utf8(&vec).ok() {
+                            if unwrapping.batch_mut(content).is_ok() {
+                                println!("unwrapped file block {}", file_name);
+                            }
+                        }
+                    }
+                }
+
+                return Some(unwrapping);
+            }
+        }
+        None
+    }
+}
 
 impl Plugin<ThunkContext> for OpenDir {
     fn symbol() -> &'static str {
@@ -68,14 +100,22 @@ impl Plugin<ThunkContext> for OpenDir {
                                                     )
                                                     .await;
 
-                                                    if let Some(imported) =
+                                                    let file_block =
                                                         result.as_ref().find_imported_graph(
                                                             tc.as_ref().entity() + 1,
-                                                        )
-                                                    {
-                                                        let mut block_context = BlockContext::from(imported);
-                                                        block_context.as_mut().with_text("file_src", &file_src);
-                                                        if let Some(transpiled) =  block_context.transpile().ok() {
+                                                        );
+
+                                                    if let Some(imported) = file_block {
+                                                        let mut block_context =
+                                                            BlockContext::from(imported);
+
+                                                        block_context.update_block("file", |file|{
+                                                            file.with_text("file_src", &file_src);
+                                                        });
+
+                                                        if let Some(transpiled) =
+                                                            block_context.transpile().ok()
+                                                        {
                                                             progress += 0.01;
                                                             tc.update_progress(
                                                                 format!(
@@ -87,10 +127,13 @@ impl Plugin<ThunkContext> for OpenDir {
                                                             )
                                                             .await;
 
+                                                            // transpiles the content into a message
                                                             tc.as_mut().add_message(
-                                                                block_context.block_name.trim_start_matches("#"), 
+                                                                block_context
+                                                                    .block_name
+                                                                    .trim_start_matches("#"),
                                                                 "file",
-                                                                transpiled
+                                                                transpiled,
                                                             );
                                                         }
                                                     }

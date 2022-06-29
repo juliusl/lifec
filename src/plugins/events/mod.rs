@@ -1,5 +1,4 @@
 use atlier::system::Extension;
-use atlier::system::WindowEvent;
 use specs::Entity;
 use specs::World;
 use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage};
@@ -17,6 +16,9 @@ use tokio::{
 use super::thunks::StatusUpdate;
 use super::{Plugin, Thunk, ThunkContext};
 use specs::storage::VecStorage;
+
+mod listen;
+pub use listen::Listen;
 
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
 #[derive(Component)]
@@ -82,6 +84,7 @@ impl Event {
     /// Note: this receives from the world's global receiver, to receive full broadcast, use Event::subscribe to get a receiver
     pub fn receive(world: &World) -> Option<ThunkContext> {
         let mut receiver = world.write_resource::<sync::broadcast::Receiver<Entity>>();
+
         match receiver.try_recv() {
             Ok(entity) => {
                 let contexts = world.read_component::<ThunkContext>();
@@ -93,6 +96,7 @@ impl Event {
         }
     }
 }
+
 /// Event runtime handles various system related tasks, such as the progress system
 /// and scheduling tasks on tokio
 #[derive(Default)]
@@ -107,26 +111,16 @@ impl Extension for EventRuntime {
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
         dispatcher.add(EventRuntime::default(), "event_runtime", &[]);
     }
-
-    fn on_ui(&'_ mut self, _: &specs::World, _: &'_ imgui::Ui<'_>) {
-        // No-op
-    }
-
-    fn on_window_event(&'_ mut self, _: &specs::World, _: &'_ WindowEvent<'_>) {
-        // No-op
-    }
-
-    fn on_run(&'_ mut self, _: &specs::World) {
-        // No-op
-    }
 }
 
+/// Setup for tokio runtime, (Not to be confused with crate::Runtime)
 impl SetupHandler<Runtime> for EventRuntime {
     fn setup(world: &mut specs::World) {
         world.insert(Runtime::new().unwrap());
     }
 }
 
+/// Setup for tokio-mulitple-producers single-consumer channel for status updates
 impl SetupHandler<sync::mpsc::Sender<StatusUpdate>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         let (tx, rx) = mpsc::channel::<StatusUpdate>(30);
@@ -135,6 +129,7 @@ impl SetupHandler<sync::mpsc::Sender<StatusUpdate>> for EventRuntime {
     }
 }
 
+/// Setup for tokio-broadcast channel for entity updates
 impl SetupHandler<sync::broadcast::Sender<Entity>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         let (tx, rx) = broadcast::channel::<Entity>(100);

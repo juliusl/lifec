@@ -1,16 +1,13 @@
-use std::{path::PathBuf, str::from_utf8};
-
 use super::{Call, List, Task, Timer};
 use crate::{
-    plugins::{Engine, Event, OpenDir, OpenFile, Process, Project, ThunkContext},
-    AttributeGraph, Runtime, RuntimeDispatcher,
+    plugins::{Engine, Event, Listen, OpenDir, OpenFile, Process, Project, ThunkContext},
+    Runtime,
 };
-use atlier::system::{Extension, Value};
-use imgui::Window;
+use atlier::system::Extension;
+use imgui::{Ui, Window};
 use specs::{Entity, World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
-#[derive(Clone)]
 pub struct RuntimeEditor {
     runtime: Runtime,
 }
@@ -61,6 +58,21 @@ impl Default for RuntimeEditor {
     }
 }
 
+impl RuntimeEditor {
+    pub fn task_window(&mut self, app_world: &specs::World, ui: &Ui) {
+        Window::new("Tasks")
+            .menu_bar(true)
+            .size([800.0, 600.0], imgui::Condition::Appearing)
+            .build(ui, || {
+                ui.menu_bar(|| {
+                    self.project_mut().edit_project_menu(ui);
+                });
+
+                List::<Task>::default().on_ui(app_world, ui);
+            });
+    }
+}
+
 impl Extension for RuntimeEditor {
     fn configure_app_world(world: &mut specs::World) {
         List::<Task>::configure_app_world(world);
@@ -72,16 +84,7 @@ impl Extension for RuntimeEditor {
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
-        Window::new("Tasks")
-            .menu_bar(true)
-            .size([800.0, 600.0], imgui::Condition::Appearing)
-            .build(ui, || {
-                ui.menu_bar(|| {
-                    self.project_mut().edit_project_menu(ui);
-                });
-
-                List::<Task>::default().on_ui(app_world, ui);
-            });
+        self.task_window(app_world, ui);
     }
 
     fn on_window_event(
@@ -112,34 +115,37 @@ impl Extension for RuntimeEditor {
     }
 
     fn on_run(&'_ mut self, world: &specs::World) {
-        if let Some(next) = Event::receive(world) {
-            // listen for file_dir events, and ingest files
-            if let Some(file_dir) = next.as_ref().find_text("file_dir") {
-                let mut file_src = PathBuf::from(file_dir);
-                for (file_name, content) in next.as_ref().find_symbol_values("file") {
-                    let file_name = file_name.trim_end_matches("::file");
-                    file_src.set_file_name(file_name);
-                    
-                    let file_src = file_src.to_str().unwrap_or_default();
-                    if let Value::BinaryVector(vec) = content {
-                        if let Some(content) = from_utf8(&vec).ok() {
-                            let mut unwrapping = AttributeGraph::from(0);
-                            if unwrapping.batch_mut(content).is_ok() {
-                                if let Some(content) = unwrapping.find_file("content") {
-                                    self.schedule(world, &Call::event::<OpenFile>(), |g| {
-                                        // Setting content will skip reading the file_src, unless refresh is enabled
-                                        g.as_mut().add_binary_attr("content", content);
-                                        g.as_mut().add_text_attr("file_src", file_src);
-                                    });
-                                }
-                            }
+        match OpenDir::listen(&mut self.runtime, world) {
+            Some(file_dir) => {
+                for (block_name, block) in Project::from(file_dir).iter_block_mut() {
+                    eprintln!("found block {}", block_name);
+
+                    if let Some(file) = block.get_block("file") {
+                        if let (Some(file_src), Some(content)) = (
+                            file.as_ref().find_text("file_src"),
+                            file.as_ref().find_binary("content"),
+                        ) {
+                            self.schedule(world, &Call::event::<OpenFile>(), |g| {
+                                // Setting content will skip reading the file_src, unless refresh is enabled
+                                g.as_mut()
+                                    .with_binary("content", content)
+                                    .add_text_attr("file_src", file_src);
+                            });
                         }
                     }
                 }
             }
+            None => {}
+        }
 
-            self.project_mut()
-                .import_block(next.block);
+        match OpenFile::listen(&mut self.runtime, world) {
+            Some(file) => {
+                if self.project_mut().import(file) {
+                    eprintln!("Imported file to project");
+                }
+            },
+            None => {
+            },
         }
     }
 }

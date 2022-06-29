@@ -1,14 +1,52 @@
-use atlier::system::{App, Extension, WindowEvent};
+use atlier::system::{App, Extension};
 use specs::storage::HashMapStorage;
 use specs::{Component, WorldExt};
 use std::cmp::min;
 use std::fmt::Write;
 
 use crate::plugins::{EventRuntime, StatusUpdate};
+use crate::AttributeGraph;
 
 #[derive(Component, Clone, Default)]
 #[storage(HashMapStorage)]
 pub struct ProgressStatusBar(pub f32, pub String, pub String, pub String);
+
+impl Into<AttributeGraph> for ProgressStatusBar {
+    fn into(self) -> AttributeGraph {
+        let Self(progress, status, log_display, log_history) = self;
+
+        AttributeGraph::from(0)
+            .with_float("progress", progress)
+            .with_text("status", status)
+            .with_binary("log_display", log_display)
+            .with_binary("history.log", log_history)
+            .to_owned()
+    }
+}
+
+impl From<AttributeGraph> for ProgressStatusBar {
+    fn from(graph: AttributeGraph) -> Self {
+        Self(
+            {
+                graph.find_float("progress")
+                    .unwrap_or_default()
+            }, 
+            {
+                graph.find_text("status")
+                    .unwrap_or_default()
+            }, 
+            {
+                graph.find_binary("log_display")
+                    .and_then(|b| String::from_utf8(b).ok())
+                    .unwrap_or_default()
+            }, 
+            {
+                graph.find_binary("history.log")
+                    .and_then(|b| String::from_utf8(b).ok())
+                    .unwrap_or_default()
+            })
+    }
+}
 
 impl App for ProgressStatusBar {
     fn name() -> &'static str {
@@ -53,7 +91,7 @@ impl App for ProgressStatusBar {
             }
 
             ui.popup(&log_full, || {
-                ui.text("Full log");
+                ui.text("Log history");
                 ui.input_text_multiline("output_log", &mut log_full.clone(), [1360.0, 35.0 * 16.0])
                     .read_only(true)
                     .build();
@@ -83,10 +121,6 @@ impl Extension for ProgressStatusBar {
         self.display_ui(ui);
         self.edit_ui(ui);
         self.on_run(app_world);
-    }
-
-    fn on_window_event(&'_ mut self, _: &specs::World, _: &'_ WindowEvent<'_>) {
-        // No-op
     }
 
     fn on_run(&'_ mut self, app_world: &specs::World) {

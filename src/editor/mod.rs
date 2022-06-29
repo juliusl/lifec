@@ -28,14 +28,14 @@ pub use atlier::system::Extension;
 pub use atlier::system::Value;
 pub use atlier::system::WindowEvent;
 
-/// open a runtime editor for an attribute graph, and extension
+/// Opens a new window w/ the provided App and Extension
 pub fn open<A, E>(
     title: &str,
     app: A,
     extension: E
 ) 
 where
-    A: App + Clone + for<'c> System<'c>,
+    A: App + for<'c> System<'c>,
     E: Extension + 'static
 {
     use atlier::system::start_editor_from;

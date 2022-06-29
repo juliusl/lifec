@@ -1,12 +1,10 @@
 use atlier::system::Extension;
-
-use specs::storage::DenseVecStorage;
+use specs::storage::HashMapStorage;
 use crate::plugins::*;
-
 use super::{StartButton, ProgressStatusBar};
 
 #[derive(Default, Component, Clone)]
-#[storage(DenseVecStorage)]
+#[storage(HashMapStorage)]
 pub struct Task(Option<StartButton>, Option<ProgressStatusBar>);
 
 impl Extension for Task {
@@ -34,10 +32,6 @@ impl Extension for Task {
             progress_status_bar.on_ui(app_world, ui);
         }
     }
-
-    fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {}
-
-    fn on_run(&'_ mut self, _: &World) {}
 }
 
 struct TaskSystem;
@@ -51,7 +45,7 @@ impl<'a> System<'a> for TaskSystem {
     );
 
     fn run(&mut self, (entities, mut timers, start_events, progress): Self::SystemData) {
-        for (_, timer, start_event, progress) in (
+        for (_, task, start_event, progress) in (
             &entities,
             &mut timers,
             start_events.maybe(),
@@ -60,10 +54,10 @@ impl<'a> System<'a> for TaskSystem {
             .join()
         {
             if let Some(start_event) = start_event {
-                timer.0 = Some(start_event.clone());
+                task.0 = Some(start_event.clone());
             }
             if let Some(progress) = progress {
-                timer.1 = Some(progress.clone());
+                task.1 = Some(progress.clone());
             }
         }
     }

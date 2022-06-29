@@ -1,9 +1,10 @@
 use crate::editor::*;
 use crate::plugins::*;
 use atlier::system::Extension;
+use imgui::TreeNodeFlags;
 use imgui::Ui;
 
-/// List-layout widget
+/// List-layout widget for thunk_context's
 pub struct List<Item>(fn(&mut ThunkContext, &mut Item, &World, &Ui))
 where
     Item: Extension + Component;
@@ -28,11 +29,16 @@ where
 
     pub fn edit_attr_form() -> Self {
         List::<Item>(|context, item, world, ui| {
-            for attr in BlockContext::iter_block_attrs_mut(context.as_mut()) {
-                attr.edit_value(format!("{} {}", attr.name(), attr.id()), ui);
+            if ui.collapsing_header(
+                format!("Task: {}", context.as_ref().hash_code()),
+                TreeNodeFlags::DEFAULT_OPEN,
+            ) {
+                for attr in BlockContext::iter_block_attrs_mut(context.as_mut()) {
+                    attr.edit_value(format!("{} {}", attr.name(), attr.id()), ui);
+                }
+                item.on_ui(world, ui);
+                ui.separator();
             }
-            item.on_ui(world, ui);
-            ui.separator();
         })
     }
 }
@@ -56,8 +62,6 @@ where
         world.register::<Item>();
     }
 
-    fn configure_app_systems(_: &mut specs::DispatcherBuilder) {}
-
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
         let mut contexts = app_world.write_component::<ThunkContext>();
         let mut items = app_world.write_component::<Item>();
@@ -65,11 +69,6 @@ where
         for (context, item) in (&mut contexts, &mut items).join() {
             let List(layout) = self;
             (layout)(context, item, app_world, ui);
-            ui.new_line();
         }
     }
-
-    fn on_window_event(&'_ mut self, _: &specs::World, _: &'_ atlier::system::WindowEvent<'_>) {}
-
-    fn on_run(&'_ mut self, _: &specs::World) {}
 }

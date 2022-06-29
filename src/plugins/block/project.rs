@@ -206,6 +206,19 @@ impl Project {
         }
     }
 
+    /// imports the graph in it's current context as a block with the block_name/block_symbol values currently set
+    pub fn import(&mut self, graph: AttributeGraph) -> bool {
+        if let (Some(block_name), Some(block_symbol)) = (graph.find_text("block_name"), graph.find_text("block_symbol")) {
+            let mut importing = AttributeGraph::from(0);
+            importing.start_block_mode(block_name, block_symbol);
+            importing.copy(&graph);
+            self.import_block(BlockContext::from(importing))
+        } else {
+            eprintln!("Did not find text attributes for block_name and block_symbol");
+            false
+        }
+    }
+
     /// sends a message between two blocks within the project
     /// returns the transpilation of the project without applying the events
     pub fn send(

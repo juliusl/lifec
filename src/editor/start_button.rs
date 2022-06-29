@@ -1,4 +1,4 @@
-use atlier::system::{Extension, WindowEvent};
+use atlier::system::Extension;
 use specs::{World, DispatcherBuilder, Entity, Component};
 use specs::storage::DenseVecStorage;
 
@@ -37,12 +37,12 @@ impl Extension for StartButton {
     fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
         dispatcher.add(
             Call::default(), 
-            "call_event", 
+            "start_button/call_event", 
             &[]);
         dispatcher.add(
             EventRuntime::default(),
             "start_button/event_runtime",
-            &["call_event"],
+            &["start_button/call_event"],
         );
     }
 
@@ -54,13 +54,5 @@ impl Extension for StartButton {
                 start_button.display_ui(ui);
             }
         }
-    }
-
-    fn on_window_event(&'_ mut self, _: &World, _: &'_ WindowEvent<'_>) {
-        // No-op
-    }
-
-    fn on_run(&'_ mut self, _: &World) {
-        //todo!()
     }
 }
