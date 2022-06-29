@@ -3,6 +3,9 @@ use chrono::{Local, Utc};
 use specs::{Component, HashMapStorage};
 use tokio::task::JoinHandle;
 
+mod remote;
+pub use remote::Remote;
+
 #[derive(Debug, Clone, Default, Component)]
 #[storage(HashMapStorage)]
 pub struct Process;
