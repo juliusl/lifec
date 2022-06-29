@@ -59,11 +59,15 @@ impl BlockContext {
     }
 
     pub fn has_pending_events(&self) -> bool {
-        let mut has_event = !self.graph.find_symbols("event").is_empty();
+        self.has_pending("event")
+    }
+
+    pub fn has_pending(&self, symbol: impl AsRef<str>) -> bool {
+        let mut has_event = !self.graph.find_symbols(symbol).is_empty();
 
         for symbol in self.block_symbols.iter() {
             if let Some(graph) = self.get_block(symbol) {
-                has_event |= !graph.find_symbols("event").is_empty();
+                has_event |= !graph.find_symbols(symbol).is_empty();
             }
         }
 
@@ -309,24 +313,27 @@ impl BlockContext {
         let block_name = self.block_name.clone();
         if let Some(token) = ui.begin_menu("File") {
             if let Some(token) = ui.begin_menu("Blocks") {
-                if MenuItem::new(format!("Transpile {0} to {0}.runmd", block_name)).build(ui) {
-                    let mut transpiled = self.clone();
-                    transpiled.add_block("file", |f| {
-                        f.add_text_attr("runmd_path", format!("{}.runmd", block_name))
-                    });
-                    Transpile::call_with_context(&mut transpiled);
-                }
-
-                if ui.is_item_hovered() {
-                    ui.tooltip(|| {
-                        self.edit_block_tooltip_view(true, ui);
-                    });
-                }
-
-                if MenuItem::new(format!("Dump {}", self.block_name)).build(ui) {
-                    println!("{:#?}", self.as_ref());
-                }
-
+                ui.menu("Transpile", ||{ 
+                    if MenuItem::new(format!("Transpile {0} to {0}.runmd", block_name)).build(ui) {
+                        let mut transpiled = self.clone();
+                        transpiled.add_block("file", |f| {
+                            f.add_text_attr("runmd_path", format!("{}.runmd", block_name))
+                        });
+                        Transpile::call_with_context(&mut transpiled);
+                    }
+                    if ui.is_item_hovered() {
+                        ui.tooltip(|| {
+                            self.edit_block_tooltip_view(true, ui);
+                        });
+                    }
+                });
+          
+                ui.menu("Debug", ||{
+                    if MenuItem::new(format!("Dump {}", self.block_name)).build(ui) {
+                        println!("{:#?}", self.as_ref());
+                    }
+                });
+          
                 if self.has_pending_events() {
                     if MenuItem::new(format!("Apply events for {}", self.block_name)).build(ui) {
                         self.as_mut().apply_events();

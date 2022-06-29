@@ -29,16 +29,12 @@ pub use thunks::Thunk;
 pub use thunks::ThunkContext;
 pub use thunks::WriteFiles;
 
-pub mod demos {
-    pub use super::thunks::demo::*;
-}
-
 mod render;
 pub use render::Display;
 pub use render::Edit;
 pub use render::Render;
-use tokio::task::JoinHandle;
 
+use tokio::task::JoinHandle;
 use crate::AttributeGraph;
 
 /// This trait is to facilitate extending working with the attribute graph

@@ -1,3 +1,4 @@
+
 use crate::editor::*;
 use crate::plugins::*;
 use atlier::system::Extension;
@@ -29,14 +30,26 @@ where
 
     pub fn edit_attr_form() -> Self {
         List::<Item>(|context, item, world, ui| {
+            let thunk_symbol = context
+                .block
+                .as_ref()
+                .find_text("thunk_symbol")
+                .unwrap_or("entity".to_string());
+
             if ui.collapsing_header(
-                format!("Task: {}", context.as_ref().hash_code()),
+                format!(
+                    "{} {} - {}",
+                    thunk_symbol,
+                    context.block.block_name,
+                    context.as_ref().hash_code()
+                ),
                 TreeNodeFlags::DEFAULT_OPEN,
             ) {
-                for attr in BlockContext::iter_block_attrs_mut(context.as_mut()) {
+                for attr in context.as_mut().iter_mut_attributes() {
                     attr.edit_value(format!("{} {}", attr.name(), attr.id()), ui);
                 }
                 item.on_ui(world, ui);
+                ui.text(format!("stable: {}", context.as_ref().is_stable()));
                 ui.separator();
             }
         })

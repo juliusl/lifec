@@ -44,10 +44,10 @@ impl<'a> System<'a> for TaskSystem {
         ReadStorage<'a, ProgressStatusBar>,
     );
 
-    fn run(&mut self, (entities, mut timers, start_events, progress): Self::SystemData) {
+    fn run(&mut self, (entities, mut tasks, start_events, progress): Self::SystemData) {
         for (_, task, start_event, progress) in (
             &entities,
-            &mut timers,
+            &mut tasks,
             start_events.maybe(),
             progress.maybe(),
         )

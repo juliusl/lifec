@@ -4,7 +4,10 @@ use atlier::system::Value;
 use specs::Component;
 use tokio::fs;
 
-use crate::{plugins::{*, events::Listen}, RuntimeDispatcher, Runtime};
+use crate::{
+    plugins::{events::Listen, *},
+    Runtime, RuntimeDispatcher,
+};
 use specs::storage::DenseVecStorage;
 
 use super::ThunkContext;
@@ -23,6 +26,8 @@ impl Listen for OpenDir {
                 .and_then(|dir| Some(PathBuf::from(dir)))
             {
                 let mut unwrapping = AttributeGraph::from(0);
+                unwrapping.add_text_attr("block_name", file_dir.to_str().unwrap_or_default());
+                unwrapping.add_text_attr("block_symbol", "file_dir");
 
                 for (file_name, content) in next.as_ref().find_symbol_values("file") {
                     let mut file_src = file_dir.clone();
@@ -60,10 +65,12 @@ impl Plugin<ThunkContext> for OpenDir {
             let mut tc = context.clone();
 
             async move {
-                if let Some(file_src) = tc.as_ref().find_text("file_dir") {
+                if let Some(file_dir) = tc.as_ref().find_text("file_dir") {
                     tc.update_status_only("file directory found").await;
 
-                    let path_buf = PathBuf::from(file_src);
+                    tc.block.block_name = file_dir.to_string();
+
+                    let path_buf = PathBuf::from(file_dir);
 
                     if let Some(mut read_dir) = fs::read_dir(path_buf).await.ok() {
                         let mut progress = 0.0;
@@ -88,12 +95,12 @@ impl Plugin<ThunkContext> for OpenDir {
                                                 OpenFile::call_with_context(&mut work_file)
                                             {
                                                 progress += 0.01;
-                                                tc.update_progress("task started", progress).await;
+                                                tc.update_progress("open file task started", progress).await;
                                                 if let Some(result) = handle.await.ok() {
                                                     progress += 0.01;
                                                     tc.update_progress(
                                                         format!(
-                                                            "task completing, merging, {}",
+                                                            "open file task completing, merging, {}",
                                                             result.as_ref().entity()
                                                         ),
                                                         progress,
@@ -109,9 +116,14 @@ impl Plugin<ThunkContext> for OpenDir {
                                                         let mut block_context =
                                                             BlockContext::from(imported);
 
-                                                        block_context.update_block("file", |file|{
-                                                            file.with_text("file_src", &file_src);
-                                                        });
+                                                        block_context.update_block(
+                                                            "file",
+                                                            |file| {
+                                                                file.with_text(
+                                                                    "file_src", &file_src,
+                                                                );
+                                                            },
+                                                        );
 
                                                         if let Some(transpiled) =
                                                             block_context.transpile().ok()

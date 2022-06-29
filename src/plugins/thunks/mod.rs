@@ -18,12 +18,6 @@ pub use open_dir::OpenDir;
 mod write_files;
 use tokio::{runtime::Handle, sync::mpsc::Sender, task::JoinHandle};
 pub use write_files::WriteFiles;
-
-pub mod demo {
-    use super::write_files::demo;
-    pub use demo::WriteFilesDemo;
-}
-
 use super::{BlockContext, Plugin};
 
 /// Thunk is a function that can be passed around for the system to call later

@@ -19,6 +19,9 @@ pub use list::List;
 mod timer;
 pub use timer::Timer;
 
+mod sequencer;
+pub use sequencer::Sequencer;
+
 use specs::prelude::*;
 pub use specs::prelude::WorldExt;
 pub use specs::prelude::Builder;

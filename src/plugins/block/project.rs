@@ -147,10 +147,6 @@ impl Project {
                 self.export_blocks_view(ui);
                 token.end();
             }
-
-            if let Some(token) = ui.begin_menu("Import") {
-                token.end();
-            }
             ui.separator();
         });
     }
@@ -210,7 +206,7 @@ impl Project {
     pub fn import(&mut self, graph: AttributeGraph) -> bool {
         if let (Some(block_name), Some(block_symbol)) = (graph.find_text("block_name"), graph.find_text("block_symbol")) {
             let mut importing = AttributeGraph::from(0);
-            importing.start_block_mode(block_name, block_symbol);
+            importing.start_block_mode(&block_name, block_symbol);
             importing.copy(&graph);
             self.import_block(BlockContext::from(importing))
         } else {

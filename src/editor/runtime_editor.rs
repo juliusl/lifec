@@ -1,11 +1,11 @@
-use super::{Call, List, Task, Timer};
+use super::{Call, List, Task, Timer, unique_title};
 use crate::{
-    plugins::{Engine, Event, Listen, OpenDir, OpenFile, Process, Project, ThunkContext},
-    Runtime,
+    plugins::{Engine, Listen, OpenDir, OpenFile, Process, Project, Plugin},
+    Runtime, AttributeGraph, RuntimeDispatcher,
 };
-use atlier::system::Extension;
+use atlier::system::{Extension, Value};
 use imgui::{Ui, Window};
-use specs::{Entity, World, WorldExt};
+use specs::World;
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
 pub struct RuntimeEditor {
@@ -13,28 +13,6 @@ pub struct RuntimeEditor {
 }
 
 impl RuntimeEditor {
-    /// Schedule an event on the runtime
-    pub fn schedule(
-        &mut self,
-        world: &World,
-        event: &Event,
-        config: impl FnOnce(&mut ThunkContext),
-    ) -> Option<Entity> {
-        if let Some(entity) = self.runtime.create(world, event, |_| {}) {
-            let mut contexts = world.write_component::<ThunkContext>();
-            let mut events = world.write_component::<Event>();
-            if let Some(tc) = contexts.get_mut(entity) {
-                config(tc);
-                if let Some(event) = events.get_mut(entity) {
-                    event.fire(tc.clone());
-                    return Some(entity);
-                }
-            }
-        }
-
-        None
-    }
-
     /// returns the project for updating
     pub fn project_mut(&mut self) -> &mut Project {
         &mut self.runtime.project
@@ -54,11 +32,67 @@ impl Default for RuntimeEditor {
         default.runtime.install::<Call, Process>();
         default.runtime.install::<Call, OpenFile>();
         default.runtime.install::<Call, OpenDir>();
+
+        default.project_mut().as_mut().add_text_attr("next_dispatch", "");
         default
     }
 }
 
 impl RuntimeEditor {
+    pub fn edit_event_menu(&mut self, app_world: &specs::World, ui: &Ui) {
+        self.runtime.create_event_menu_item(
+            app_world,
+            &Call::event::<Timer>(),
+            |c| {
+                c.block.block_name = unique_title("new_timer");
+                c.as_mut()
+                .with_text("thunk_symbol", Timer::symbol())
+                .with_int("duration", 0);
+            },
+            Timer::description(),
+            ui,
+        );
+
+        self.runtime.create_event_menu_item(
+            app_world,
+            &Call::event::<Process>(),
+            |c| {
+                c.block.block_name = unique_title("new_process");
+                c.as_mut()
+                .with_text("thunk_symbol", Process::symbol())
+                .with_text("command", "");
+            },
+            Process::description(),
+            ui,
+        );
+
+        self.runtime.create_event_menu_item(
+            app_world,
+            &Call::event::<OpenFile>(),
+            |c| {
+                c.block.block_name = unique_title("new_open_file");
+                c.as_mut()
+                .with_text("thunk_symbol", OpenFile::symbol())
+                .with_text("file_src", "");
+            },
+            OpenFile::description(),
+            ui,
+        );
+
+        self.runtime.create_event_menu_item(
+            app_world,
+            &Call::event::<OpenDir>(),
+            |c| {
+                c.block.block_name = unique_title("new_open_dir");
+                c.as_mut()
+                    .with_text("thunk_symbol", OpenDir::symbol())
+                    .with_text("file_dir", "");
+            },
+            OpenDir::description(),
+            ui,
+        );
+    }
+
     pub fn task_window(&mut self, app_world: &specs::World, ui: &Ui) {
         Window::new("Tasks")
             .menu_bar(true)
@@ -66,9 +100,11 @@ impl RuntimeEditor {
             .build(ui, || {
                 ui.menu_bar(|| {
                     self.project_mut().edit_project_menu(ui);
+                    self.edit_event_menu(app_world, ui);
                 });
 
                 List::<Task>::default().on_ui(app_world, ui);
+                ui.new_line();
             });
     }
 }
@@ -95,15 +131,14 @@ impl Extension for RuntimeEditor {
         match event {
             atlier::system::WindowEvent::DroppedFile(file) => {
                 let file_src = format!("{:?}", &file);
-
                 if file.is_dir() {
-                    self.schedule(world, &Call::event::<OpenDir>(), |tc| {
+                    self.runtime.schedule(world, &Call::event::<OpenDir>(), |tc| {
                         tc.as_mut()
                             .add_text_attr("file_dir", &file_src.trim_matches('"'));
                     })
                     .and_then(|_| Some(()));
                 } else {
-                    self.schedule(world, &Call::event::<OpenFile>(), |tc| {
+                    self.runtime.schedule(world, &Call::event::<OpenFile>(), |tc| {
                         tc.as_mut()
                             .add_text_attr("file_src", &file_src.trim_matches('"'));
                     })
@@ -115,17 +150,35 @@ impl Extension for RuntimeEditor {
     }
 
     fn on_run(&'_ mut self, world: &specs::World) {
+        self.on_open_dir(world);
+        self.on_open_file(world);
+    }
+}
+
+impl RuntimeEditor {
+    fn on_open_file(&mut self, world: &World) {
+        match OpenFile::listen(&mut self.runtime, world) {
+            Some(file) => {
+                if self.project_mut().import(file) {
+                    eprintln!("Imported file to project");
+                }
+            }
+            None => {}
+        }
+    }
+
+    fn on_open_dir(&mut self, world: &World) {
         match OpenDir::listen(&mut self.runtime, world) {
             Some(file_dir) => {
-                for (block_name, block) in Project::from(file_dir).iter_block_mut() {
+                let mut project = Project::from(file_dir.clone());
+                for (block_name, block) in project.iter_block_mut() {
                     eprintln!("found block {}", block_name);
-
                     if let Some(file) = block.get_block("file") {
                         if let (Some(file_src), Some(content)) = (
                             file.as_ref().find_text("file_src"),
                             file.as_ref().find_binary("content"),
                         ) {
-                            self.schedule(world, &Call::event::<OpenFile>(), |g| {
+                            self.runtime.schedule(world, &Call::event::<OpenFile>(), |g| {
                                 // Setting content will skip reading the file_src, unless refresh is enabled
                                 g.as_mut()
                                     .with_binary("content", content)
@@ -136,16 +189,6 @@ impl Extension for RuntimeEditor {
                 }
             }
             None => {}
-        }
-
-        match OpenFile::listen(&mut self.runtime, world) {
-            Some(file) => {
-                if self.project_mut().import(file) {
-                    eprintln!("Imported file to project");
-                }
-            },
-            None => {
-            },
         }
     }
 }

@@ -2405,7 +2405,7 @@ pub enum AttributeGraphElements {
     #[regex("[0-9]+", priority = 3, callback = graph_lexer::from_entity)]
     Entity(u32),
     /// symbols must start with a character, and is composed of lowercase characters, digits, underscores, and colons
-    #[regex("[a-z]+[a-z._:0-9]*", graph_lexer::from_string)]
+    #[regex("[a-z]+[a-z-._:0-9]*", graph_lexer::from_string)]
     Symbol(String),
     /// names have more relaxed rules
     #[regex("[#][A-Za-z_.-/0-9]*", graph_lexer::from_string)]

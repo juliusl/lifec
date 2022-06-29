@@ -25,11 +25,13 @@ impl Plugin<ThunkContext> for Process {
                     // Creating a new tokio command
                     let parts: Vec<&str> = command.split(" ").collect();
                     if let Some(command) = parts.get(0) {
-                        tc.update_progress(format!("command found {}", command), 0.10)
+                        tc.update_progress(format!("command: {}", command), 0.10)
                             .await;
                         let mut command_task = tokio::process::Command::new(&command);
                         for arg in parts.iter().skip(1) {
                             command_task.arg(arg);
+                            tc.update_progress(format!("arg: {}", arg), 0.10)
+                                .await;
                         }
                         tc.update_progress("starting", 0.20).await;
                         let start_time = Some(Utc::now());

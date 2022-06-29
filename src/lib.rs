@@ -1,7 +1,7 @@
 use atlier::system::App;
-use imgui::{ChildWindow, Window, Ui};
-use plugins::{Engine, Plugin, Project, ThunkContext, Event};
-use specs::{Component, System, World, Entity, WorldExt};
+use imgui::{ChildWindow, MenuItem, Ui, Window};
+use plugins::{Engine, Event, Plugin, Project, ThunkContext};
+use specs::{Component, Entity, System, World, WorldExt};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::{any::Any, collections::BTreeMap};
@@ -158,36 +158,48 @@ impl Runtime {
     }
 
     /// returns the next thunk context that has been updated by the event runtime, if registered to broadcasts
-    pub fn listen<P>(&mut self, world: &World) -> Option<ThunkContext> 
+    pub fn listen<P>(&mut self, world: &World) -> Option<ThunkContext>
     where
-        P: Plugin<ThunkContext>
+        P: Plugin<ThunkContext>,
     {
-        if let Some(rx) = self.receivers.get_mut(P::symbol()) {
+        self.listen_with(world, P::symbol())
+    }
+
+    /// subscribe to thunk contexts updated from the event runtime
+    pub fn subscribe<P>(&mut self, world: &World)
+    where
+        P: Plugin<ThunkContext>,
+    {
+        self.subscribe_with(world, P::symbol());
+    }
+
+    /// returns the next thunk context that has been updated by the event runtime, if registered to broadcasts
+    pub fn listen_with(
+        &mut self,
+        world: &World,
+        with_key: impl AsRef<str>,
+    ) -> Option<ThunkContext> {
+        if let Some(rx) = self.receivers.get_mut(with_key.as_ref()) {
             match rx.try_recv() {
                 Ok(entity) => {
                     let contexts = world.read_component::<ThunkContext>();
                     contexts.get(entity).and_then(|c| Some(c.clone()))
                 }
-                Err(_) => {
-                    None
-                }
+                Err(_) => None,
             }
         } else {
             // If not already subscribed, the plugin will miss any events it generated before calling listen
-            // this is probably not too bad since this is called inside the loop, so in most situations, the subscriber will get a 
+            // this is probably not too bad since this is called inside the loop, so in most situations, the subscriber will get a
             // chance to subscribe before it has a chance to make any changes
             // TODO: Can add a way to subscribe in the runtime's system trait
-            self.subscribe::<P>(world);
+            self.subscribe_with(world, with_key);
             None
         }
     }
 
     /// subscribe to thunk contexts updated from the event runtime
-    pub fn subscribe<P>(&mut self, world: &World) 
-    where
-        P: Plugin<ThunkContext>
-    {
-        self.receivers.insert(P::symbol().to_string(), Event::subscribe(world));
+    pub fn subscribe_with(&mut self, world: &World, with_key: impl AsRef<str>) {
+        self.receivers.insert(with_key.as_ref().to_string(), Event::subscribe(world));
     }
 
     /// Install an engine into the runtime. An engine provides functions for creating new component instances.
@@ -203,13 +215,58 @@ impl Runtime {
     }
 
     /// initialize and configure an event component and it's deps for a new entity, and insert into world.
-    pub fn create(&self, world: &World, event: &Event, config_fn: fn(&mut ThunkContext)) -> Option<Entity> {
+    pub fn create(
+        &self,
+        world: &World,
+        event: &Event,
+        config_fn: fn(&mut ThunkContext),
+    ) -> Option<Entity> {
         let key = event.to_string();
 
         if let Some(create_fn) = self.create_event.get(&key) {
             Some((create_fn)(world, config_fn))
         } else {
             None
+        }
+    }
+
+    pub fn schedule(
+        &mut self,
+        world: &World,
+        event: &Event,
+        config: impl FnOnce(&mut ThunkContext),
+    ) -> Option<Entity> {
+        if let Some(entity) = self.create(world, event, |_| {}) {
+            let mut contexts = world.write_component::<ThunkContext>();
+            let mut events = world.write_component::<Event>();
+            if let Some(tc) = contexts.get_mut(entity) {
+                config(tc);
+                if let Some(event) = events.get_mut(entity) {
+                    event.fire(tc.clone());
+                    return Some(entity);
+                }
+            }
+        }
+
+        None
+    }
+
+    pub fn sequence(&mut self, world: &World, _initial: ThunkContext, events: Vec<Event>) {
+        let mut entities = vec![];
+        for event in events.iter() {
+            if let Some(entity) = self.create(world, event, |_| {}) {
+                entities.push(entity);
+            }
+        }
+
+        let sequence_key = _initial.label("sequence_key");
+        self.subscribe_with(world, sequence_key);
+
+        let mut events = world.write_component::<Event>();
+        for entity in entities {
+            if let Some(_event) = events.get_mut(entity) {
+                _event.fire(_initial.clone());
+            }
         }
     }
 
@@ -223,21 +280,38 @@ impl Runtime {
 }
 
 impl<'a> System<'a> for Runtime {
-    type SystemData = (
-    );
+    type SystemData = ();
 
-    fn run(&mut self, _: Self::SystemData) {
-    }
+    fn run(&mut self, _: Self::SystemData) {}
 }
 
 impl Runtime {
     fn menu(&mut self, ui: &Ui) {
-        ui.menu("Edit", ||{
+        ui.menu("Edit", || {
             for (event_name, _) in self.create_event.iter() {
-                ui.menu(event_name, || {
-
-                })
+                ui.menu(event_name, || {})
             }
+        });
+    }
+
+    pub fn create_event_menu_item(
+        &mut self,
+        world: &World,
+        event: &Event,
+        config_fn: fn(&mut ThunkContext),
+        tooltip: impl AsRef<str>,
+        ui: &Ui,
+    ) {
+        ui.menu("Edit", || {
+            ui.menu("Events", || {
+                let label = format!("Add '{}'", event.to_string());
+                if MenuItem::new(label).build(ui) {
+                    self.create(world, event, config_fn);
+                }
+                if ui.is_item_hovered() {
+                    ui.tooltip_text(tooltip);
+                }
+            });
         });
     }
 }

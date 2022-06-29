@@ -2,8 +2,8 @@ use atlier::system::Extension;
 use specs::Entity;
 use specs::World;
 use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage};
-use tokio::sync::broadcast;
 use std::fmt::Display;
+use tokio::sync::broadcast;
 use tokio::{
     runtime::Runtime,
     sync::{
@@ -72,7 +72,6 @@ impl Event {
             .unwrap_or_default()
     }
 
-
     /// subscribe to get a notification when the runtime editor has updated an entity
     pub fn subscribe(world: &World) -> sync::broadcast::Receiver<Entity> {
         let sender = world.write_resource::<sync::broadcast::Sender<Entity>>();
@@ -80,7 +79,7 @@ impl Event {
         sender.subscribe()
     }
 
-    /// receive the next updated thunkcontext from world, 
+    /// receive the next updated thunkcontext from world,
     /// Note: this receives from the world's global receiver, to receive full broadcast, use Event::subscribe to get a receiver
     pub fn receive(world: &World) -> Option<ThunkContext> {
         let mut receiver = world.write_resource::<sync::broadcast::Receiver<Entity>>();
@@ -90,9 +89,7 @@ impl Event {
                 let contexts = world.read_component::<ThunkContext>();
                 contexts.get(entity).and_then(|c| Some(c.clone()))
             }
-            Err(_) => {
-                None
-            }
+            Err(_) => None,
         }
     }
 }
@@ -157,7 +154,8 @@ impl<'a> System<'a> for EventRuntime {
             let Event(_, thunk, initial_context, task) = event;
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
-                    if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() }) {
+                    if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() })
+                    {
                         match contexts.insert(entity, thunk_context) {
                             Ok(_) => {
                                 updated_sender.send(entity).ok();
@@ -196,10 +194,11 @@ impl<'a> System<'a> for EventRuntime {
                             .await;
 
                         match handle.await {
-                            Ok(updated_context) => {
+                            Ok(mut updated_context) => {
                                 context
                                     .update_status_only(format!("completed: {}", &event_name))
                                     .await;
+                                updated_context.as_mut().add_text_attr("thunk_symbol", thunk_name);
                                 updated_context
                             }
                             Err(err) => {

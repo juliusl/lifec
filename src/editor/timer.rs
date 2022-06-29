@@ -15,6 +15,10 @@ impl Plugin<ThunkContext> for Timer {
         "timer"
     }
 
+    fn description() -> &'static str {
+        "Create a timer w/ a duration of seconds."
+    }
+
     fn call_with_context(thunk_context: &mut ThunkContext) -> Option<JoinHandle<ThunkContext>> {
         thunk_context.clone().task(|| {
             let mut tc = thunk_context.clone();
