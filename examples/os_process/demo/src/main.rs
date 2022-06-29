@@ -1,7 +1,7 @@
-use lifec::{plugins::*, editor::{*, runtime_editor::Receiver}, AttributeGraph};
+use lifec::{plugins::*, editor::*, AttributeGraph};
 
 #[derive(Default)]
-struct Demo(RuntimeEditor, Option<Receiver<Entity>>);
+struct Demo(RuntimeEditor);
 
 impl Extension for Demo {
     fn configure_app_world(world: &mut World) {
@@ -37,7 +37,7 @@ fn main() {
         *demo.0.project_mut().as_mut() = file;
         demo.0.project_mut().reload_source();
         open(
-            "demo",
+            "Demo",
             Demo::default(),
             demo,
         );
