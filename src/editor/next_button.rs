@@ -10,6 +10,8 @@ use super::StartButton;
 pub struct NextButton(
     /// Owner
     pub StartButton,
+    /// Enable auto mode
+    pub Option<bool>,
     /// Next
     pub Option<StartButton>
 );

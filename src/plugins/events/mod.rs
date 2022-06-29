@@ -161,7 +161,7 @@ impl<'a> System<'a> for EventRuntime {
                                 updated_sender.send(entity).ok();
                             }
                             Err(err) => {
-                                eprintln!("error completing: {}, {}", &event_name, err);
+                                eprintln!("# error completing: {}, {}", &event_name, err);
                             }
                         }
                     }
@@ -170,7 +170,7 @@ impl<'a> System<'a> for EventRuntime {
                 }
             } else if let Some(initial_context) = initial_context.take() {
                 println!(
-                    "start event: {}, {}",
+                    "# start event: {}, {}",
                     &event_name,
                     initial_context.as_ref().hash_code()
                 );
@@ -183,20 +183,20 @@ impl<'a> System<'a> for EventRuntime {
                     let Thunk(thunk_name, thunk) = thunk;
                     context
                         .update_status_only(format!(
-                            "event received: {}, {}",
+                            "# event received: {}, {}",
                             &event_name,
                             initial_context.as_ref().hash_code()
                         ))
                         .await;
                     if let Some(handle) = thunk(&mut context) {
                         context
-                            .update_status_only(format!("{} is being called", thunk_name))
+                            .update_status_only(format!("# {} is being called", thunk_name))
                             .await;
 
                         match handle.await {
                             Ok(mut updated_context) => {
                                 context
-                                    .update_status_only(format!("completed: {}", &event_name))
+                                    .update_status_only(format!("# completed: {}", &event_name))
                                     .await;
                                 updated_context.as_mut().add_text_attr("thunk_symbol", thunk_name);
                                 updated_context
@@ -207,7 +207,7 @@ impl<'a> System<'a> for EventRuntime {
                                 });
                                 context
                                     .update_status_only(format!(
-                                        "event error: {}, {}",
+                                        "# event error: {}, {}",
                                         &event_name, err
                                     ))
                                     .await;
@@ -217,7 +217,7 @@ impl<'a> System<'a> for EventRuntime {
                     } else {
                         // This means that the event completed without spawning any tasks
                         context
-                            .update_status_only(format!("completed: {}", &event_name))
+                            .update_status_only(format!("# completed: {}", &event_name))
                             .await;
                         context
                     }

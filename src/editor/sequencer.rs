@@ -15,7 +15,7 @@ impl<'a> System<'a> for Sequencer {
         for (entity, event) in (&entities, start_buttons.maybe()).join() {
             if let Some(event) = event {
                 if !next_buttons.contains(entity) {
-                    match next_buttons.insert(entity, NextButton(event.clone(), None)) {
+                    match next_buttons.insert(entity, NextButton(event.clone(), None, None)) {
                         Ok(_) => {
                             eprintln!("adding next button for {:?}", entity);
                         }
