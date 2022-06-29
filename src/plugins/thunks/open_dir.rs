@@ -36,7 +36,7 @@ impl Listen for OpenDir {
                     if let Value::BinaryVector(vec) = content {
                         if let Some(content) = from_utf8(&vec).ok() {
                             if unwrapping.batch_mut(content).is_ok() {
-                                println!("unwrapped file block {}", file_name);
+                                eprintln!("unwrapped file block {}", file_name);
                             }
                         }
                     }

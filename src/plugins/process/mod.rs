@@ -33,12 +33,12 @@ impl Plugin<ThunkContext> for Process {
                             tc.update_progress(format!("arg: {}", arg), 0.10)
                                 .await;
                         }
-                        tc.update_progress("starting", 0.20).await;
+                        tc.update_progress("running", 0.20).await;
                         let start_time = Some(Utc::now());
                         match command_task.output().await {
                             Ok(output) => {
                                 // Completed process, publish result
-                                tc.update_progress("recording output", 0.30).await;
+                                tc.update_progress("Finished, recording output", 0.30).await;
                                 let timestamp_utc = Some(Utc::now().to_string());
                                 let timestamp_local = Some(Local::now().to_string());
                                 let elapsed = start_time

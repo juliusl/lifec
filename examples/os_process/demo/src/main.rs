@@ -22,7 +22,9 @@ impl Extension for Demo {
         let Demo(editor, ..) = self;
         editor.on_ui(app_world, ui);
 
-        ui.show_demo_window(&mut true);
+        if let Some(Value::Bool(show_demo_window)) = self.0.project_mut().as_mut().find_attr_value_mut("show_demo_window") {
+            ui.show_demo_window(show_demo_window);
+        }
     }
 
     fn on_window_event(&'_ mut self, app_world: &World, event: &'_ WindowEvent<'_>) {
@@ -37,15 +39,18 @@ impl Extension for Demo {
 
 fn main() {
     if let Some(file) = AttributeGraph::load_from_file("drag_drop_example.runmd") {
-        let mut runtime = Runtime::new(Project::from(file));
+        let mut runtime = Runtime::new(Project::from(file.clone()));
         runtime.install::<Call, Timer>();
         runtime.install::<Call, Process>();
         runtime.install::<Call, OpenFile>();
         runtime.install::<Call, OpenDir>();
+        let mut demo = Demo::default();
+        *demo.0.project_mut().as_mut() = file;
+        demo.0.project_mut().reload_source();
         open(
             "demo",
             runtime,
-            Demo::default(),
+            demo,
         );
     }
 }

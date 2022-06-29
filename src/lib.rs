@@ -211,7 +211,7 @@ impl Runtime {
         let event = E::event::<P>();
         self.create_event.insert(event.to_string(), E::create::<P>);
 
-        println!("Runtime installed event: {}", event.to_string());
+        println!("install event: {}", event.to_string());
     }
 
     /// initialize and configure an event component and it's deps for a new entity, and insert into world.
