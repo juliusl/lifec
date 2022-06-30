@@ -11,6 +11,9 @@ pub use open_file::OpenFile;
 mod open_dir;
 pub use open_dir::OpenDir;
 
+mod write_file;
+pub use write_file::WriteFile;
+
 mod timer;
 pub use timer::Timer;
 
@@ -152,8 +155,10 @@ impl ThunkContext {
     }
 
     /// Updates error block
-    pub fn error(&mut self, record: impl FnOnce(&mut AttributeGraph)) {
-        self.block.update_block("error", record);
+    pub fn error(&mut self, record: impl Fn(&mut AttributeGraph)) {
+        if !self.block.update_block("error", &record) {
+            self.block.add_block("error", record);
+        }
     }
 
     /// Formats a label that is unique to this state

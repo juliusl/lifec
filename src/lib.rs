@@ -136,6 +136,7 @@ pub struct Runtime {
     project: Project,
     /// Table for creating new event components
     create_event: BTreeMap<String, fn(&World, fn(&mut ThunkContext)) -> Option<Entity>>,
+    /// Table of broadcase receivers
     receivers: HashMap<String, tokio::sync::broadcast::Receiver<Entity>>,
 }
 
