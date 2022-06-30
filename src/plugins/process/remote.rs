@@ -66,6 +66,7 @@ impl Plugin<ThunkContext> for Remote {
                                             )
                                             .with_text("timestamp_utc", timestamp_utc.unwrap_or_default())
                                             .with_text("elapsed", elapsed.unwrap_or_default());
+                                        println!("exit code {}", output.status.code().unwrap_or_default());
                                     }
                                     Err(err) => {
                                         tc.update_progress(format!("# error {}", err), 0.0).await;
