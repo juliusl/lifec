@@ -26,8 +26,12 @@ impl App for StartButton {
 
     fn edit_ui(&mut self, ui: &imgui::Ui) {
         if let Self(pressed, .., label, Some(entity)) = self {
-            if ui.button(format!("{} {}", label, entity.id())) {
-               *pressed = Some(true);
+            if let Some(_) = pressed {
+                ui.text(label);
+            } else {
+                if ui.button(format!("{} {}", label, entity.id())) {
+                    *pressed = Some(true);
+                 }
             }
         }
     }
