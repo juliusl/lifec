@@ -19,6 +19,7 @@ pub use nodes::NodeContext;
 
 mod process;
 pub use process::Process;
+pub use process::Remote;
 
 mod thunks;
 pub use thunks::OpenFile;

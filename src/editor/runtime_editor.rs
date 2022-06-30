@@ -1,6 +1,6 @@
-use super::{Call, List, Task, unique_title, Interpret};
+use super::{Call, List, Task, unique_title};
 use crate::{
-    plugins::{Engine, Listen, Timer, OpenDir, OpenFile, Process, Project, Plugin},
+    plugins::{Engine, Listen, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin},
     Runtime
 };
 use atlier::system::Extension;
@@ -32,7 +32,8 @@ impl Default for RuntimeEditor {
         default.runtime.install::<Call, Process>();
         default.runtime.install::<Call, OpenFile>();
         default.runtime.install::<Call, OpenDir>();
-        default.runtime.install::<Interpret, OpenFile>();
+        default.runtime.install::<Call, Remote>();
+        // default.runtime.install::<Interpret, OpenFile>();
 
         default.project_mut().as_mut().add_text_attr("next_dispatch", "");
         default
@@ -69,6 +70,19 @@ impl RuntimeEditor {
 
         self.runtime.create_event_menu_item(
             app_world,
+            &Call::event::<Remote>(),
+            |c| {
+                c.block.block_name = unique_title("new_remote");
+                c.as_mut()
+                .with_text("thunk_symbol", Remote::symbol())
+                .with_text("command", "");
+            },
+            Remote::description(),
+            ui,
+        );
+
+        self.runtime.create_event_menu_item(
+            app_world,
             &Call::event::<OpenFile>(),
             |c| {
                 c.block.block_name = unique_title("new_open_file");
@@ -93,22 +107,22 @@ impl RuntimeEditor {
             ui,
         );
 
-        self.runtime.create_event_menu_item(
-            app_world,
-            &Interpret::event::<OpenFile>(),
-            |c| {
-                c.block.block_name = unique_title("new_interpret_file");
-                c.as_mut()
-                    .with_text("thunk_symbol", "interpret_file")
-                    .with_bool("interpret", true)
-                    .with_text("file_src", "");
-            },
-            format!(
-                "{}\nIf an interpreter exists for the file type, interprets the file and stores the result in an attribute.", 
-                OpenFile::description()
-            ),
-            ui,
-        );
+        // self.runtime.create_event_menu_item(
+        //     app_world,
+        //     &Interpret::event::<OpenFile>(),
+        //     |c| {
+        //         c.block.block_name = unique_title("new_interpret_file");
+        //         c.as_mut()
+        //             .with_text("thunk_symbol", "interpret_file")
+        //             .with_bool("interpret", true)
+        //             .with_text("file_src", "");
+        //     },
+        //     format!(
+        //         "{}\nIf an interpreter exists for the file type, interprets the file and stores the result in an attribute.", 
+        //         OpenFile::description()
+        //     ),
+        //     ui,
+        // );
     }
 
     pub fn task_window(&mut self, app_world: &specs::World, ui: &Ui) {

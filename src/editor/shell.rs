@@ -3,11 +3,9 @@ use imgui::{InputTextCallbackHandler, StyleVar, StyleColor};
 
 
 pub struct Shell {
-
 }
 
 impl InputTextCallbackHandler for Shell {
-    
 }
 
 impl App for Shell {
