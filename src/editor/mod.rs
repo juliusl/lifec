@@ -1,6 +1,9 @@
 pub mod runtime_editor;
 pub use runtime_editor::RuntimeEditor;
 
+mod shell;
+pub use shell::Shell;
+
 mod progress;
 pub use progress::ProgressStatusBar;
 
