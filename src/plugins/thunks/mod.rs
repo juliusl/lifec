@@ -1,13 +1,9 @@
 use std::future::Future;
 
 use crate::AttributeGraph;
-use atlier::system::Attribute;
 use imgui::Ui;
 use specs::Component;
 use specs::{storage::DenseVecStorage, Entity};
-
-mod println;
-pub use println::Println;
 
 mod open_file;
 pub use open_file::OpenFile;
@@ -18,9 +14,7 @@ pub use open_dir::OpenDir;
 mod timer;
 pub use timer::Timer;
 
-mod write_files;
 use tokio::{runtime::Handle, sync::mpsc::Sender, task::JoinHandle};
-pub use write_files::WriteFiles;
 use super::{BlockContext, Plugin};
 
 /// Thunk is a function that can be passed around for the system to call later
@@ -157,38 +151,9 @@ impl ThunkContext {
         self.handle.as_ref().and_then(|h| Some(h.clone()))
     }
 
-    /// returns the thunk_symbol that was called with this context
-    pub fn symbol(&self) -> Option<String> {
-        if let Some(thunk) = self.block.get_block("thunk") {
-            thunk.find_text("thunk_symbol")
-        } else {
-            None
-        }
-    }
-
     /// Updates error block
     pub fn error(&mut self, record: impl FnOnce(&mut AttributeGraph)) {
         self.block.update_block("error", record);
-    }
-
-    /// Update publish block
-    pub fn publish(&mut self, update: impl FnOnce(&mut AttributeGraph)) {
-        self.block.update_block("publish", update);
-    }
-
-    /// Receives values from the accept block, and updates the destination block with the new values
-    pub fn accept(&mut self, dest_block: impl AsRef<str>, accept: impl Fn(&Attribute) -> bool) {
-        if let Some(accept_block) = self.block.get_block("accept") {
-            for (name, value) in accept_block
-                .iter_attributes()
-                .filter(|a| accept(a))
-                .map(|a| (a.name(), a.value()))
-            {
-                self.block.update_block(dest_block.as_ref(), |u| {
-                    u.with(name, value.clone());
-                });
-            }
-        }
     }
 
     /// Formats a label that is unique to this state

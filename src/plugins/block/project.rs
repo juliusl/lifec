@@ -215,6 +215,15 @@ impl Project {
         }
     }
 
+    /// Returns a new project, defining a new block
+    pub fn with_block(&self, block_name: impl AsRef<str>, block_symbol: impl AsRef<str>, config: impl FnOnce(&mut AttributeGraph)) -> Self {
+        let mut next = self.clone();
+        next.as_mut().start_block_mode(block_name, block_symbol);
+        config(next.as_mut());
+        next.as_mut().end_block_mode();
+        next.reload_source()
+    }
+
     /// sends a message between two blocks within the project
     /// returns the transpilation of the project without applying the events
     pub fn send(
@@ -405,4 +414,48 @@ fn test_send_event() {
         }
         Err(err) => assert!(false, "should be able to dispatch test, {:?}", err)
     }
+}
+
+#[test]
+fn test_with_block() {
+    let project = Project::default();
+
+    let project = project.with_block("test.sh", "file", |a| {
+        a.with_binary("content", b"test message".to_vec());
+    });
+
+
+    assert!(project.find_block("test.sh").is_some());
+    assert!(project.find_block("test.sh").and_then(|b| b.get_block("file")).is_some());
+
+    let project = project.with_block("test.sh", "file", |a| {
+        a.with_text("file_src", "/some/test/path");
+    });
+
+    assert!(project.find_block("test.sh").is_some());
+    assert!(project.find_block("test.sh").and_then(|b| b.get_block("file")).is_some());
+
+    if let Some(file_block) = project.find_block("test.sh").and_then(|b| b.get_block("file")) {
+        assert!(file_block.find_text("file_src").is_some());
+        assert!(file_block.find_binary("content").is_some());
+    }
+
+    let project = project.with_block("test.sh", "interpret", |a| {
+        a.with_text("result", "interpretation");
+    });
+
+    assert!(project.find_block("test.sh").is_some());
+    assert!(project.find_block("test.sh").and_then(|b| b.get_block("interpret")).is_some());
+    assert!(project.find_block("test.sh").and_then(|b| b.get_block("file")).is_some());
+
+    if let Some(file_block) = project.find_block("test.sh").and_then(|b| b.get_block("file")) {
+        assert!(file_block.find_text("file_src").is_some());
+        assert!(file_block.find_binary("content").is_some());
+    }
+
+    if let Some(file_block) = project.find_block("test.sh").and_then(|b| b.get_block("interpret")) {
+        assert!(file_block.find_text("result").is_some());
+    }
+
+    println!("{:#?}", project);
 }

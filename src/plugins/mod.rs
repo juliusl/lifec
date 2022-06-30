@@ -24,11 +24,9 @@ pub use process::Remote;
 mod thunks;
 pub use thunks::OpenFile;
 pub use thunks::OpenDir;
-pub use thunks::Println;
 pub use thunks::StatusUpdate;
 pub use thunks::Thunk;
 pub use thunks::ThunkContext;
-pub use thunks::WriteFiles;
 pub use thunks::Timer;
 
 mod render;

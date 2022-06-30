@@ -15,6 +15,10 @@ impl Plugin<ThunkContext> for Remote {
         "remote"
     }
 
+    fn description() -> &'static str {
+        "Starts a process and pipes stdin and stdout to the current console. Useful for ssh, etc."
+    }
+
     fn call_with_context(
         context: &mut ThunkContext,
     ) -> Option<tokio::task::JoinHandle<ThunkContext>> {

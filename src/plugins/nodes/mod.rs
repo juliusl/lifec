@@ -1,9 +1,8 @@
 use super::block::Project;
 use super::events::EventRuntime;
 use super::{
-    BlockContext, Display, Edit, Plugin, Process, Render, Thunk, ThunkContext, WriteFiles,
+    BlockContext, Display, Edit, Plugin, Process, Render, Thunk, ThunkContext, 
 };
-use crate::plugins::Println;
 use crate::AttributeGraph;
 use atlier::system::{Extension, Value};
 use imgui::{Condition, MenuItem, Ui, Window};
@@ -317,14 +316,10 @@ impl Extension for Node {
         world.register::<Thunk>();
         
         NodeSync::<Process>::configure_app_world(world);
-        NodeSync::<Println>::configure_app_world(world);
-        NodeSync::<WriteFiles>::configure_app_world(world);
     }
 
     fn configure_app_systems(builder: &mut specs::DispatcherBuilder) {
         NodeSync::<Process>::configure_app_systems(builder);
-        NodeSync::<Println>::configure_app_systems(builder);
-        NodeSync::<WriteFiles>::configure_app_systems(builder);
     }
 
     fn on_ui(&mut self, _: &World, ui: &imgui::Ui) {
