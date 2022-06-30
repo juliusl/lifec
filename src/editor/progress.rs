@@ -17,6 +17,7 @@ pub struct ProgressStatusBar(
     /// log_display
     pub String, 
     /// history.log
+    /// TODO: change to binary vec
     pub String
 );
 
@@ -101,6 +102,9 @@ impl App for ProgressStatusBar {
 
             ui.popup(&log_full, || {
                 ui.text("Log history");
+                if ui.button("dump to console out") {
+                    println!("{}", &log_full);
+                }
                 ui.input_text_multiline("output_log", &mut log_full.clone(), [1360.0, 35.0 * 16.0])
                     .read_only(true)
                     .build();
