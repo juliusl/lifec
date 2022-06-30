@@ -36,6 +36,9 @@ impl Thunk {
         Self(P::symbol(), P::call_with_context)
     }
 
+    
+
+    /// deprecated? 
     pub fn show(&self, context: &mut ThunkContext, ui: &Ui) {
         ui.set_next_item_width(130.0);
         if ui.button(context.label(self.0)) {
@@ -73,6 +76,11 @@ impl ThunkContext {
         async_enabled.handle = Some(handle);
         async_enabled.status_updates = status_updates;
         async_enabled
+    }
+
+    /// returns a handle to a tokio runtime
+    pub fn handle(&self) -> Option<Handle> {
+        self.handle.as_ref().and_then(|h| Some(h.clone()))
     }
 
     /// If async is enabled on the thunk context, this will spawn the task
@@ -149,11 +157,6 @@ impl AsMut<AttributeGraph> for ThunkContext {
 }
 
 impl ThunkContext {
-    /// returns a handle to a tokio runtime
-    pub fn handle(&self) -> Option<Handle> {
-        self.handle.as_ref().and_then(|h| Some(h.clone()))
-    }
-
     /// Updates error block
     pub fn error(&mut self, record: impl Fn(&mut AttributeGraph)) {
         if !self.block.update_block("error", &record) {
