@@ -9,7 +9,16 @@ use crate::AttributeGraph;
 
 #[derive(Component, Clone, Default)]
 #[storage(HashMapStorage)]
-pub struct ProgressStatusBar(pub f32, pub String, pub String, pub String);
+pub struct ProgressStatusBar(
+    /// progress
+    pub f32, 
+    /// status
+    pub String,
+    /// log_display
+    pub String, 
+    /// history.log
+    pub String
+);
 
 impl Into<AttributeGraph> for ProgressStatusBar {
     fn into(self) -> AttributeGraph {
@@ -132,6 +141,8 @@ impl Extension for ProgressStatusBar {
                 progress.get_mut(entity)
             {
                 *progress = p;
+                // The idea here is to show at max 10 lines with 85 chars on each line
+                // this gets dynamically sized so that small log messages get more that 10 lines automatically
                 let limit = 10 * min(85, status.len());
                 if log_display.len() > limit {
                     if let Some((_, remaining)) = log_display.split_once("\n") {
