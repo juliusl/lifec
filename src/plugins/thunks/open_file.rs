@@ -53,6 +53,8 @@ impl Plugin<ThunkContext> for OpenFile {
                     let path_buf = PathBuf::from(&file_src);
                     let file_name = path_buf.file_name().unwrap_or_default().to_str().unwrap_or_default();
 
+                    tc.as_mut().add_text_attr("file_ext", path_buf.extension().unwrap_or_default().to_str().unwrap_or_default().to_string());
+
                     // block names are usually strictly symbols, but with a # prefix the rules are more relaxed
                     tc.block.block_name = format!("{}", file_name);
 

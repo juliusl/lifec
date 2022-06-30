@@ -5,7 +5,7 @@ use super::{StartButton, ProgressStatusBar, NextButton, Sequencer};
 
 #[derive(Default, Component, Clone)]
 #[storage(HashMapStorage)]
-pub struct Task(Option<StartButton>, Option<ProgressStatusBar>);
+pub struct Task(Option<StartButton>, Option<ProgressStatusBar>, Option<NextButton>);
 
 impl Extension for Task {
     fn configure_app_world(world: &mut World) {
@@ -27,11 +27,15 @@ impl Extension for Task {
             start_button.on_ui(app_world, ui);
         }
 
-        if let Task(.., Some(progress_status_bar)) = self {
+        if let Task(_, Some(progress_status_bar), ..) = self {
             if progress_status_bar.0 > 0.0 {
                 ui.same_line();
             }
             progress_status_bar.on_ui(app_world, ui);
+        }
+
+        if let Task(.., Some(next_button)) = self {
+            next_button.on_ui(app_world, ui);
         }
     }
 }

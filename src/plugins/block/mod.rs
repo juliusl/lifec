@@ -26,6 +26,19 @@ pub struct BlockContext {
 }
 
 impl BlockContext {
+    /// Converts self into vec of blocks
+    pub fn to_blocks(&self) -> Vec<(String, AttributeGraph)> {
+        let clone = self.clone();
+        self.block_symbols.iter().filter_map(|b| {
+            if let Some(block) = clone.get_block(b) {
+                Some((b.to_string(), block))
+            } else {
+                None
+            }  
+        })
+        .collect()
+    }
+
     pub fn transpile_blocks(blocks: Vec<(String, BlockContext)>) -> Result<String, Error> {
         let mut output = String::new();
 

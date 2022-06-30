@@ -1,4 +1,4 @@
-use super::{ProgressStatusBar, StartButton, Task};
+use super::{ProgressStatusBar, StartButton, Task, NextButton};
 use crate::plugins::*;
 
 #[derive(Clone, Default)]
@@ -13,6 +13,7 @@ impl Engine for Call {
         entity
             .with(Task::default())
             .with(StartButton::default())
+            .with(NextButton::default())
             .with(ProgressStatusBar::default())
             .with(event)
     }
@@ -20,6 +21,7 @@ impl Engine for Call {
     fn create_event(entity: Entity, world: &World) {
         let mut tasks = world.write_component::<Task>();
         let mut start_buttons = world.write_component::<StartButton>();
+        let mut next_buttons = world.write_component::<NextButton>();
         let mut progress_status_bars = world.write_component::<ProgressStatusBar>();
 
         match tasks.insert(entity, Task::default()) {
@@ -30,6 +32,11 @@ impl Engine for Call {
         match start_buttons.insert(entity, StartButton::default()) {
             Ok(_) => {}
             Err(_) => {}
+        }
+
+        match next_buttons.insert(entity, NextButton::default()) {
+            Ok(_) => {},
+            Err(_) => {},
         }
 
         match progress_status_bars.insert(entity, ProgressStatusBar::default()) {

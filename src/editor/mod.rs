@@ -10,10 +10,6 @@ pub use progress::ProgressStatusBar;
 mod call;
 pub use call::Call;
 
-mod interpret;
-pub use interpret::Interpret;
-pub use interpret::Interpreter;
-
 mod start_button;
 pub use start_button::StartButton;
 

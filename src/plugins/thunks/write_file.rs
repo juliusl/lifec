@@ -1,5 +1,5 @@
 use specs::Component;
-use crate::plugins::*;
+use crate::{plugins::*};
 use specs::storage::DenseVecStorage;
 
 use super::ThunkContext;

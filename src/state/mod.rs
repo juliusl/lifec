@@ -5,13 +5,14 @@ use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, Entity};
+use tokio::io::{AsyncBufRead, AsyncReadExt, AsyncBufReadExt};
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     fmt::Display,
     fs,
     hash::{Hash, Hasher},
     path::PathBuf,
-    str::from_utf8,
+    str::from_utf8, error::Error, io::BufReader,
 };
 
 /// Attribute graph is a component that indexes attributes for an entity
@@ -21,6 +22,17 @@ use std::{
 pub struct AttributeGraph {
     entity: u32,
     index: BTreeMap<String, Attribute>,
+}
+
+impl From<Vec<u8>> for AttributeGraph {
+    fn from(vec: Vec<u8>) -> Self {
+        let mut graph = AttributeGraph::default();
+        if let Some(content) = String::from_utf8(vec).ok() {
+            graph.batch_mut(content).ok();
+        }
+        
+        graph
+    }
 }
 
 impl TryInto<Attribute> for AttributeGraph {

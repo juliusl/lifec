@@ -6,7 +6,7 @@ use crate::plugins::*;
 use super::Call;
 
 /// This button is to start actions that take computation time
-#[derive(Component, Clone, Default)]
+#[derive(Component, Clone, Default, Debug)]
 #[storage(DenseVecStorage)]
 pub struct StartButton(
     /// Pressed
