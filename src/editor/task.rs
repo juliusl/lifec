@@ -31,10 +31,6 @@ impl Extension for Task {
             }
             progress_status_bar.on_ui(app_world, ui);
         }
-
-        if let Task(.., Some(next_button)) = self {
-            next_button.on_ui(app_world, ui);
-        }
     }
 }
 
