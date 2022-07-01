@@ -190,7 +190,6 @@ impl Runtime {
                     let name = block_name.trim_end_matches(plugin_name.as_ref()).trim_end_matches("::");
                     
                     eprintln!("block_name: {}", name);
-                    println!("{:#?}", blocks);
                     if let Some(block) = blocks.find_block(name) {
                         println!("found block {}", block.block_name);
                         // 

@@ -28,6 +28,23 @@ impl Extension for Demo {
     fn on_window_event(&'_ mut self, app_world: &World, event: &'_ WindowEvent<'_>) {
         let Demo(editor, ..) = self;
         editor.on_window_event(app_world, event);
+
+        match event {
+            WindowEvent::DroppedFile(path) => {
+                if "runmd" == path.extension().unwrap_or_default() {
+                    if let Some(file) = AttributeGraph::load_from_file(path.to_str().unwrap_or_default()) {
+                        let mut demo = Demo::default();
+                        *demo.0.project_mut().as_mut() = file;
+                        let demo_project = demo.0.project_mut().reload_source();
+                        *demo.0.project_mut() = demo_project;
+                        self.0.runtime_mut().read_project(app_world);
+                    }
+                }
+            },
+            _ => {
+
+            }
+        }
     }
 
     fn on_run(&'_ mut self, world: &World) {
