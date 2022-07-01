@@ -1,6 +1,6 @@
 use atlier::system::App;
 use imgui::{ChildWindow, MenuItem, Ui, Window};
-use plugins::{Config, Engine, Event, Plugin, Project, ThunkContext};
+use plugins::{Config, Engine, Event, Plugin, Project, ThunkContext, Sequence};
 use specs::{Component, Entity, System, World, WorldExt};
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -135,7 +135,7 @@ pub trait RuntimeState:
 pub struct Runtime {
     project: Project,
     /// Table for creating new event components
-    create_event: BTreeMap<String, fn(&World, fn(&mut ThunkContext)) -> Option<Entity>>,
+    engine_plugin: BTreeMap<String, fn(&World, fn(&mut ThunkContext)) -> Option<Entity>>,
     /// Table for thunk configurations
     config: BTreeMap<String, fn(&mut ThunkContext)>,
     /// Table of broadcase receivers
@@ -146,7 +146,7 @@ impl Default for Runtime {
     fn default() -> Self {
         Self {
             project: Default::default(),
-            create_event: BTreeMap::default(),
+            engine_plugin: BTreeMap::default(),
             config: BTreeMap::default(),
             receivers: HashMap::default(),
         }
@@ -158,9 +158,60 @@ impl Runtime {
     pub fn new(project: Project) -> Self {
         Self {
             project,
-            create_event: BTreeMap::default(),
+            engine_plugin: BTreeMap::default(),
             config: BTreeMap::default(),
             receivers: HashMap::default(),
+        }
+    }
+
+    pub fn read_project(&mut self, world: &World) {
+        let blocks = self.project.clone();
+        let root = self.project.as_mut().root_mut();
+
+        for (key, create_event) in self.engine_plugin.iter() {
+            let mut installed_plugin = key.split_whitespace();
+            match (installed_plugin.next(), installed_plugin.next()) {
+                (Some(event_name), Some(plugin_name)) => {
+                    eprintln!("reading plugin instances {} {}", event_name, plugin_name);
+
+                    for (block_name, value) in root.find_symbol_values(plugin_name) {
+                        match value {
+                            atlier::system::Value::Empty => {
+                                eprintln!("creating new engine {} {}", block_name, plugin_name);
+                                let name = block_name.trim_end_matches(plugin_name).trim_end_matches("::");
+                                eprintln!("block_name: {}", name);
+
+                                println!("{:#?}", blocks);
+
+
+                                if let Some(block) = blocks.find_block(name) {
+                                    println!("found block {}", block.block_name);
+                                    if let Some(config_name) = block
+                                        .get_block(plugin_name)
+                                        .and_then(|b| b.find_text("config")) {
+                                        self.config.get(&config_name).and_then(|c| {
+                                            create_event(world, *c)
+                                        });
+                                    }
+                                }
+                            },
+                            atlier::system::Value::TextBuffer(_) => todo!(),
+                            atlier::system::Value::Symbol(_) => todo!(),
+                            _ => {}
+                        }
+                    }
+                }
+                _ => continue,
+            }
+        }
+
+        for (block_name, block) in blocks.iter_block() {
+            if let Some(calls) = block.get_block("call") {
+                let sequence = Sequence::default();
+
+
+            
+            }
         }
     }
 
@@ -218,7 +269,7 @@ impl Runtime {
         P: Plugin<ThunkContext> + Component + Send + Default,
     {
         let event = E::event::<P>();
-        self.create_event.insert(event.to_string(), E::create::<P>);
+        self.engine_plugin.insert(event.to_string(), E::create::<P>);
 
         println!("install event: {}", event.to_string());
     }
@@ -238,7 +289,7 @@ impl Runtime {
     ) -> Option<Entity> {
         let key = event.to_string();
 
-        if let Some(create_fn) = self.create_event.get(&key) {
+        if let Some(create_fn) = self.engine_plugin.get(&key) {
             (create_fn)(world, config_fn)
         } else {
             None
@@ -254,7 +305,7 @@ impl Runtime {
     ) -> Option<Entity> {
         let key = event.to_string();
 
-        if let Some(create_fn) = self.create_event.get(&key) {
+        if let Some(create_fn) = self.engine_plugin.get(&key) {
             (create_fn)(world, config.as_ref().1.clone())
         } else {
             None
@@ -344,7 +395,7 @@ impl<'a> System<'a> for Runtime {
 impl Runtime {
     fn menu(&mut self, ui: &Ui) {
         ui.menu("Edit", || {
-            for (event_name, _) in self.create_event.iter() {
+            for (event_name, _) in self.engine_plugin.iter() {
                 ui.menu(event_name, || {})
             }
         });

@@ -4,13 +4,13 @@ use crate::RuntimeDispatcher;
 use imgui::Ui;
 use specs::storage::HashMapStorage;
 use specs::Component;
-use std::collections::btree_map::IterMut;
+use std::collections::btree_map::{Iter, IterMut};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Error;
 use std::fmt::Write;
-use std::hash::{Hash, Hasher};
 use std::fs;
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Default, Component, Clone)]
 #[storage(HashMapStorage)]
@@ -122,6 +122,11 @@ impl Project {
         self.block_index.iter_mut()
     }
 
+    /// iterate through each block_name
+    pub fn iter_block(&self) -> Iter<String, BlockContext> {
+        self.block_index.iter()
+    }
+
     /// returns a filtered vectored of selected blocks
     pub fn select_blocks(
         &mut self,
@@ -204,7 +209,10 @@ impl Project {
 
     /// imports the graph in it's current context as a block with the block_name/block_symbol values currently set
     pub fn import(&mut self, graph: AttributeGraph) -> bool {
-        if let (Some(block_name), Some(block_symbol)) = (graph.find_text("block_name"), graph.find_text("block_symbol")) {
+        if let (Some(block_name), Some(block_symbol)) = (
+            graph.find_text("block_name"),
+            graph.find_text("block_symbol"),
+        ) {
             let mut importing = AttributeGraph::from(0);
             importing.start_block_mode(&block_name, block_symbol);
             importing.copy(&graph);
@@ -216,7 +224,12 @@ impl Project {
     }
 
     /// Returns a new project, defining a new block
-    pub fn with_block(&self, block_name: impl AsRef<str>, block_symbol: impl AsRef<str>, config: impl FnOnce(&mut AttributeGraph)) -> Self {
+    pub fn with_block(
+        &self,
+        block_name: impl AsRef<str>,
+        block_symbol: impl AsRef<str>,
+        config: impl FnOnce(&mut AttributeGraph),
+    ) -> Self {
         let mut next = self.clone();
         next.as_mut().start_block_mode(block_name, block_symbol);
         config(next.as_mut());
@@ -259,7 +272,8 @@ impl Project {
 
             let mut update = Project::from(update);
             update.as_mut().add_event(event_name, message);
-            update.as_mut()
+            update
+                .as_mut()
                 .with_text("from", from.block_name)
                 .with_text("to", to.block_name);
             update.transpile().ok()
@@ -268,7 +282,11 @@ impl Project {
         }
     }
 
-    pub fn receive(&self, update: impl AsRef<str>, dest_block: impl AsRef<str>) -> Option<BlockContext> {
+    pub fn receive(
+        &self,
+        update: impl AsRef<str>,
+        dest_block: impl AsRef<str>,
+    ) -> Option<BlockContext> {
         if let Some(mut graph) = AttributeGraph::from(0).batch(update.as_ref()).ok() {
             println!("Received update -> {}", dest_block.as_ref());
             graph.apply_events();
@@ -279,9 +297,14 @@ impl Project {
         }
     }
 
-    pub fn receive_mut(&mut self, update: impl AsRef<str>, dest_block: impl AsRef<str>, received: impl FnOnce(&mut BlockContext)) -> bool {
+    pub fn receive_mut(
+        &mut self,
+        update: impl AsRef<str>,
+        dest_block: impl AsRef<str>,
+        received: impl FnOnce(&mut BlockContext),
+    ) -> bool {
         match self.as_mut().batch_mut(update) {
-            Ok(_) => {            
+            Ok(_) => {
                 self.as_mut().apply_events();
                 *self = self.reload_source();
                 if let Some(dest) = self.find_block_mut(&dest_block) {
@@ -291,10 +314,8 @@ impl Project {
                 } else {
                     false
                 }
-            },
-            Err(_) => {
-                false
-            },
+            }
+            Err(_) => false,
         }
     }
 }
@@ -375,10 +396,10 @@ fn test_send_event() {
         Ok(graph) => {
             let mut graph = Project::from(graph);
             if let Some(message) = graph.send(
-                "sh_test", 
-                  "println_settings", 
-          "connect", 
-            r#"
+                "sh_test",
+                "println_settings",
+                "connect",
+                r#"
             ``` println_settings accept
             from sh_test publish called
             from sh_test publish code 
@@ -389,13 +410,16 @@ fn test_send_event() {
             from sh_test publish timestamp_local
             from sh_test publish timestamp_utc
             ```
-            "#) {
+            "#,
+            ) {
                 let update = Project::from(AttributeGraph::from(0).batch(&message).expect("works"));
 
-                let from_block = update.as_ref()
+                let from_block = update
+                    .as_ref()
                     .find_text("from")
                     .and_then(|f| update.find_block(f));
-                let to_block = update.as_ref()
+                let to_block = update
+                    .as_ref()
                     .find_text("to")
                     .and_then(|f| update.find_block(f));
 
@@ -404,15 +428,15 @@ fn test_send_event() {
 
                 println!("from: {}", from_block.expect("exists").block_name);
                 println!("to: {}", to_block.expect("exists").block_name);
-                
+
                 assert!(graph.receive_mut(message, "println_settings", |received| {
-                    println!("{}",  received.transpile().expect("should exist"));
+                    println!("{}", received.transpile().expect("should exist"));
                 }));
             } else {
                 assert!(false, "should exist");
             }
         }
-        Err(err) => assert!(false, "should be able to dispatch test, {:?}", err)
+        Err(err) => assert!(false, "should be able to dispatch test, {:?}", err),
     }
 }
 
@@ -424,18 +448,26 @@ fn test_with_block() {
         a.with_binary("content", b"test message".to_vec());
     });
 
-
     assert!(project.find_block("test.sh").is_some());
-    assert!(project.find_block("test.sh").and_then(|b| b.get_block("file")).is_some());
+    assert!(project
+        .find_block("test.sh")
+        .and_then(|b| b.get_block("file"))
+        .is_some());
 
     let project = project.with_block("test.sh", "file", |a| {
         a.with_text("file_src", "/some/test/path");
     });
 
     assert!(project.find_block("test.sh").is_some());
-    assert!(project.find_block("test.sh").and_then(|b| b.get_block("file")).is_some());
+    assert!(project
+        .find_block("test.sh")
+        .and_then(|b| b.get_block("file"))
+        .is_some());
 
-    if let Some(file_block) = project.find_block("test.sh").and_then(|b| b.get_block("file")) {
+    if let Some(file_block) = project
+        .find_block("test.sh")
+        .and_then(|b| b.get_block("file"))
+    {
         assert!(file_block.find_text("file_src").is_some());
         assert!(file_block.find_binary("content").is_some());
     }
@@ -445,15 +477,27 @@ fn test_with_block() {
     });
 
     assert!(project.find_block("test.sh").is_some());
-    assert!(project.find_block("test.sh").and_then(|b| b.get_block("interpret")).is_some());
-    assert!(project.find_block("test.sh").and_then(|b| b.get_block("file")).is_some());
+    assert!(project
+        .find_block("test.sh")
+        .and_then(|b| b.get_block("interpret"))
+        .is_some());
+    assert!(project
+        .find_block("test.sh")
+        .and_then(|b| b.get_block("file"))
+        .is_some());
 
-    if let Some(file_block) = project.find_block("test.sh").and_then(|b| b.get_block("file")) {
+    if let Some(file_block) = project
+        .find_block("test.sh")
+        .and_then(|b| b.get_block("file"))
+    {
         assert!(file_block.find_text("file_src").is_some());
         assert!(file_block.find_binary("content").is_some());
     }
 
-    if let Some(file_block) = project.find_block("test.sh").and_then(|b| b.get_block("interpret")) {
+    if let Some(file_block) = project
+        .find_block("test.sh")
+        .and_then(|b| b.get_block("interpret"))
+    {
         assert!(file_block.find_text("result").is_some());
     }
 

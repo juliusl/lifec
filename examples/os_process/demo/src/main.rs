@@ -20,6 +20,10 @@ impl Extension for Demo {
             ui.show_demo_window(show_demo_window);
         }
 
+        if ui.button("read project") {
+            self.0.runtime_mut().read_project(app_world);
+        }
+
         if ui.button("create sequence") {
             let runtime = self.0.runtime_mut();
             let mut sequence = Sequence::default();
@@ -28,11 +32,6 @@ impl Extension for Demo {
                 context.block.block_name =  unique_title( "default_timer");
                 context.as_mut().with_int("duration", 0).with_float_range("duration_ms", &[16.0, 0.0, 1000.0]);
             });
-
-            runtime.add_config(Config("timer_1", |tc| {
-                tc.block.block_name = unique_title("timer_1");
-                tc.as_mut().with_int_range("duration", &[2, 0, 10]);
-            }));
 
             // create by defining constants, statics
             if let Some(event) = runtime.create_event::<Call, Timer>(app_world, "timer_1") {
@@ -86,7 +85,19 @@ fn main() {
     if let Some(file) = AttributeGraph::load_from_file("drag_drop_example.runmd") {
         let mut demo = Demo::default();
         *demo.0.project_mut().as_mut() = file;
-        demo.0.project_mut().reload_source();
+        let demo_project = demo.0.project_mut().reload_source();
+        *demo.0.project_mut() = demo_project;
+
+        demo.0.runtime_mut().add_config(Config("timer_1", |tc| {
+            tc.block.block_name = unique_title("timer_1");
+            tc.as_mut().with_int_range("duration", &[2, 0, 10]);
+        }));
+
+        demo.0.runtime_mut().add_config(Config("cargo_run", |tc| {
+            tc.block.block_name = unique_title("cargo_run");
+            tc.as_mut().with_text("command", "cargo run .");
+        }));
+
         open(
             "Demo",
             Demo::default(),
