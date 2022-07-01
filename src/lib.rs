@@ -392,26 +392,6 @@ impl Runtime {
         None
     }
 
-    /// TODO:
-    pub fn sequence(&mut self, world: &World, _initial: ThunkContext, events: Vec<Event>) {
-        let mut entities = vec![];
-        for event in events.iter() {
-            if let Some(entity) = self.create(world, event, |_| {}) {
-                entities.push(entity);
-            }
-        }
-
-        let sequence_key = _initial.label("sequence_key");
-        self.subscribe_with(world, sequence_key);
-
-        let mut events = world.write_component::<Event>();
-        for entity in entities {
-            if let Some(_event) = events.get_mut(entity) {
-                _event.fire(_initial.clone());
-            }
-        }
-    }
-
     /// Generate runtime_state from the underlying project graph
     pub fn state<S>(&self) -> S
     where

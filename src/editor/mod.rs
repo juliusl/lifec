@@ -13,17 +13,11 @@ pub use call::Call;
 mod start_button;
 pub use start_button::StartButton;
 
-mod next_button;
-pub use next_button::NextButton;
-
 mod task;
 pub use task::Task;
 
 mod list;
 pub use list::List;
-
-mod sequencer;
-pub use sequencer::Sequencer;
 
 use specs::prelude::*;
 pub use specs::prelude::WorldExt;
