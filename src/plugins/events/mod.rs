@@ -13,6 +13,7 @@ use tokio::{
     task::JoinHandle,
 };
 
+use crate::plugins::thunks::Config;
 use super::thunks::StatusUpdate;
 use super::{Plugin, Thunk, ThunkContext};
 use specs::storage::VecStorage;
@@ -20,12 +21,16 @@ use specs::storage::VecStorage;
 mod listen;
 pub use listen::Listen;
 
+mod sequence;
+pub use sequence::Sequence;
+
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
 #[derive(Component)]
 #[storage(VecStorage)]
 pub struct Event(
     &'static str,
     Thunk,
+    Option<Config>,
     Option<ThunkContext>,
     Option<JoinHandle<ThunkContext>>,
 );
@@ -45,12 +50,16 @@ impl Event {
     where
         P: Plugin<ThunkContext> + Component + Default + Send,
     {
-        Self(event_name, Thunk::from_plugin::<P>(), None, None)
+        Self(event_name, Thunk::from_plugin::<P>(), None, None, None)
+    }
+
+    pub fn set_config(&mut self, config: Config) {
+        self.2 = Some(config);
     }
 
     /// "fire" the event, abort any previously running tasks
     pub fn fire(&mut self, thunk_context: ThunkContext) {
-        self.2 = Some(thunk_context);
+        self.3 = Some(thunk_context);
 
         // cancel any current task
         self.cancel();
@@ -58,7 +67,7 @@ impl Event {
 
     /// cancel any ongoing task spawned by this event
     pub fn cancel(&mut self) {
-        if let Some(task) = self.3.as_mut() {
+        if let Some(task) = self.4.as_mut() {
             eprintln!("aborting existing task");
             task.abort();
         }
@@ -66,7 +75,7 @@ impl Event {
 
     /// returns true if task is running
     pub fn is_running(&self) -> bool {
-        self.3
+        self.4
             .as_ref()
             .and_then(|j| Some(!j.is_finished()))
             .unwrap_or_default()
@@ -143,22 +152,43 @@ impl<'a> System<'a> for EventRuntime {
         Entities<'a>,
         WriteStorage<'a, Event>,
         WriteStorage<'a, ThunkContext>,
+        WriteStorage<'a, Sequence>,
     );
 
     fn run(
         &mut self,
-        (runtime, status_sender, updated_sender, entities, mut events, mut contexts): Self::SystemData,
+        (runtime, status_sender, updated_sender, entities, mut events, mut contexts, mut sequences): Self::SystemData,
     ) {
+        let mut dispatch_queue = vec![];
+
         for (entity, event) in (&entities, &mut events).join() {
             let event_name = event.to_string();
-            let Event(_, thunk, initial_context, task) = event;
+            let Event(_, thunk, _, initial_context, task) = event;
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
                     if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() })
                     {
-                        match contexts.insert(entity, thunk_context) {
+                        match contexts.insert(entity, thunk_context.clone()) {
                             Ok(_) => {
                                 updated_sender.send(entity).ok();
+
+                                // if the entity has a sequence, dispatch the next event
+                                if let Some(sequence) = sequences.get(entity) {
+                                    let mut next = sequence.clone();
+                                    if let Some(next_event) = next.next() {
+                                        println!("sequence has next event");
+                                        match sequences.insert(next_event, next.clone()).ok() {
+                                            Some(_) => {
+                                                dispatch_queue.push((next_event, thunk_context));
+                                            }
+                                            None => {}
+                                        }
+                                    } else {
+                                        if let Some(cursor) = sequence.cursor() {
+                                            dispatch_queue.push((cursor, thunk_context));
+                                        }
+                                    }
+                                }
                             }
                             Err(err) => {
                                 eprintln!("# error completing: {}, {}", &event_name, err);
@@ -198,7 +228,9 @@ impl<'a> System<'a> for EventRuntime {
                                 context
                                     .update_status_only(format!("# completed: {}", &event_name))
                                     .await;
-                                updated_context.as_mut().add_text_attr("thunk_symbol", thunk_name);
+                                updated_context
+                                    .as_mut()
+                                    .add_text_attr("thunk_symbol", thunk_name);
                                 updated_context
                             }
                             Err(err) => {
@@ -222,6 +254,33 @@ impl<'a> System<'a> for EventRuntime {
                         context
                     }
                 }));
+            }
+        }
+
+        // dispatch all queued messages
+        loop {
+            match dispatch_queue.pop() {
+                Some((next, last)) => {
+                    if let (Some(event), Some(context)) =
+                        (events.get_mut(next), contexts.get_mut(next))
+                    {
+                        context.as_mut().add_message(
+                            event.to_string(),
+                            "previous",
+                            last.block.transpile().unwrap_or_default(),
+                        );
+
+                        event.fire(context.clone());
+                        println!(
+                            "Dispatching next event, {}, {}",
+                            event,
+                            context.as_ref().hash_code()
+                        );
+                    } else {
+                        eprintln!("Next event does not exist");
+                    }
+                }
+                None => break,
             }
         }
     }

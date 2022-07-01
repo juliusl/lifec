@@ -19,6 +19,57 @@ impl Extension for Demo {
         if let Some(Value::Bool(show_demo_window)) = self.0.project_mut().as_mut().find_attr_value_mut("show_demo_window") {
             ui.show_demo_window(show_demo_window);
         }
+
+        if ui.button("create sequence") {
+            let runtime = self.0.runtime_mut();
+            let mut sequence = Sequence::default();
+
+            let config = lifec::plugins::Config("default_timer", |context|{
+                context.block.block_name =  unique_title( "default_timer");
+                context.as_mut().with_int("duration", 0).with_float_range("duration_ms", &[16.0, 0.0, 1000.0]);
+            });
+
+            runtime.add_config(Config("timer_1", |tc| {
+                tc.block.block_name = unique_title("timer_1");
+                tc.as_mut().with_int_range("duration", &[2, 0, 10]);
+            }));
+
+            // create by defining constants, statics
+            if let Some(event) = runtime.create_event::<Call, Timer>(app_world, "timer_1") {
+                sequence.add(event);
+            }
+
+            // create by predefining config
+            if let Some(event) = runtime.create_with(app_world, &Call::event::<Timer>(), config) {
+                sequence.add(event);
+            }
+
+            // create by predefining config
+            if let Some(event) = runtime.create_with_name(app_world, &Call::event::<Timer>(), "timer_1") {
+                sequence.add(event);
+            }
+
+            // create adhoc
+            if let Some(event) = runtime.create(app_world, &Call::event::<Timer>(), |config| {
+                config.block.block_name = "timer3".to_string();
+                config.as_mut()
+                    .with_int("duration", 3);
+            }) {
+                sequence.add(event);
+            }
+
+            if let Some(first) = sequence.next() {
+                sequence.set_cursor(first);
+                app_world.write_component::<Sequence>().insert(first, sequence).ok();
+            }
+
+            let mut sequence = Sequence::default();
+            if let Some(event) = runtime.create_with_name(app_world, &Call::event::<Timer>(), "timer_1") {
+                sequence.add(event);
+                sequence.set_cursor(event);
+                app_world.write_component::<Sequence>().insert(event, sequence).ok();
+            }
+        }
     }
 
     fn on_window_event(&'_ mut self, app_world: &World, event: &'_ WindowEvent<'_>) {
@@ -57,8 +108,10 @@ impl App for Demo {
 }
 
 impl<'a> System<'a> for Demo {
-    type SystemData = ();
+    type SystemData = (
+    );
 
-    fn run(&mut self, _: Self::SystemData) {
+    fn run(&mut self, data: Self::SystemData) {
+   
     }
 }

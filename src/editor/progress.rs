@@ -153,7 +153,10 @@ impl Extension for ProgressStatusBar {
                         *log_display = remaining.to_string();
                     }
                 }
+
                 writeln!(log_display, "{}", &s).ok();
+
+                // TODO need to have caps on log-size, or compressor
                 writeln!(log, "{}", &s).ok();
                 *status = s;
             } else {

@@ -12,6 +12,7 @@ mod events;
 pub use events::Event;
 pub use events::EventRuntime;
 pub use events::Listen;
+pub use events::Sequence;
 
 mod nodes;
 pub use nodes::Node;
@@ -22,6 +23,7 @@ pub use process::Process;
 pub use process::Remote;
 
 mod thunks;
+pub use thunks::Config;
 pub use thunks::OpenFile;
 pub use thunks::OpenDir;
 pub use thunks::StatusUpdate;

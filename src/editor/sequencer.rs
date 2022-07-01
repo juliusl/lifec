@@ -1,4 +1,5 @@
 use specs::{Entities, Join, ReadStorage, System, WriteStorage};
+
 use super::{NextButton, StartButton};
 
 /// Generates a next button component for all start buttons

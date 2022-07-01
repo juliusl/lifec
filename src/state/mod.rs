@@ -5,14 +5,13 @@ use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, Entity};
-use tokio::io::{AsyncBufRead, AsyncReadExt, AsyncBufReadExt};
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     fmt::Display,
     fs,
     hash::{Hash, Hasher},
     path::PathBuf,
-    str::from_utf8, error::Error, io::BufReader,
+    str::from_utf8,
 };
 
 /// Attribute graph is a component that indexes attributes for an entity
@@ -713,24 +712,22 @@ impl AttributeGraph {
 
     /// Finds an int value of an attribute
     pub fn find_int(&self, with_name: impl AsRef<str>) -> Option<i32> {
-        self.find_attr_value(with_name).and_then(|n| {
-            if let Value::Int(int) = n {
-                Some(*int)
-            } else {
-                None
-            }
+        self.find_attr_value(with_name).and_then(|n| match n {
+            Value::Int(int)
+            | Value::IntRange(int, _, _) => Some(*int),
+            _ => None
         })
     }
 
     /// Finds a float value of an attribute
     pub fn find_float(&self, with_name: impl AsRef<str>) -> Option<f32> {
-        self.find_attr_value(with_name).and_then(|n| {
-            if let Value::Float(float) = n {
-                Some(*float)
-            } else {
-                None
+        self.find_attr_value(with_name).and_then(|n|
+            match n {
+                Value::Float(float) 
+                | Value::FloatRange(float, _, _) => Some(*float),
+                _ => None
             }
-        })
+        )
     }
 
     /// Finds the mut value of an attribute by name that is owned by `self.entity`.

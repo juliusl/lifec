@@ -1,4 +1,3 @@
-
 use crate::editor::*;
 use crate::plugins::*;
 use atlier::system::Extension;
@@ -25,6 +24,66 @@ where
         List::<Item>(|context, item, world, ui| {
             context.as_mut().edit_attr_table(ui);
             item.on_ui(world, ui);
+        })
+    }
+
+    pub fn edit_block_view() -> Self {
+        List::<Item>(|context, item, world, ui| {
+            let thunk_symbol = context
+                .block
+                .as_ref()
+                .find_text("thunk_symbol")
+                .unwrap_or("entity".to_string());
+
+            if ui.collapsing_header(
+                format!(
+                    "{} {} - {}",
+                    thunk_symbol,
+                    context.block.block_name,
+                    context.as_ref().hash_code()
+                ),
+                TreeNodeFlags::DEFAULT_OPEN,
+            ) {
+                let hash = context
+                    .as_ref()
+                    .find_attr("item::index")
+                    .and_then(|h| h.transient())
+                    .and_then(|(_, v)| match v {
+                        Value::Int(v) => Some(*v),
+                        _ => None,
+                    })
+                    .unwrap_or_default();
+
+                ui.input_text(format!("block_name {}", context.as_ref().entity()), &mut context.block.block_name).build();
+                let mut current_id = context.as_ref().entity();
+
+                let clone = context.as_ref().clone();
+                for attr in context.as_mut().iter_mut_attributes() {
+                    if current_id != attr.id() {
+                        ui.new_line();
+
+                        if let Some(next_block) = clone.find_imported_graph(attr.id()) {
+                            let thunk_symbol =
+                                next_block.find_text("thunk_symbol").unwrap_or_default();
+                            let block_symbol =
+                                next_block.find_text("block_symbol").unwrap_or_default();
+                            ui.text(format!("{} - {}", thunk_symbol, block_symbol));
+                        }
+
+                        current_id = attr.id();
+                    }
+
+                    if attr.is_stable() {
+                        attr.edit_value(
+                            format!("{} {}:{:#04x}", attr.name(), attr.id(), hash as u16),
+                            ui,
+                        );
+                    }
+                }
+                item.on_ui(world, ui);
+                ui.text(format!("stable: {}", context.as_ref().is_stable()));
+                ui.separator();
+            }
         })
     }
 
@@ -79,9 +138,18 @@ where
         let mut contexts = app_world.write_component::<ThunkContext>();
         let mut items = app_world.write_component::<Item>();
 
+        let mut item_index = 0;
+
         for (context, item) in (&mut contexts, &mut items).join() {
             let List(layout) = self;
+            context
+                .as_mut()
+                .define("item", "index")
+                .edit_as(Value::Int(item_index));
+
             (layout)(context, item, app_world, ui);
+
+            item_index += 1;
         }
     }
 }

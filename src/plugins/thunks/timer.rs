@@ -22,18 +22,22 @@ impl Plugin<ThunkContext> for Timer {
         thunk_context.clone().task(|| {
             let mut tc = thunk_context.clone();
             async move {
-                let mut duration = 5;
+                let mut duration = 0.0;
                 if let Some(d) = tc.as_ref().find_int("duration") {
-                    tc.update_progress("duration found", 0.0).await;
-                    duration = d;
+                    tc.update_status_only("duration found").await;
+                    duration += d as f32;
+                }
+
+                if let Some(d_ms) = tc.as_ref().find_float("duration_ms") {
+                    tc.update_status_only("duration_ms found").await;
+                    duration += d_ms/1000.0;
                 }
 
                 let start = Instant::now();
-                let duration = duration as u64;
                 loop {
                     let elapsed = start.elapsed();
                     let progress =
-                        elapsed.as_secs_f32() / Duration::from_secs(duration).as_secs_f32();
+                        elapsed.as_secs_f32() / duration;
                     if progress < 1.0 {
                         tc.update_progress(format!("elapsed {} ms", elapsed.as_millis()), progress)
                             .await;

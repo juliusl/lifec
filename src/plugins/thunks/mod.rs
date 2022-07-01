@@ -31,6 +31,23 @@ pub struct Thunk(
     pub fn(&mut ThunkContext) -> Option<JoinHandle<ThunkContext>>,
 );
 
+/// Config for a thunk context
+#[derive(Component, Clone)]
+#[storage(DenseVecStorage)]
+pub struct Config
+(
+    /// config label
+    pub &'static str,
+    /// config fn
+    pub fn(&mut ThunkContext)
+);
+
+impl AsRef<Config> for Config {
+    fn as_ref(&self) -> &Config {
+        self
+    }
+}
+
 impl Thunk {
     pub fn from_plugin<P>() -> Self
     where
@@ -38,8 +55,6 @@ impl Thunk {
     {
         Self(P::symbol(), P::call_with_context)
     }
-
-
 
     /// deprecated? 
     pub fn show(&self, context: &mut ThunkContext, ui: &Ui) {

@@ -1,11 +1,11 @@
 use super::{Call, List, Task, unique_title};
 use crate::{
-    plugins::{Engine, Listen, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin},
+    plugins::{Engine, Listen, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence},
     Runtime
 };
 use atlier::system::Extension;
 use imgui::{Ui, Window};
-use specs::World;
+use specs::{World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
 pub struct RuntimeEditor {
@@ -20,6 +20,14 @@ impl RuntimeEditor {
 
     pub fn project(&self) -> &Project {
         &self.runtime.project
+    }
+
+    pub fn runtime(&self) -> &Runtime {
+        &self.runtime
+    }
+
+    pub fn runtime_mut(&mut self) -> &mut Runtime {
+        &mut self.runtime
     }
 }
 
@@ -135,7 +143,7 @@ impl RuntimeEditor {
                     self.edit_event_menu(app_world, ui);
                 });
 
-                List::<Task>::default().on_ui(app_world, ui);
+                List::<Task>::edit_block_view().on_ui(app_world, ui);
                 ui.new_line();
             });
     }
@@ -145,6 +153,8 @@ impl Extension for RuntimeEditor {
     fn configure_app_world(world: &mut specs::World) {
         List::<Task>::configure_app_world(world);
         Task::configure_app_world(world);
+
+        world.register::<Sequence>();
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {

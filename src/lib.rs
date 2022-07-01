@@ -1,6 +1,6 @@
 use atlier::system::App;
 use imgui::{ChildWindow, MenuItem, Ui, Window};
-use plugins::{Engine, Event, Plugin, Project, ThunkContext};
+use plugins::{Config, Engine, Event, Plugin, Project, ThunkContext};
 use specs::{Component, Entity, System, World, WorldExt};
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -136,6 +136,8 @@ pub struct Runtime {
     project: Project,
     /// Table for creating new event components
     create_event: BTreeMap<String, fn(&World, fn(&mut ThunkContext)) -> Option<Entity>>,
+    /// Table for thunk configurations
+    config: BTreeMap<String, fn(&mut ThunkContext)>,
     /// Table of broadcase receivers
     receivers: HashMap<String, tokio::sync::broadcast::Receiver<Entity>>,
 }
@@ -145,6 +147,7 @@ impl Default for Runtime {
         Self {
             project: Default::default(),
             create_event: BTreeMap::default(),
+            config: BTreeMap::default(),
             receivers: HashMap::default(),
         }
     }
@@ -156,6 +159,7 @@ impl Runtime {
         Self {
             project,
             create_event: BTreeMap::default(),
+            config: BTreeMap::default(),
             receivers: HashMap::default(),
         }
     }
@@ -203,7 +207,8 @@ impl Runtime {
 
     /// Subscribe to thunk contexts updates, with a subscriber key
     pub fn subscribe_with(&mut self, world: &World, with_key: impl AsRef<str>) {
-        self.receivers.insert(with_key.as_ref().to_string(), Event::subscribe(world));
+        self.receivers
+            .insert(with_key.as_ref().to_string(), Event::subscribe(world));
     }
 
     /// Install an engine into the runtime. An engine provides functions for creating new component instances.
@@ -216,6 +221,12 @@ impl Runtime {
         self.create_event.insert(event.to_string(), E::create::<P>);
 
         println!("install event: {}", event.to_string());
+    }
+
+    pub fn add_config(&mut self, config: Config) {
+        let Config(name, config_fn) = config;
+
+        self.config.insert(name.to_string(), config_fn);
     }
 
     /// Initialize and configure an event component and it's deps for a new entity, and insert into world.
@@ -232,6 +243,45 @@ impl Runtime {
         } else {
             None
         }
+    }
+
+    /// Initialize and configure an event component and it's deps for a new entity, and insert into world.
+    pub fn create_with(
+        &self,
+        world: &World,
+        event: &Event,
+        config: impl AsRef<Config>,
+    ) -> Option<Entity> {
+        let key = event.to_string();
+
+        if let Some(create_fn) = self.create_event.get(&key) {
+            (create_fn)(world, config.as_ref().1.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Initialize and configure an event component and it's deps for a new entity, and insert into world.
+    pub fn create_with_name(
+        &self,
+        world: &World,
+        event: &Event,
+        config_name: &'static str,
+    ) -> Option<Entity> {
+        if let Some(config) = self.config.get(config_name) {
+            self.create_with(world, event, Config(config_name, *config))
+        } else {
+            None
+        }
+    }
+
+    /// Creates a new event, returns an entity if successful
+    pub fn create_event<E, P>(&self, world: &World, config_name: &'static str) -> Option<Entity>
+    where
+        E: Engine,
+        P: Plugin<ThunkContext> + Component + Send + Default,
+    {
+        self.create_with_name(world, &E::event::<P>(), config_name)
     }
 
     /// Schedule a new event on this runtime, returns an entity if the event was created/started
