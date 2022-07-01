@@ -1,21 +1,21 @@
-``` cargo_run process
-add config .text cargo_run
-```
-
-``` timer_1 timer
-add duration .int 5
-```
-
+# This an example sequence
 ``` test call
-add repeat .enable
+
+# Example 1 - choose config w/ edit
 define timer1 timer
-edit timer1::timer .text timer_1
+edit timer1::timer .text timer_simple
 
+# Example 2 - choose config in block
 define timer2 timer
-edit timer2::timer .text timer_1
 
+# Example 3 - choose a different config
 define timer3 timer
-edit timer3::timer .text timer_1
+edit timer3::timer .text timer_complex
 
-define cargo_run process
+# Enables looping this sequence
+add repeat .enable
+```
+
+``` timer2 timer
+add config .text timer_simple
 ```

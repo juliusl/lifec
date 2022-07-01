@@ -38,16 +38,18 @@ impl Extension for Demo {
 fn main() {
     if let Some(file) = AttributeGraph::load_from_file("drag_drop_example.runmd") {
         let mut demo = Demo::default();
-        *demo.0.project_mut().as_mut() = file;
-        let demo_project = demo.0.project_mut().reload_source();
-        *demo.0.project_mut() = demo_project;
-
-        demo.0.runtime_mut().add_config(Config("timer_1", |tc| {
-            tc.block.block_name = unique_title("timer_1");
-            tc.as_mut().with_int_range("duration", &[2, 0, 10]);
+        demo.0.as_mut().add_config(Config("timer_simple", |tc| {
+            tc.block.block_name = unique_title("simple");
+            tc.as_mut().with_int_range("duration", &[1, 0, 10]);
         }));
 
-        demo.0.runtime_mut().add_config(Config("cargo_run", |tc| {
+        demo.0.as_mut().add_config(Config("timer_complex", |tc| {
+            tc.block.block_name = unique_title("complex");
+            tc.as_mut().with_int_range("duration", &[1, 0, 10]);
+            tc.as_mut().with_float_range("duration_ms", &[0.0, 0.0, 1000.0]);
+        }));
+
+        demo.0.as_mut().add_config(Config("cargo_run", |tc| {
             tc.block.block_name = unique_title("cargo_run");
             tc.as_mut().with_text("command", "cargo run .");
         }));

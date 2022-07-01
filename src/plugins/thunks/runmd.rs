@@ -1,8 +1,13 @@
+use specs::Component;
+use specs::storage::HashMapStorage;
+
 use crate::{plugins::{Plugin, Project}, AttributeGraph};
 
 use super::ThunkContext;
 
 /// The Runmd plugin reads .runmd content into block symbols for the current content
+#[derive(Component, Default)]
+#[storage(HashMapStorage)]
 pub struct Runmd;
 
 impl Plugin<ThunkContext> for Runmd {
@@ -18,28 +23,26 @@ impl Plugin<ThunkContext> for Runmd {
         context.clone().task(||{
             let mut tc = context.clone();
             async {
-                if let Some(file_block) = tc.block.get_block("file") {
-                    if let Some(file_ext) = file_block.find_text("file_ext") {
-                        if file_ext == "runmd" {
-                            if let Some(content) = file_block.find_binary("content") {
-                                  let graph = AttributeGraph::from(content);
-                                  let project = Project::from(graph);
+                let project = Project::from(tc.as_ref().clone());
 
-                                  if let Some(block) = project.find_block(&tc.block.block_name)  {
-                                        for (block_symbol, graph) in block.to_blocks() {
-                                            if !tc.block.add_block(&block_symbol, |g|{
-                                                *g = graph;
-                                            }) {
-                                                tc.block.replace_block(&block, block_symbol);
-                                            }
-                                        }
-                                  }
-                            }
-                        }
+                for (block_name, block) in project.iter_block() {
+                    let content = block.get_block("file")
+                        .filter(|b| b.find_text("file_ext").filter(|ext| ext != "runmd").is_some())
+                        .and_then(|file_block| {
+                            file_block.find_binary("content")
+                        });
+
+                    if let Some(content) = content {
+                        let graph = AttributeGraph::from(content);
+                        let project = Project::from(graph);
+                        tc.as_mut()
+                            .add_message(
+                                block_name, 
+                                "project", 
+                                project.transpile().unwrap_or_default());
                     }
                 }
 
-                // TODO can handle some other cases, such as file_path, etc
                 Some(tc)
             }
         })
