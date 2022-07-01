@@ -29,7 +29,7 @@ impl From<Vec<u8>> for AttributeGraph {
         if let Some(content) = String::from_utf8(vec).ok() {
             graph.batch_mut(content).ok();
         }
-        
+
         graph
     }
 }
@@ -71,6 +71,13 @@ impl AttributeGraph {
     /// ends block mode, and puts the graph back to its initial root
     pub fn root_mut(&mut self) -> &mut Self {
         self.dispatch_mut("```")
+            .expect("should be able to end block mode");
+        self
+    }
+
+    /// ends block mode, and puts the graph back to its initial root
+    pub fn root(&self) -> &Self {
+        self.dispatch("```")
             .expect("should be able to end block mode");
         self
     }
@@ -384,8 +391,6 @@ impl AttributeGraph {
         //     }
         //     token.end()
         // }
-   
-   
     }
 
     /// This method shows an attribute table
@@ -473,9 +478,8 @@ impl AttributeGraph {
         }
     }
 
-
-       /// This method shows an attribute table
-       pub fn edit_attr_short_table(&mut self, ui: &imgui::Ui) {
+    /// This method shows an attribute table
+    pub fn edit_attr_short_table(&mut self, ui: &imgui::Ui) {
         if let Some(token) = ui.begin_table_with_flags(
             format!("Attribute Graph Table {}", self.entity),
             3,
@@ -497,7 +501,7 @@ impl AttributeGraph {
                             0 => a.name().cmp(b.name()),
                             1 => a.value().cmp(b.value()),
                             2 => a.is_stable().cmp(&b.is_stable()),
-                            _ => a.cmp(b)
+                            _ => a.cmp(b),
                         };
                         if let Some(dir) = spec.sort_direction() {
                             match dir {
@@ -546,7 +550,6 @@ impl AttributeGraph {
             token.end();
         }
     }
-
 
     /// Copies all the values from other graph
     pub fn copy(&mut self, other: &AttributeGraph) {
@@ -713,21 +716,17 @@ impl AttributeGraph {
     /// Finds an int value of an attribute
     pub fn find_int(&self, with_name: impl AsRef<str>) -> Option<i32> {
         self.find_attr_value(with_name).and_then(|n| match n {
-            Value::Int(int)
-            | Value::IntRange(int, _, _) => Some(*int),
-            _ => None
+            Value::Int(int) | Value::IntRange(int, _, _) => Some(*int),
+            _ => None,
         })
     }
 
     /// Finds a float value of an attribute
     pub fn find_float(&self, with_name: impl AsRef<str>) -> Option<f32> {
-        self.find_attr_value(with_name).and_then(|n|
-            match n {
-                Value::Float(float) 
-                | Value::FloatRange(float, _, _) => Some(*float),
-                _ => None
-            }
-        )
+        self.find_attr_value(with_name).and_then(|n| match n {
+            Value::Float(float) | Value::FloatRange(float, _, _) => Some(*float),
+            _ => None,
+        })
     }
 
     /// Finds the mut value of an attribute by name that is owned by `self.entity`.
@@ -2036,7 +2035,6 @@ fn test_attribute_graph_dispatcher() {
     let next = next.next();
     println!("{:?}", next);
 
-
     let test_messages = r#"
     ```
     # <- Usually this is a comment
@@ -2076,9 +2074,7 @@ fn test_attribute_graph_dispatcher() {
 
     for message in test_messages.trim().split("\n") {
         match graph.dispatch_mut(message) {
-            Ok(_) => {
-                
-            },
+            Ok(_) => {}
             Err(err) => assert!(false, "{:?}", err),
         }
     }
@@ -2119,16 +2115,12 @@ fn test_attribute_graph_dispatcher() {
     );
 
     assert_eq!(
-        Some(&Value::TextBuffer(
-            "testing #file.txt".to_string()
-        )),
+        Some(&Value::TextBuffer("testing #file.txt".to_string())),
         graph.find_attr_value("File.txt")
     );
 
     assert_eq!(
-        Some(&Value::TextBuffer(
-            "testing #test_.attr2".to_string()
-        )),
+        Some(&Value::TextBuffer("testing #test_.attr2".to_string())),
         graph.find_attr_value("test_.attr2")
     );
 
@@ -2352,7 +2344,7 @@ pub enum AttributeGraphEvents {
     Comment,
     /// Usage:
     /// add test_attr .TEXT remaining text is the value
-    /// 
+    ///
     #[token("```")]
     BlockDelimitter,
     // Logos requires one token variant to handle errors,

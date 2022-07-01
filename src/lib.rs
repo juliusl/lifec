@@ -131,13 +131,16 @@ pub trait RuntimeState:
     }
 }
 
+pub type CreateFn = fn(&World, fn(&mut ThunkContext)) -> Option<Entity>;
+pub type ConfigFn =  fn(&mut ThunkContext);
+
 /// Runtime provides access to the underlying project, and function tables for creating components
 pub struct Runtime {
     project: Project,
     /// Table for creating new event components
-    engine_plugin: BTreeMap<String, fn(&World, fn(&mut ThunkContext)) -> Option<Entity>>,
+    engine_plugin: BTreeMap<String, CreateFn>,
     /// Table for thunk configurations
-    config: BTreeMap<String, fn(&mut ThunkContext)>,
+    config: BTreeMap<String, ConfigFn>,
     /// Table of broadcase receivers
     receivers: HashMap<String, tokio::sync::broadcast::Receiver<Entity>>,
 }
@@ -164,53 +167,85 @@ impl Runtime {
         }
     }
 
+    pub fn find_config_and_create(&self, config_name: impl AsRef<str>, world: &World, create_event: CreateFn) -> Option<Entity> {
+        self.config
+        .get(config_name.as_ref())
+        .and_then(|c| {
+            create_event(world, *c)
+        })
+    }
+
+    pub fn read_block(&self, 
+        plugin_name: impl AsRef<str>, 
+        root: &AttributeGraph,
+         world: &World,
+          create_event: CreateFn) -> Vec<Entity> {
+        let mut created_events = vec![];
+        let blocks = self.project.clone();
+
+        for (block_name, value) in root.find_symbol_values(&plugin_name.as_ref()) {
+            match value {
+                atlier::system::Value::Empty => {
+                    eprintln!("creating new engine {} {}", block_name, plugin_name.as_ref());
+                    let name = block_name.trim_end_matches(plugin_name.as_ref()).trim_end_matches("::");
+                    
+                    eprintln!("block_name: {}", name);
+                    println!("{:#?}", blocks);
+                    if let Some(block) = blocks.find_block(name) {
+                        println!("found block {}", block.block_name);
+                        // 
+                        let config = block
+                            .get_block(plugin_name.as_ref())
+                            .and_then(|b| b.find_text("config"));
+                        if let Some(config_name) = config {
+                            if let Some(created) = self.find_config_and_create(config_name, world, create_event) {
+                                created_events.push(created);
+                            }
+                        }
+                    }
+                },
+                atlier::system::Value::TextBuffer(config_name)
+                | atlier::system::Value::Symbol(config_name) => {
+                    if let Some(created) = self.find_config_and_create(config_name, world, create_event) {
+                        created_events.push(created);
+                    }
+                },
+                _ => {}
+            }
+        }
+
+        created_events
+    }
+
     pub fn read_project(&mut self, world: &World) {
         let blocks = self.project.clone();
-        let root = self.project.as_mut().root_mut();
+        let root = self.project.as_ref().root();
 
         for (key, create_event) in self.engine_plugin.iter() {
             let mut installed_plugin = key.split_whitespace();
             match (installed_plugin.next(), installed_plugin.next()) {
                 (Some(event_name), Some(plugin_name)) => {
-                    eprintln!("reading plugin instances {} {}", event_name, plugin_name);
+                    eprintln!("Processing plugins from project {} {}", event_name, plugin_name);
+                    self.read_block(plugin_name, root, world, *create_event);
 
-                    for (block_name, value) in root.find_symbol_values(plugin_name) {
-                        match value {
-                            atlier::system::Value::Empty => {
-                                eprintln!("creating new engine {} {}", block_name, plugin_name);
-                                let name = block_name.trim_end_matches(plugin_name).trim_end_matches("::");
-                                eprintln!("block_name: {}", name);
-
-                                println!("{:#?}", blocks);
-
-
-                                if let Some(block) = blocks.find_block(name) {
-                                    println!("found block {}", block.block_name);
-                                    if let Some(config_name) = block
-                                        .get_block(plugin_name)
-                                        .and_then(|b| b.find_text("config")) {
-                                        self.config.get(&config_name).and_then(|c| {
-                                            create_event(world, *c)
-                                        });
-                                    }
+                    eprintln!("Processing sequences from project");
+                    for (block_name, block) in blocks.iter_block() {
+                        eprintln!("Sequence name {}", block_name);
+                        if let Some(calls_root) = block.get_block("call") {
+                            let created = self.read_block(plugin_name, &calls_root, world, *create_event);
+                            let mut sequence = Sequence::from(created);
+                            
+                            if let Some(first) = sequence.next() {
+                                if let Some(true) = calls_root.is_enabled("repeat") {
+                                    sequence.set_cursor(first);
                                 }
-                            },
-                            atlier::system::Value::TextBuffer(_) => todo!(),
-                            atlier::system::Value::Symbol(_) => todo!(),
-                            _ => {}
+                                world.write_component::<Sequence>().insert(first, sequence).ok();
+                            }
                         }
                     }
+                    
                 }
                 _ => continue,
-            }
-        }
-
-        for (block_name, block) in blocks.iter_block() {
-            if let Some(calls) = block.get_block("call") {
-                let sequence = Sequence::default();
-
-
-            
             }
         }
     }
