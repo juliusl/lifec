@@ -176,25 +176,26 @@ impl Runtime {
     }
 
     pub fn read_block(&self, 
-        plugin_name: impl AsRef<str>, 
+        plugin_symbol: impl AsRef<str>, 
         root: &AttributeGraph,
-         world: &World,
-          create_event: CreateFn) -> Vec<Entity> {
+        world: &World,
+        create_event: CreateFn) -> Vec<Entity> {
         let mut created_events = vec![];
         let blocks = self.project.clone();
 
-        for (block_name, value) in root.find_symbol_values(&plugin_name.as_ref()) {
+        for (block_address, value) in root.find_symbol_values(&plugin_symbol.as_ref()) {
             match value {
+                // if transient is empty, find the block from the block_address, which is {block_name}::{block_symbol}
                 atlier::system::Value::Empty => {
-                    eprintln!("creating new engine {} {}", block_name, plugin_name.as_ref());
-                    let name = block_name.trim_end_matches(plugin_name.as_ref()).trim_end_matches("::");
+                    eprintln!("creating new engine {} {}", block_address, plugin_symbol.as_ref());
+                    let name = block_address.trim_end_matches(plugin_symbol.as_ref()).trim_end_matches("::");
                     
                     eprintln!("block_name: {}", name);
                     if let Some(block) = blocks.find_block(name) {
                         println!("found block {}", block.block_name);
                         // 
                         let config = block
-                            .get_block(plugin_name.as_ref())
+                            .get_block(plugin_symbol.as_ref())
                             .and_then(|b| b.find_text("config"));
                         if let Some(config_name) = config {
                             if let Some(created) = self.find_config_and_create(config_name, world, create_event) {

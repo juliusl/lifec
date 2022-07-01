@@ -19,10 +19,6 @@ impl Extension for Demo {
         if let Some(Value::Bool(show_demo_window)) = self.0.project_mut().as_mut().find_attr_value_mut("show_demo_window") {
             ui.show_demo_window(show_demo_window);
         }
-
-        if ui.button("read project") {
-            self.0.runtime_mut().read_project(app_world);
-        }
     }
 
     fn on_window_event(&'_ mut self, app_world: &World, event: &'_ WindowEvent<'_>) {
