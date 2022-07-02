@@ -6,7 +6,7 @@ use tokio::fs;
 use crate::plugins::*;
 use specs::storage::DenseVecStorage;
 
-use super::ThunkContext;
+use super::{ThunkContext, CancelToken};
 
 /// This component facilitates bringing file content into the system
 /// The listen trait converts completed transfers into file blocks, i.e.
@@ -49,8 +49,8 @@ impl Plugin<ThunkContext> for OpenFile {
         "Open and reads a file to a string, and then imports to a binary attribute."
     }
 
-    fn call_with_context(context: &mut ThunkContext) -> Option<tokio::task::JoinHandle<ThunkContext>> {
-        context.clone().task(||{
+    fn call_with_context(context: &mut ThunkContext) -> Option<(tokio::task::JoinHandle<ThunkContext>, CancelToken)> {
+        context.clone().task(|_|{
             let mut tc = context.clone();
             async {            
                 let start = Instant::now();

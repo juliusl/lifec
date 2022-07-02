@@ -29,14 +29,16 @@ impl BlockContext {
     /// Converts self into vec of blocks
     pub fn to_blocks(&self) -> Vec<(String, AttributeGraph)> {
         let clone = self.clone();
-        self.block_symbols.iter().filter_map(|b| {
-            if let Some(block) = clone.get_block(b) {
-                Some((b.to_string(), block))
-            } else {
-                None
-            }  
-        })
-        .collect()
+        self.block_symbols
+            .iter()
+            .filter_map(|b| {
+                if let Some(block) = clone.get_block(b) {
+                    Some((b.to_string(), block))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     pub fn transpile_blocks(blocks: Vec<(String, BlockContext)>) -> Result<String, Error> {
@@ -130,7 +132,7 @@ impl BlockContext {
     ) -> bool {
         if let Some(mut block) = self.get_block(block_symbol) {
             for attr in block.iter_attributes() {
-                self.as_mut().remove(attr); 
+                self.as_mut().remove(attr);
             }
             update(&mut block);
             self.as_mut().merge(&block);
@@ -190,7 +192,7 @@ impl BlockContext {
             match self.transpile_block(symbol) {
                 Ok(block_runmd) => {
                     writeln!(src, "{}", block_runmd)?;
-                },
+                }
                 Err(err) => return Err(err),
             }
         }
@@ -208,16 +210,10 @@ impl BlockContext {
 
                 if attr.is_stable() {
                     Self::transpile_value(&mut src, "add", attr.name(), attr.value())?;
-                } else {
-                    let symbols: Vec<&str> = attr.name().split("::").collect();
-                    let a = symbols.get(0);
-                    let b = symbols.get(1);
-
-                    if let (Some(a), Some(b)) = (a, b) {
-                        writeln!(src, "define {} {}", a, b)?; 
-                        if let Some((name, value)) = attr.transient() {
-                            Self::transpile_value(&mut src, "edit", name, value)?;
-                        }
+                } else if let Some((a, b)) = attr.name().split_once("::") {
+                    let definition = format!("{} {}", a, b);
+                    if let Some((_, value)) = attr.transient() {
+                        Self::transpile_value(&mut src, "define", definition, value)?;
                     }
                 }
             }
@@ -234,21 +230,21 @@ impl BlockContext {
     ) -> Result<(), Error> {
         match value {
             atlier::system::Value::Empty => {
-                writeln!(src, "{} {} .EMPTY", event.as_ref(), name.as_ref())?;
+                writeln!(src, "{} {} .empty", event.as_ref(), name.as_ref())?;
             }
             atlier::system::Value::Bool(val) => {
-                writeln!(src, "{} {} .BOOL {}", event.as_ref(), name.as_ref(), val)?;
+                writeln!(src, "{} {} .bool {}", event.as_ref(), name.as_ref(), val)?;
             }
             atlier::system::Value::TextBuffer(text) => {
-                writeln!(src, "{} {} .TEXT {}", event.as_ref(), name.as_ref(), text)?;
+                writeln!(src, "{} {} .text {}", event.as_ref(), name.as_ref(), text)?;
             }
             atlier::system::Value::Int(val) => {
-                writeln!(src, "{} {} .INT {}", event.as_ref(), name.as_ref(), val)?;
+                writeln!(src, "{} {} .int {}", event.as_ref(), name.as_ref(), val)?;
             }
             atlier::system::Value::IntPair(val1, val2) => {
                 writeln!(
                     src,
-                    "{} {} .INT_PAIR {}, {}",
+                    "{} {} .int_pair {}, {}",
                     event.as_ref(),
                     name.as_ref(),
                     val1,
@@ -258,7 +254,7 @@ impl BlockContext {
             atlier::system::Value::IntRange(val1, val2, val3) => {
                 writeln!(
                     src,
-                    "{} {} .INT_RANGE {}, {}, {}",
+                    "{} {} .int_range {}, {}, {}",
                     event.as_ref(),
                     name.as_ref(),
                     val1,
@@ -267,7 +263,7 @@ impl BlockContext {
                 )?;
             }
             atlier::system::Value::Float(val) => {
-                writeln!(src, "{} {} .FLOAT {}", event.as_ref(), name.as_ref(), val)?;
+                writeln!(src, "{} {} .float {}", event.as_ref(), name.as_ref(), val)?;
             }
             atlier::system::Value::FloatPair(val1, val2) => {
                 writeln!(
@@ -293,7 +289,7 @@ impl BlockContext {
             atlier::system::Value::BinaryVector(bin) => {
                 writeln!(
                     src,
-                    "{} {} .BINARY_VECTOR {}",
+                    "{} {} .bin {}",
                     event.as_ref(),
                     name.as_ref(),
                     base64::encode(bin)
@@ -326,7 +322,7 @@ impl BlockContext {
         let block_name = self.block_name.clone();
         if let Some(token) = ui.begin_menu("File") {
             if let Some(token) = ui.begin_menu("Blocks") {
-                ui.menu("Transpile", ||{ 
+                ui.menu("Transpile", || {
                     if MenuItem::new(format!("Transpile {0} to {0}.runmd", block_name)).build(ui) {
                         let mut transpiled = self.clone();
                         transpiled.add_block("file", |f| {
@@ -340,13 +336,13 @@ impl BlockContext {
                         });
                     }
                 });
-          
-                ui.menu("Debug", ||{
+
+                ui.menu("Debug", || {
                     if MenuItem::new(format!("Dump {}", self.block_name)).build(ui) {
                         println!("{:#?}", self.as_ref());
                     }
                 });
-          
+
                 if self.has_pending_events() {
                     if MenuItem::new(format!("Apply events for {}", self.block_name)).build(ui) {
                         self.as_mut().apply_events();
@@ -461,7 +457,9 @@ impl BlockContext {
     }
 
     /// creates an iter on all the block attributes skipping block specific attrs
-    pub fn iter_block_attrs_mut(block: &mut AttributeGraph) -> impl Iterator<Item = &mut Attribute> {
+    pub fn iter_block_attrs_mut(
+        block: &mut AttributeGraph,
+    ) -> impl Iterator<Item = &mut Attribute> {
         block
             .iter_mut_attributes()
             .filter(|a| {
@@ -563,7 +561,7 @@ add debug_out .BOOL true
 #[test]
 fn test_event() {
     use crate::RuntimeDispatcher;
-    
+
     let mut sh_test = AttributeGraph::from(0);
     let sh_test_test = r#"
     ``` sh_test publish
@@ -580,24 +578,28 @@ fn test_event() {
     assert!(sh_test.batch_mut(sh_test_test).is_ok());
 
     let mut sh_test = Project::from(sh_test);
-    sh_test.as_mut().add_event("connect", r#"
+    sh_test.as_mut().add_event(
+        "connect",
+        r#"
     ``` println accept
     from sh_test publish command
     ```
-    "#);
+    "#,
+    );
 
     if let Some(transpiled) = sh_test.transpile().ok() {
         let mut test_sh_test = AttributeGraph::from(0);
         assert!(test_sh_test.batch_mut(transpiled).is_ok());
         test_sh_test.apply_events();
-        
+
         let mut project = Project::from(test_sh_test);
         println!("{:#?}", project);
-    
-        let command = project.find_block_mut("println")
+
+        let command = project
+            .find_block_mut("println")
             .and_then(|println| println.get_block("accept"))
             .and_then(|a| a.find_text("command"));
-    
+
         assert_eq!(Some("sh ./test.sh".to_string()), command);
     } else {
         assert!(false, "should work");
@@ -609,12 +611,15 @@ fn test_event() {
     println!("{}", sh_test.transpile().expect("works"));
 
     let mut test_sh_test = AttributeGraph::from(0);
-    assert!(test_sh_test.batch_mut(sh_test.transpile().expect("works")).is_ok());
-    
+    assert!(test_sh_test
+        .batch_mut(sh_test.transpile().expect("works"))
+        .is_ok());
+
     let mut project = Project::from(test_sh_test);
     println!("{:#?}", project);
 
-    let command = project.find_block_mut("println")
+    let command = project
+        .find_block_mut("println")
         .and_then(|println| println.get_block("accept"))
         .and_then(|a| a.find_text("command"));
 

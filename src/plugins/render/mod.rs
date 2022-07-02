@@ -4,6 +4,7 @@ use specs::storage::DenseVecStorage;
 use specs::{Component, Join, ReadStorage, RunNow, System, World, WriteStorage};
 use tokio::task::JoinHandle;
 
+use super::thunks::CancelToken;
 use super::{Plugin, Thunk};
 use crate::AttributeGraph;
 
@@ -94,7 +95,7 @@ where
         "render"
     }
 
-    fn call_with_context(_: &mut Context) -> Option<JoinHandle<Context>> {
+    fn call_with_context(_: &mut Context) -> Option<(JoinHandle<Context>, CancelToken)> {
         None
     }
 }

@@ -1,3 +1,4 @@
+use crate::plugins::thunks::CancelToken;
 use crate::plugins::{Plugin, ThunkContext};
 use chrono::{Local, Utc};
 use specs::storage::DenseVecStorage;
@@ -21,8 +22,8 @@ impl Plugin<ThunkContext> for Remote {
 
     fn call_with_context(
         context: &mut ThunkContext,
-    ) -> Option<tokio::task::JoinHandle<ThunkContext>> {
-        context.clone().task(|| {
+    ) -> Option<(tokio::task::JoinHandle<ThunkContext>, CancelToken)> {
+        context.clone().task(|_| {
             let log = context.clone();
             let mut tc = context.clone();
             let child_handle = context.handle().clone();

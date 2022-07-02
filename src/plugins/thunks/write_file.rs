@@ -2,7 +2,7 @@ use specs::Component;
 use crate::{plugins::*};
 use specs::storage::DenseVecStorage;
 
-use super::ThunkContext;
+use super::{ThunkContext, CancelToken};
 
 #[derive(Component, Default)]
 #[storage(DenseVecStorage)]
@@ -17,8 +17,8 @@ impl Plugin<ThunkContext> for WriteFile {
         "Writes a file_block to the path specified by file_dst."
     }
 
-    fn call_with_context(context: &mut ThunkContext) -> Option<JoinHandle<ThunkContext>> {
-        context.clone().task(|| {
+    fn call_with_context(context: &mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
+        context.clone().task(|_| {
             let mut tc = context.clone();
             async {
                 if let Some(file_block) = tc.block.get_block("file") {

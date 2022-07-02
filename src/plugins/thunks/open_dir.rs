@@ -10,7 +10,7 @@ use crate::{
 };
 use specs::storage::DenseVecStorage;
 
-use super::ThunkContext;
+use super::{ThunkContext, CancelToken};
 
 #[derive(Component, Default)]
 #[storage(DenseVecStorage)]
@@ -60,8 +60,8 @@ impl Plugin<ThunkContext> for OpenDir {
 
     fn call_with_context(
         context: &mut ThunkContext,
-    ) -> Option<tokio::task::JoinHandle<ThunkContext>> {
-        context.clone().task(|| {
+    ) -> Option<(tokio::task::JoinHandle<ThunkContext>, CancelToken)> {
+        context.clone().task(|_| {
             let mut tc = context.clone();
 
             async move {
@@ -91,7 +91,7 @@ impl Plugin<ThunkContext> for OpenDir {
                                             let file_src = path_buf.to_str().unwrap_or_default();
                                             let mut work_file = tc.clone();
                                             work_file.as_mut().with_text("file_src", file_src);
-                                            if let Some(handle) =
+                                            if let Some((handle, ..)) =
                                                 OpenFile::call_with_context(&mut work_file)
                                             {
                                                 progress += 0.01;

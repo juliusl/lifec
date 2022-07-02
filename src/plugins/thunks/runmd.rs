@@ -3,7 +3,7 @@ use specs::storage::HashMapStorage;
 
 use crate::{plugins::{Plugin, Project}, AttributeGraph};
 
-use super::ThunkContext;
+use super::{ThunkContext, CancelToken};
 
 /// The Runmd plugin reads .runmd content into block symbols for the current content
 #[derive(Component, Default)]
@@ -19,8 +19,8 @@ impl Plugin<ThunkContext> for Runmd {
         "Converts a .runmd file into block symbols, then updates the current block."
     }
 
-    fn call_with_context(context: &mut ThunkContext) -> Option<tokio::task::JoinHandle<ThunkContext>> {
-        context.clone().task(||{
+    fn call_with_context(context: &mut ThunkContext) -> Option<(tokio::task::JoinHandle<ThunkContext>, CancelToken)> {
+        context.clone().task(|_|{
             let mut tc = context.clone();
             async {
                 let project = Project::from(tc.as_ref().clone());

@@ -20,7 +20,7 @@ pub use timer::Timer;
 mod runmd;
 pub use runmd::Runmd;
 
-use tokio::{runtime::Handle, sync::mpsc::Sender, task::JoinHandle};
+use tokio::{runtime::Handle, sync::mpsc::Sender, task::JoinHandle, sync::oneshot::channel};
 use super::{BlockContext, Plugin};
 
 /// Thunk is a function that can be passed around for the system to call later
@@ -28,7 +28,7 @@ use super::{BlockContext, Plugin};
 #[storage(DenseVecStorage)]
 pub struct Thunk(
     pub &'static str,
-    pub fn(&mut ThunkContext) -> Option<JoinHandle<ThunkContext>>,
+    pub fn(&mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
 );
 
 /// Config for a thunk context
@@ -69,6 +69,20 @@ impl Thunk {
 /// StatusUpdate for stuff like progress bars
 pub type StatusUpdate = (Entity, f32, String);
 
+pub type CancelToken = tokio::sync::oneshot::Sender<()>;
+
+pub type CancelSource = tokio::sync::oneshot::Receiver<()>;
+
+#[derive(Component)]
+#[storage(DenseVecStorage)]
+pub struct CancelThunk(pub CancelToken);
+
+impl From<CancelToken> for CancelThunk {
+    fn from(token: CancelToken) -> Self {
+        Self(token)
+    }
+}
+
 /// ThunkContext provides common methods for updating the underlying state graph,
 /// in the context of a thunk. If async is enabled, then the context will have a handle to the tokio runtime.
 #[derive(Component, Default, Clone)]
@@ -103,7 +117,7 @@ impl ThunkContext {
 
     /// If async is enabled on the thunk context, this will spawn the task
     /// otherwise, this call will result in a no-op
-    pub fn task<F>(&self, task: impl FnOnce() -> F) -> Option<JoinHandle<ThunkContext>>
+    pub fn task<F>(&self, task: impl FnOnce(CancelSource) -> F) -> Option<(JoinHandle<ThunkContext>, CancelToken)>
     where
         F: Future<Output = Option<ThunkContext>> + Send + 'static,
     {
@@ -113,15 +127,19 @@ impl ThunkContext {
         } = self
         {
             let default_return = self.clone();
-            let future = (task)();
+            let (tx, cancel) = channel::<()>();
 
-            Some(handle.spawn(async {
-                if let Some(next) = future.await {
-                    next
-                } else {
-                    default_return
+            let task = (task)(cancel);
+            Some((handle.spawn(async {
+                match task.await {
+                    Some(next) => {
+                        next
+                    },
+                    None => {
+                        default_return
+                    },
                 }
-            }))
+            }), tx))
         } else {
             None
         }

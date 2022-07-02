@@ -1,7 +1,7 @@
-use super::{Plugin, ThunkContext};
+use super::{thunks::CancelToken, Plugin, ThunkContext};
 use chrono::{Local, Utc};
 use specs::{Component, HashMapStorage};
-use tokio::task::JoinHandle;
+use tokio::{select, task::JoinHandle};
 
 mod remote;
 pub use remote::Remote;
@@ -19,8 +19,10 @@ impl Plugin<ThunkContext> for Process {
         "Executes a new command w/ an OS process."
     }
 
-    fn call_with_context(context: &mut super::ThunkContext) -> Option<JoinHandle<ThunkContext>> {
-        context.clone().task(|| {
+    fn call_with_context(
+        context: &mut super::ThunkContext,
+    ) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
+        context.clone().task(|cancel_source| {
             let mut tc = context.clone();
             async move {
                 let command = tc
@@ -43,27 +45,37 @@ impl Plugin<ThunkContext> for Process {
                     tc.update_progress("```", 0.10).await;
                     tc.update_progress("# Running", 0.20).await;
                     let start_time = Some(Utc::now());
-                    match command_task.output().await {
-                        Ok(output) => {
-                            // Completed process, publish result
-                            tc.update_progress("# Finished, recording output", 0.30)
-                                .await;
-                            let timestamp_utc = Some(Utc::now().to_string());
-                            let timestamp_local = Some(Local::now().to_string());
-                            let elapsed = start_time
-                                .and_then(|s| Some(Utc::now() - s))
-                                .and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
-                            tc.as_mut()
-                                .with_int("code", output.status.code().unwrap_or_default())
-                                .with_binary("stdout", output.stdout)
-                                .with_binary("stderr", output.stderr)
-                                .with_text("timestamp_local", timestamp_local.unwrap_or_default())
-                                .with_text("timestamp_utc", timestamp_utc.unwrap_or_default())
-                                .with_text("elapsed", elapsed.unwrap_or_default());
-                        }
-                        Err(err) => {
-                            tc.update_progress(format!("# error {}", err), 0.0).await;
-                        }
+
+                    command_task.kill_on_drop(true);
+
+                    select! {
+                       output = command_task.output() => {
+                            match output {
+                                Ok(output) => {
+                                // Completed process, publish result
+                                tc.update_progress("# Finished, recording output", 0.30)
+                                    .await;
+                                let timestamp_utc = Some(Utc::now().to_string());
+                                let timestamp_local = Some(Local::now().to_string());
+                                let elapsed = start_time
+                                    .and_then(|s| Some(Utc::now() - s))
+                                    .and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
+                                tc.as_mut()
+                                    .with_int("code", output.status.code().unwrap_or_default())
+                                    .with_binary("stdout", output.stdout)
+                                    .with_binary("stderr", output.stderr)
+                                    .with_text("timestamp_local", timestamp_local.unwrap_or_default())
+                                    .with_text("timestamp_utc", timestamp_utc.unwrap_or_default())
+                                    .add_text_attr("elapsed", elapsed.unwrap_or_default());
+                                }
+                                Err(err) => {
+                                    tc.update_progress(format!("# error {}", err), 0.0).await;
+                                }
+                            }
+                       }
+                       _ = cancel_source => {
+                            tc.update_progress(format!("# cancelling"), 0.0).await;
+                       }
                     }
                 }
 

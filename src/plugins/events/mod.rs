@@ -13,9 +13,10 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::plugins::thunks::Config;
+use super::thunks::CancelThunk;
 use super::thunks::StatusUpdate;
 use super::{Plugin, Thunk, ThunkContext};
+use crate::plugins::thunks::Config;
 use specs::storage::VecStorage;
 
 mod listen;
@@ -156,11 +157,21 @@ impl<'a> System<'a> for EventRuntime {
         WriteStorage<'a, Event>,
         WriteStorage<'a, ThunkContext>,
         WriteStorage<'a, Sequence>,
+        WriteStorage<'a, CancelThunk>,
     );
 
     fn run(
         &mut self,
-        (runtime, status_sender, updated_sender, entities, mut events, mut contexts, mut sequences): Self::SystemData,
+        (
+            runtime,
+            status_sender,
+            updated_sender,
+            entities,
+            mut events,
+            mut contexts,
+            mut sequences,
+            mut cancel_tokens,
+        ): Self::SystemData,
     ) {
         let mut dispatch_queue = vec![];
 
@@ -217,56 +228,64 @@ impl<'a> System<'a> for EventRuntime {
                 let runtime_handle = runtime.handle().clone();
                 let mut context =
                     initial_context.enable_async(entity, runtime_handle, Some(status_sender));
-                
-                // Initializes and starts the task by spawning it on the runtime
-                *task = Some(runtime.spawn(async move {
-                    let Thunk(thunk_name, thunk) = thunk;
-                    // TODO it would be really helpful to add a macro for these status updates
-                    // OR could implement AsyncWrite, so you can do:
-                    // ``` writeln!(context, "# event received", &event_name, hash_code).await.ok();
-                    context
-                        .update_status_only(format!(
-                            "# event received: {}, {}",
-                            &event_name,
-                            initial_context.as_ref().hash_code()
-                        ))
-                        .await;
-                    if let Some(handle) = thunk(&mut context) {
-                        context
-                            .update_status_only(format!("# {} is being called", thunk_name))
-                            .await;
 
-                        match handle.await {
-                            Ok(mut updated_context) => {
-                                context
-                                    .update_status_only(format!("# completed: {}", &event_name))
-                                    .await;
-                                updated_context
-                                    .as_mut()
-                                    .add_text_attr("thunk_symbol", thunk_name);
-                                updated_context
+                let Thunk(thunk_name, thunk) = thunk;
+                // TODO it would be really helpful to add a macro for these status updates
+                // OR could implement AsyncWrite, so you can do:
+                // ``` writeln!(context, "# event received", &event_name, hash_code).await.ok();
+
+                if let Some((handle, cancel_token)) = thunk(&mut context) {
+                    match cancel_tokens.insert(entity, CancelThunk::from(cancel_token)) {
+                        Ok(existing) => {
+                            // If an existing cancel token existed, send a message now
+                            if let Some(CancelThunk(cancel)) = existing {
+                                eprintln!("existing cancel token existed");
+                                cancel.send(()).ok();
                             }
-                            Err(err) => {
-                                context.error(|g| {
-                                    g.with_text("event_runtime", format!("{}", err));
-                                });
+
+                            // Initializes and starts the task by spawning it on the runtime
+                            *task = Some(runtime.spawn(async move {
                                 context
                                     .update_status_only(format!(
-                                        "# event error: {}, {}",
-                                        &event_name, err
+                                        "# event received: {}, {}",
+                                        &event_name,
+                                        initial_context.as_ref().hash_code()
                                     ))
                                     .await;
-                                context
-                            }
+
+                                match handle.await {
+                                    Ok(mut updated_context) => {
+                                        context
+                                            .update_status_only(format!(
+                                                "# completed: {}",
+                                                &event_name
+                                            ))
+                                            .await;
+                                        updated_context
+                                            .as_mut()
+                                            .add_text_attr("thunk_symbol", thunk_name);
+                                        updated_context
+                                    }
+                                    Err(err) => {
+                                        context.error(|g| {
+                                            g.with_text("event_runtime", format!("{}", err));
+                                        });
+                                        context
+                                            .update_status_only(format!(
+                                                "# event error: {}, {}",
+                                                &event_name, err
+                                            ))
+                                            .await;
+                                        context
+                                    }
+                                }
+                            }));
                         }
-                    } else {
-                        // This means that the event completed without spawning any tasks
-                        context
-                            .update_status_only(format!("# completed: {}", &event_name))
-                            .await;
-                        context
+                        Err(_) => {}
                     }
-                }));
+                } else {
+                    eprintln!("Task didn't start, which means the thunk has already completed");
+                }
             }
         }
 

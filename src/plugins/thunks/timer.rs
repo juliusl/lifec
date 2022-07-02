@@ -4,6 +4,8 @@ use specs::storage::DenseVecStorage;
 use tokio::task::JoinHandle;
 use crate::plugins::*;
 
+use super::CancelToken;
+
 #[derive(Default, Component, Clone)]
 #[storage(DenseVecStorage)]
 pub struct Timer;
@@ -17,8 +19,8 @@ impl Plugin<ThunkContext> for Timer {
         "Create a timer w/ a duration of seconds."
     }
 
-    fn call_with_context(thunk_context: &mut ThunkContext) -> Option<JoinHandle<ThunkContext>> {
-        thunk_context.clone().task(|| {
+    fn call_with_context(thunk_context: &mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
+        thunk_context.clone().task(|_| {
             let mut tc = thunk_context.clone();
             async move {
                 let mut duration = 0.0;

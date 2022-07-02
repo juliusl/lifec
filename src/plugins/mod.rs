@@ -53,7 +53,7 @@ where
     fn symbol() -> &'static str;
 
     /// implement call_with_context to allow for static extensions of attribute graph
-    fn call_with_context(context: &mut T) -> Option<JoinHandle<T>>;
+    fn call_with_context(context: &mut T) -> Option<(JoinHandle<T>, tokio::sync::oneshot::Sender<()>)>;
 
     /// Returns a short string description for this plugin
     fn description() -> &'static str {
