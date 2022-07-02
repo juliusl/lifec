@@ -79,7 +79,6 @@ impl Plugin<ThunkContext> for Remote {
                                 tc
                             });
 
-                            log.update_status_only("# remote session started").await;
                             loop {
                                 match reader.next_line().await {
                                     Ok(Some(line)) => {

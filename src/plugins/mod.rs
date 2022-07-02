@@ -24,8 +24,8 @@ pub use process::Remote;
 
 mod thunks;
 pub use thunks::Config;
-pub use thunks::OpenFile;
 pub use thunks::OpenDir;
+pub use thunks::OpenFile;
 pub use thunks::StatusUpdate;
 pub use thunks::Thunk;
 pub use thunks::ThunkContext;
@@ -36,8 +36,8 @@ pub use render::Display;
 pub use render::Edit;
 pub use render::Render;
 
-use tokio::task::JoinHandle;
 use crate::AttributeGraph;
+use tokio::task::JoinHandle;
 
 /// This trait is to facilitate extending working with the attribute graph
 pub trait Plugin<T>
@@ -151,23 +151,29 @@ pub trait Engine {
                 let mut initial_context = ThunkContext::default();
                 config(&mut initial_context);
                 initial_context.as_mut().set_parent_entity(entity);
-        
+
                 match world
                     .write_component::<ThunkContext>()
                     .insert(entity, initial_context)
                 {
-                    Ok(_) => {
-                        Some(entity)
-                    }
+                    Ok(_) => Some(entity),
                     Err(err) => {
-                        eprintln!("could not finish creating event {}, {}, src_desc: inserting context", P::symbol(), err);
+                        eprintln!(
+                            "could not finish creating event {}, {}, src_desc: inserting context",
+                            P::symbol(),
+                            err
+                        );
                         entities.delete(entity).ok();
                         None
                     }
                 }
             }
             Err(err) => {
-                eprintln!("could not finish creating event {}, {}, src_desc: inserting event", P::symbol(), err);
+                eprintln!(
+                    "could not finish creating event {}, {}, src_desc: inserting event",
+                    P::symbol(),
+                    err
+                );
                 entities.delete(entity).ok();
                 None
             }
@@ -190,5 +196,27 @@ pub trait Engine {
         P::parse_entity(path, world, Self::setup, |entity| {
             Self::init_event(entity, Self::event::<P>()).build()
         })
+    }
+
+    /// Initializes the sequence and returns the first entity for the first event
+    fn initialize_sequence(
+        engine_root: impl AsRef<AttributeGraph>,
+        mut sequence: Sequence,
+        world: &World,
+    ) -> Option<Entity> {
+        if let Some(first) = sequence.next() {
+            if let Some(true) = engine_root.as_ref().is_enabled("repeat") {
+                sequence.set_cursor(first);
+            }
+
+            world
+                .write_component::<Sequence>()
+                .insert(first, sequence)
+                .ok();
+
+            Some(first)
+        } else {
+            None
+        }
     }
 }

@@ -849,6 +849,67 @@ impl AttributeGraph {
             .collect()
     }
 
+    /// Returns a vec of current symbol values, from symbol transients in the current root
+    pub fn iter_transient_root_values(&self) -> Vec<(String, Value)> {
+        self.index
+            .iter()
+            .filter(|(_, a)| {
+                if let Attribute {
+                    id,
+                    value: Value::Symbol(_),
+                    ..
+                } = a
+                {
+                    *id == self.entity
+                } else {
+                    false
+                }
+            })
+            .filter_map(|(_, a)| a.transient())
+            .cloned()
+            .collect()
+    }
+
+    /// Returns a vec of current symbol values, from symbol transients not owned by this root
+    pub fn iter_transient_imported_values(&self) -> Vec<(String, Value)> {
+        self.index
+            .iter()
+            .filter(|(_, a)| {
+                if let Attribute {
+                    id,
+                    value: Value::Symbol(_),
+                    ..
+                } = a
+                {
+                    *id != self.entity
+                } else {
+                    false
+                }
+            })
+            .filter_map(|(_, a)| a.transient())
+            .cloned()
+            .collect()
+    }
+
+    /// Returns a vec of current symbol values, from symbol transients not owned by this root
+    pub fn iter_transient_values(&self) -> Vec<(String, Value)> {
+        self.index
+            .iter()
+            .filter_map(|(_, a)| {
+                if let Attribute {
+                    value: Value::Symbol(_),
+                    ..
+                } = a
+                {
+                    a.transient()
+                } else {
+                    None
+                }
+            })
+            .cloned()
+            .collect()
+    }
+
     /// Takes all transient values
     pub fn take_symbol_values(&mut self, with_symbol: impl AsRef<str>) -> Vec<(String, Value)> {
         self.find_symbols_mut(with_symbol)
@@ -1546,6 +1607,7 @@ impl AttributeGraph {
                 Some(value),
             ) => match value {
                 AttributeGraphElements::Text(value)
+                | AttributeGraphElements::SymbolValue(value)
                 | AttributeGraphElements::Int(value)
                 | AttributeGraphElements::Bool(value)
                 | AttributeGraphElements::IntPair(value)
@@ -1573,6 +1635,7 @@ impl AttributeGraph {
             },
             (Some(AttributeGraphElements::Symbol(name)), Some(value), _) => match value {
                 AttributeGraphElements::Text(value)
+                | AttributeGraphElements::SymbolValue(value)
                 | AttributeGraphElements::Int(value)
                 | AttributeGraphElements::Bool(value)
                 | AttributeGraphElements::IntPair(value)
@@ -1667,6 +1730,7 @@ impl AttributeGraph {
             (Some(AttributeGraphElements::Name(name)), Some(value))
             | (Some(AttributeGraphElements::Symbol(name)), Some(value)) => match value {
                 AttributeGraphElements::Text(value)
+                | AttributeGraphElements::SymbolValue(value)
                 | AttributeGraphElements::Int(value)
                 | AttributeGraphElements::Bool(value)
                 | AttributeGraphElements::IntPair(value)
@@ -1720,6 +1784,7 @@ impl AttributeGraph {
                 Some(value),
             ) => match value {
                 AttributeGraphElements::Text(value)
+                | AttributeGraphElements::SymbolValue(value)
                 | AttributeGraphElements::Int(value)
                 | AttributeGraphElements::Bool(value)
                 | AttributeGraphElements::IntPair(value)
@@ -2056,6 +2121,7 @@ fn test_attribute_graph_dispatcher() {
     add test_attr_float_pair  .FLOAT_PAIR 5000.0, 1200.12
     add test_attr_float_range .FLOAT_RANGE 500.0, 0.0, 1000.0
     add test_attr_bin         .bin dGVzdCB2YWx1ZXM=
+    add test_attr_symbol      .symbol test_symbol
     import 10 test_attr       .TEXT this value is imported
     define test_attr node
     #
@@ -2096,6 +2162,7 @@ fn test_attribute_graph_dispatcher() {
     assert!(graph.contains_attribute("test_attr_disabled"));
     assert!(graph.contains_attribute("test_attr_enabled"));
     assert!(graph.contains_attribute("test_attr_bin"));
+    assert!(graph.contains_attribute("test_attr_symbol"));
     assert!(graph.contains_attribute("test_attr::node"));
     assert!(graph.contains_attribute("new_text_attr::node"));
     assert!(!graph.contains_attribute("new_text_attr"));
@@ -2203,6 +2270,11 @@ fn test_attribute_graph_dispatcher() {
     assert_eq!(
         Some(&Value::FloatRange(500.0, 0.0, 1000.0)),
         graph.find_attr_value("test_attr_float_range")
+    );
+
+    assert_eq!(
+        Some(&Value::Symbol("test_symbol".to_string())),
+        graph.find_attr_value("test_attr_symbol")
     );
 
     assert_eq!(
@@ -2379,6 +2451,7 @@ pub enum AttributeGraphElements {
     IntPair(Value),
     /// int range element parses remaining as 3 comma-delimitted i32's
     #[token(".int3", graph_lexer::from_int_range)]
+    #[token(".int_range", graph_lexer::from_int_range)]
     #[token(".INT_RANGE", graph_lexer::from_int_range)]
     IntRange(Value),
     /// float element parses remaining as f32
@@ -2398,6 +2471,8 @@ pub enum AttributeGraphElements {
     #[token(".base64", graph_lexer::from_binary_vector_base64)]
     #[token(".BINARY_VECTOR", graph_lexer::from_binary_vector_base64)]
     BinaryVector(Value),
+    #[token(".symbol", graph_lexer::from_symbol)]
+    SymbolValue(Value),
     /// empty element parses
     #[token(".empty")]
     #[token(".EMPTY")]
@@ -2432,6 +2507,12 @@ mod graph_lexer {
         lexer.slice().parse().ok()
     }
 
+    pub fn from_symbol(lexer: &mut Lexer<AttributeGraphElements>) -> Option<Value> {
+        let remaining = lexer.remainder().trim().to_string();
+
+        Some(Value::Symbol(remaining))
+    }
+
     pub fn from_string(lexer: &mut Lexer<AttributeGraphElements>) -> Option<String> {
         let mut slice = lexer.slice();
         if slice.starts_with('#') {
@@ -2440,7 +2521,6 @@ mod graph_lexer {
 
         Some(slice.to_string())
     }
-
     pub fn from_text(lexer: &mut Lexer<AttributeGraphElements>) -> Option<Value> {
         let remaining = lexer.remainder().trim().to_string();
 

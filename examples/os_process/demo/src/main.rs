@@ -33,7 +33,7 @@ impl Extension for Demo {
                         *demo.0.project_mut().as_mut() = file;
                         let demo_project = demo.0.project_mut().reload_source();
                         *demo.0.project_mut() = demo_project;
-                        self.0.runtime_mut().read_project(app_world);
+                        self.0.runtime().create_engine::<Call>(app_world, "test");
                     }
                 }
             },
