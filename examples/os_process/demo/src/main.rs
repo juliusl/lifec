@@ -17,15 +17,6 @@ impl Extension for Demo {
     fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
         let Demo(editor, ..) = self;
         editor.on_ui(app_world, ui);
-
-        if let Some(Value::Bool(show_demo_window)) = self
-            .0
-            .project_mut()
-            .as_mut()
-            .find_attr_value_mut("show_demo_window")
-        {
-            ui.show_demo_window(show_demo_window);
-        }
     }
 
     fn on_window_event(&'_ mut self, app_world: &World, event: &'_ WindowEvent<'_>) {
@@ -38,7 +29,7 @@ impl Extension for Demo {
                         println!("{:#?}", file);
                         *self.0.project_mut().as_mut() = file;
                         *self.0.project_mut() = self.0.project_mut().reload_source();
-                        self.0.runtime().create_engine::<Call>(app_world, "test");
+                        self.0.runtime().create_engine::<Call>(app_world, "demo");
                     }
                 }
             }
@@ -63,6 +54,8 @@ fn main() {
         if arg == "--run_now" {
             main_headless();
         }
+
+        // TODO add file_path
     }
 
     let mut demo = Demo::default();
@@ -88,13 +81,13 @@ fn main() {
         tc.as_mut().with_text("command", "cargo run .");
     }));
 
-    open("Demo", Demo::default(), demo);
+    open("Lifec Demo Viewer", Demo::default(), demo);
 }
 
 /// Example headless function, that reads a runmd file, creates a new engine
 /// and then starts the engine. This allows the same file to be used with the UI and also w/o.
 pub fn main_headless() {
-    if let Some(file) = AttributeGraph::load_from_file("drag_drop_example.runmd") {
+    if let Some(file) = AttributeGraph::load_from_file(".runmd") {
         let mut demo = Demo::default();
         *demo.0.project_mut().as_mut() = file;
         let demo_project = demo.0.project_mut().reload_source();
@@ -129,7 +122,7 @@ pub fn main_headless() {
         let mut dispatcher = dipatch_builder.build();
         dispatcher.setup(&mut world);
 
-        if let Some(start) = demo.0.runtime().create_engine::<Call>(&world, "test") {
+        if let Some(start) = demo.0.runtime().create_engine::<Call>(&world, "demo") {
             println!("Created engine {:?}", start);
 
             let mut event = world.write_component::<Event>();

@@ -1,5 +1,5 @@
 # This an example sequence
-``` test call
+``` demo call
 
 # Currently, the events are ordered by alphabet when stored in graph
 # even though they are dispatched in order

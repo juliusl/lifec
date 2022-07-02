@@ -34,7 +34,16 @@ where
                 .as_ref()
                 .find_text("thunk_symbol")
                 .unwrap_or("entity".to_string());
-
+            let item_index = context
+                .as_ref()
+                .find_attr("item::index")
+                .and_then(|h| h.transient())
+                .and_then(|(_, v)| match v {
+                    Value::Int(v) => Some(*v),
+                    _ => None,
+                })
+                .unwrap_or_default();
+            
             if ui.collapsing_header(
                 format!(
                     "{} {} - {}",
@@ -44,16 +53,6 @@ where
                 ),
                 TreeNodeFlags::DEFAULT_OPEN,
             ) {
-                let hash = context
-                    .as_ref()
-                    .find_attr("item::index")
-                    .and_then(|h| h.transient())
-                    .and_then(|(_, v)| match v {
-                        Value::Int(v) => Some(*v),
-                        _ => None,
-                    })
-                    .unwrap_or_default();
-
                 ui.input_text(format!("name {}", context.as_ref().entity()), &mut context.block.block_name).build();
                 let mut current_id = context.as_ref().entity();
 
@@ -75,7 +74,7 @@ where
 
                     if attr.is_stable() {
                         attr.edit_value(
-                            format!("{} {}:{:#04x}", attr.name(), attr.id(), hash as u16),
+                            format!("{} {}:{:#04x}", attr.name(), attr.id(), item_index as u16),
                             ui,
                         );
                     }
