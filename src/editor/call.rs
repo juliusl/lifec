@@ -45,15 +45,21 @@ impl<'a> System<'a> for Call {
         ReadStorage<'a, ThunkContext>,
         WriteStorage<'a, StartButton>,
         WriteStorage<'a, Event>,
+        WriteStorage<'a, CancelThunk>,
     );
 
-    fn run(&mut self, (entities, contexts, mut start_buttons, mut events): Self::SystemData) {
+    fn run(&mut self, (entities, contexts, mut start_buttons, mut events, mut _cancel_thunk): Self::SystemData) {
         for (entity, context, start_button, event) in
             (&entities, &contexts, &mut start_buttons, &mut events).join()
         {
             // Handle starting the event
             if let Some(true) = start_button.0 {
-                event.fire(context.clone());
+                if let Some(cancel) = _cancel_thunk.remove(entity) {
+                    cancel.0.send(()).ok();
+                } else {
+                    event.fire(context.clone());
+                }
+
                 start_button.0 = Some(false);
             }
 
@@ -71,7 +77,13 @@ impl<'a> System<'a> for Call {
             }
 
             // Sets the label for this button
-            start_button.2 = event.to_string();
+            start_button.2 = { 
+                if event.is_running() {
+                    format!("cancel {}", event.to_string())
+                } else {
+                    event.to_string()
+                }
+            };
 
             // Sets the owning entity
             start_button.3 = Some(entity);

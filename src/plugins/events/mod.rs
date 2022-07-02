@@ -114,6 +114,7 @@ impl Extension for EventRuntime {
     fn configure_app_world(world: &mut specs::World) {
         world.register::<Event>();
         world.register::<ThunkContext>();
+        world.register::<CancelThunk>();
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {

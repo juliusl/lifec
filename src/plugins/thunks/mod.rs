@@ -12,6 +12,7 @@ mod open_dir;
 pub use open_dir::OpenDir;
 
 mod write_file;
+use tokio::sync::oneshot;
 pub use write_file::WriteFile;
 
 mod timer;
@@ -96,6 +97,22 @@ pub struct ThunkContext {
 
 /// This block has all the async related features
 impl ThunkContext {
+    /// Returns true if the source has been cancelled.
+    /// Note: In most cases you could just use tokio::select! macro with the source,
+    /// but there are control flows where getting a boolean is more ergonomic.
+    /// (Example: Timer uses this, while Process uses select!)
+    pub fn is_cancelled(cancel_source: &mut oneshot::Receiver<()>) -> bool {
+        match cancel_source.try_recv() {
+            Ok(_)
+            | Err(tokio::sync::oneshot::error::TryRecvError::Closed)  => {
+                true
+            }
+            _ => {
+                false
+            }
+        }
+    }
+
     /// enable async features for the context
     pub fn enable_async(
         &self,

@@ -24,6 +24,7 @@ pub use process::Remote;
 
 mod thunks;
 pub use thunks::Config;
+pub use thunks::CancelThunk;
 pub use thunks::OpenDir;
 pub use thunks::OpenFile;
 pub use thunks::StatusUpdate;
