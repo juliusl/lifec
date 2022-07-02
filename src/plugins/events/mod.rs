@@ -105,8 +105,7 @@ impl Event {
     }
 }
 
-/// Event runtime handles various system related tasks, such as the progress system
-/// and scheduling tasks on tokio
+/// Event runtime drives the tokio::Runtime and schedules/monitors/orchestrates task entities
 #[derive(Default)]
 pub struct EventRuntime;
 
@@ -202,6 +201,7 @@ impl<'a> System<'a> for EventRuntime {
                         }
                     }
                 } else {
+                    // TODO Can check for cancellation here before reinserting the task handle back to it's event
                     *task = Some(current_task);
                 }
             } else if let Some(initial_context) = initial_context.take() {
@@ -217,8 +217,13 @@ impl<'a> System<'a> for EventRuntime {
                 let runtime_handle = runtime.handle().clone();
                 let mut context =
                     initial_context.enable_async(entity, runtime_handle, Some(status_sender));
+                
+                // Initializes and starts the task by spawning it on the runtime
                 *task = Some(runtime.spawn(async move {
                     let Thunk(thunk_name, thunk) = thunk;
+                    // TODO it would be really helpful to add a macro for these status updates
+                    // OR could implement AsyncWrite, so you can do:
+                    // ``` writeln!(context, "# event received", &event_name, hash_code).await.ok();
                     context
                         .update_status_only(format!(
                             "# event received: {}, {}",
