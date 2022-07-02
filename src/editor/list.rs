@@ -54,7 +54,7 @@ where
                     })
                     .unwrap_or_default();
 
-                ui.input_text(format!("block_name {}", context.as_ref().entity()), &mut context.block.block_name).build();
+                ui.input_text(format!("name {}", context.as_ref().entity()), &mut context.block.block_name).build();
                 let mut current_id = context.as_ref().entity();
 
                 let clone = context.as_ref().clone();

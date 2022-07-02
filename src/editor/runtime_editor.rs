@@ -3,7 +3,7 @@ use crate::{
     plugins::{Engine, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence},
     Runtime
 };
-use atlier::system::Extension;
+use atlier::system::{Extension, App};
 use imgui::{Ui, Window};
 use specs::{World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
@@ -76,6 +76,8 @@ impl Extension for RuntimeEditor {
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
         self.task_window(app_world, ui);
+        self.runtime.edit_ui(ui);
+        self.runtime.display_ui(ui);
     }
 
     fn on_window_event(
@@ -232,6 +234,7 @@ impl RuntimeEditor {
                 ui.menu_bar(|| {
                     self.project_mut().edit_project_menu(ui);
                     self.edit_event_menu(app_world, ui);
+                    self.runtime.menu(ui);
                 });
 
                 List::<Task>::edit_block_view().on_ui(app_world, ui);

@@ -236,6 +236,15 @@ impl Runtime {
                 ui.menu(event_name, || {})
             }
         });
+
+        ui.menu("Blocks", ||{
+            for (block_name, block) in self.project.iter_block_mut() {
+                MenuItem::new(format!("{}", block_name)).build(ui);
+                if ui.is_item_hovered() {
+                    block.edit_block_view(true, ui);
+                }
+            }
+        })
     }
 
     pub fn create_event_menu_item(
@@ -289,13 +298,9 @@ impl App for Runtime {
                 for (_, block) in project.iter_block_mut().enumerate() {
                     let (block_name, block) = block;
 
-                    let thunk_symbol = if let Some(thunk) = block.get_block("thunk") {
-                        thunk.find_text("thunk_symbol")
-                    } else {
-                        None
-                    };
-
-                    let thunk_symbol = thunk_symbol.unwrap_or("entity".to_string());
+                    let thunk_symbol = block.as_ref()
+                        .find_text("thunk_symbol")
+                        .unwrap_or("entity".to_string());
 
                     if let Some(token) = ui.tab_item(format!("{} {}", thunk_symbol, block_name)) {
                         ui.group(|| {
