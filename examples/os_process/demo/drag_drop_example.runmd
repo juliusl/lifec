@@ -27,6 +27,9 @@ edit e_process_1::process .text cargo_run
 define f_timer4 timer
 edit f_timer4::timer .symbol timer_config
 
+define g_process process
+edit g_process::process .symbol process_config
+
 # Enables looping this sequence
 add repeat .enable
 ```
@@ -37,4 +40,8 @@ add config .text timer_simple
 
 ``` timer_config timer
 add duration .int_range 10, 0, 50
+```
+
+``` process_config process
+add command .text echo hello world
 ```
