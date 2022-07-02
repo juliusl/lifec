@@ -8,6 +8,13 @@ use specs::storage::DenseVecStorage;
 
 use super::ThunkContext;
 
+/// This component facilitates bringing file content into the system
+/// The listen trait converts completed transfers into file blocks, i.e.
+/// ``` filename.ext file
+/// add content   .bin
+/// add file_src  .text
+/// ... (etc)
+/// The thunk trait reads files and converts into a binary attribute
 #[derive(Component, Default)]
 #[storage(DenseVecStorage)]
 pub struct OpenFile;
