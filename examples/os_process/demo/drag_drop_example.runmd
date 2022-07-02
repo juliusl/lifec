@@ -16,12 +16,12 @@ edit c_timer3::timer .text timer_complex
 
 # Example 4 - use same registered config for different plugins
 # This is the remote plugin
-define d_remote_1 remote
-edit d_remote_1::remote .text cargo_run
+# define d_remote_1 remote
+# edit d_remote_1::remote .text cargo_run
 
 # This is the process plugin
-define e_process_1 process
-edit e_process_1::process .text cargo_run
+# define e_process_1 process
+# edit e_process_1::process .text cargo_run
 
 # Example 5 - use config defined in project
 define f_timer4 timer
@@ -31,7 +31,8 @@ define g_process process
 edit g_process::process .symbol process_config
 
 # Enables looping this sequence
-add repeat .enable
+# add repeat .enable
+add repeat .text f_timer4
 ```
 
 ``` timer2 timer
