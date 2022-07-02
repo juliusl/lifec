@@ -1,4 +1,5 @@
 use super::{thunks::CancelToken, Plugin, ThunkContext};
+use atlier::system::Value;
 use chrono::{Local, Utc};
 use specs::{Component, HashMapStorage};
 use tokio::{select, task::JoinHandle};
@@ -39,9 +40,22 @@ impl Plugin<ThunkContext> for Process {
                     let mut command_task = tokio::process::Command::new(&command);
                     for (el, arg) in parts.iter().skip(1).enumerate() {
                         command_task.arg(arg);
-                        tc.update_progress(format!("add arg{}    .text {}", el, arg), 0.10)
+                        tc.update_progress(format!("define arg{}    .text {}", el, arg), 0.10)
                             .await;
                     }
+
+                    for (_, arg) in tc.as_ref().find_symbol_values("arg") {
+                        if let Value::TextBuffer(arg) = arg {
+                            let parts: Vec<&str> = arg.split(" ").collect();
+
+                            for (e, arg) in parts.iter().enumerate() {
+                                command_task.arg(arg);
+                                tc.update_progress(format!("add arg{0}{0}    .text {1}", e, arg), 0.20)
+                                .await;
+                            }
+                        }
+                    }
+
                     tc.update_progress("```", 0.10).await;
                     tc.update_progress("# Running", 0.20).await;
                     let start_time = Some(Utc::now());
@@ -53,8 +67,7 @@ impl Plugin<ThunkContext> for Process {
                             match output {
                                 Ok(output) => {
                                 // Completed process, publish result
-                                tc.update_progress("# Finished, recording output", 0.30)
-                                    .await;
+                                tc.update_progress("# Finished, recording output", 0.30).await;
                                 let timestamp_utc = Some(Utc::now().to_string());
                                 let timestamp_local = Some(Local::now().to_string());
                                 let elapsed = start_time

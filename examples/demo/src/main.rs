@@ -96,11 +96,17 @@ impl Extension for Demo {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
+    for (index, arg) in args.iter().enumerate() {
+        println!("add arg{} {}", index, arg);
+    }
+
     println!("{:?}", args);
     if let Some(arg) = args.get(1) {
         println!("{}", arg);
 
-        if arg == "--run_now" {
+        // starts without the UI
+        if arg == "--headless" {
             main_headless();
         }
 
