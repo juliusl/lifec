@@ -483,25 +483,14 @@ impl Runtime {
                     );
                     if let Some(config_block) = blocks
                         .find_block(config_block_name)
-                        .and_then(|b| b.get_block(plugin_symbol))
                     {
-                        if let Some(created) = create_event(world, |_| {}) {
-                            let mut tc = world.write_component::<ThunkContext>();
-                            if let Some(tc) = tc.get_mut(created) {
-                                for (name, value) in config_block
-                                    .as_ref()
-                                    .iter_attributes()
-                                    .filter(|a| a.is_stable())
-                                    .map(|a| (a.name(), a.value()))
-                                {
-                                    tc.as_mut().with(name, value.clone());
-                                }
-
-                                tc.block.block_name = block_name.to_string();
-                            }
-
-                            return Some(created);
-                        }
+                        eprintln!("config block {}",config_block.block_name);
+                        return self.find_config_block_and_create(
+                            world,
+                            block_name,
+                            config_block,
+                            create_event,
+                        );
                     }
                 }
                 _ => {
