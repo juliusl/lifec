@@ -1,0 +1,26 @@
+``` demo call
+define a_timer   timer   .text   timer_simple
+define b_timer   timer   .empty
+define c_timer   timer   .text   timer_complex
+define d_timer   timer   .symbol timer_config
+define e_timer   timer   .empty
+define f_process process .symbol process_config
+add repeat .enable
+```
+
+``` process_config process
+add command .text sh test.sh
+```
+
+``` b_timer timer
+add config .text timer_simple
+```
+
+``` e_timer timer
+add config .symbol timer_config
+```
+
+``` timer_config timer
+add duration .int_range 10, 0, 50
+```
+

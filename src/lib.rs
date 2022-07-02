@@ -1,6 +1,6 @@
 use atlier::system::{App, Value};
 use imgui::{ChildWindow, MenuItem, Ui, Window};
-use plugins::{Config, Engine, Event, Plugin, Project, Sequence, ThunkContext};
+use plugins::{BlockContext, Config, Engine, Event, Plugin, Project, Sequence, ThunkContext};
 use specs::{Component, Entity, System, World, WorldExt};
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -221,6 +221,33 @@ impl Runtime {
             .get(config_name.as_ref())
             .and_then(|c| create_event(world, *c))
     }
+
+    fn find_config_block_and_create(
+        &self,
+        world: &World,
+        block_name: impl AsRef<str>,
+        config_block: BlockContext,
+        create_event: CreateFn,
+    ) -> Option<Entity> {
+        if let Some(created) = create_event(world, |_| {}) {
+            let mut tc = world.write_component::<ThunkContext>();
+            if let Some(tc) = tc.get_mut(created) {
+                for (name, value) in config_block
+                    .as_ref()
+                    .iter_attributes()
+                    .filter(|a| a.is_stable())
+                    .map(|a| (a.name(), a.value()))
+                {
+                    tc.as_mut().with(name, value.clone());
+                }
+                tc.block.block_name = block_name.as_ref().to_string();
+            }
+
+            return Some(created);
+        } else {
+            None
+        }
+    }
 }
 
 impl<'a> System<'a> for Runtime {
@@ -237,7 +264,7 @@ impl Runtime {
             }
         });
 
-        ui.menu("Blocks", ||{
+        ui.menu("Blocks", || {
             for (block_name, block) in self.project.iter_block_mut() {
                 MenuItem::new(format!("{}", block_name)).build(ui);
                 if ui.is_item_hovered() {
@@ -299,7 +326,8 @@ impl App for Runtime {
                 for (_, block) in project.iter_block_mut().enumerate() {
                     let (block_name, block) = block;
 
-                    let thunk_symbol = block.as_ref()
+                    let thunk_symbol = block
+                        .as_ref()
                         .find_text("thunk_symbol")
                         .unwrap_or("entity".to_string());
 
@@ -367,7 +395,10 @@ impl Runtime {
                             if let Some(created) =
                                 self.create_plugin(world, block_address, value.clone(), *create_fn)
                             {
-                                eprintln!("\tCreated event {:?}, {}, {}, config: {:?}", created, engine_plugin_key, block_name, &value);
+                                eprintln!(
+                                    "\tCreated event {:?}, {}, {}, config: {:?}",
+                                    created, engine_plugin_key, block_name, &value
+                                );
                                 engine_root.add_int_attr(block_name, created.id() as i32);
                                 sequence.add(created);
                             }
@@ -418,6 +449,21 @@ impl Runtime {
                             eprintln!("config block {}", config_name);
                             return self.find_config_and_create(world, config_name, create_event);
                         }
+
+                        let config_block = block
+                            .get_block(plugin_symbol)
+                            .and_then(|b| b.find_symbol("config"))
+                            .and_then(|b| blocks.find_block(b));
+
+                        if let Some(config_block) = config_block {
+                            eprintln!("config block {}", config_block.block_name);
+                            return self.find_config_block_and_create(
+                                world,
+                                block_name,
+                                config_block,
+                                create_event,
+                            );
+                        }
                     }
                 }
                 atlier::system::Value::TextBuffer(config_name) => {
@@ -454,7 +500,7 @@ impl Runtime {
                                 tc.block.block_name = block_name.to_string();
                             }
 
-                           return Some(created);
+                            return Some(created);
                         }
                     }
                 }

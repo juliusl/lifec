@@ -718,6 +718,17 @@ impl AttributeGraph {
         })
     }
 
+      /// Finds a symbol value of an attribute
+      pub fn find_symbol(&self, with_name: impl AsRef<str>) -> Option<String> {
+        self.find_attr_value(with_name).and_then(|n| {
+            if let Value::Symbol(text) = n {
+                Some(text.to_string())
+            } else {
+                None
+            }
+        })
+    }
+
     /// Finds an int value of an attribute
     pub fn find_int(&self, with_name: impl AsRef<str>) -> Option<i32> {
         self.find_attr_value(with_name).and_then(|n| match n {
