@@ -304,7 +304,7 @@ impl App for Runtime {
 
                     if let Some(token) = ui.tab_item(format!("{} {}", thunk_symbol, block_name)) {
                         ui.group(|| {
-                            block.edit_block_view(true, ui);
+                            block.edit_block_view(false, ui);
                             ChildWindow::new(&format!("table_view_{}", block_name))
                                 .size([0.0, 0.0])
                                 .build(ui, || {

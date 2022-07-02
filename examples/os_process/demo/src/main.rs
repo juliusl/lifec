@@ -12,8 +12,6 @@ impl Extension for Demo {
 
     fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
         RuntimeEditor::configure_app_systems(dispatcher);
-
-        dispatcher.add(EventRuntime {}, "event_runtime", &[]);
     }
 
     fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
@@ -31,9 +29,6 @@ impl Extension for Demo {
     }
 
     fn on_window_event(&'_ mut self, app_world: &World, event: &'_ WindowEvent<'_>) {
-        let Demo(editor, ..) = self;
-        editor.on_window_event(app_world, event);
-
         match event {
             WindowEvent::DroppedFile(path) => {
                 if "runmd" == path.extension().unwrap_or_default() {
@@ -41,17 +36,17 @@ impl Extension for Demo {
                         AttributeGraph::load_from_file(path.to_str().unwrap_or_default())
                     {
                         println!("{:#?}", file);
-
-                        let mut demo = Demo::default();
-                        *demo.0.project_mut().as_mut() = file;
-                        let demo_project = demo.0.project_mut().reload_source();
-                        *demo.0.project_mut() = demo_project;
+                        *self.0.project_mut().as_mut() = file;
+                        *self.0.project_mut() = self.0.project_mut().reload_source();
                         self.0.runtime().create_engine::<Call>(app_world, "test");
                     }
                 }
             }
             _ => {}
         }
+
+        let Demo(editor, ..) = self;
+        editor.on_window_event(app_world, event);
     }
 
     fn on_run(&'_ mut self, world: &World) {
@@ -69,41 +64,31 @@ fn main() {
             main_headless();
         }
     }
-    
-    if let Some(file) = AttributeGraph::load_from_file("drag_drop_example.runmd") {
-        let mut demo = Demo::default();
-        *demo.0.project_mut().as_mut() = file;
-        let demo_project = demo.0.project_mut().reload_source();
-        *demo.0.project_mut() = demo_project;
 
-        demo.0
-            .runtime_mut()
-            .add_config(Config("timer_simple", |tc| {
-                tc.block.block_name = unique_title("simple");
-                tc.as_mut()
-                .with_int_range("duration", &[1, 0, 10]);
-            }));
+    let mut demo = Demo::default();
 
-        demo.0
-            .runtime_mut()
-            .add_config(Config("timer_complex", |tc| {
-                tc.block.block_name = unique_title("complex");
-                tc.as_mut().with_int_range("duration", &[1, 0, 10]);
-                tc.as_mut()
-                    .with_float_range("duration_ms", &[0.0, 0.0, 1000.0]);
-            }));
-
-        demo.0.runtime_mut().add_config(Config("cargo_run", |tc| {
-            tc.block.block_name = unique_title("cargo_run");
-            tc.as_mut().with_text("command", "cargo run .");
+    demo.0
+        .runtime_mut()
+        .add_config(Config("timer_simple", |tc| {
+            tc.block.block_name = unique_title("simple");
+            tc.as_mut().with_int_range("duration", &[1, 0, 10]);
         }));
 
-        open(
-            "Demo",
-            Demo::default(),
-            demo,
-        );
-    }
+    demo.0
+        .runtime_mut()
+        .add_config(Config("timer_complex", |tc| {
+            tc.block.block_name = unique_title("complex");
+            tc.as_mut().with_int_range("duration", &[1, 0, 10]);
+            tc.as_mut()
+                .with_float_range("duration_ms", &[0.0, 0.0, 1000.0]);
+        }));
+
+    demo.0.runtime_mut().add_config(Config("cargo_run", |tc| {
+        tc.block.block_name = unique_title("cargo_run");
+        tc.as_mut().with_text("command", "cargo run .");
+    }));
+
+    open("Demo", Demo::default(), demo);
 }
 
 /// Example headless function, that reads a runmd file, creates a new engine
@@ -131,13 +116,11 @@ pub fn main_headless() {
                     .with_float_range("duration_ms", &[0.0, 0.0, 1000.0]);
             }));
 
-        demo.0
-            .runtime_mut()
-            .add_config(Config("cargo_run", |tc| {
-                tc.block.block_name = unique_title("cargo_run");
-                tc.as_mut().with_text("command", "cargo run .");
-            }));
-        
+        demo.0.runtime_mut().add_config(Config("cargo_run", |tc| {
+            tc.block.block_name = unique_title("cargo_run");
+            tc.as_mut().with_text("command", "cargo run .");
+        }));
+
         let mut world = World::new();
         let mut dipatch_builder = DispatcherBuilder::new();
         Demo::configure_app_world(&mut world);

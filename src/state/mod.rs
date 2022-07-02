@@ -215,13 +215,18 @@ impl AttributeGraph {
     pub fn load_from_file(path: impl AsRef<str>) -> Option<Self> {
         let mut loading = AttributeGraph::default();
 
-        if loading.from_file(&path).is_ok() {
-            let loaded = loading.define("src", "file");
-            loaded.edit_as(Value::TextBuffer(path.as_ref().to_string()));
+        match loading.from_file(&path) {
+            Ok(_) => {
+                let loaded = loading.define("src", "file");
+                loaded.edit_as(Value::TextBuffer(path.as_ref().to_string()));
 
-            Some(loading)
-        } else {
-            None
+                eprintln!("loading {}", path.as_ref());
+                Some(loading)
+            }
+            Err(err) => {
+                eprintln!("Could not load {}, {:?}", path.as_ref(), err);
+                None
+            }
         }
     }
 
@@ -1712,10 +1717,37 @@ impl AttributeGraph {
 
     fn on_define(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
         let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
-        match (element_lexer.next(), element_lexer.next()) {
+        match (element_lexer.next(), element_lexer.next(), element_lexer.next()) {
             (
                 Some(AttributeGraphElements::Symbol(name)),
                 Some(AttributeGraphElements::Symbol(symbol)),
+                Some(value)
+            ) => {
+                match value {
+                    AttributeGraphElements::Text(value)|
+                    AttributeGraphElements::Bool(value)|
+                    AttributeGraphElements::Int(value) |
+                    AttributeGraphElements::IntPair(value)|
+                    AttributeGraphElements::IntRange(value)|
+                    AttributeGraphElements::Float(value) |
+                    AttributeGraphElements::FloatPair(value)|
+                    AttributeGraphElements::FloatRange(value) |
+                    AttributeGraphElements::BinaryVector(value)|
+                    AttributeGraphElements::SymbolValue(value) => {
+                        self.define(name, symbol).edit_as(value);
+                        Ok(())
+                    },
+                    _ => {
+                        // TODO: Could extend this part here
+                        self.define(name, symbol);
+                        Ok(())
+                    }
+                }
+            }
+            (
+                Some(AttributeGraphElements::Symbol(name)),
+                Some(AttributeGraphElements::Symbol(symbol)),
+                _
             ) => {
                 self.define(name, symbol);
                 Ok(())

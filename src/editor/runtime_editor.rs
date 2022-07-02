@@ -229,7 +229,7 @@ impl RuntimeEditor {
     pub fn task_window(&mut self, app_world: &specs::World, ui: &Ui) {
         Window::new("Tasks")
             .menu_bar(true)
-            .size([800.0, 600.0], imgui::Condition::Appearing)
+            .size([900.0, 800.0], imgui::Condition::Appearing)
             .build(ui, || {
                 ui.menu_bar(|| {
                     self.project_mut().edit_project_menu(ui);
