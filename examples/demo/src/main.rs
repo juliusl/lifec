@@ -7,30 +7,38 @@ use lifec::{editor::*, plugins::*, AttributeGraph};
 struct Demo(RuntimeEditor, bool);
 
 impl Demo {
-    fn load(file: AttributeGraph) -> Self {
+    fn new() -> Self {
         let mut demo = Demo::default();
 
         demo.0
             .runtime_mut()
             .add_config(Config("timer_simple", |tc| {
                 tc.block.block_name = unique_title("simple");
-                tc.as_mut().with_int_range("duration", &[1, 0, 10]);
+                tc.as_mut()
+                    .with_int_range("duration", &[1, 0, 10]);
             }));
-
+    
         demo.0
             .runtime_mut()
             .add_config(Config("timer_complex", |tc| {
                 tc.block.block_name = unique_title("complex");
-                tc.as_mut().with_int_range("duration", &[1, 0, 10]);
                 tc.as_mut()
-                    .with_float_range("duration_ms", &[0.0, 0.0, 1000.0]);
+                    .with_int_range("duration", &[1, 0, 10])
+                    .add_float_range_attr("duration_ms", &[0.0, 0.0, 1000.0]);
             }));
+    
+        demo.0
+            .runtime_mut()
+            .add_config(Config("cargo_run", |tc| {
+                tc.block.block_name = unique_title("cargo_run");
+                tc.as_mut()
+                    .with_text("command", "cargo run .");
+            }));
+        demo
+    }
 
-        demo.0.runtime_mut().add_config(Config("cargo_run", |tc| {
-            tc.block.block_name = unique_title("cargo_run");
-            tc.as_mut().with_text("command", "cargo run .");
-        }));
-        let mut demo = Demo::default();
+    fn load(file: AttributeGraph) -> Self {
+        let mut demo = Self::new();
         *demo.0.project_mut().as_mut() = file;
         let demo_project = demo.0.project_mut().reload_source();
         *demo.0.project_mut() = demo_project;
@@ -99,35 +107,16 @@ fn main() {
         // TODO add file_path
     }
 
-    let mut demo = Demo::default();
-
-    demo.0
-        .runtime_mut()
-        .add_config(Config("timer_simple", |tc| {
-            tc.block.block_name = unique_title("simple");
-            tc.as_mut().with_int_range("duration", &[1, 0, 10]);
-        }));
-
-    demo.0
-        .runtime_mut()
-        .add_config(Config("timer_complex", |tc| {
-            tc.block.block_name = unique_title("complex");
-            tc.as_mut().with_int_range("duration", &[1, 0, 10]);
-            tc.as_mut()
-                .with_float_range("duration_ms", &[0.0, 0.0, 1000.0]);
-        }));
-
-    demo.0.runtime_mut().add_config(Config("cargo_run", |tc| {
-        tc.block.block_name = unique_title("cargo_run");
-        tc.as_mut().with_text("command", "cargo run .");
-    }));
-
-    open("Lifec Demo Viewer", Demo::default(), demo);
+    open("Lifec Demo Viewer", 
+        Demo::default(),  
+        Demo::new()
+    );
 }
 
 /// Example headless function, that reads a runmd file, creates a new engine
 /// and then starts the engine. This allows the same file to be used with the UI and also w/o.
 pub fn main_headless() {
+    println!("Starting in headless mode, loading from .runmd");
     if let Some(file) = AttributeGraph::load_from_file(".runmd") {
        let mut demo = Demo::load(file);
 
@@ -154,7 +143,6 @@ pub fn main_headless() {
 
         loop {
             demo.on_run(&world);
-            //demo.on_window_event(app_world, event)
             dispatcher.dispatch(&world);
             world.maintain();
             demo.on_maintain(&mut world);
