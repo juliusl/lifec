@@ -192,6 +192,7 @@ impl Extension for RuntimeEditor {
     }
 
     fn on_run(&'_ mut self, world: &specs::World) {
+        List::<Task>::edit_block_view().on_run(world);
         self.on_open_dir(world);
         self.on_open_file(world);
     }

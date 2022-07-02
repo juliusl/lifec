@@ -130,10 +130,9 @@ impl Extension for ProgressStatusBar {
         );
     }
 
-    fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
+    fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {
         self.display_ui(ui);
         self.edit_ui(ui);
-        self.on_run(app_world);
     }
 
     fn on_run(&'_ mut self, app_world: &specs::World) {

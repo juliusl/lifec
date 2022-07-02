@@ -1,7 +1,7 @@
+use super::{ProgressStatusBar, StartButton};
+use crate::plugins::*;
 use atlier::system::Extension;
 use specs::storage::HashMapStorage;
-use crate::plugins::*;
-use super::{StartButton, ProgressStatusBar};
 
 #[derive(Default, Component, Clone)]
 #[storage(HashMapStorage)]
@@ -20,7 +20,7 @@ impl Extension for Task {
         dispatcher.add(TaskSystem {}, "task_system", &[]);
     }
 
-    fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {        
+    fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
         if let Task(Some(start_button), ..) = self {
             start_button.on_ui(app_world, ui);
         }
@@ -30,6 +30,13 @@ impl Extension for Task {
                 ui.same_line();
             }
             progress_status_bar.on_ui(app_world, ui);
+        }
+    }
+
+    /// In the case of runnin
+    fn on_run(&'_ mut self, app_world: &World) {
+        if let Task(_, Some(progess_status_bar)) = self {
+            progess_status_bar.on_run(app_world);
         }
     }
 }

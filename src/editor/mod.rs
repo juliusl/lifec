@@ -38,10 +38,10 @@ where
     A: App + for<'c> System<'c>,
     E: Extension + 'static
 {
-    use atlier::system::start_editor_from;
+    use atlier::system::open_window;
     let &[width, height] = A::window_size();
 
-    start_editor_from(
+    open_window(
         title,
         width.into(),
         height.into(),

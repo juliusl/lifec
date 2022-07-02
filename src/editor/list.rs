@@ -152,4 +152,12 @@ where
             item_index += 1;
         }
     }
+
+    fn on_run(&'_ mut self, app_world: &World) {
+        let mut items = app_world.write_component::<Item>();
+
+        for item in (&mut items).join() {
+            item.on_run(app_world);
+        }
+    }
 }
