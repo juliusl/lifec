@@ -167,63 +167,6 @@ impl Runtime {
         }
     }
 
-    /// Creates a new engine defined by a sequence of events
-    pub fn create_engine<E>(
-        &self,
-        world: &World,
-        sequence_block_name: &'static str,
-    ) -> Option<Entity>
-    where
-        E: Engine,
-    {
-        eprintln!("Creating engine for {}", sequence_block_name);
-        if let Some(block) = self.project.find_block(sequence_block_name) {
-            if let Some(engine_root) = block.get_block(E::event_name()) {
-                eprintln!(
-                    "Found engine root for {} {}",
-                    block.block_name,
-                    E::event_name()
-                );
-                let mut sequence = Sequence::default();
-
-                for (block_address, block_name, value) in
-                    engine_root.iter_attributes().filter_map(|a| {
-                        let name = a.name();
-                        if let Some((tname, tvalue)) = a.transient() {
-                            Some((name.to_string(), tname.clone(), tvalue.clone()))
-                        } else {
-                            None
-                        }
-                    })
-                {
-                    eprintln!(
-                        "Found definition for {}, {} {:?}",
-                        block_name, block_address, value
-                    );
-                    if let Some((_, block_symbol)) = block_address.split_once("::") {
-                        let engine_plugin_key = format!("{} {}", "call", block_symbol);
-                        eprintln!("Looking for engine_plugin {}", engine_plugin_key);
-
-                        if let Some(create_fn) = self.engine_plugin.get(&engine_plugin_key) {
-                            eprintln!("Symbol {} {:?}", block_address, value);
-                            if let Some(created) =
-                                self.create_plugin(world, block_address, value, *create_fn)
-                            {
-                                sequence.add(created);
-                            }
-                        }
-                    }
-                }
-
-                return E::initialize_sequence(engine_root, sequence, world);
-            }
-        } else {
-            eprintln!("{} block not found", sequence_block_name);
-        }
-
-        None
-    }
-
     /// Returns the next thunk context that has been updated by the event runtime, if registered to broadcasts.
     /// Uses the plugin symbol as the subscriber key.
     pub fn listen<P>(&mut self, world: &World) -> Option<ThunkContext>
@@ -375,8 +318,66 @@ impl App for Runtime {
     fn display_ui(&self, _: &imgui::Ui) {}
 }
 
-/// Methods for creating plugins
+/// Methods for creating engines & plugins
 impl Runtime {
+    /// Creates a new engine,
+    /// an engine is defined by a sequence of events.
+    pub fn create_engine<E>(
+        &self,
+        world: &World,
+        sequence_block_name: &'static str,
+    ) -> Option<Entity>
+    where
+        E: Engine,
+    {
+        eprintln!("Creating engine for {}", sequence_block_name);
+        if let Some(block) = self.project.find_block(sequence_block_name) {
+            if let Some(mut engine_root) = block.get_block(E::event_name()) {
+                eprintln!(
+                    "Found engine root for {} {}",
+                    block.block_name,
+                    E::event_name()
+                );
+                let mut sequence = Sequence::default();
+
+                for (block_address, block_name, value) in
+                    engine_root.clone().iter_attributes().filter_map(|a| {
+                        let name = a.name();
+                        if let Some((tname, tvalue)) = a.transient() {
+                            Some((name.to_string(), tname.clone(), tvalue.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                {
+                    eprintln!(
+                        "Found definition for {}, {} {:?}",
+                        block_name, block_address, value
+                    );
+                    if let Some((_, block_symbol)) = block_address.split_once("::") {
+                        let engine_plugin_key = format!("{} {}", "call", block_symbol);
+                        eprintln!("Looking for engine_plugin {}", engine_plugin_key);
+                        if let Some(create_fn) = self.engine_plugin.get(&engine_plugin_key) {
+                            if let Some(created) =
+                                self.create_plugin(world, block_address, value.clone(), *create_fn)
+                            {
+                                eprintln!("\tCreated event {:?}, {}, {}, config: {:?}", created, engine_plugin_key, block_name, &value);
+                                engine_root.add_int_attr(block_name, created.id() as i32);
+                                sequence.add(created);
+                            }
+                        }
+                    }
+                }
+
+                return E::initialize_sequence(engine_root, sequence, world);
+            }
+        } else {
+            eprintln!("{} block not found", sequence_block_name);
+        }
+
+        None
+    }
+
     /// Reads/creates events from symbols defined at the root of the graph for a given plugin.
     /// Symbols defined at the root specify a block_address in the format,
     /// {block_name}::{block_symbol},
@@ -443,6 +444,8 @@ impl Runtime {
                                 {
                                     tc.as_mut().with(name, value.clone());
                                 }
+
+                                tc.block.block_name = block_name.to_string();
                             }
 
                            return Some(created);

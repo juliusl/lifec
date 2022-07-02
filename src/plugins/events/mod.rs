@@ -123,6 +123,8 @@ impl Extension for EventRuntime {
 impl SetupHandler<Runtime> for EventRuntime {
     fn setup(world: &mut specs::World) {
         world.insert(Runtime::new().unwrap());
+
+        // TODO: Need to setup cancellation/shutdown
     }
 }
 
@@ -184,7 +186,9 @@ impl<'a> System<'a> for EventRuntime {
                                             None => {}
                                         }
                                     } else {
+                                        eprintln!("seqeunce, completed");
                                         if let Some(cursor) = sequence.cursor() {
+                                            eprintln!("-- found cursor {:?}", cursor);
                                             dispatch_queue.push((cursor, thunk_context));
                                         }
                                     }
@@ -200,7 +204,9 @@ impl<'a> System<'a> for EventRuntime {
                 }
             } else if let Some(initial_context) = initial_context.take() {
                 println!(
-                    "start event: {}, {}",
+                    "start event: {:?}, {}, {}, {}",
+                    entity,
+                    initial_context.block.block_name,
                     &event_name,
                     initial_context.as_ref().hash_code()
                 );
@@ -272,8 +278,9 @@ impl<'a> System<'a> for EventRuntime {
 
                         event.fire(context.clone());
                         println!(
-                            "Dispatching next event, {}, {}",
+                            "Dispatching next event, {}, {}, {}",
                             event,
+                            context.block.block_name,
                             context.as_ref().hash_code()
                         );
                     } else {

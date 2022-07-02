@@ -208,6 +208,17 @@ pub trait Engine {
             if let Some(true) = engine_root.as_ref().is_enabled("repeat") {
                 sequence.set_cursor(first);
             }
+            
+            if let Some(text) = engine_root.as_ref().find_text("repeat") {
+                eprintln!("Looking for {}, to set cursor", text);
+                if let Some(entity) = engine_root.as_ref().find_int(text) {
+                    let entity = world.entities().entity(entity as u32);
+                    sequence.set_cursor(entity);               
+                    eprintln!("Cursor found");
+                } else {
+                    eprintln!("Cursor not found");
+                }
+            }
 
             world
                 .write_component::<Sequence>()

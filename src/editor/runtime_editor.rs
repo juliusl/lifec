@@ -40,7 +40,8 @@ impl RuntimeEditor {
 
     /// Listen for thunk contexts from thunks that have completed their task
     pub fn listen(&mut self, listen: RuntimeEditorListener) {
-        self.listeners.push(listen);
+        self.listeners.push(listen);        
+        eprintln!("Current runtime editor listeners {}", self.listeners.len());
     }
 }
 
@@ -49,8 +50,6 @@ impl Default for RuntimeEditor {
         let mut default = Self {
             runtime: Default::default(),
             listeners: vec![
-                Self::on_open_dir,
-                Self::on_open_file,
             ]
         };
         default.runtime.install::<Call, Timer>();
@@ -58,6 +57,8 @@ impl Default for RuntimeEditor {
         default.runtime.install::<Call, Remote>();
         default.runtime.install::<Call, OpenFile>();
         default.runtime.install::<Call, OpenDir>();
+        default.listen(Self::on_open_file);
+        default.listen(Self::on_open_dir);
         default
     }
 }

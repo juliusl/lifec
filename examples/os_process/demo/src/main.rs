@@ -1,3 +1,5 @@
+use std::env;
+
 use lifec::{editor::*, plugins::*, AttributeGraph};
 
 #[derive(Default)]
@@ -58,6 +60,16 @@ impl Extension for Demo {
 }
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    println!("{:?}", args);
+    if let Some(arg) = args.get(1) {
+        println!("{}", arg);
+
+        if arg == "--run_now" {
+            main_headless();
+        }
+    }
+    
     if let Some(file) = AttributeGraph::load_from_file("drag_drop_example.runmd") {
         let mut demo = Demo::default();
         *demo.0.project_mut().as_mut() = file;
@@ -68,7 +80,8 @@ fn main() {
             .runtime_mut()
             .add_config(Config("timer_simple", |tc| {
                 tc.block.block_name = unique_title("simple");
-                tc.as_mut().with_int_range("duration", &[1, 0, 10]);
+                tc.as_mut()
+                .with_int_range("duration", &[1, 0, 10]);
             }));
 
         demo.0
@@ -93,7 +106,9 @@ fn main() {
     }
 }
 
-fn main_headless() {
+/// Example headless function, that reads a runmd file, creates a new engine
+/// and then starts the engine. This allows the same file to be used with the UI and also w/o.
+pub fn main_headless() {
     if let Some(file) = AttributeGraph::load_from_file("drag_drop_example.runmd") {
         let mut demo = Demo::default();
         *demo.0.project_mut().as_mut() = file;
@@ -116,10 +131,13 @@ fn main_headless() {
                     .with_float_range("duration_ms", &[0.0, 0.0, 1000.0]);
             }));
 
-        demo.0.runtime_mut().add_config(Config("cargo_run", |tc| {
-            tc.block.block_name = unique_title("cargo_run");
-            tc.as_mut().with_text("command", "cargo run .");
-        }));
+        demo.0
+            .runtime_mut()
+            .add_config(Config("cargo_run", |tc| {
+                tc.block.block_name = unique_title("cargo_run");
+                tc.as_mut().with_text("command", "cargo run .");
+            }));
+        
         let mut world = World::new();
         let mut dipatch_builder = DispatcherBuilder::new();
         Demo::configure_app_world(&mut world);
