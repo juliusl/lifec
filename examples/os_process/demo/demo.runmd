@@ -1,5 +1,0 @@
-```
-add title   .TEXT demo
-define title node
-edit title::node .TEXT demo
-```
