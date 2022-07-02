@@ -66,6 +66,8 @@ impl Event {
     }
 
     /// cancel any ongoing task spawned by this event
+    /// TODO, BUG, not completly correct, because this will not cancel tasks that have loops inside of their implementation
+    /// Need to add an additional channel to thunk_context/event_runtim
     pub fn cancel(&mut self) {
         if let Some(task) = self.4.as_mut() {
             eprintln!("aborting existing task");
