@@ -1,7 +1,6 @@
 use std::env;
 
 use lifec::{editor::*, plugins::*, AttributeGraph};
-use tokio::sync::watch;
 
 /// Demo app for the runtime, can swap projects by dropping a .runmd file in
 #[derive(Default)]
