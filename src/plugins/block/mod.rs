@@ -360,7 +360,7 @@ impl BlockContext {
 
     pub fn edit_block_view(&mut self, show_transpile_preview: bool, ui: &Ui) {
         ChildWindow::new(&format!("edit_block_view_{}", self.block_name))
-            .size([600.0, 420.0])
+            .size([0.0, 420.0])
             .build(ui, || {
                 ui.group(|| {
                     for block_symbol in self.block_symbols.clone().iter() {

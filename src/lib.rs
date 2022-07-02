@@ -283,6 +283,7 @@ impl App for Runtime {
             "Runtime - hash: {}",
             self.project.as_ref().hash_code()
         ))
+        .bg_alpha(0.99)
         .size(*Self::window_size(), imgui::Condition::Appearing)
         .menu_bar(true)
         .build(ui, || {

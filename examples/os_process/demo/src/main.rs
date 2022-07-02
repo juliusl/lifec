@@ -3,7 +3,7 @@ use std::env;
 use lifec::{editor::*, plugins::*, AttributeGraph};
 
 #[derive(Default)]
-struct Demo(RuntimeEditor);
+struct Demo(RuntimeEditor, bool);
 
 impl Extension for Demo {
     fn configure_app_world(world: &mut World) {
@@ -29,7 +29,7 @@ impl Extension for Demo {
                         println!("{:#?}", file);
                         *self.0.project_mut().as_mut() = file;
                         *self.0.project_mut() = self.0.project_mut().reload_source();
-                        self.0.runtime().create_engine::<Call>(app_world, "demo");
+                        self.1 = true;
                     }
                 }
             }
@@ -42,6 +42,14 @@ impl Extension for Demo {
 
     fn on_run(&'_ mut self, world: &World) {
         self.0.on_run(world);
+    }
+
+    fn on_maintain(&'_ mut self, app_world: &mut World) {
+        if self.1 {
+            app_world.delete_all();
+            self.0.runtime().create_engine::<Call>(app_world, "demo");
+            self.1 = false;
+        }
     }
 }
 
