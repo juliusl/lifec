@@ -191,7 +191,7 @@ impl<'a> System<'a> for EventRuntime {
                                 if let Some(sequence) = sequences.get(entity) {
                                     let mut next = sequence.clone();
                                     if let Some(next_event) = next.next() {
-                                        println!("sequence has next event");
+                                        eprintln!("sequence has next event");
                                         match sequences.insert(next_event, next.clone()).ok() {
                                             Some(_) => {
                                                 dispatch_queue.push((next_event, thunk_context));
@@ -218,7 +218,7 @@ impl<'a> System<'a> for EventRuntime {
                 }
             } else if let Some(initial_context) = initial_context.take() {
                 println!(
-                    "start event: {:?}, {}, {}, {}",
+                    "start event: \n\t{:?}, \n\t{}, \n\t{}, \n\t{}",
                     entity,
                     initial_context.block.block_name,
                     &event_name,
@@ -240,7 +240,7 @@ impl<'a> System<'a> for EventRuntime {
                         Ok(existing) => {
                             // If an existing cancel token existed, send a message now
                             if let Some(CancelThunk(cancel)) = existing {
-                                eprintln!("existing cancel token existed");
+                                eprintln!("swapping cancel token for: {:?}", entity);
                                 cancel.send(()).ok();
                             }
 
@@ -305,7 +305,7 @@ impl<'a> System<'a> for EventRuntime {
 
                         event.fire(context.clone());
                         println!(
-                            "Dispatching next event, {}, {}, {}",
+                            "dispatch event \n\t{}, \n\t{}, \n\t{}",
                             event,
                             context.block.block_name,
                             context.as_ref().hash_code()

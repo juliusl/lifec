@@ -6,6 +6,39 @@ use lifec::{editor::*, plugins::*, AttributeGraph};
 #[derive(Default)]
 struct Demo(RuntimeEditor, bool);
 
+impl Demo {
+    fn load(file: AttributeGraph) -> Self {
+        let mut demo = Demo::default();
+
+        demo.0
+            .runtime_mut()
+            .add_config(Config("timer_simple", |tc| {
+                tc.block.block_name = unique_title("simple");
+                tc.as_mut().with_int_range("duration", &[1, 0, 10]);
+            }));
+
+        demo.0
+            .runtime_mut()
+            .add_config(Config("timer_complex", |tc| {
+                tc.block.block_name = unique_title("complex");
+                tc.as_mut().with_int_range("duration", &[1, 0, 10]);
+                tc.as_mut()
+                    .with_float_range("duration_ms", &[0.0, 0.0, 1000.0]);
+            }));
+
+        demo.0.runtime_mut().add_config(Config("cargo_run", |tc| {
+            tc.block.block_name = unique_title("cargo_run");
+            tc.as_mut().with_text("command", "cargo run .");
+        }));
+        let mut demo = Demo::default();
+        *demo.0.project_mut().as_mut() = file;
+        let demo_project = demo.0.project_mut().reload_source();
+        *demo.0.project_mut() = demo_project;
+
+        demo
+    }
+}
+
 impl Extension for Demo {
     fn configure_app_world(world: &mut World) {
         RuntimeEditor::configure_app_world(world);
@@ -27,7 +60,6 @@ impl Extension for Demo {
                     if let Some(file) =
                         AttributeGraph::load_from_file(path.to_str().unwrap_or_default())
                     {
-                        println!("{:#?}", file);
                         *self.0.project_mut().as_mut() = file;
                         *self.0.project_mut() = self.0.project_mut().reload_source();
                         self.1 = true;
@@ -97,31 +129,7 @@ fn main() {
 /// and then starts the engine. This allows the same file to be used with the UI and also w/o.
 pub fn main_headless() {
     if let Some(file) = AttributeGraph::load_from_file(".runmd") {
-        let mut demo = Demo::default();
-        *demo.0.project_mut().as_mut() = file;
-        let demo_project = demo.0.project_mut().reload_source();
-        *demo.0.project_mut() = demo_project;
-
-        demo.0
-            .runtime_mut()
-            .add_config(Config("timer_simple", |tc| {
-                tc.block.block_name = unique_title("simple");
-                tc.as_mut().with_int_range("duration", &[1, 0, 10]);
-            }));
-
-        demo.0
-            .runtime_mut()
-            .add_config(Config("timer_complex", |tc| {
-                tc.block.block_name = unique_title("complex");
-                tc.as_mut().with_int_range("duration", &[1, 0, 10]);
-                tc.as_mut()
-                    .with_float_range("duration_ms", &[0.0, 0.0, 1000.0]);
-            }));
-
-        demo.0.runtime_mut().add_config(Config("cargo_run", |tc| {
-            tc.block.block_name = unique_title("cargo_run");
-            tc.as_mut().with_text("command", "cargo run .");
-        }));
+       let mut demo = Demo::load(file);
 
         let mut world = World::new();
         let mut dipatch_builder = DispatcherBuilder::new();
