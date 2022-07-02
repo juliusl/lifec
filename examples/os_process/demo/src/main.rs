@@ -29,6 +29,9 @@ impl Extension for Demo {
             WindowEvent::DroppedFile(path) => {
                 if "runmd" == path.extension().unwrap_or_default() {
                     if let Some(file) = AttributeGraph::load_from_file(path.to_str().unwrap_or_default()) {
+                        
+                        println!("{:#?}", file);
+                        
                         let mut demo = Demo::default();
                         *demo.0.project_mut().as_mut() = file;
                         let demo_project = demo.0.project_mut().reload_source();

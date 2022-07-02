@@ -1,20 +1,31 @@
 # This an example sequence
 ``` test call
 
+# Currently, the events are ordered by alphabet when stored in graph
+# even though they are dispatched in order
 # Example 1 - choose config w/ edit
-define timer1 timer
-edit timer1::timer .text timer_simple
+define a_timer1 timer
+edit a_timer1::timer .text timer_simple
 
 # Example 2 - choose config in block
-define timer2 timer
+define b_timer2 timer
 
 # Example 3 - choose a different config
-define timer3 timer
-edit timer3::timer .text timer_complex
+define c_timer3 timer
+edit c_timer3::timer .text timer_complex
 
-# Example 3 - choose a different config
-define timer4 timer
-edit timer4::timer .symbol timer_config
+# Example 4 - use same registered config for different plugins
+# This is the remote plugin
+define d_remote_1 remote
+edit d_remote_1::remote .text cargo_run
+
+# This is the process plugin
+define e_process_1 process
+edit e_process_1::process .text cargo_run
+
+# Example 5 - use config defined in project
+define f_timer4 timer
+edit f_timer4::timer .symbol timer_config
 
 # Enables looping this sequence
 add repeat .enable
