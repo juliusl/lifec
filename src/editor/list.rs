@@ -56,19 +56,16 @@ where
                     .find_text("thunk_symbol")
                     .unwrap_or("entity".to_string());
 
-                if ui.collapsing_header(
-                    format!(
-                        "{} {} - {}",
-                        thunk_symbol,
-                        context.block.block_name,
-                        context.as_ref().hash_code()
-                    ),
-                    TreeNodeFlags::DEFAULT_OPEN,
-                ) {
-                    item.on_ui(world, ui);
-                    ui.text(format!("stable: {}", context.as_ref().is_stable()));
-                    ui.separator();
-                }
+                let title = format!(
+                    "{} {} - {}:",
+                    thunk_symbol,
+                    context.block.block_name,
+                    context.as_ref().hash_code()
+                );
+
+                ui.text(title);
+                item.on_ui(world, ui);
+                ui.separator();
             },
             None,
             None,
@@ -131,6 +128,11 @@ where
                     })
                     .unwrap_or_default();
 
+                let mut flags = TreeNodeFlags::empty();
+                if item_index == 0 || context.as_ref().is_enabled("last_item").unwrap_or_default() {
+                    flags |= TreeNodeFlags::DEFAULT_OPEN;
+                }
+
                 if ui.collapsing_header(
                     format!(
                         "{} {} - {}",
@@ -138,7 +140,7 @@ where
                         context.block.block_name,
                         context.as_ref().hash_code()
                     ),
-                    TreeNodeFlags::DEFAULT_OPEN,
+                    flags,
                 ) {
                     ui.input_text(
                         format!("name {}", context.as_ref().entity()),
@@ -270,6 +272,7 @@ where
                             .as_mut()
                             .define("item", "index")
                             .edit_as(Value::Int(item_index));
+                        context.as_mut().add_bool_attr("last_item", last == Some(entity));
     
                         (layout)(context, item, app_world, ui);
     

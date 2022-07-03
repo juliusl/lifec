@@ -76,13 +76,13 @@ impl Extension for RuntimeEditor {
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
-        Window::new("table").build(ui, ||{
-            List::<Task>::table(&[
-                "entity", 
-                "name",
-                "value"
-            ]).on_ui(app_world, ui);
-        });
+        // Window::new("table").build(ui, ||{
+        //     List::<Task>::table(&[
+        //         "entity", 
+        //         "name",
+        //         "value"
+        //     ]).on_ui(app_world, ui);
+        // });
 
         // This is all tasks,
         self.task_window(app_world, &mut List::<Task>::simple(), ui);
@@ -93,8 +93,8 @@ impl Extension for RuntimeEditor {
             self.task_window(app_world, sequence, ui);
         }
 
-        self.runtime.edit_ui(ui);
-        self.runtime.display_ui(ui);
+       // self.runtime.edit_ui(ui);
+       // self.runtime.display_ui(ui);
     }
 
     fn on_window_event(
@@ -249,7 +249,7 @@ impl RuntimeEditor {
 
         Window::new(format!("Tasks, engine: {}", title))
             .menu_bar(true)
-            .size([900.0, 1080.0], imgui::Condition::Appearing)
+            .size([580.0, 950.0], imgui::Condition::Appearing)
             .build(ui, || {
                 ui.menu_bar(|| {
                     self.project_mut().edit_project_menu(ui);
