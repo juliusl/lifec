@@ -54,12 +54,8 @@ impl Project {
         let mut src = String::default();
 
         for (_, block) in self.block_index.iter() {
-            match block.transpile() {
-                Ok(block) => {
-                    writeln!(src, "{}", block)?;
-                }
-                Err(_) => todo!(),
-            }
+            let transpiled =  block.transpile()?;
+            writeln!(src, "{}", transpiled)?;
         }
 
         Ok(src)

@@ -25,8 +25,8 @@ impl Plugin<ThunkContext> for Remote {
         context: &mut ThunkContext,
     ) -> Option<(tokio::task::JoinHandle<ThunkContext>, CancelToken)> {
         context.clone().task(|cancel_source| {
-            let log = context.clone();
             let mut tc = context.clone();
+            let log = context.clone();
             let child_handle = context.handle().clone();
             async move {
                 let cmd = tc.as_ref()
