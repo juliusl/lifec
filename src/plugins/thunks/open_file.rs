@@ -52,6 +52,11 @@ impl Plugin<ThunkContext> for OpenFile {
     fn call_with_context(context: &mut ThunkContext) -> Option<(tokio::task::JoinHandle<ThunkContext>, CancelToken)> {
         context.clone().task(|_|{
             let mut tc = context.clone();
+
+            if let Some(project) = &context.project {
+                println!("{:#?}", project);
+            }
+
             async {            
                 let start = Instant::now();
                 if let Some(file_src) = tc.as_ref().find_text("file_src") {

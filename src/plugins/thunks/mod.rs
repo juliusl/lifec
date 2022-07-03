@@ -22,7 +22,7 @@ pub use timer::Timer;
 mod runmd;
 pub use runmd::Runmd;
 
-use super::{BlockContext, Plugin};
+use super::{BlockContext, Plugin, Project};
 use tokio::{runtime::Handle, sync::mpsc::Sender, sync::oneshot::channel, task::JoinHandle};
 
 /// Thunk is a function that can be passed around for the system to call later
@@ -52,6 +52,7 @@ impl AsRef<Config> for Config {
 }
 
 impl Thunk {
+    /// Generates a thunk from a plugin impl
     pub fn from_plugin<P>() -> Self
     where
         P: Plugin<ThunkContext>,
@@ -105,6 +106,8 @@ impl From<CancelToken> for CancelThunk {
 pub struct ThunkContext {
     /// Underlying block context for this thunk
     pub block: BlockContext,
+    /// Current project
+    pub project: Option<Project>,
     /// Async fields
     /// Entity that is identifying the thunk
     pub entity: Option<Entity>,
@@ -132,12 +135,14 @@ impl ThunkContext {
         &self,
         entity: Entity,
         handle: Handle,
+        project: Option<Project>,
         status_updates: Option<Sender<StatusUpdate>>,
     ) -> ThunkContext {
         let mut async_enabled = self.clone();
         async_enabled.entity = Some(entity);
         async_enabled.handle = Some(handle);
         async_enabled.status_updates = status_updates;
+        async_enabled.project = project;
         async_enabled
     }
 
@@ -206,6 +211,7 @@ impl From<AttributeGraph> for ThunkContext {
     fn from(g: AttributeGraph) -> Self {
         Self {
             block: BlockContext::from(g),
+            project: None,
             entity: None,
             handle: None,
             status_updates: None,
@@ -257,7 +263,10 @@ impl Extension for ThunkContext {
                 }
 
                 if ui.table_next_column() {
-                    ui.text(format!("{}", attr.value()).split_once("::Reference").and_then(|(a, _)| Some(a)).unwrap_or_default());
+                    ui.text(format!("{}", attr.value())
+                        .split_once("::Reference")
+                        .and_then(|(a, _)| Some(a)).unwrap_or_default()
+                    );
                 }
     
                 ui.table_next_row();

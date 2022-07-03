@@ -13,6 +13,7 @@ use tokio::{
     task::JoinHandle,
 };
 
+use super::Project;
 use super::thunks::CancelThunk;
 use super::thunks::StatusUpdate;
 use super::{Plugin, Thunk, ThunkContext};
@@ -154,6 +155,7 @@ impl<'a> System<'a> for EventRuntime {
         Read<'a, Runtime, EventRuntime>,
         Read<'a, Sender<StatusUpdate>, EventRuntime>,
         Read<'a, sync::broadcast::Sender<Entity>, EventRuntime>,
+        Read<'a, Project>,
         Entities<'a>,
         WriteStorage<'a, Event>,
         WriteStorage<'a, ThunkContext>,
@@ -167,6 +169,7 @@ impl<'a> System<'a> for EventRuntime {
             runtime,
             status_sender,
             updated_sender,
+            project,
             entities,
             mut events,
             mut contexts,
@@ -227,7 +230,7 @@ impl<'a> System<'a> for EventRuntime {
                 let status_sender = status_sender.clone();
                 let runtime_handle = runtime.handle().clone();
                 let mut context =
-                    initial_context.enable_async(entity, runtime_handle, Some(status_sender));
+                    initial_context.enable_async(entity, runtime_handle, Some(project.reload_source()), Some(status_sender));
 
                 let Thunk(thunk_name, thunk) = thunk;
                 // TODO it would be really helpful to add a macro for these status updates

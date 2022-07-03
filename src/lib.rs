@@ -1,9 +1,10 @@
 use atlier::system::{App, Value};
 use imgui::{ChildWindow, MenuItem, Ui, Window};
 use plugins::{BlockContext, Config, Engine, Event, Plugin, Project, Sequence, ThunkContext};
-use specs::{Component, Entity, System, World, WorldExt};
+use specs::{Component, Entity, System, World, WorldExt, Write, ReadStorage, Join};
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::ops::DerefMut;
 use std::{any::Any, collections::BTreeMap};
 
 pub mod editor;
@@ -252,9 +253,22 @@ impl Runtime {
 }
 
 impl<'a> System<'a> for Runtime {
-    type SystemData = ();
+    type SystemData = (
+        Write<'a, Project>,
+        ReadStorage<'a, ThunkContext>,
+    );
 
-    fn run(&mut self, _: Self::SystemData) {}
+    fn run(&mut self, (mut project, contexts): Self::SystemData) {
+        for tc in contexts.join() {
+            if !self.project.replace_block(tc.block.clone()) {
+                if !self.project.import_block(tc.block.clone()) {
+                    self.project.import(tc.as_ref().clone());
+                }
+            }
+        }
+
+        *project.deref_mut() = self.project.reload_source();
+    }
 }
 
 impl Runtime {

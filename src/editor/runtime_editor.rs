@@ -1,6 +1,6 @@
 use super::{Call, List, Task, unique_title};
 use crate::{
-    plugins::{Engine, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence, WriteFile, ThunkContext},
+    plugins::{Engine, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence, WriteFile},
     Runtime
 };
 use atlier::system::{Extension, App};
