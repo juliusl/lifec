@@ -32,6 +32,7 @@ where
         self.1.clone()
     }
 
+    /// Returns the title of the list 
     pub fn title(&self) -> Option<String> {
         if let Some(title) = &self.2 {
             Some(title.to_string())
@@ -40,6 +41,7 @@ where
         }
     }
 
+    /// Sets the title of this list
     pub fn set_title(&mut self, title: impl AsRef<str>) {
         self.2 = Some(title.as_ref().to_string());
     }
@@ -74,7 +76,7 @@ where
         )
     }
 
-    /// Returns a simple list view
+    /// Returns a table view with cols
     pub fn table(cols: &[&'static str]) -> Self {
         List::<Item>(
             |context, _, world, ui| {
@@ -149,7 +151,6 @@ where
                     for attr in context.as_mut().iter_mut_attributes() {
                         if current_id != attr.id() {
                             ui.new_line();
-
                             if let Some(next_block) = clone.find_imported_graph(attr.id()) {
                                 let thunk_symbol =
                                     next_block.find_text("thunk_symbol").unwrap_or_default();
@@ -157,7 +158,6 @@ where
                                     next_block.find_text("block_symbol").unwrap_or_default();
                                 ui.text(format!("{} - {}", thunk_symbol, block_symbol));
                             }
-
                             current_id = attr.id();
                         }
 
@@ -253,6 +253,7 @@ where
         let title = self.title().clone();
         let mut item_index = 0;
 
+        // Layout composition for the list view
         let mut layout = || {
             let List(_, sequence, ..) = self;
             if let Some(sequence) = sequence {
@@ -278,8 +279,12 @@ where
                             ui.menu_bar(|| {
                                 ui.menu("File", || {
                                     if MenuItem::new("Output sequence output to console").build(ui) {
-                                        if let Some(transpiled) = Project::from(context.as_ref().clone()).transpile_blocks().ok() {
-                                            println!("{}", transpiled);
+                                        if let None = Project::from(context.as_ref().clone())
+                                                        .transpile_blocks()
+                                                        .ok()
+                                                        .and_then(|t| Some(println!("{}", t))) 
+                                        {
+                                            eprintln!("Could not output sequence output");
                                         }
                                     }
                                 });

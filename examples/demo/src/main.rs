@@ -113,10 +113,7 @@ fn main() {
         // TODO add file_path
     }
 
-    open("Lifec Demo Viewer", 
-    Demo::default(),  
-    Demo::new()
-    );
+    open("Lifec Demo Viewer", Demo::default(), Demo::new());
 }
 
 /// Example headless function, that reads a runmd file, creates a new engine
