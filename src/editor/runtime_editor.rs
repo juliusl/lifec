@@ -3,7 +3,7 @@ use crate::{
     plugins::{Engine, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence, WriteFile},
     Runtime
 };
-use atlier::system::{Extension, App};
+use atlier::system::Extension;
 use imgui::{Ui, Window};
 use specs::{World, WorldExt, Join};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
@@ -245,16 +245,18 @@ impl RuntimeEditor {
     }
 
     pub fn task_window(&mut self, app_world: &specs::World, task_list: &mut List<Task>, ui: &Ui) {
-        let title = task_list.title().unwrap_or("All".to_string());
+        let title = task_list.title().unwrap_or("all sequences".to_string());
 
         Window::new(format!("Tasks, engine: {}", title))
             .menu_bar(true)
             .size([580.0, 950.0], imgui::Condition::Appearing)
             .build(ui, || {
                 ui.menu_bar(|| {
-                    self.project_mut().edit_project_menu(ui);
-                    self.edit_event_menu(app_world, ui);
-                    self.runtime.menu(ui);
+                    ui.menu("Menu", ||{
+                        self.project_mut().edit_project_menu(ui);
+                        self.edit_event_menu(app_world, ui);
+                        self.runtime.menu(ui);
+                    });
                 });
 
                 task_list.on_ui(app_world, ui);

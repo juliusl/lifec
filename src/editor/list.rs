@@ -32,7 +32,7 @@ where
         self.1.clone()
     }
 
-    /// Returns the title of the list 
+    /// Returns the title of the list
     pub fn title(&self) -> Option<String> {
         if let Some(title) = &self.2 {
             Some(title.to_string())
@@ -69,7 +69,7 @@ where
             },
             None,
             None,
-            None
+            None,
         )
     }
 
@@ -261,38 +261,40 @@ where
             if let Some(sequence) = sequence {
                 let last = sequence.iter_entities().last();
                 for entity in sequence.iter_entities() {
-                    let row = (
-                        entity,
-                        &mut contexts.get_mut(entity),
-                        &mut items.get_mut(entity),
-                    );
-                    if let (_, Some(context), Some(item)) = row {
+                    let row = (contexts.get_mut(entity), items.get_mut(entity));
+                    if let (Some(context), Some(item)) = row {
                         let List(layout, ..) = self;
                         context
                             .as_mut()
                             .define("item", "index")
                             .edit_as(Value::Int(item_index));
-                        context.as_mut().add_bool_attr("last_item", last == Some(entity));
-    
+                        context
+                            .as_mut()
+                            .add_bool_attr("last_item", last == Some(entity));
+
                         (layout)(context, item, app_world, ui);
-    
+
                         item_index += 1;
 
-                        if last == Some(entity) {
-                            ui.menu_bar(|| {
-                                ui.menu("File", || {
-                                    if MenuItem::new("Output sequence output to console").build(ui) {
-                                        if let None = Project::from(context.as_ref().clone())
-                                                        .transpile_blocks()
-                                                        .ok()
-                                                        .and_then(|t| Some(println!("{}", t))) 
+                        ui.menu_bar(|| {
+                            ui.menu("Menu", || {
+                                if let Some(transpiled) = Project::from(context.as_ref().clone())
+                                    .transpile_blocks()
+                                    .ok()
+                                {
+                                    if !transpiled.trim().is_empty() {
+                                        if MenuItem::new(format!(
+                                            "Write {} output to console",
+                                            context.block.block_name
+                                        ))
+                                        .build(ui)
                                         {
-                                            eprintln!("Could not output sequence output");
+                                            println!("{}", transpiled);
                                         }
                                     }
-                                });
+                                }
                             });
-                        }
+                        });
                     }
                 }
             } else {
@@ -302,7 +304,7 @@ where
                         .as_mut()
                         .define("item", "index")
                         .edit_as(Value::Int(item_index));
-    
+
                     (layout)(context, item, app_world, ui);
 
                     item_index += 1;
@@ -327,7 +329,6 @@ where
         } else {
             layout();
         }
-
     }
 
     fn on_run(&'_ mut self, app_world: &World) {

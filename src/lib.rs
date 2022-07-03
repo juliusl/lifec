@@ -12,7 +12,6 @@ pub mod plugins;
 mod state;
 pub use state::AttributeGraph;
 
-
 pub trait RuntimeDispatcher: AsRef<AttributeGraph> + AsMut<AttributeGraph>
 where
     Self: Sized,
@@ -252,29 +251,13 @@ impl Runtime {
 }
 
 impl<'a> System<'a> for Runtime {
-    type SystemData = ( );
+    type SystemData = ();
 
-    fn run(&mut self, _: Self::SystemData) {
-     
-    }
+    fn run(&mut self, _: Self::SystemData) {}
 }
 
 impl Runtime {
-    fn menu(&mut self, ui: &Ui) {
-        ui.menu("Edit", || {
-            for (event_name, _) in self.engine_plugin.iter() {
-                ui.menu(event_name, || {})
-            }
-        });
-
-        ui.menu("Blocks", || {
-            for (block_name, block) in self.project.iter_block_mut() {
-                MenuItem::new(format!("{}", block_name)).build(ui);
-                if ui.is_item_hovered() {
-                    block.edit_block_view(true, ui);
-                }
-            }
-        })
+    fn menu(&mut self, _: &Ui) {
     }
 
     pub fn create_event_menu_item(
@@ -286,15 +269,13 @@ impl Runtime {
         ui: &Ui,
     ) {
         ui.menu("Edit", || {
-            ui.menu("Events", || {
-                let label = format!("Add '{}'", event.to_string());
-                if MenuItem::new(label).build(ui) {
-                    self.create_with_fn(world, event, config_fn);
-                }
-                if ui.is_item_hovered() {
-                    ui.tooltip_text(tooltip);
-                }
-            });
+            let label = format!("Add '{}' event", event.to_string());
+            if MenuItem::new(label).build(ui) {
+                self.create_with_fn(world, event, config_fn);
+            }
+            if ui.is_item_hovered() {
+                ui.tooltip_text(tooltip);
+            }
         });
     }
 }
@@ -485,10 +466,8 @@ impl Runtime {
                         config_block_name,
                         plugin_symbol,
                     );
-                    if let Some(config_block) = blocks
-                        .find_block(config_block_name)
-                    {
-                        eprintln!("config block {}",config_block.block_name);
+                    if let Some(config_block) = blocks.find_block(config_block_name) {
+                        eprintln!("config block {}", config_block.block_name);
                         return self.find_config_block_and_create(
                             world,
                             block_name,

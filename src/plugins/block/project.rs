@@ -156,7 +156,7 @@ impl Project {
             block.edit_menu(ui);
         }
 
-        ui.menu("File", || {
+        ui.menu("Project", || {
             if let Some(token) = ui.begin_menu("Export") {
                 self.export_blocks_view(ui);
                 token.end();
