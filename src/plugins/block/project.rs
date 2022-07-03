@@ -218,7 +218,6 @@ impl Project {
             importing.copy(&graph);
             self.import_block(BlockContext::from(importing))
         } else {
-            eprintln!("Did not find text attributes for block_name and block_symbol");
             false
         }
     }

@@ -12,6 +12,7 @@ pub use remote::Remote;
 #[storage(HashMapStorage)]
 pub struct Process;
 
+
 impl Plugin<ThunkContext> for Process {
     fn symbol() -> &'static str {
         "process"
