@@ -1,11 +1,10 @@
 ``` demo call
-define a_timer   timer      .text    timer_simple
-define b_timer   timer      .empty
-define c_timer   timer      .text    timer_complex
-define d_timer   timer      .symbol  timer_config
-define e_timer   timer      .empty
-define f_process process    .symbol  process_config
-
+define a_timer   timer       .text    timer_simple
+define b_timer   timer       .empty
+define c_timer   timer       .text    timer_complex
+define d_timer   timer       .symbol  timer_config
+define e_timer   timer       .empty
+define f_process process     .symbol  process_config
 define open      open_file   .symbol  file_config
 define write     write_file  .symbol  write_config
 add repeat .disable

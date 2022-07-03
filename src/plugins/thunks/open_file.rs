@@ -60,41 +60,22 @@ impl Plugin<ThunkContext> for OpenFile {
 
                     let path_buf = PathBuf::from(&file_src);
                     let file_name = path_buf.file_name().unwrap_or_default().to_str().unwrap_or_default();
-
-                    tc.as_mut()
-                        .with_text("file_name", file_name)
-                        .add_text_attr("file_ext", 
-                            path_buf
-                                .extension()
-                                .unwrap_or_default()
-                                .to_str()
-                                .unwrap_or_default()
-                                .to_string());
+                    let file_ext = path_buf.extension()
+                        .unwrap_or_default()
+                        .to_str()
+                        .unwrap_or_default()
+                        .to_string();
 
                     // block names are usually strictly symbols, but with a # prefix the rules are more relaxed
                     tc.block.block_name = format!("{}", file_name);
 
                     if !tc.as_ref().contains_attribute("content") || tc.as_ref().is_enabled("refresh").unwrap_or_default(){
                         if let Some(content) = fs::read_to_string(&path_buf).await.ok() {
-
                             if let Some(project) = tc.project.as_mut() {
                                 *project = project.with_block(file_name, "file", |c| {
-                                    c.with_text("file_src", &file_src)
-                                        .with_text("file_name", file_name)
-                                        .add_binary_attr("content", content.as_bytes());
-                                });
-                            }
-                
-                            tc.update_status_only("read content, writing to block").await;
-                            if tc.block.add_block("file", |c| {
-                                c.add_binary_attr("content", content.as_bytes());
-                            }) {
-                                tc.update_status_only("added file").await;
-                            } else if tc.as_ref().is_enabled("refresh").unwrap_or_default() {
-                                tc.update_status_only(format!("refreshing content from file_src {}", file_src)).await;
-
-                                tc.block.update_block("file", |update| {
-                                    update.add_binary_attr("content", content.as_bytes());
+                                    c.with_text("file_name", file_name)
+                                    .with_text("file_ext", file_ext) 
+                                    .add_binary_attr("content", content.as_bytes());
                                 });
                             }
                         }

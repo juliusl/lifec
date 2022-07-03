@@ -64,7 +64,6 @@ where
                 ) {
                     item.on_ui(world, ui);
                     ui.text(format!("stable: {}", context.as_ref().is_stable()));
-                    ui.text(format!("previous pending: {}", context.block.has_pending("previous")));
                     ui.separator();
                 }
             },
