@@ -53,10 +53,6 @@ impl Plugin<ThunkContext> for OpenFile {
         context.clone().task(|_|{
             let mut tc = context.clone();
 
-            if let Some(project) = &context.project {
-                println!("{:#?}", project);
-            }
-
             async {            
                 let start = Instant::now();
                 if let Some(file_src) = tc.as_ref().find_text("file_src") {
@@ -80,6 +76,15 @@ impl Plugin<ThunkContext> for OpenFile {
 
                     if !tc.as_ref().contains_attribute("content") || tc.as_ref().is_enabled("refresh").unwrap_or_default(){
                         if let Some(content) = fs::read_to_string(&path_buf).await.ok() {
+
+                            if let Some(project) = tc.project.as_mut() {
+                                *project = project.with_block(file_name, "file", |c| {
+                                    c.with_text("file_src", &file_src)
+                                        .with_text("file_name", file_name)
+                                        .add_binary_attr("content", content.as_bytes());
+                                });
+                            }
+                
                             tc.update_status_only("read content, writing to block").await;
                             if tc.block.add_block("file", |c| {
                                 c.add_binary_attr("content", content.as_bytes());

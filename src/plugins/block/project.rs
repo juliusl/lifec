@@ -40,6 +40,19 @@ impl Project {
             Err(_) => {}
         }
 
+        match self.transpile_blocks() {
+            Ok(root) => {
+                writeln!(src, "{}", root)?;
+            },
+            Err(_) => {},
+        }
+
+        Ok(src)
+    }
+
+    pub fn transpile_blocks(&self) -> Result<String, Error> {
+        let mut src = String::default();
+
         for (_, block) in self.block_index.iter() {
             match block.transpile() {
                 Ok(block) => {

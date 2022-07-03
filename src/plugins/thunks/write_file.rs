@@ -1,8 +1,10 @@
-use specs::Component;
-use crate::{plugins::*};
-use specs::storage::DenseVecStorage;
+use std::path::PathBuf;
 
-use super::{ThunkContext, CancelToken};
+use crate::plugins::*;
+use specs::storage::DenseVecStorage;
+use specs::Component;
+
+use super::{CancelToken, ThunkContext};
 
 #[derive(Component, Default)]
 #[storage(DenseVecStorage)]
@@ -17,43 +19,49 @@ impl Plugin<ThunkContext> for WriteFile {
         "Writes a file_block to the path specified by file_dst."
     }
 
-    fn call_with_context(context: &mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
+    fn call_with_context(
+        context: &mut ThunkContext,
+    ) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
         context.clone().task(|_| {
             let mut tc = context.clone();
+            async move {
+                tc.as_mut().apply("previous");
+                for file_block in tc.as_ref().find_blocks("file") {
+                    if let Some(work_dir) = tc.as_ref().find_text("work_dir") {
+                        if let Some(file_name) = file_block.find_text("file_name") {
+                            if let Some(content) = file_block.find_binary("content") {
+                                let path = PathBuf::from(&work_dir);
+                                tokio::fs::create_dir_all(&work_dir).await.ok();
 
-            tc.as_mut().apply("previous");
+                                let path = path.join(file_name);
 
-            async {
-                if let Some(file_block) = tc.block.get_block("file") {
-                    if let Some(file_dst) = file_block.find_text("file_dst") {
-                        if let Some(content) = file_block.find_binary("content") {
-                            match tokio::fs::write(&file_dst, content).await {
-                                Ok(_) => {
-                                    tc.update_status_only(format!("# wrote file to {}", &file_dst))
+                                match tokio::fs::write(&path, content).await {
+                                    Ok(_) => {
+                                        tc.update_status_only(format!(
+                                            "# wrote file to {:?}",
+                                            path
+                                        ))
                                         .await;
+                                    }
+                                    Err(err) => {
+                                        let error_message = format!("# error writing file {}", err);
+                                        tc.update_status_only(error_message).await;
+                                        tc.error(|a| {
+                                            a.add_text_attr("error", format!("{}", err));
+                                        });
+                                    }
                                 }
-                                Err(err) => {
-                                    let error_message = format!("# error writing file {}", err);
-                                    tc.update_status_only(error_message).await;
-                                    tc.error(|a| {
-                                        a.add_text_attr("error", format!("{}", err));
-                                    });
-                                }
+                            } else {
+                                tc.error(|a| {
+                                    a.add_text_attr("error", "missing content");
+                                });
                             }
                         } else {
                             tc.error(|a| {
-                                a.add_text_attr("error", "missing content");
+                                a.add_text_attr("error", "missing file destination");
                             });
                         }
-                    } else {
-                        tc.error(|a| {
-                            a.add_text_attr("error", "missing file destination");
-                        });
                     }
-                } else {
-                    tc.error(|a| {
-                        a.add_text_attr("error", "missing file block");
-                    });
                 }
 
                 Some(tc)

@@ -299,11 +299,20 @@ impl<'a> System<'a> for EventRuntime {
                     if let (Some(event), Some(context)) =
                         (events.get_mut(next), contexts.get_mut(next))
                     {
-                        context.as_mut().add_message(
-                            event.to_string(),
-                            "previous",
-                            last.block.transpile().unwrap_or_default(),
-                        );
+                        let previous = last.project
+                                .and_then(|p| p.transpile_blocks().ok())
+                                .unwrap_or_default()
+                                .trim()
+                                .to_string();
+
+                        if !previous.trim().is_empty() {
+                            eprintln!("Previous block left a message");
+                            context.as_mut().add_message(
+                                event.to_string(),
+                                "previous",
+                                previous,
+                            );
+                        }
 
                         event.fire(context.clone());
                         println!(

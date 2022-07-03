@@ -76,13 +76,13 @@ impl Extension for RuntimeEditor {
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
-        // Window::new("table").build(ui, ||{
-        //     List::<Task>::table(&[
-        //         "entity", 
-        //         "name",
-        //         "value"
-        //     ]).on_ui(app_world, ui);
-        // });
+        Window::new("table").build(ui, ||{
+            List::<Task>::table(&[
+                "entity", 
+                "name",
+                "value"
+            ]).on_ui(app_world, ui);
+        });
 
         // This is all tasks,
         self.task_window(app_world, &mut List::<Task>::simple(), ui);
@@ -154,20 +154,20 @@ impl RuntimeEditor {
             Some(file_dir) => {
                 let mut project = Project::from(file_dir.as_ref().clone());
                 for (block_name, block) in project.iter_block_mut() {
-                    eprintln!("found block {}", block_name);
-                    if let Some(file) = block.get_block("file") {
-                        if let (Some(file_src), Some(content)) = (
-                            file.as_ref().find_text("file_src"),
-                            file.as_ref().find_binary("content"),
-                        ) {
-                            self.runtime.schedule(world, &Call::event::<OpenFile>(), |g| {
-                                // Setting content will skip reading the file_src, unless refresh is enabled
-                                g.as_mut()
-                                    .with_binary("content", content)
-                                    .add_text_attr("file_src", file_src);
-                            });
-                        }
-                    }
+                    // eprintln!("found block {}", block_name);
+                    // if let Some(file) = block.get_block("file") {
+                    //     if let (Some(file_src), Some(content)) = (
+                    //         file.as_ref().find_text("file_src"),
+                    //         file.as_ref().find_binary("content"),
+                    //     ) {
+                    //         self.runtime.schedule(world, &Call::event::<OpenFile>(), |g| {
+                    //             // Setting content will skip reading the file_src, unless refresh is enabled
+                    //             g.as_mut()
+                    //                 .with_binary("content", content)
+                    //                 .add_text_attr("file_src", file_src);
+                    //         });
+                    //     }
+                    // }
                 }
             }
             None => {}

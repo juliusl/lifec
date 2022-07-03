@@ -6,19 +6,18 @@ define d_timer   timer      .symbol  timer_config
 define e_timer   timer      .empty
 define f_process process    .symbol  process_config
 
-# Still needs some work
-# define open      open_file   .symbol  file_config
-# define write     write_file  .symbol  write_config
-add repeat .enable
+define open      open_file   .symbol  file_config
+define write     write_file  .symbol  write_config
+add repeat .disable
 ```
 
-# ``` file_config open_file
-# add file_src .text test.sh
-# ```
+``` file_config open_file
+add file_src .text test.sh
+```
 
-# ``` write_config write_file
-# add file_dst .text test/test.sh
-# ```
+``` write_config write_file
+add work_dir .text test/test2
+```
 
 ``` process_config process
 add command .text sh test.sh

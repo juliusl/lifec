@@ -1,6 +1,7 @@
 use std::env;
 
 use lifec::{editor::*, plugins::*, AttributeGraph, Runtime};
+use specs::RunNow;
 
 /// Demo app for the runtime, can swap projects by dropping a .runmd file in
 #[derive(Default)]
@@ -113,10 +114,8 @@ fn main() {
         // TODO add file_path
     }
 
-    let runtime = Runtime::new(Project::default());
-
     open("Lifec Demo Viewer", 
-    runtime,  
+    Demo::default(),  
     Demo::new()
     );
 }
@@ -171,5 +170,6 @@ impl App for Demo {
 impl<'a> System<'a> for Demo {
     type SystemData = ();
 
-    fn run(&mut self, _: Self::SystemData) {}
+    fn run(&mut self, _: Self::SystemData) {
+    }
 }

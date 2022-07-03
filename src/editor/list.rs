@@ -64,6 +64,7 @@ where
                 ) {
                     item.on_ui(world, ui);
                     ui.text(format!("stable: {}", context.as_ref().is_stable()));
+                    ui.text(format!("previous pending: {}", context.block.has_pending("previous")));
                     ui.separator();
                 }
             },
@@ -77,6 +78,7 @@ where
     pub fn table(cols: &[&'static str]) -> Self {
         List::<Item>(
             |context, _, world, ui| {
+                // context.as_mut().apply("previous");
                 context.on_ui(world, ui);
             },
             None,
