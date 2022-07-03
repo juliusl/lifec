@@ -33,11 +33,10 @@ impl Extension for Task {
         }
 
         if let Task(.., Some(sequence)) = self {
-            ui.text(format!("sequence: {}", sequence));
+            ui.text(format!("{}", sequence));
         }
     }
 
-    /// In the case of runnin
     fn on_run(&'_ mut self, app_world: &World) {
         if let Task(_, Some(progess_status_bar), ..) = self {
             progess_status_bar.on_run(app_world);
@@ -72,7 +71,6 @@ impl<'a> System<'a> for TaskSystem {
             if let Some(progress) = progress {
                 task.1 = Some(progress.clone());
             }
-
             if let Some(sequence) = sequence {
                 task.2 = Some(sequence.clone());
             }

@@ -63,8 +63,8 @@ impl<'a> System<'a> for Call {
                 start_button.0 = Some(false);
             }
 
+            // Handle setting the current status
             if let Some(_) = start_button.0 {
-                // Handle setting the current status
                 if event.is_running() {
                     start_button.1 = "Running".to_string();
                 } else {

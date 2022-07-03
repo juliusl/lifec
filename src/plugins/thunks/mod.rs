@@ -1,6 +1,7 @@
 use std::future::Future;
 
 use crate::AttributeGraph;
+use atlier::system::Extension;
 use imgui::Ui;
 use specs::Component;
 use specs::{storage::DenseVecStorage, Entity};
@@ -28,7 +29,9 @@ use tokio::{runtime::Handle, sync::mpsc::Sender, sync::oneshot::channel, task::J
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
 pub struct Thunk(
+    // thunk label
     pub &'static str,
+    // thunk fn
     pub fn(&mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
 );
 
@@ -67,7 +70,14 @@ impl Thunk {
 }
 
 /// StatusUpdate for stuff like progress bars
-pub type StatusUpdate = (Entity, f32, String);
+pub type StatusUpdate = (
+    // entity with an update
+    Entity, 
+    // progress
+    f32, 
+    // status message 
+    String
+);
 
 /// Cancel token stored by the event runtime
 pub type CancelToken = tokio::sync::oneshot::Sender<()>;
@@ -77,7 +87,10 @@ pub type CancelSource = tokio::sync::oneshot::Receiver<()>;
 
 #[derive(Component)]
 #[storage(DenseVecStorage)]
-pub struct CancelThunk(pub CancelToken);
+pub struct CancelThunk(
+    // Oneshot channel that cancels the thunk
+    pub CancelToken
+);
 
 impl From<CancelToken> for CancelThunk {
     fn from(token: CancelToken) -> Self {
@@ -90,9 +103,14 @@ impl From<CancelToken> for CancelThunk {
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
+    /// Underlying block context for this thunk
     pub block: BlockContext,
+    /// Async fields
+    /// Entity that is identifying the thunk
     pub entity: Option<Entity>,
+    /// Tokio runtime handle, to spawn additional tasks 
     pub handle: Option<Handle>,
+    /// Sender for status updates for the thunk
     pub status_updates: Option<Sender<StatusUpdate>>,
 }
 
@@ -222,5 +240,11 @@ impl ThunkContext {
             label.as_ref(),
             self.as_ref().hash_code() as u16
         )
+    }
+}
+
+impl Extension for ThunkContext {
+    fn on_ui(&'_ mut self, _: &specs::World, _: &'_ imgui::Ui<'_>) {
+        
     }
 }
