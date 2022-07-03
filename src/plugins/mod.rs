@@ -27,6 +27,7 @@ pub use thunks::Config;
 pub use thunks::CancelThunk;
 pub use thunks::OpenDir;
 pub use thunks::OpenFile;
+pub use thunks::WriteFile;
 pub use thunks::StatusUpdate;
 pub use thunks::Thunk;
 pub use thunks::ThunkContext;

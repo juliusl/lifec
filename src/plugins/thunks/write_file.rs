@@ -20,6 +20,9 @@ impl Plugin<ThunkContext> for WriteFile {
     fn call_with_context(context: &mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
         context.clone().task(|_| {
             let mut tc = context.clone();
+
+            tc.as_mut().apply("previous");
+
             async {
                 if let Some(file_block) = tc.block.get_block("file") {
                     if let Some(file_dst) = file_block.find_text("file_dst") {

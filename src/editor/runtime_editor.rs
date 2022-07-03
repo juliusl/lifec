@@ -1,6 +1,6 @@
 use super::{Call, List, Task, unique_title};
 use crate::{
-    plugins::{Engine, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence},
+    plugins::{Engine, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence, WriteFile},
     Runtime
 };
 use atlier::system::{Extension, App};
@@ -57,6 +57,7 @@ impl Default for RuntimeEditor {
         default.runtime.install::<Call, Remote>();
         default.runtime.install::<Call, OpenFile>();
         default.runtime.install::<Call, OpenDir>();
+        default.runtime.install::<Call, WriteFile>();
         default.listen(Self::on_open_file);
         default.listen(Self::on_open_dir);
         default
