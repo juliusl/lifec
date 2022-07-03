@@ -246,6 +246,13 @@ impl<'a> System<'a> for EventRuntime {
                                 cancel.send(()).ok();
                             }
 
+                            let mut started = context.clone();                            
+                            started.as_mut()
+                                .with_text(
+                                    "thunk_symbol", 
+                                    format!("Running -> {}", thunk_name)
+                                );
+
                             // Initializes and starts the task by spawning it on the runtime
                             *task = Some(runtime.spawn(async move {
                                 context
@@ -283,6 +290,8 @@ impl<'a> System<'a> for EventRuntime {
                                     }
                                 }
                             }));
+
+                            contexts.insert(entity, started).ok();
                         }
                         Err(_) => {}
                     }
