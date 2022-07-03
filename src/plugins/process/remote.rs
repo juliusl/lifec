@@ -88,6 +88,7 @@ impl Plugin<ThunkContext> for Remote {
                                 tc
                             });
 
+                            // Reads child's stdout, so that stdin can continue to work
                             let reader_task = handle.spawn(async move {
                                 while let Ok(line) = reader.next_line().await {
                                     match line {
@@ -103,6 +104,8 @@ impl Plugin<ThunkContext> for Remote {
                             });
                          
 
+                            // Wait for child to exit
+                            // OR, cancellation
                             let output = select! {
                                 tc = _child_task => {
                                     eprintln!("child task completed");
