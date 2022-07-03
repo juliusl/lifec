@@ -244,7 +244,24 @@ impl ThunkContext {
 }
 
 impl Extension for ThunkContext {
-    fn on_ui(&'_ mut self, _: &specs::World, _: &'_ imgui::Ui<'_>) {
-        
+    /// table view to debug backend
+    fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {
+        if let Some(entity) = self.entity {
+            for attr in self.as_mut().iter_mut_attributes() {
+                if ui.table_next_column() {
+                    ui.text(format!("{}", entity.id()));
+                }
+
+                if ui.table_next_column() {
+                    ui.text(attr.name());
+                }
+
+                if ui.table_next_column() {
+                    ui.text(format!("{}", attr.value()).split_once("::Reference").and_then(|(a, _)| Some(a)).unwrap_or_default());
+                }
+    
+                ui.table_next_row();
+            }
+        }
     }
 }

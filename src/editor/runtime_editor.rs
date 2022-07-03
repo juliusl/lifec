@@ -1,6 +1,6 @@
 use super::{Call, List, Task, unique_title};
 use crate::{
-    plugins::{Engine, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence, WriteFile},
+    plugins::{Engine, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence, WriteFile, ThunkContext},
     Runtime
 };
 use atlier::system::{Extension, App};
@@ -76,6 +76,14 @@ impl Extension for RuntimeEditor {
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
+        // Window::new("table").build(ui, ||{
+        //     List::<Task>::table(&[
+        //         "entity", 
+        //         "name",
+        //         "value"
+        //     ]).on_ui(app_world, ui);
+        // });
+
         // This is all tasks,
         self.task_window(app_world, &mut List::<Task>::simple(), ui);
 

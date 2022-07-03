@@ -1,6 +1,7 @@
 use crate::editor::*;
 use crate::plugins::*;
 use atlier::system::Extension;
+use imgui::TableFlags;
 use imgui::TreeNodeFlags;
 use imgui::Ui;
 use specs::storage::DefaultVecStorage;
@@ -8,7 +9,16 @@ use specs::storage::DefaultVecStorage;
 /// List-layout widget for thunk_context's
 #[derive(Component)]
 #[storage(DefaultVecStorage)]
-pub struct List<Item>(fn(&mut ThunkContext, &mut Item, &World, &Ui), Option<Sequence>, Option<String>)
+pub struct List<Item>(
+    /// Layout fn
+    fn(&mut ThunkContext, &mut Item, &World, &Ui),
+    /// Sequence to follow
+    Option<Sequence>,
+    /// Title
+    Option<String>,
+    /// Column Names
+    Option<Vec<&'static str>>,
+)
 where
     Item: Extension + Component;
 
@@ -22,10 +32,10 @@ where
     }
 
     pub fn title(&self) -> Option<String> {
-        if let Some(title) = &self.2 { 
+        if let Some(title) = &self.2 {
             Some(title.to_string())
         } else {
-            None 
+            None
         }
     }
 
@@ -35,127 +45,168 @@ where
 
     /// Returns a simple list view
     pub fn simple() -> Self {
-        List::<Item>(|context, item, world, ui| {
-            let thunk_symbol = context
-            .block
-            .as_ref()
-            .find_text("thunk_symbol")
-            .unwrap_or("entity".to_string());
-        
-        if ui.collapsing_header(
-            format!(
-                "{} {} - {}",
-                thunk_symbol,
-                context.block.block_name,
-                context.as_ref().hash_code()
-            ),
-            TreeNodeFlags::DEFAULT_OPEN,
-        ) {
-            item.on_ui(world, ui);
-            ui.text(format!("stable: {}", context.as_ref().is_stable()));
-            ui.separator();
-        }
-        }, None, None)
+        List::<Item>(
+            |context, item, world, ui| {
+                let thunk_symbol = context
+                    .block
+                    .as_ref()
+                    .find_text("thunk_symbol")
+                    .unwrap_or("entity".to_string());
+
+                if ui.collapsing_header(
+                    format!(
+                        "{} {} - {}",
+                        thunk_symbol,
+                        context.block.block_name,
+                        context.as_ref().hash_code()
+                    ),
+                    TreeNodeFlags::DEFAULT_OPEN,
+                ) {
+                    item.on_ui(world, ui);
+                    ui.text(format!("stable: {}", context.as_ref().is_stable()));
+                    ui.separator();
+                }
+            },
+            None,
+            None,
+            None
+        )
+    }
+
+    /// Returns a simple list view
+    pub fn table(cols: &[&'static str]) -> Self {
+        List::<Item>(
+            |context, _, world, ui| {
+                context.on_ui(world, ui);
+            },
+            None,
+            None,
+            Some(cols.to_vec()),
+        )
     }
 
     pub fn edit_attr_short_table() -> Self {
-        List::<Item>(|context, item, world, ui| {
-            context.as_mut().edit_attr_short_table(ui);
-            item.on_ui(world, ui);
-        }, None, None)
+        List::<Item>(
+            |context, item, world, ui| {
+                context.as_mut().edit_attr_short_table(ui);
+                item.on_ui(world, ui);
+            },
+            None,
+            None,
+            None,
+        )
     }
 
     pub fn edit_attr_table() -> Self {
-        List::<Item>(|context, item, world, ui| {
-            context.as_mut().edit_attr_table(ui);
-            item.on_ui(world, ui);
-        }, None, None)
+        List::<Item>(
+            |context, item, world, ui| {
+                context.as_mut().edit_attr_table(ui);
+                item.on_ui(world, ui);
+            },
+            None,
+            None,
+            None,
+        )
     }
 
     pub fn edit_block_view(sequence: Option<Sequence>) -> Self {
-        List::<Item>(|context, item, world, ui| {
-            let thunk_symbol = context
-                .block
-                .as_ref()
-                .find_text("thunk_symbol")
-                .unwrap_or("entity".to_string());
-            let item_index = context
-                .as_ref()
-                .find_attr("item::index")
-                .and_then(|h| h.transient())
-                .and_then(|(_, v)| match v {
-                    Value::Int(v) => Some(*v),
-                    _ => None,
-                })
-                .unwrap_or_default();
-            
-            if ui.collapsing_header(
-                format!(
-                    "{} {} - {}",
-                    thunk_symbol,
-                    context.block.block_name,
-                    context.as_ref().hash_code()
-                ),
-                TreeNodeFlags::DEFAULT_OPEN,
-            ) {
-                ui.input_text(format!("name {}", context.as_ref().entity()), &mut context.block.block_name).build();
-                let mut current_id = context.as_ref().entity();
+        List::<Item>(
+            |context, item, world, ui| {
+                let thunk_symbol = context
+                    .block
+                    .as_ref()
+                    .find_text("thunk_symbol")
+                    .unwrap_or("entity".to_string());
+                let item_index = context
+                    .as_ref()
+                    .find_attr("item::index")
+                    .and_then(|h| h.transient())
+                    .and_then(|(_, v)| match v {
+                        Value::Int(v) => Some(*v),
+                        _ => None,
+                    })
+                    .unwrap_or_default();
 
-                let clone = context.as_ref().clone();
-                for attr in context.as_mut().iter_mut_attributes() {
-                    if current_id != attr.id() {
-                        ui.new_line();
+                if ui.collapsing_header(
+                    format!(
+                        "{} {} - {}",
+                        thunk_symbol,
+                        context.block.block_name,
+                        context.as_ref().hash_code()
+                    ),
+                    TreeNodeFlags::DEFAULT_OPEN,
+                ) {
+                    ui.input_text(
+                        format!("name {}", context.as_ref().entity()),
+                        &mut context.block.block_name,
+                    )
+                    .build();
+                    let mut current_id = context.as_ref().entity();
 
-                        if let Some(next_block) = clone.find_imported_graph(attr.id()) {
-                            let thunk_symbol =
-                                next_block.find_text("thunk_symbol").unwrap_or_default();
-                            let block_symbol =
-                                next_block.find_text("block_symbol").unwrap_or_default();
-                            ui.text(format!("{} - {}", thunk_symbol, block_symbol));
+                    let clone = context.as_ref().clone();
+                    for attr in context.as_mut().iter_mut_attributes() {
+                        if current_id != attr.id() {
+                            ui.new_line();
+
+                            if let Some(next_block) = clone.find_imported_graph(attr.id()) {
+                                let thunk_symbol =
+                                    next_block.find_text("thunk_symbol").unwrap_or_default();
+                                let block_symbol =
+                                    next_block.find_text("block_symbol").unwrap_or_default();
+                                ui.text(format!("{} - {}", thunk_symbol, block_symbol));
+                            }
+
+                            current_id = attr.id();
                         }
 
-                        current_id = attr.id();
+                        if attr.is_stable() {
+                            attr.edit_value(
+                                format!("{} {}:{:#04x}", attr.name(), attr.id(), item_index as u16),
+                                ui,
+                            );
+                        }
                     }
-
-                    if attr.is_stable() {
-                        attr.edit_value(
-                            format!("{} {}:{:#04x}", attr.name(), attr.id(), item_index as u16),
-                            ui,
-                        );
-                    }
+                    item.on_ui(world, ui);
+                    ui.text(format!("stable: {}", context.as_ref().is_stable()));
+                    ui.separator();
                 }
-                item.on_ui(world, ui);
-                ui.text(format!("stable: {}", context.as_ref().is_stable()));
-                ui.separator();
-            }
-        }, sequence, None)
+            },
+            sequence,
+            None,
+            None,
+        )
     }
 
     pub fn edit_attr_form() -> Self {
-        List::<Item>(|context, item, world, ui| {
-            let thunk_symbol = context
-                .block
-                .as_ref()
-                .find_text("thunk_symbol")
-                .unwrap_or("entity".to_string());
+        List::<Item>(
+            |context, item, world, ui| {
+                let thunk_symbol = context
+                    .block
+                    .as_ref()
+                    .find_text("thunk_symbol")
+                    .unwrap_or("entity".to_string());
 
-            if ui.collapsing_header(
-                format!(
-                    "{} {} - {}",
-                    thunk_symbol,
-                    context.block.block_name,
-                    context.as_ref().hash_code()
-                ),
-                TreeNodeFlags::DEFAULT_OPEN,
-            ) {
-                for attr in context.as_mut().iter_mut_attributes() {
-                    attr.edit_value(format!("{} {}", attr.name(), attr.id()), ui);
+                if ui.collapsing_header(
+                    format!(
+                        "{} {} - {}",
+                        thunk_symbol,
+                        context.block.block_name,
+                        context.as_ref().hash_code()
+                    ),
+                    TreeNodeFlags::DEFAULT_OPEN,
+                ) {
+                    for attr in context.as_mut().iter_mut_attributes() {
+                        attr.edit_value(format!("{} {}", attr.name(), attr.id()), ui);
+                    }
+                    item.on_ui(world, ui);
+                    ui.text(format!("stable: {}", context.as_ref().is_stable()));
+                    ui.separator();
                 }
-                item.on_ui(world, ui);
-                ui.text(format!("stable: {}", context.as_ref().is_stable()));
-                ui.separator();
-            }
-        }, None, None)
+            },
+            None,
+            None,
+            None,
+        )
     }
 }
 
@@ -197,39 +248,63 @@ where
         let mut contexts = app_world.write_component::<ThunkContext>();
         let mut items = app_world.write_component::<Item>();
 
+        let title = self.title().clone();
         let mut item_index = 0;
 
-        let List(_, sequence, ..) = self;
-        if let Some(sequence) = sequence {
-     
-            for entity in sequence.iter_entities()
-            {
-                let row = (entity, &mut contexts.get_mut(entity), &mut items.get_mut(entity));
-                if let (_, Some(context), Some(item)) = row {
+        let mut layout = || {
+            let List(_, sequence, ..) = self;
+            if let Some(sequence) = sequence {
+                for entity in sequence.iter_entities() {
+                    let row = (
+                        entity,
+                        &mut contexts.get_mut(entity),
+                        &mut items.get_mut(entity),
+                    );
+                    if let (_, Some(context), Some(item)) = row {
+                        let List(layout, ..) = self;
+                        context
+                            .as_mut()
+                            .define("item", "index")
+                            .edit_as(Value::Int(item_index));
+    
+                        (layout)(context, item, app_world, ui);
+    
+                        item_index += 1;
+                    }
+                }
+            } else {
+                for (context, item) in (&mut contexts, &mut items).join() {
                     let List(layout, ..) = self;
                     context
                         .as_mut()
                         .define("item", "index")
                         .edit_as(Value::Int(item_index));
-        
+    
                     (layout)(context, item, app_world, ui);
-        
+
                     item_index += 1;
                 }
             }
-        } else {
-            for (context, item) in (&mut contexts, &mut items).join() {
-                let List(layout, ..) = self;
-                context
-                    .as_mut()
-                    .define("item", "index")
-                    .edit_as(Value::Int(item_index));
-    
-                (layout)(context, item, app_world, ui);
-    
-                item_index += 1;
+        };
+
+        if let Some(table_cols) = &self.3 {
+            if let Some(token) = ui.begin_table_with_flags(
+                format!("{:?}", title),
+                table_cols.len(),
+                TableFlags::RESIZABLE,
+            ) {
+                for col in table_cols {
+                    ui.table_setup_column(col);
+                }
+                ui.table_headers_row();
+
+                layout();
+                token.end();
             }
+        } else {
+            layout();
         }
+
     }
 
     fn on_run(&'_ mut self, app_world: &World) {
