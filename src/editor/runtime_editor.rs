@@ -153,7 +153,8 @@ impl RuntimeEditor {
         match self.runtime.listen::<OpenDir>(world) {
             Some(file_dir) => {
                 let mut project = Project::from(file_dir.as_ref().clone());
-                for (block_name, block) in project.iter_block_mut() {
+                for (_, _) in project.iter_block_mut() {
+                    // TODO, this seems to cause a slight issue
                     // eprintln!("found block {}", block_name);
                     // if let Some(file) = block.get_block("file") {
                     //     if let (Some(file_src), Some(content)) = (

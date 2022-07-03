@@ -1,6 +1,7 @@
 use crate::editor::*;
 use crate::plugins::*;
 use atlier::system::Extension;
+use imgui::MenuItem;
 use imgui::TableFlags;
 use imgui::TreeNodeFlags;
 use imgui::Ui;
@@ -255,6 +256,7 @@ where
         let mut layout = || {
             let List(_, sequence, ..) = self;
             if let Some(sequence) = sequence {
+                let last = sequence.iter_entities().last();
                 for entity in sequence.iter_entities() {
                     let row = (
                         entity,
@@ -271,6 +273,18 @@ where
                         (layout)(context, item, app_world, ui);
     
                         item_index += 1;
+
+                        if last == Some(entity) {
+                            ui.menu_bar(|| {
+                                ui.menu("File", || {
+                                    if MenuItem::new("Output sequence output to console").build(ui) {
+                                        if let Some(transpiled) = Project::from(context.as_ref().clone()).transpile_blocks().ok() {
+                                            println!("{}", transpiled);
+                                        }
+                                    }
+                                });
+                            });
+                        }
                     }
                 }
             } else {

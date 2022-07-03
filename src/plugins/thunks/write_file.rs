@@ -26,7 +26,7 @@ impl Plugin<ThunkContext> for WriteFile {
             let mut tc = context.clone();
             async move {
                 tc.as_mut().apply("previous");
-                for file_block in tc.as_ref().find_blocks("file") {
+                for mut file_block in tc.as_ref().find_blocks("file") {
                     if let Some(work_dir) = tc.as_ref().find_text("work_dir") {
                         if let Some(file_name) = file_block.find_text("file_name") {
                             if let Some(content) = file_block.find_binary("content") {
@@ -42,6 +42,10 @@ impl Plugin<ThunkContext> for WriteFile {
                                             path
                                         ))
                                         .await;
+                                        // Example of moving a file
+                                        // open_file -> write_file -> file (output of sequence)
+                                        file_block.add_text_attr("file_src", format!("{:?}", path).trim_matches('"'));
+                                        tc.as_mut().merge(&file_block);
                                     }
                                     Err(err) => {
                                         let error_message = format!("# error writing file {}", err);

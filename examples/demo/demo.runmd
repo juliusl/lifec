@@ -34,3 +34,11 @@ add config .symbol timer_config
 add duration .int_range 10, 0, 50
 ```
 
+# Expected output of sequence:
+#
+# ``` test.sh file
+# add content   .bin  IyEvYmluL3pzaAoKZWNobyBIZWxsbyBXb3JsZAplY2hvIEhlbGxvIFdvcmxkCg==
+# add file_ext  .text sh
+# add file_name .text test.sh
+# add file_src  .text test/test2/test.sh
+# ```
