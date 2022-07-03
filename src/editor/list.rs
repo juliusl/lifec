@@ -177,6 +177,20 @@ where
         world.register::<ThunkContext>();
         world.register::<Item>();
         world.register::<List<Item>>();
+
+        Item::configure_app_world(world);
+    }
+
+    fn configure_app_systems(dispatcher: &mut DispatcherBuilder) {
+        Item::configure_app_systems(dispatcher);
+    }
+
+    fn on_window_event(&'_ mut self, app_world: &World, event: &'_ WindowEvent<'_>) {
+        let mut items = app_world.write_component::<Item>();
+
+        for item in (&mut items).join() {
+            item.on_window_event(app_world, event);
+        }
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
