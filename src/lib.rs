@@ -407,6 +407,7 @@ impl Runtime {
                     }
                 }
 
+                engine_root.add_text_attr("sequence_name", sequence_block_name);
                 return E::initialize_sequence(engine_root, sequence, world);
             }
         } else {

@@ -5,7 +5,7 @@ use crate::{
 };
 use atlier::system::{Extension, App};
 use imgui::{Ui, Window};
-use specs::{World, WorldExt};
+use specs::{World, WorldExt, Join};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
 /// Listener function, called when a thunk completes
@@ -76,7 +76,15 @@ impl Extension for RuntimeEditor {
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
-        self.task_window(app_world, ui);
+        // This is all tasks,
+        self.task_window(app_world, &mut List::<Task>::simple(), ui);
+
+        // These are each active sequences
+        let mut sequence_lists = app_world.write_component::<List::<Task>>();
+        for sequence in (&mut sequence_lists).join() {
+            self.task_window(app_world, sequence, ui);
+        }
+
         self.runtime.edit_ui(ui);
         self.runtime.display_ui(ui);
     }
@@ -227,8 +235,10 @@ impl RuntimeEditor {
         );
     }
 
-    pub fn task_window(&mut self, app_world: &specs::World, ui: &Ui) {
-        Window::new("Tasks")
+    pub fn task_window(&mut self, app_world: &specs::World, task_list: &mut List<Task>, ui: &Ui) {
+        let title = task_list.title().unwrap_or("All".to_string());
+
+        Window::new(format!("Tasks, engine: {}", title))
             .menu_bar(true)
             .size([900.0, 1080.0], imgui::Condition::Appearing)
             .build(ui, || {
@@ -238,7 +248,7 @@ impl RuntimeEditor {
                     self.runtime.menu(ui);
                 });
 
-                List::<Task>::edit_block_view().on_ui(app_world, ui);
+                task_list.on_ui(app_world, ui);
                 ui.new_line();
             });
     }

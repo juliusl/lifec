@@ -39,6 +39,8 @@ pub use render::Edit;
 pub use render::Render;
 
 use crate::AttributeGraph;
+use crate::editor::List;
+use crate::editor::Task;
 use tokio::task::JoinHandle;
 
 /// This trait is to facilitate extending working with the attribute graph
@@ -206,6 +208,7 @@ pub trait Engine {
         mut sequence: Sequence,
         world: &World,
     ) -> Option<Entity> {
+        let sequence_list = sequence.clone();
         if let Some(first) = sequence.next() {
             if let Some(true) = engine_root.as_ref().is_enabled("repeat") {
                 sequence.set_cursor(first);
@@ -221,10 +224,19 @@ pub trait Engine {
                     eprintln!("Cursor not found");
                 }
             }
+            let mut sequence_list = List::<Task>::edit_block_view(Some(sequence_list));
+
+            if let Some(sequence_name) = engine_root.as_ref().find_text("sequence_name") {
+                sequence_list.set_title(sequence_name);
+            }
 
             world
                 .write_component::<Sequence>()
-                .insert(first, sequence)
+                .insert(first, sequence.clone())
+                .ok();
+            world
+                .write_component::<List<Task>>()
+                .insert(first, sequence_list)
                 .ok();
 
             Some(first)

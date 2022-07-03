@@ -1,11 +1,11 @@
 use super::{ProgressStatusBar, StartButton};
 use crate::plugins::*;
 use atlier::system::Extension;
-use specs::storage::HashMapStorage;
+use specs::storage::BTreeStorage;
 
 #[derive(Default, Component, Clone)]
-#[storage(HashMapStorage)]
-pub struct Task(Option<StartButton>, Option<ProgressStatusBar>);
+#[storage(BTreeStorage)]
+pub struct Task(Option<StartButton>, Option<ProgressStatusBar>, Option<Sequence>);
 
 impl Extension for Task {
     fn configure_app_world(world: &mut World) {
@@ -31,11 +31,15 @@ impl Extension for Task {
             }
             progress_status_bar.on_ui(app_world, ui);
         }
+
+        if let Task(.., Some(sequence)) = self {
+            ui.text(format!("sequence: {}", sequence));
+        }
     }
 
     /// In the case of runnin
     fn on_run(&'_ mut self, app_world: &World) {
-        if let Task(_, Some(progess_status_bar)) = self {
+        if let Task(_, Some(progess_status_bar), ..) = self {
             progess_status_bar.on_run(app_world);
         }
     }
@@ -49,14 +53,16 @@ impl<'a> System<'a> for TaskSystem {
         WriteStorage<'a, Task>,
         ReadStorage<'a, StartButton>,
         ReadStorage<'a, ProgressStatusBar>,
+        ReadStorage<'a, Sequence>,
     );
 
-    fn run(&mut self, (entities, mut tasks, start_events, progress): Self::SystemData) {
-        for (_, task, start_event, progress) in (
+    fn run(&mut self, (entities, mut tasks, start_events, progress, sequences): Self::SystemData) {
+        for (_, task, start_event, progress, sequence) in (
             &entities,
             &mut tasks,
             start_events.maybe(),
             progress.maybe(),
+            sequences.maybe(),
         )
             .join()
         {
@@ -65,6 +71,10 @@ impl<'a> System<'a> for TaskSystem {
             }
             if let Some(progress) = progress {
                 task.1 = Some(progress.clone());
+            }
+
+            if let Some(sequence) = sequence {
+                task.2 = Some(sequence.clone());
             }
         }
     }

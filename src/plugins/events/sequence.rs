@@ -1,8 +1,10 @@
+use std::fmt::Display;
+
 use specs::storage::HashMapStorage;
 use specs::{Component, Entity};
 
 /// The event runtime uses this component to determine if it should execute additional events after an event completes
-#[derive(Component, Default, Clone)]
+#[derive(Component, Debug, Default, Clone)]
 #[storage(HashMapStorage)]
 pub struct Sequence(
     /// sequence, a list of entities w/ events that are called in sequence
@@ -10,6 +12,23 @@ pub struct Sequence(
     /// cursor, if set, this entity will be called after the sequence completes
     Option<Entity>
 );
+
+impl Display for Sequence {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0.is_empty() {
+            write!(f, "End of sequence, cursor: {:?}",  self.1)?;
+        } else {
+            let mut clone = self.0.clone(); 
+            clone.reverse();
+            for entity in clone.iter().take(1) {
+                write!(f, "next: {:?} ", entity)?;
+            }
+            write!(f, "remaining: {} ", clone.len())?;
+        }
+
+        Ok(())
+    }
+}
 
 impl From<Vec<Entity>> for Sequence {
     /// Note: Reverses the order, assuming vec was built with .push(), this is 
@@ -66,5 +85,12 @@ impl Sequence {
         } else {
             None 
         }
+    }
+
+    /// iterate through entities 
+    pub fn iter_entities(&self) -> impl Iterator<Item = Entity> {
+        let mut clone = self.0.clone();
+        clone.reverse();
+        clone.into_iter()
     }
 }
