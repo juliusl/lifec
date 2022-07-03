@@ -12,6 +12,7 @@ pub mod plugins;
 mod state;
 pub use state::AttributeGraph;
 
+
 pub trait RuntimeDispatcher: AsRef<AttributeGraph> + AsMut<AttributeGraph>
 where
     Self: Sized,
@@ -141,7 +142,7 @@ pub struct Runtime {
     engine_plugin: BTreeMap<String, CreateFn>,
     /// Table for thunk configurations
     config: BTreeMap<String, ConfigFn>,
-    /// Table of broadcase receivers
+    /// Table of broadcast receivers
     receivers: HashMap<String, tokio::sync::broadcast::Receiver<Entity>>,
 }
 
@@ -157,7 +158,7 @@ impl Default for Runtime {
 }
 
 impl Runtime {
-    /// returns a runtime from a project, with no plugins installed
+    /// Returns a runtime from a project, with no plugins installed
     pub fn new(project: Project) -> Self {
         Self {
             project,

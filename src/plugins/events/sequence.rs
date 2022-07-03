@@ -1,7 +1,7 @@
 use specs::storage::HashMapStorage;
 use specs::{Component, Entity};
 
-
+/// The event runtime uses this component to determine if it should execute additional events after an event completes
 #[derive(Component, Default, Clone)]
 #[storage(HashMapStorage)]
 pub struct Sequence(
@@ -32,13 +32,9 @@ impl Sequence {
     /// Adds an entity to this sequence.
     pub fn add(&mut self, entity: Entity) {
         let Self(events, ..) = self;
-       
-        let mut clone = events.clone();
-        clone.reverse();
-        clone.push(entity);
-        clone.reverse();
-
-        *events = clone;
+        events.reverse();
+        events.push(entity);
+        events.reverse();
     }
 
     /// Returns the next entity in this sequence.
@@ -57,5 +53,18 @@ impl Sequence {
     /// if pointing to an entity in this sequence, setting the cursor will create a loop.
     pub fn set_cursor(&mut self, cursor: Entity) {
         self.1 = Some(cursor);
+    }
+
+    /// Takes the next event and returns a sequence with only that event
+    pub fn fork(&self) -> Option<Sequence> {
+        let mut clone = self.clone();
+
+        if let Some(next) = clone.next() {
+            let mut fork = Sequence::default();
+            fork.add(next);
+            Some(fork)
+        } else {
+            None 
+        }
     }
 }

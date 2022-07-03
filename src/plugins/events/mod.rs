@@ -45,7 +45,7 @@ impl Display for Event {
 }
 
 impl Event {
-    /// creates an event component, with a task created with on_event
+    /// Creates an event component, with a task created with on_event
     /// a handle to the tokio runtime is passed to this function to customize the task spawning
     pub fn from_plugin<P>(event_name: &'static str) -> Self
     where
@@ -54,11 +54,12 @@ impl Event {
         Self(event_name, Thunk::from_plugin::<P>(), None, None, None)
     }
 
+    /// Sets the config to use w/ this event
     pub fn set_config(&mut self, config: Config) {
         self.2 = Some(config);
     }
 
-    /// "fire" the event, abort any previously running tasks
+    /// Prepares an event for the event runtime to start, cancel any previous join_handle
     pub fn fire(&mut self, thunk_context: ThunkContext) {
         self.3 = Some(thunk_context);
 
@@ -66,12 +67,11 @@ impl Event {
         self.cancel();
     }
 
-    /// cancel any ongoing task spawned by this event
-    /// TODO, BUG, not completly correct, because this will not cancel tasks that have loops inside of their implementation
-    /// Need to add an additional channel to thunk_context/event_runtim
+    /// Cancel the existing join handle, mainly used for housekeeping.
+    /// Thunks must manage their own cancellation by using the cancel_source.
     pub fn cancel(&mut self) {
         if let Some(task) = self.4.as_mut() {
-            eprintln!("aborting existing task");
+            eprintln!("cancelling existing join_handle");
             task.abort();
         }
     }
@@ -213,7 +213,6 @@ impl<'a> System<'a> for EventRuntime {
                         }
                     }
                 } else {
-                    // TODO Can check for cancellation here before reinserting the task handle back to it's event
                     *task = Some(current_task);
                 }
             } else if let Some(initial_context) = initial_context.take() {

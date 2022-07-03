@@ -102,7 +102,7 @@ pub trait Engine {
     /// Setup graph
     fn setup(_: &mut AttributeGraph) {
         // No-op
-        // Note: Left as an extension point, but mainly shouldn't be needed
+        // Note: Left as an extension point, but mainly shouldn't need to be implemented
     }
 
     /// Initialize event for entity, this is called by init<P>

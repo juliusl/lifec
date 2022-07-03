@@ -21,8 +21,8 @@ pub use timer::Timer;
 mod runmd;
 pub use runmd::Runmd;
 
-use tokio::{runtime::Handle, sync::mpsc::Sender, task::JoinHandle, sync::oneshot::channel};
 use super::{BlockContext, Plugin};
+use tokio::{runtime::Handle, sync::mpsc::Sender, sync::oneshot::channel, task::JoinHandle};
 
 /// Thunk is a function that can be passed around for the system to call later
 #[derive(Component, Clone)]
@@ -35,12 +35,11 @@ pub struct Thunk(
 /// Config for a thunk context
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
-pub struct Config
-(
+pub struct Config(
     /// config label
     pub &'static str,
     /// config fn
-    pub fn(&mut ThunkContext)
+    pub fn(&mut ThunkContext),
 );
 
 impl AsRef<Config> for Config {
@@ -57,7 +56,7 @@ impl Thunk {
         Self(P::symbol(), P::call_with_context)
     }
 
-    /// deprecated? 
+    /// deprecated?
     pub fn show(&self, context: &mut ThunkContext, ui: &Ui) {
         ui.set_next_item_width(130.0);
         if ui.button(context.label(self.0)) {
@@ -70,8 +69,10 @@ impl Thunk {
 /// StatusUpdate for stuff like progress bars
 pub type StatusUpdate = (Entity, f32, String);
 
+/// Cancel token stored by the event runtime
 pub type CancelToken = tokio::sync::oneshot::Sender<()>;
 
+/// Cancel source stored by the thunk
 pub type CancelSource = tokio::sync::oneshot::Receiver<()>;
 
 #[derive(Component)]
@@ -103,13 +104,8 @@ impl ThunkContext {
     /// (Example: Timer uses this, while Process uses select!)
     pub fn is_cancelled(cancel_source: &mut oneshot::Receiver<()>) -> bool {
         match cancel_source.try_recv() {
-            Ok(_)
-            | Err(tokio::sync::oneshot::error::TryRecvError::Closed)  => {
-                true
-            }
-            _ => {
-                false
-            }
+            Ok(_) | Err(tokio::sync::oneshot::error::TryRecvError::Closed) => true,
+            _ => false,
         }
     }
 
@@ -134,7 +130,10 @@ impl ThunkContext {
 
     /// If async is enabled on the thunk context, this will spawn the task
     /// otherwise, this call will result in a no-op
-    pub fn task<F>(&self, task: impl FnOnce(CancelSource) -> F) -> Option<(JoinHandle<ThunkContext>, CancelToken)>
+    pub fn task<F>(
+        &self,
+        task: impl FnOnce(CancelSource) -> F,
+    ) -> Option<(JoinHandle<ThunkContext>, CancelToken)>
     where
         F: Future<Output = Option<ThunkContext>> + Send + 'static,
     {
@@ -147,16 +146,15 @@ impl ThunkContext {
             let (tx, cancel) = channel::<()>();
 
             let task = (task)(cancel);
-            Some((handle.spawn(async {
-                match task.await {
-                    Some(next) => {
-                        next
-                    },
-                    None => {
-                        default_return
-                    },
-                }
-            }), tx))
+            Some((
+                handle.spawn(async {
+                    match task.await {
+                        Some(next) => next,
+                        None => default_return,
+                    }
+                }),
+                tx,
+            ))
         } else {
             None
         }
@@ -180,8 +178,8 @@ impl ThunkContext {
         }
     }
 
-      /// optionally, update status of the thunk execution
-      pub async fn update_status_only(&self, status: impl AsRef<str>) {
+    /// optionally, update status of the thunk execution
+    pub async fn update_status_only(&self, status: impl AsRef<str>) {
         self.update_progress(status, 0.0).await;
     }
 }
