@@ -63,6 +63,12 @@ impl Sequence {
         events.pop()
     }
 
+    /// Returns a copy of the next entity in this sequence,
+    /// w/o altering the sequence 
+    pub fn peek(&self) -> Option<Entity> {
+        self.clone().0.pop()
+    }
+
     /// Returns the entity that should be called at the end of the sequence.
     pub fn cursor(&self) -> Option<Entity> {
         self.1
