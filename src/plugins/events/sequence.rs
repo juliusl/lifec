@@ -69,6 +69,31 @@ impl Sequence {
         self.clone().0.pop()
     }
 
+    /// Connects the current cursor to the start of the other sequence,
+    /// by returning a sequence that contains the first entity as the the only
+    /// element in the sequence, and the next entity set as the cursor
+    pub fn connect(&self, other: &Sequence) -> Sequence {
+        let from = self.cursor();
+        let to = other.peek();
+
+        let mut link = Sequence::default();
+        
+        if let Some(from) = from {
+            link.add(from);
+        }
+
+        if let Some(to) = to {
+            link.set_cursor(to);
+        }
+
+        link
+    }
+
+    /// Returns a tuple of the start of the sequence, and the cursor
+    pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
+        (self.peek(), self.cursor())
+    }
+
     /// Returns the entity that should be called at the end of the sequence.
     pub fn cursor(&self) -> Option<Entity> {
         self.1
