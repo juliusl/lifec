@@ -13,6 +13,7 @@ pub struct Sequence(
     Option<Entity>
 );
 
+/// This component configures the Sequence cursor to point at the sequence it is connected to
 #[derive(Component, Debug, Default, Clone)]
 #[storage(DefaultVecStorage)]
 pub struct Connection(
