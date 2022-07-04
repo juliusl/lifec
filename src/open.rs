@@ -1,5 +1,6 @@
-pub use atlier::system::{App, Extension};
-pub use specs::System;
+use crate::editor::Extension;
+use crate::editor::App;
+use crate::plugins::System;
 
 
 /// Opens a new window w/ the provided App and Extension
