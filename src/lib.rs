@@ -6,7 +6,9 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::{any::Any, collections::BTreeMap};
 
-pub mod open;
+mod open;
+pub use open::open;
+
 pub mod editor;
 pub mod plugins;
 
