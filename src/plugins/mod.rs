@@ -13,6 +13,7 @@ pub use events::Event;
 pub use events::EventRuntime;
 pub use events::Listen;
 pub use events::Sequence;
+pub use events::Connection;
 
 mod nodes;
 pub use nodes::Node;

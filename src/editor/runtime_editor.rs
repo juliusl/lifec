@@ -19,6 +19,11 @@ pub struct RuntimeEditor {
 }
 
 impl RuntimeEditor {
+    pub fn new(runtime: Runtime) -> Self {
+        let mut new = Self::default();
+        new.runtime = runtime;
+        new
+    }
     /// Returns a mutable version of the current project
     pub fn project_mut(&mut self) -> &mut Project {
         &mut self.runtime.project

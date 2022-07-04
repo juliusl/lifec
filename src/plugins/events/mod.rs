@@ -25,6 +25,7 @@ pub use listen::Listen;
 
 mod sequence;
 pub use sequence::Sequence;
+pub use sequence::Connection;
 
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
 #[derive(Component)]

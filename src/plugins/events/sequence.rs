@@ -1,17 +1,41 @@
 use std::fmt::Display;
 
-use specs::storage::HashMapStorage;
+use specs::storage::DefaultVecStorage;
 use specs::{Component, Entity};
 
 /// The event runtime uses this component to determine if it should execute additional events after an event completes
 #[derive(Component, Debug, Default, Clone)]
-#[storage(HashMapStorage)]
+#[storage(DefaultVecStorage)]
 pub struct Sequence(
     /// sequence, a list of entities w/ events that are called in sequence
     Vec<Entity>, 
     /// cursor, if set, this entity will be called after the sequence completes
     Option<Entity>
 );
+
+#[derive(Component, Debug, Default, Clone)]
+#[storage(DefaultVecStorage)]
+pub struct Connection(
+    Sequence,
+    Option<Entity>,
+);
+
+impl Connection {
+    pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
+        let Self(sequence, ..) = self; 
+
+
+        (sequence.last(), sequence.cursor())
+    }
+
+    pub fn set_owner(&mut self, owner: Entity) {
+        self.1 = Some(owner);
+    }
+
+    pub fn owner(&self) -> Option<Entity> {
+        self.1
+    }
+}
 
 impl Display for Sequence {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -56,6 +80,12 @@ impl Sequence {
         events.reverse();
     }
 
+    /// Pushs an entity to the top of this sequence,
+    pub fn push(&mut self, entity: Entity) {
+        let Self(events, ..) = self;
+        events.push(entity);
+    }
+
     /// Returns the next entity in this sequence.
     pub fn next(&mut self) -> Option<Entity> {
         let Self(events, ..) = self; 
@@ -79,8 +109,8 @@ impl Sequence {
     /// Connects the current cursor to the start of the other sequence,
     /// by returning a sequence that contains the first entity as the the only
     /// element in the sequence, and the next entity set as the cursor
-    pub fn connect(&self, other: &Sequence) -> Sequence {
-        let from = self.cursor();
+    pub fn connect(&self, other: &Sequence) -> Connection {
+        let from = self.last();
         let to = other.peek();
 
         let mut link = Sequence::default();
@@ -93,12 +123,7 @@ impl Sequence {
             link.set_cursor(to);
         }
 
-        link
-    }
-
-    /// Returns a tuple of the start of the sequence, and the cursor
-    pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
-        (self.last(), self.cursor())
+        Connection(link, None)
     }
 
     /// Returns the entity that should be called at the end of the sequence.
