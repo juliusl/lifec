@@ -98,7 +98,7 @@ impl Sequence {
 
     /// Returns a tuple of the start of the sequence, and the cursor
     pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
-        (self.peek(), self.cursor())
+        (self.last(), self.cursor())
     }
 
     /// Returns the entity that should be called at the end of the sequence.
