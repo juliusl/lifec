@@ -4,7 +4,7 @@ use crate::{
     Runtime
 };
 use atlier::system::Extension;
-use imgui::{Ui, Window};
+use imgui::{Ui, Window, StyleVar, Slider};
 use specs::{World, WorldExt, Join};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
@@ -14,7 +14,8 @@ type RuntimeEditorListener = fn (&mut RuntimeEditor, world: &World);
 /// This struct is an environment and extension point for a lifec Runtime
 pub struct RuntimeEditor {
     runtime: Runtime,
-    listeners: Vec<RuntimeEditorListener>
+    listeners: Vec<RuntimeEditorListener>,
+    font_scale: f32,
 }
 
 impl RuntimeEditor {
@@ -50,7 +51,8 @@ impl Default for RuntimeEditor {
         let mut default = Self {
             runtime: Default::default(),
             listeners: vec![
-            ]
+            ],
+            font_scale: 1.0
         };
         default.runtime.install::<Call, Timer>();
         default.runtime.install::<Call, Process>();
@@ -76,6 +78,13 @@ impl Extension for RuntimeEditor {
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
+        ui.main_menu_bar(||{
+            ui.menu("Window", ||{
+                Slider::new("font scale", 0.5, 4.0) .build(ui, &mut self.font_scale);
+                ui.separator();
+            });
+        });
+
         // Window::new("table").build(ui, ||{
         //     List::<Task>::table(&[
         //         "entity", 
@@ -253,14 +262,35 @@ impl RuntimeEditor {
             .build(ui, || {
                 ui.menu_bar(|| {
                     ui.menu("Menu", ||{
-                        self.project_mut().edit_project_menu(ui);
+                        let frame_padding = ui.push_style_var(
+                            StyleVar::FramePadding([8.0, 5.0])
+                        );
+                        self.project_mut()
+                            .edit_project_menu(ui);
+                        ui.separator();
+                        
                         self.edit_event_menu(app_world, ui);
-                        self.runtime.menu(ui);
+                        ui.separator();
+                        
+                        self.runtime
+                            .menu(ui);
+                        ui.separator();
+                        frame_padding.end();
                     });
                 });
 
+                let frame_padding = ui.push_style_var(
+                    StyleVar::FramePadding([8.0, 5.0])
+                );
+
+                let window_padding = ui.push_style_var(
+                    StyleVar::WindowPadding([16.0, 16.0])
+                );
+                ui.set_window_font_scale(self.font_scale);
                 task_list.on_ui(app_world, ui);
                 ui.new_line();
+                frame_padding.end();
+                window_padding.end();
             });
     }
 }

@@ -58,7 +58,7 @@ impl Plugin<ThunkContext> for Process {
                         }
                     }
 
-                    tc.update_progress("```", 0.10).await;
+                    tc.update_progress("```", 0.20).await;
                     tc.update_progress("# Running", 0.20).await;
                     let start_time = Some(Utc::now());
 
