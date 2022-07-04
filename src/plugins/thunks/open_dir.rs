@@ -72,6 +72,7 @@ impl Plugin<ThunkContext> for OpenDir {
 
                     let path_buf = PathBuf::from(file_dir);
 
+                    // Add files to project
                     if let Some(mut read_dir) = fs::read_dir(path_buf).await.ok() {
                         let mut progress = 0.0;
                         loop {
