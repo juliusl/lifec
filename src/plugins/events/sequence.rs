@@ -24,8 +24,6 @@ pub struct Connection(
 impl Connection {
     pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
         let Self(sequence, ..) = self; 
-
-
         (sequence.last(), sequence.cursor())
     }
 
