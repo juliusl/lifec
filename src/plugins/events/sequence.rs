@@ -69,6 +69,13 @@ impl Sequence {
         self.clone().0.pop()
     }
 
+    /// Returns the copy of the last entity in this sequence, before the cursor
+    pub fn last(&self) -> Option<Entity> {
+        let mut clone = self.clone();
+        clone.0.reverse();
+        clone.0.pop()
+    }
+
     /// Connects the current cursor to the start of the other sequence,
     /// by returning a sequence that contains the first entity as the the only
     /// element in the sequence, and the next entity set as the cursor
