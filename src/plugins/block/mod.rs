@@ -492,7 +492,6 @@ impl AsMut<AttributeGraph> for BlockContext {
 
 #[test]
 fn test_block_context() {
-    use crate::plugins::NodeContext;
     use crate::RuntimeDispatcher;
     let mut test_graph = AttributeGraph::from(0);
 
@@ -537,17 +536,6 @@ add debug_out .BOOL true
     assert!(sh_test.add_block("accept", |attr| {
         attr.add_empty_attr("filename");
     }));
-
-    let other_context = NodeContext::from(sh_test.as_ref().clone());
-    let back_to_block = BlockContext::from(other_context.as_ref().clone());
-
-    println!("{:#?}", back_to_block.as_ref());
-    match back_to_block.transpile() {
-        Ok(result) => {
-            println!("{}", result);
-        }
-        Err(_) => todo!(),
-    }
 }
 
 #[test]
