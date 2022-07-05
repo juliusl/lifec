@@ -31,6 +31,9 @@ pub use thunks::Thunk;
 pub use thunks::ThunkContext;
 pub use thunks::Timer;
 
+/// Async context returned if the plugin starts an async task
+pub type AsyncContext = (tokio::task::JoinHandle<ThunkContext>, tokio::sync::oneshot::Sender<()>);
+
 /// This trait is to facilitate extending working with the attribute graph
 pub trait Plugin<T>
 where
@@ -45,7 +48,7 @@ where
     fn symbol() -> &'static str;
 
     /// implement call_with_context to allow for static extensions of attribute graph
-    fn call_with_context(context: &mut T) -> Option<(JoinHandle<T>, tokio::sync::oneshot::Sender<()>)>;
+    fn call_with_context(context: &mut T) -> Option<AsyncContext>;
 
     /// Returns a short string description for this plugin
     fn description() -> &'static str {

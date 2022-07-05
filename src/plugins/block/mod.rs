@@ -1,6 +1,4 @@
-mod transpile;
 use serde::{Deserialize, Serialize};
-use transpile::Transpile;
 
 mod project;
 pub use project::Project;
@@ -12,8 +10,6 @@ use specs::storage::DenseVecStorage;
 use specs::Component;
 use std::fmt::Write;
 use std::{collections::BTreeSet, fmt::Error};
-
-use super::Plugin;
 
 /// BlockContext provides common methods for working with blocks
 #[derive(Debug, Component, Default, Clone, Hash, PartialEq, Serialize, Deserialize)]
@@ -327,7 +323,6 @@ impl BlockContext {
                     transpiled.add_block("file", |f| {
                         f.add_text_attr("runmd_path", format!("{}.runmd", block_name))
                     });
-                    Transpile::call_with_context(&mut transpiled);
                 }
                 if ui.is_item_hovered() {
                     ui.tooltip(|| {
