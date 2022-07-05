@@ -1,7 +1,7 @@
 pub use atlier::system::{App, Value, Extension};
 use imgui::{ChildWindow, MenuItem, Ui, Window};
 use plugins::{BlockContext, Config, Engine, Event, Plugin, Project, Sequence, ThunkContext};
-pub use specs::{Component, Entity, System, World, WorldExt};
+use specs::{Component, Entity, System, World, WorldExt};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::{any::Any, collections::BTreeMap};
