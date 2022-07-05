@@ -16,6 +16,13 @@ pub struct RuntimeEditor {
     font_scale: f32,
 }
 
+/// Allows runtime editor to use `crate::start` method
+impl AsRef<Runtime> for RuntimeEditor {
+    fn as_ref(&self) -> &Runtime {
+        &self.runtime
+    }
+}
+
 impl RuntimeEditor {
     pub fn new(runtime: Runtime) -> Self {
         let mut new = Self::default();

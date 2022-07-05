@@ -1,10 +1,13 @@
-pub use atlier::system::{App, Value, Extension};
-pub use specs::{DenseVecStorage, HashMapStorage, DefaultVecStorage};
+pub use atlier::system::{App, Extension, Value};
+use editor::{Call};
 pub use specs::storage::BTreeStorage;
-pub use specs::{Component, Entity, System, World, WorldExt, DispatcherBuilder};
+pub use specs::{Component, DispatcherBuilder, Entity, System, World, WorldExt};
+pub use specs::{DefaultVecStorage, DenseVecStorage, HashMapStorage};
 
 use imgui::{ChildWindow, MenuItem, Ui, Window};
-use plugins::{BlockContext, Config, Engine, Event, Plugin, Project, Sequence, ThunkContext, AsyncContext};
+use plugins::{
+    AsyncContext, BlockContext, Config, Engine, Event, Plugin, Project, Sequence, ThunkContext, OpenFile, WriteFile, OpenDir, Process, Remote, Timer,
+};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::{any::Any, collections::BTreeMap};
@@ -266,8 +269,7 @@ impl<'a> System<'a> for Runtime {
 }
 
 impl Runtime {
-    fn menu(&mut self, _: &Ui) {
-    }
+    fn menu(&mut self, _: &Ui) {}
 
     pub fn create_event_menu_item(
         &mut self,
@@ -636,8 +638,37 @@ impl Plugin<ThunkContext> for Runtime {
     }
 
     fn call_with_context(context: &mut ThunkContext) -> Option<AsyncContext> {
-       // TODO
+        context.clone().task(|_| {
+            let tc = context.clone();
+            async {
+                if let Some(project_src) = tc.as_ref().find_text("project_src") {
+                    if let Some(project) = Project::load_file(project_src) {
+                        let mut runtime = Runtime::new(project);
+                        runtime.install::<Call, OpenFile>();
+                        runtime.install::<Call, WriteFile>();
+                        runtime.install::<Call, OpenDir>();
+                        runtime.install::<Call, Process>();
+                        runtime.install::<Call, Remote>();
+                        runtime.install::<Call, Timer>();
 
-       None
+                        let project = &runtime.project;
+
+                        let mut call_names = vec![];
+
+                        for (_, block) in project.iter_block() {
+                            if let Some(runtime_block) = block.get_block("runtime") {
+                                for (_, value) in runtime_block.find_symbol_values("call") {
+                                    if let Value::Symbol(sequence_name) = value {
+                                      call_names.push(sequence_name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Some(tc)
+            }
+        })
     }
 }
