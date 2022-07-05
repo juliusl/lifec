@@ -9,6 +9,9 @@ use std::{any::Any, collections::BTreeMap};
 mod open;
 pub use open::open;
 
+mod start;
+pub use start::start;
+
 pub mod editor;
 pub mod plugins;
 

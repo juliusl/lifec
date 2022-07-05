@@ -1,6 +1,6 @@
 use std::env;
 
-use lifec::{editor::*, plugins::*, AttributeGraph, open};
+use lifec::{editor::*, plugins::*, AttributeGraph, open, start, Runtime};
 
 /// Demo app for the runtime, can swap projects by dropping a .runmd file in
 #[derive(Default)]
@@ -121,39 +121,13 @@ fn main() {
 pub fn main_headless() {
     println!("Starting in headless mode, loading from .runmd");
     if let Some(file) = AttributeGraph::load_from_file(".runmd") {
-       let mut demo = Demo::load(file);
+       start(Demo::load(file), "demo");
+    }
+}
 
-        let mut world = World::new();
-        let mut dipatch_builder = DispatcherBuilder::new();
-        Demo::configure_app_world(&mut world);
-        Demo::configure_app_systems(&mut dipatch_builder);
-
-        let mut dispatcher = dipatch_builder.build();
-        dispatcher.setup(&mut world);
-
-        if let Some(start) = demo.0.runtime().create_engine::<Call>(&world, "demo") {
-            println!("Created engine {:?}", start);
-
-            let mut event = world.write_component::<Event>();
-            let tc = world.read_component::<ThunkContext>();
-            let event = event.get_mut(start);
-            if let Some(event) = event {
-                if let Some(tc) = tc.get(start) {
-                    event.fire(tc.clone());
-                }
-            }
-        }
-
-        // TODO create launch function
-        // extension -- just basically replicate the loop
-        // but how to hook exit in... drop runtime from event system? 
-
-        loop {
-            demo.on_run(&world);
-            dispatcher.dispatch(&world);
-            world.maintain();
-            demo.on_maintain(&mut world);
-        }
+impl AsRef<Runtime> for Demo {
+    fn as_ref(&self) -> &Runtime {
+        self.0.runtime()
     }
 }
 
