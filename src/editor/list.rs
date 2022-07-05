@@ -4,6 +4,7 @@ use imgui::MenuItem;
 use imgui::TableFlags;
 use imgui::TreeNodeFlags;
 use imgui::Ui;
+use crate::Component;
 use specs::storage::DefaultVecStorage;
 
 /// List-layout widget for thunk_context's

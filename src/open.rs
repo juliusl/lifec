@@ -1,6 +1,6 @@
 use crate::Extension;
 use crate::editor::App;
-use crate::plugins::System;
+use crate::System;
 
 
 /// Opens a new window w/ the provided App and Extension
