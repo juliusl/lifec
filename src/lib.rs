@@ -1,4 +1,5 @@
 pub use atlier::system::{App, Value, Extension};
+pub use specs::{DenseVecStorage, HashMapStorage, DefaultVecStorage};
 pub use specs::{Component, Entity, System, World, WorldExt};
 
 use imgui::{ChildWindow, MenuItem, Ui, Window};
