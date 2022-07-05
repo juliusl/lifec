@@ -7,6 +7,9 @@ pub use progress::ProgressStatusBar;
 mod call;
 pub use call::Call;
 
+mod exit;
+pub use exit::Exit;
+
 mod start_button;
 pub use start_button::StartButton;
 

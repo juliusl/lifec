@@ -60,10 +60,12 @@ impl Default for RuntimeEditor {
             font_scale: 1.0
         };
         default.runtime.install::<Call, Timer>();
-        default.runtime.install::<Call, Process>();
+
         default.runtime.install::<Call, Remote>();
-        default.runtime.install::<Call, OpenFile>();
+        default.runtime.install::<Call, Process>();
+
         default.runtime.install::<Call, OpenDir>();
+        default.runtime.install::<Call, OpenFile>();
         default.runtime.install::<Call, WriteFile>();
         default.listen(Self::on_open_file);
         default.listen(Self::on_open_dir);
@@ -254,6 +256,19 @@ impl RuntimeEditor {
                     .with_text("file_dir", "");
             },
             OpenDir::description(),
+            ui,
+        );
+
+        self.runtime.create_event_menu_item(
+            app_world, 
+            &Call::event::<WriteFile>(), 
+            |c| {
+                c.block.block_name = unique_title("new_write_file");
+                c.as_mut()
+                    .with_text("thunk_symbol", WriteFile::symbol())
+                    .add_text_attr("file_dst", "");
+            }, 
+            WriteFile::description(), 
             ui,
         );
     }

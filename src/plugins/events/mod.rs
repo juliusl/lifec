@@ -129,7 +129,7 @@ impl SetupHandler<Runtime> for EventRuntime {
     fn setup(world: &mut specs::World) {
         world.insert(Runtime::new().unwrap());
 
-        // TODO: Need to setup cancellation/shutdown
+        // TODO: setup shutdown hook
     }
 }
 

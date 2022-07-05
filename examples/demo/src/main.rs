@@ -1,6 +1,6 @@
 use std::env;
 
-use lifec::{editor::*, plugins::*, AttributeGraph};
+use lifec::{editor::*, plugins::*, AttributeGraph, open};
 
 /// Demo app for the runtime, can swap projects by dropping a .runmd file in
 #[derive(Default)]
@@ -143,6 +143,10 @@ pub fn main_headless() {
                 }
             }
         }
+
+        // TODO create launch function
+        // extension -- just basically replicate the loop
+        // but how to hook exit in... drop runtime from event system? 
 
         loop {
             demo.on_run(&world);
