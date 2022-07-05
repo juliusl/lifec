@@ -1,2 +1,1 @@
-# lifec
-Lifecycle runtime
+# lifec - runtime framework w/ a view 
