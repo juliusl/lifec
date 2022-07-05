@@ -3,7 +3,7 @@ use specs::{World, DispatcherBuilder, WorldExt};
 use crate::{Extension, Runtime, editor::Call, plugins::{Event, ThunkContext}};
 
 /// start creates an engine from the runtime, and begins the world in a loop
-pub fn start<E>(mut extension: E, call_sequence_name: &'static str)
+pub fn start<E>(mut extension: E, call_sequence: &[&'static str])
 where
     E: Extension + AsRef<Runtime> + 'static
 {
@@ -15,20 +15,22 @@ where
     
     let mut dispatcher = dipatch_builder.build();
     dispatcher.setup(&mut world);
-
-    if let Some(start) = extension.as_ref().create_engine::<Call>(&world, call_sequence_name) {
-        eprintln!("Created engine {:?}", start);
-
-        let mut event = world.write_component::<Event>();
-        let tc = world.read_component::<ThunkContext>();
-        let event = event.get_mut(start);
-        if let Some(event) = event {
-            if let Some(tc) = tc.get(start) {
-                event.fire(tc.clone());
+    
+    for sequence_name in call_sequence {
+        if let Some(start) = extension.as_ref().create_engine::<Call>(&world, sequence_name) {
+            eprintln!("Created engine {:?}", start);
+    
+            let mut event = world.write_component::<Event>();
+            let tc = world.read_component::<ThunkContext>();
+            let event = event.get_mut(start);
+            if let Some(event) = event {
+                if let Some(tc) = tc.get(start) {
+                    event.fire(tc.clone());
+                }
             }
         }
     }
-
+    
     loop {
         // TODO, use a tokio thread instead
         dispatcher.dispatch(&world);
