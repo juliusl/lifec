@@ -24,7 +24,6 @@ pub use specs::prelude::WorldExt;
 pub use specs::prelude::Builder;
 pub use atlier::system::App;
 pub use atlier::system::Attribute;
-pub use atlier::system::Extension;
 pub use atlier::system::Value;
 pub use atlier::system::WindowEvent;
 

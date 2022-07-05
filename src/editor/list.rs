@@ -1,6 +1,5 @@
 use crate::editor::*;
 use crate::plugins::*;
-use atlier::system::Extension;
 use imgui::MenuItem;
 use imgui::TableFlags;
 use imgui::TreeNodeFlags;

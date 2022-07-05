@@ -1,4 +1,4 @@
-use atlier::system::{App, Value};
+pub use atlier::system::{App, Value, Extension};
 use imgui::{ChildWindow, MenuItem, Ui, Window};
 use plugins::{BlockContext, Config, Engine, Event, Plugin, Project, Sequence, ThunkContext};
 use specs::{Component, Entity, System, World, WorldExt};

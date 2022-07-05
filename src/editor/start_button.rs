@@ -1,4 +1,3 @@
-use atlier::system::Extension;
 use specs::{World, DispatcherBuilder, Entity, Component};
 use specs::storage::DenseVecStorage;
 

@@ -1,4 +1,3 @@
-use atlier::system::Extension;
 use specs::Entity;
 use specs::World;
 use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage};
@@ -12,6 +11,8 @@ use tokio::{
     },
     task::JoinHandle,
 };
+
+use crate::Extension;
 
 use super::Project;
 use super::thunks::CancelThunk;

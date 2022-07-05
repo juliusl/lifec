@@ -1,6 +1,5 @@
 use super::{ProgressStatusBar, StartButton};
 use crate::plugins::*;
-use atlier::system::Extension;
 use specs::storage::BTreeStorage;
 
 #[derive(Default, Component, Clone)]

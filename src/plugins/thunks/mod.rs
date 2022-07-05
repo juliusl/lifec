@@ -1,7 +1,7 @@
 use std::future::Future;
 
+use crate::Extension;
 use crate::AttributeGraph;
-use atlier::system::Extension;
 use imgui::Ui;
 use specs::Component;
 use specs::{storage::DenseVecStorage, Entity};

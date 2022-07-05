@@ -1,6 +1,6 @@
 use specs::{World, DispatcherBuilder, WorldExt};
 
-use crate::{editor::{Extension, Call}, Runtime, plugins::{Event, ThunkContext}};
+use crate::{Extension, Runtime, editor::Call, plugins::{Event, ThunkContext}};
 
 /// start creates an engine from the runtime, and begins the world in a loop
 pub fn start<E>(mut extension: E, call_sequence_name: &'static str)

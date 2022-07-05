@@ -3,7 +3,8 @@ use crate::{
     plugins::{Engine, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence, WriteFile},
     Runtime
 };
-use atlier::system::Extension;
+use crate::plugins::Extension;
+
 use imgui::{Ui, Window, StyleVar, Slider};
 use specs::{World, WorldExt, Join};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};

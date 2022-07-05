@@ -1,4 +1,4 @@
-use crate::editor::Extension;
+use crate::Extension;
 use crate::editor::App;
 use crate::plugins::System;
 
