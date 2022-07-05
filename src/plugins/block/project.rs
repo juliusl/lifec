@@ -20,6 +20,12 @@ pub struct Project {
 }
 
 impl Project {
+    /// reads the .runmd file in the current directory and creates a project
+    /// If the file is missing or cannot be parsed this method returns None.
+    pub fn runmd() -> Option<Self> {
+        Self::load_file(".runmd")
+    }
+
     pub fn index_hash_code(&self) -> u64 {
         let mut hasher = DefaultHasher::default();
         let hasher = &mut hasher;
