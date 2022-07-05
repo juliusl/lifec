@@ -908,17 +908,6 @@ impl App for Dealer {
 impl RuntimeState for Dealer {
     type Error = InvalidDealerExpression;
 
-    fn load<S: AsRef<str> + ?Sized>(&self, init: &S) -> Self
-    where
-        Self: Sized,
-    {
-        if let Ok(dealer) = Dealer::try_from(init.as_ref()) {
-            dealer
-        } else {
-            panic!("could not parse {}", init.as_ref())
-        }
-    }
-
     fn process<S: AsRef<str> + ?Sized>(&self, msg: &S) -> Result<Self, Self::Error> {
         println!("Received: {}", msg.as_ref());
         self.deal(msg.as_ref())
@@ -940,7 +929,12 @@ impl RuntimeState for Dealer {
 
     fn from_attributes(attributes: Vec<lifec::editor::Attribute>) -> Self {
         if let Some(lifec::editor::Value::TextBuffer(s)) = SectionAttributes::from(attributes).get_attr_value("carddeck::") {
-            Self::default().load(s)
+            match Dealer::try_from(s.as_str()) {
+                Ok(dealer) => dealer,
+                Err(_) => {
+                    Self::default()
+                },
+            }
         } else {
             Self::default()
         }

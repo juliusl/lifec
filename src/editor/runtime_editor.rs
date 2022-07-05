@@ -1,686 +1,316 @@
-use imgui::{CollapsingHeader, Window};
-use knot::store::Store;
-use serde::{Deserialize, Serialize};
-use specs::{
-    storage::DenseVecStorage, Component, Entities, Join, ReadStorage, System, Write, WriteStorage,
+use super::{Call, List, Task, unique_title};
+use crate::{
+    plugins::{Engine, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence, WriteFile},
+    Runtime
 };
-use std::{
-    collections::BTreeMap,
-    ops::{Deref, DerefMut},
-    time::Instant,
-};
+use atlier::system::Extension;
+use imgui::{Ui, Window, StyleVar, Slider};
+use specs::{World, WorldExt, Join};
+pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
-use super::{
-    event_graph::EventGraph, section::Section, unique_title, App, Attribute, EventComponent, Value,
-};
-use crate::{Action, Runtime, RuntimeState};
+/// Listener function, called when a thunk completes
+type RuntimeEditorListener = fn (&mut RuntimeEditor, world: &World);
 
-#[derive(Clone)]
-pub struct RuntimeEditor<S>
-where
-    S: RuntimeState,
-{
-    pub runtime: Runtime<S>,
-    pub events: Vec<EventComponent>,
-    pub sections: BTreeMap<u32, Section<S>>,
-    pub running: (Option<bool>, Option<Instant>, Option<Instant>),
-    pub dispatch_snapshot: Option<()>,
-    pub dispatch_remove: Option<u32>,
+/// This struct is an environment and extension point for a lifec Runtime
+pub struct RuntimeEditor {
+    runtime: Runtime,
+    listeners: Vec<RuntimeEditorListener>,
+    font_scale: f32,
 }
 
-impl<S: RuntimeState> From<Runtime<S>> for RuntimeEditor<S> {
-    fn from(runtime: Runtime<S>) -> Self {
-        let events = runtime
-            .get_listeners()
-            .iter()
-            .enumerate()
-            .filter_map(|(id, l)| match (&l.action, &l.next) {
-                (Action::Dispatch(msg), Some(transition)) => Some(EventComponent {
-                    label: format!("Event {}", id),
-                    on: l.event.to_string(),
-                    dispatch: msg.to_string(),
-                    call: String::default(),
-                    transitions: vec![transition.to_string()],
-                    // flags: parse_flags(l.extensions.get_args()),
-                    // variales: parse_variables(l.extensions.get_args()),
-                }),
-                (Action::Call(call), _) => Some(EventComponent {
-                    label: format!("Event {}", id),
-                    on: l.event.to_string(),
-                    call: call.to_string(),
-                    dispatch: String::default(),
-                    transitions: l
-                        .extensions
-                        .tests
-                        .iter()
-                        .map(|(_, t)| t.to_owned())
-                        .collect(),
-                    //     flags: parse_flags(l.extensions.get_args()),
-                    //     variales: parse_variables(l.extensions.get_args()),
-                }),
-                _ => None,
-            })
-            .collect();
+impl RuntimeEditor {
+    pub fn new(runtime: Runtime) -> Self {
+        let mut new = Self::default();
+        new.runtime = runtime;
+        new
+    }
+    /// Returns a mutable version of the current project
+    pub fn project_mut(&mut self) -> &mut Project {
+        &mut self.runtime.project
+    }
 
-        let mut sections: BTreeMap<u32, Section<S>> = BTreeMap::new();
-        let sections = &mut sections;
-        runtime.attributes.iter().for_each(|a| {
-            if let Some(section) = sections.get_mut(&a.id()) {
-                section.add_attribute(a.clone());
-            } else {
-                sections.insert(
-                    a.id(),
-                    Section::<S>::default()
-                        .with_attribute(a.clone())
-                        .with_title(format!("Runtime Entity {}", a.id()))
-                        .with_parent_entity(a.id()),
-                );
-            }
+    /// Returns a ref to the current project
+    pub fn project(&self) -> &Project {
+        &self.runtime.project
+    }
+
+    /// Returns a ref to the current runtime
+    pub fn runtime(&self) -> &Runtime {
+        &self.runtime
+    }
+
+    /// Returns a mutable version of the current runtime
+    pub fn runtime_mut(&mut self) -> &mut Runtime {
+        &mut self.runtime
+    }
+
+    /// Listen for thunk contexts from thunks that have completed their task
+    pub fn listen(&mut self, listen: RuntimeEditorListener) {
+        self.listeners.push(listen);        
+        eprintln!("Current runtime editor listeners {}", self.listeners.len());
+    }
+}
+
+impl Default for RuntimeEditor {
+    fn default() -> Self {
+        let mut default = Self {
+            runtime: Default::default(),
+            listeners: vec![
+            ],
+            font_scale: 1.0
+        };
+        default.runtime.install::<Call, Timer>();
+
+        default.runtime.install::<Call, Remote>();
+        default.runtime.install::<Call, Process>();
+
+        default.runtime.install::<Call, OpenDir>();
+        default.runtime.install::<Call, OpenFile>();
+        default.runtime.install::<Call, WriteFile>();
+        default.listen(Self::on_open_file);
+        default.listen(Self::on_open_dir);
+        default
+    }
+}
+
+impl Extension for RuntimeEditor {
+    fn configure_app_world(world: &mut specs::World) {
+        List::<Task>::configure_app_world(world);
+        Task::configure_app_world(world);
+        world.register::<Sequence>();
+    }
+
+    fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
+        Task::configure_app_systems(dispatcher);
+    }
+
+    fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
+        ui.main_menu_bar(||{
+            ui.menu("Window", ||{
+                Slider::new("font scale", 0.5, 4.0) .build(ui, &mut self.font_scale);
+                ui.separator();
+            });
         });
 
-        let sections = sections.clone();
-        let next = Self {
-            runtime,
-            events,
-            sections,
-            running: (None, None, None),
-            dispatch_snapshot: None,
-            dispatch_remove: None,
-        };
-        next
-    }
-}
+        // Window::new("table").build(ui, ||{
+        //     List::<Task>::table(&[
+        //         "entity", 
+        //         "name",
+        //         "value"
+        //     ]).on_ui(app_world, ui);
+        // });
 
-#[derive(Default, Component, Clone, Serialize, Deserialize)]
-#[storage(DenseVecStorage)]
-pub struct SectionAttributes(Vec<Attribute>);
+        // This is all tasks,
+        self.task_window(app_world, &mut List::<Task>::simple(), ui);
 
-impl From<Vec<Attribute>> for SectionAttributes {
-    fn from(attrs: Vec<Attribute>) -> Self {
-        Self(attrs)
-    }
-}
-
-impl SectionAttributes {
-    pub fn get_attrs(&self) -> Vec<&Attribute> {
-        self.0.iter().collect()
-    }
-
-    pub fn clone_attrs(&self) -> Vec<Attribute> {
-        self.0.iter().cloned().collect()
-    }
-
-    pub fn get_attr(&self, name: impl AsRef<str>) -> Option<&Attribute> {
-        let SectionAttributes(attributes) = self;
-
-        attributes.iter().find(|a| a.name() == name.as_ref())
-    }
-
-    pub fn get_attr_mut(&mut self, name: impl AsRef<str>) -> Option<&mut Attribute> {
-        
-        let SectionAttributes(attributes) = self;
-
-        attributes.iter_mut().find(|a| a.name() == name.as_ref())
-    }
-
-    pub fn get_attr_value(&self, with_name: impl AsRef<str>) -> Option<&Value> {
-        self.get_attr(with_name).and_then(|a| Some(a.value()))
-    }
-
-    pub fn get_attr_value_mut(&mut self, with_name: impl AsRef<str>) -> Option<&mut Value> {
-        self.get_attr_mut(with_name)
-            .and_then(|a| Some(a.get_value_mut()))
-    }
-
-    pub fn get_attrs_mut(&mut self) -> &mut Vec<Attribute> {
-        &mut self.0
-    }
-    
-    pub fn is_attr_checkbox(&self, name: impl AsRef<str>) -> Option<bool> {
-        if let Some(Value::Bool(val)) = self.get_attr(name).and_then(|a| Some(a.value())) {
-            Some(*val)
-        } else {
-            None
+        // These are each active sequences
+        let mut sequence_lists = app_world.write_component::<List::<Task>>();
+        for sequence in (&mut sequence_lists).join() {
+            self.task_window(app_world, sequence, ui);
         }
+
+       // self.runtime.edit_ui(ui);
+       // self.runtime.display_ui(ui);
     }
 
-    pub fn with_attribute(&mut self, attr: Attribute) -> Self {
-        let attr = attr;
-        self.update(move |next| next.add_attribute(attr))
-    }
-
-    pub fn with_text(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) -> Self {
-        self.update(move |next| next.add_text_attr(name, init_value))
-    }
-
-    pub fn with_int(&mut self, name: impl AsRef<str>, init_value: i32) -> Self {
-        self.update(move |next| next.add_int_attr(name, init_value))
-    }
-
-    pub fn with_float(&mut self, name: impl AsRef<str>, init_value: f32) -> Self {
-        self.update(move |next| next.add_float_attr(name, init_value))
-    }
-
-    pub fn with_bool(&mut self, name: impl AsRef<str>, init_value: bool) -> Self {
-        self.update(move |next| next.add_bool_attr(name, init_value))
-    }
-
-    pub fn with_float_pair(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) -> Self {
-        self.update(move |next| next.add_float_pair_attr(name, init_value))
-    }
-
-    pub fn with_int_pair(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) -> Self {
-        self.update(move |next| next.add_int_pair_attr(name, init_value))
-    }
-
-    pub fn with_int_range(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) -> Self {
-        self.update(move |next| next.add_int_range_attr(name, init_value))
-    }
-
-    pub fn with_float_range(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) -> Self {
-        self.update(move |next| next.add_float_range_attr(name, init_value))
-    }
-
-    pub fn add_empty_attr(&mut self, name: impl AsRef<str>) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::Empty,
-        ));
-    }
-
-    pub fn add_binary_attr(&mut self, name: impl AsRef<str>, init_value: impl Into<Vec<u8>>) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::BinaryVector(init_value.into()),
-        ));
-    }
-
-    pub fn add_text_attr(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::TextBuffer(init_value.as_ref().to_string()),
-        ));
-    }
-
-    pub fn add_int_attr(&mut self, name: impl AsRef<str>, init_value: i32) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::Int(init_value),
-        ));
-    }
-
-    pub fn add_float_attr(&mut self, name: impl AsRef<str>, init_value: f32) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::Float(init_value),
-        ));
-    }
-
-    pub fn add_bool_attr(&mut self, name: impl AsRef<str>, init_value: bool) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::Bool(init_value),
-        ));
-    }
-
-    pub fn add_float_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::FloatPair(init_value[0], init_value[1]),
-        ));
-    }
-
-    pub fn add_int_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::IntPair(init_value[0], init_value[1]),
-        ));
-    }
-
-    pub fn add_int_range_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::IntRange(init_value[0], init_value[1], init_value[2]),
-        ));
-    }
-
-    pub fn add_float_range_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) {
-        self.add_attribute(Attribute::new(
-            0,
-            name.as_ref().to_string(),
-            Value::FloatRange(init_value[0], init_value[1], init_value[2]),
-        ));
-    }
-
-    pub fn add_attribute(&mut self, attr: Attribute) {
-        self.0.push(attr);
-    }
-
-    pub fn update(&mut self, func: impl FnOnce(&mut Self)) -> Self {
-        let next = self;
-
-        (func)(next);
-
-        next.to_owned()
-    }
-}
-
-impl<'a, S> System<'a> for RuntimeEditor<S>
-where
-    S: RuntimeState + Component,
-{
-    type SystemData = (
-        Entities<'a>,
-        ReadStorage<'a, Section<S>>,
-        WriteStorage<'a, SectionAttributes>,
-        Write<'a, Dispatch<S>>,
-    );
-
-    /// The runtime editor maintains a vector of sections that it displays
-    /// This system coordinates updates to those sections, as well as initialization
-    fn run(
-        &mut self,
-        (entities, read_sections, mut write_attributes, mut dispatcher): Self::SystemData,
+    fn on_window_event(
+        &'_ mut self,
+        world: &specs::World,
+        event: &'_ atlier::system::WindowEvent<'_>,
     ) {
-        if let Some(_) = self.dispatch_snapshot.take() {
-            if let Some(state) = &self.runtime.state {
-                let msg = dispatcher.deref_mut();
-                let next = self.sections.len() as u32;
-                self.sections.insert(
-                    next,
-                    Section::new(
-                        unique_title(format!("{}", self.runtime.context())),
-                        |s, ui| {
-                            s.edit_attr("edit events", "enable event builder", ui);
-
-                            let label = format!("edit attributes {}", s.get_parent_entity());
-                            ui.checkbox(label, &mut s.enable_edit_attributes);
-                        },
-                        state.clone(),
-                    )
-                    .enable_app_systems()
-                    .with_text("context::", format!("{}", self.runtime.context()))
-                    .with_bool("enable event builder", false)
-                    .with_parent_entity(next),
-                );
-                *msg = Dispatch::Snapshot(self.clone());
-                return;
-            }
-        }
-
-        if let Some(to_remove) = self.dispatch_remove.take() {
-            let msg = dispatcher.deref_mut();
-            self.sections.remove(&to_remove);
-            *msg = Dispatch::RemoveSnapshot(to_remove);
-            return;
-        }
-
-        for (e, s) in (&entities, &read_sections).join() {
-            match self.sections.get(&e.id()) {
-                None => {
-                    let clone = s.clone().with_parent_entity(e.id());
-                    match write_attributes.insert(
-                        e,
-                        SectionAttributes(
-                            clone.attributes.iter().map(|(_, a)| a).cloned().collect(),
-                        ),
-                    ) {
-                        Ok(_) => {
-                            self.sections.insert(e.id(), clone);
-                        }
-                        Err(e) => {
-                            eprintln!("Error adding Section Attributes to Storage, {}", e);
-                        }
-                    }
-                }
-                Some(Section {
-                    enable_app_systems,
-                    state,
-                    attributes,
-                    enable_edit_attributes,
-                    title,
-                    ..
-                }) => {
-                    // Update the world's copy of attributes from editor's copy
-                    match write_attributes.insert(
-                        e,
-                        SectionAttributes(attributes.iter().map(|(_, a)| a).cloned().collect()),
-                    ) {
-                        Ok(_) => {}
-                        Err(err) => {
-                            eprintln!("Error updating section attributes {}", err);
-                        }
-                    }
-
-                    if *enable_app_systems {
-                        let title = title.to_string();
-                        let state = state.merge_with(&s.state);
-                        let attributes = attributes.clone();
-                        let enable_edit_attributes = *enable_edit_attributes;
-                        self.sections.insert(e.id(), {
-                            let mut s = s.clone().with_parent_entity(e.id());
-                            s.title = title;
-                            s.state = state;
-                            s.attributes = attributes;
-                            s.enable_edit_attributes = enable_edit_attributes;
-                            s.enable_app_systems = true;
-                            s
-                        });
-                    }
+        match event {
+            atlier::system::WindowEvent::DroppedFile(file) => {
+                let file_src = format!("{:?}", &file);
+                if file.is_dir() {
+                    self.runtime.schedule(world, &Call::event::<OpenDir>(), |tc| {
+                        tc.as_mut()
+                            .add_text_attr("file_dir", &file_src.trim_matches('"'));
+                    })
+                    .and_then(|_| Some(()));
+                } else {
+                    self.runtime.schedule(world, &Call::event::<OpenFile>(), |tc| {
+                        tc.as_mut()
+                            .add_text_attr("file_src", &file_src.trim_matches('"'));
+                    })
+                    .and_then(|_| Some(()));
                 }
             }
+            _ => {}
+        }
+    }
+
+    fn on_run(&'_ mut self, world: &specs::World) {
+        // This drives status and progress updates of running tasks
+        List::<Task>::default()
+            .on_run(world);
+  
+        // Listen for completed thunks
+        for listener in self.listeners.clone().iter() {
+            (listener)(self, world);
         }
     }
 }
 
-#[derive(Default)]
-pub struct RuntimeDispatcher<S>
-where
-    S: RuntimeState + Component,
-{
-    runtime: Option<RuntimeEditor<S>>,
-}
-
-impl<S> From<RuntimeEditor<S>> for RuntimeDispatcher<S>
-where
-    S: RuntimeState + Component,
-{
-    fn from(runtime: RuntimeEditor<S>) -> Self {
-        Self {
-            runtime: Some(runtime),
-        }
-    }
-}
-
-pub enum Dispatch<S>
-where
-    S: RuntimeState + Component,
-{
-    Empty,
-    Snapshot(RuntimeEditor<S>),
-    RemoveSnapshot(u32),
-}
-
-impl<S> Default for Dispatch<S>
-where
-    S: RuntimeState + Component,
-{
-    fn default() -> Self {
-        Self::Empty
-    }
-}
-
-impl<'a, S> System<'a> for RuntimeDispatcher<S>
-where
-    S: RuntimeState + Component,
-{
-    type SystemData = (
-        Entities<'a>,
-        Write<'a, Dispatch<S>>,
-        WriteStorage<'a, Section<S>>,
-        WriteStorage<'a, SectionAttributes>,
-        WriteStorage<'a, EventGraph>,
-    );
-
-    fn run(
-        &mut self,
-        (entities, mut msg, mut sections, mut section_attributes, mut event_graph): Self::SystemData,
-    ) {
-        if let Dispatch::RemoveSnapshot(id) = msg.deref() {
-            let to_remove = entities.entity(*id);
-            match entities.delete(to_remove) {
-                Ok(_) => {
-                    let msg = msg.deref_mut();
-                    *msg = Dispatch::Empty;
-                    sections.remove(to_remove);
-                    section_attributes.remove(to_remove);
-                    event_graph.remove(to_remove);
-                    return;
-                }
-                Err(err) => eprintln!("RuntimeDispatcher Error {}", err),
-            }
-        }
-
-        if let Dispatch::Snapshot(runtime) = msg.deref() {
-            self.runtime = Some(runtime.clone());
-
-            let msg = msg.deref_mut();
-            *msg = Dispatch::Empty;
-        }
-
-        if let Some(runtime) = self.runtime.as_mut() {
-            let next = sections.count() as u32;
-
-            let next_e = entities.create();
-            if let Some(section) = runtime.sections.get(&next) {
-                match sections.insert(next_e, section.clone()) {
-                    Ok(_) => {
-                        println!("RuntimeDispatcher added Section {:?}", next_e);
-                        match section_attributes.insert(
-                            next_e,
-                            SectionAttributes(
-                                section.attributes.iter().map(|(_, a)| a).cloned().collect(),
-                            ),
-                        ) {
-                            Ok(_) => {
-                                println!("RuntimeDispatcher added Section Attributes {:?}", next_e);
-                                let mut store = Store::<EventComponent>::default();
-                                runtime.events.iter().cloned().for_each(|e| {
-                                    store = store.node(e);
-                                });
-
-                                match event_graph.insert(next_e, EventGraph(store)) {
-                                    Ok(_) => {
-                                        println!(
-                                            "RuntimeDispatcher added Event Graph {:?}",
-                                            next_e
-                                        );
-                                        self.runtime = None;
-                                    }
-                                    Err(err) => {
-                                        eprintln!("RuntimeDispatcher Eror {}", err);
-                                    }
-                                }
-                            }
-                            Err(err) => eprintln!("RuntimeDispatcher Error {}", err),
-                        }
-                    }
-                    Err(err) => eprintln!("RuntimeDispatcher Error {}", err),
+impl RuntimeEditor {
+    /// When open file is called, this will import the file to the current project
+    fn on_open_file(&mut self, world: &World) {
+        match self.runtime.listen::<OpenFile>(world) {
+            Some(file) => {
+                if self.project_mut().import(file.as_ref().clone()) {
+                    eprintln!("Imported file to project");
                 }
             }
+            None => {}
+        }
+    }
+
+    /// When open dir is called, this will schedule an open_file event for each file in the directory
+    fn on_open_dir(&mut self, world: &World) {
+        match self.runtime.listen::<OpenDir>(world) {
+            Some(file_dir) => {
+                let mut project = Project::from(file_dir.as_ref().clone());
+                for (_, _) in project.iter_block_mut() {
+                    // TODO, this seems to cause a slight issue
+                    // eprintln!("found block {}", block_name);
+                    // if let Some(file) = block.get_block("file") {
+                    //     if let (Some(file_src), Some(content)) = (
+                    //         file.as_ref().find_text("file_src"),
+                    //         file.as_ref().find_binary("content"),
+                    //     ) {
+                    //         self.runtime.schedule(world, &Call::event::<OpenFile>(), |g| {
+                    //             // Setting content will skip reading the file_src, unless refresh is enabled
+                    //             g.as_mut()
+                    //                 .with_binary("content", content)
+                    //                 .add_text_attr("file_src", file_src);
+                    //         });
+                    //     }
+                    // }
+                }
+            }
+            None => {}
         }
     }
 }
 
-impl<S> Default for RuntimeEditor<S>
-where
-    S: RuntimeState + Component,
-{
-    fn default() -> Self {
-        Self {
-            runtime: Default::default(),
-            events: Default::default(),
-            sections: Default::default(),
-            running: (None, None, None),
-            dispatch_snapshot: None,
-            dispatch_remove: None,
-        }
-    }
-}
+impl RuntimeEditor {
+    pub fn edit_event_menu(&mut self, app_world: &specs::World, ui: &Ui) {
+        self.runtime.create_event_menu_item(
+            app_world,
+            &Call::event::<Timer>(),
+            |c| {
+                c.block.block_name = unique_title("new_timer");
+                c.as_mut()
+                .with_text("thunk_symbol", Timer::symbol())
+                .with_int("duration", 0);
+            },
+            Timer::description(),
+            ui,
+        );
 
-impl<S> App for RuntimeEditor<S>
-where
-    S: RuntimeState + Component,
-{
-    fn name() -> &'static str {
-        "Runtime Editor"
+        self.runtime.create_event_menu_item(
+            app_world,
+            &Call::event::<Process>(),
+            |c| {
+                c.block.block_name = unique_title("new_process");
+                c.as_mut()
+                .with_text("thunk_symbol", Process::symbol())
+                .with_text("command", "");
+            },
+            Process::description(),
+            ui,
+        );
+
+        self.runtime.create_event_menu_item(
+            app_world,
+            &Call::event::<Remote>(),
+            |c| {
+                c.block.block_name = unique_title("new_remote");
+                c.as_mut()
+                .with_text("thunk_symbol", Remote::symbol())
+                .with_text("command", "");
+            },
+            Remote::description(),
+            ui,
+        );
+
+        self.runtime.create_event_menu_item(
+            app_world,
+            &Call::event::<OpenFile>(),
+            |c| {
+                c.block.block_name = unique_title("new_open_file");
+                c.as_mut()
+                .with_text("thunk_symbol", OpenFile::symbol())
+                .with_text("file_src", "");
+            },
+            OpenFile::description(),
+            ui,
+        );
+
+        self.runtime.create_event_menu_item(
+            app_world,
+            &Call::event::<OpenDir>(),
+            |c| {
+                c.block.block_name = unique_title("new_open_dir");
+                c.as_mut()
+                    .with_text("thunk_symbol", OpenDir::symbol())
+                    .with_text("file_dir", "");
+            },
+            OpenDir::description(),
+            ui,
+        );
+
+        self.runtime.create_event_menu_item(
+            app_world, 
+            &Call::event::<WriteFile>(), 
+            |c| {
+                c.block.block_name = unique_title("new_write_file");
+                c.as_mut()
+                    .with_text("thunk_symbol", WriteFile::symbol())
+                    .add_text_attr("file_dst", "");
+            }, 
+            WriteFile::description(), 
+            ui,
+        );
     }
 
-    fn window_size() -> &'static [f32; 2] {
-        &[1500.0, 720.0]
-    }
+    pub fn task_window(&mut self, app_world: &specs::World, task_list: &mut List<Task>, ui: &Ui) {
+        let title = task_list.title().unwrap_or("all sequences".to_string());
 
-    fn show_editor(&mut self, ui: &imgui::Ui) {
-        Window::new(Self::name())
-            .size(*Self::window_size(), imgui::Condition::Appearing)
+        Window::new(format!("Tasks, engine: {}", title))
+            .menu_bar(true)
+            .size([580.0, 950.0], imgui::Condition::Appearing)
             .build(ui, || {
-                if CollapsingHeader::new(format!("Current Runtime"))
-                    .leaf(true)
-                    .begin(ui)
-                {
-                    ui.separator();
-                    match self.running {
-                        (Some(v), elapsed, stopped) => {
-                            if ui.button("Stop") {
-                                self.dispatch_remove = None;
-                                self.dispatch_snapshot = None;
-                                self.running = (None, None, None);
-                            }
-
-                            match (v, elapsed, stopped) {
-                                (true, Some(elapsed), None) => {
-                                    ui.same_line();
-                                    if ui.button("Pause") {
-                                        self.running =
-                                            (Some(false), Some(elapsed), Some(Instant::now()));
-                                    }
-
-                                    ui.text(format!("Running {:#?}", elapsed.elapsed()));
-
-                                    if self.runtime.can_continue() {
-                                        self.runtime = self.runtime.step();
-                                    } else {
-                                        self.running = (None, Some(elapsed), Some(Instant::now()));
-                                    }
-                                }
-                                (false, Some(elapsed), Some(stopped)) => {
-                                    ui.same_line();
-                                    if ui.button("Continue") {
-                                        self.running = (Some(true), Some(elapsed), None);
-                                    }
-
-                                    ui.text(format!("Paused {:#?}", stopped.elapsed()));
-                                }
-                                _ => {}
-                            }
-                        }
-                        (None, Some(elapsed), Some(stopped)) => {       
-                            if ui.button("Clear") {
-                                self.dispatch_remove = None;
-                                self.dispatch_snapshot = None;
-                                self.running = (None, None, None);
-                            }
-                            ui.text(format!("Ran for {:#?}", stopped - elapsed));
-                        }
-                        _ => {}
-                    };
-
-                    let context = self.runtime.context();
-                    ui.label_text(format!("Current Event"), format!("{}", context));
-                    ui.disabled(self.running.0.is_some(), || {
-                        if ui.button("Setup") {
-                            self.runtime.parse_event("{ setup;; }");
-                        }
-                        ui.same_line();
-                        if ui.button("Start") {
-                            self.running = (Some(true), Some(Instant::now()), None);
-                        }
-
-                        ui.same_line();
-                        if ui.button("Step") {
-                            self.runtime = self.runtime.step();
-                        }
-
-                        ui.same_line();
-                        if ui.button("Clear Attributes") {
-                            self.runtime.attributes.clear();
-                        }
+                ui.menu_bar(|| {
+                    ui.menu("Menu", ||{
+                        let frame_padding = ui.push_style_var(
+                            StyleVar::FramePadding([8.0, 5.0])
+                        );
+                        self.project_mut()
+                            .edit_project_menu(ui);
+                        ui.separator();
+                        
+                        self.edit_event_menu(app_world, ui);
+                        ui.separator();
+                        
+                        self.runtime
+                            .menu(ui);
+                        ui.separator();
+                        frame_padding.end();
                     });
-                    ui.new_line();
-                    ui.separator();
-                    if let Some(state) = self.runtime.current() {
-                        ui.input_text_multiline(
-                            format!("Current State"),
-                            &mut format!("{}", state),
-                            [0.0, 0.0],
-                        )
-                        .read_only(true)
-                        .build();
-                        ui.new_line();
-                    }
-
-                    if !self.runtime.attributes.is_empty() {
-                        if CollapsingHeader::new(format!("Runtime Attributes"))
-                            .leaf(true)
-                            .build(ui)
-                        {
-                            self.runtime.attributes.iter().for_each(|a| {
-                                ui.text(format!("{}", a));
-                            });
-                        }
-                    }
-                }
-
-                ui.new_line();
-                if CollapsingHeader::new("Snapshots").leaf(true).begin(ui) {
-                    if ui.button("Take Snapshot of Runtime") {
-                        self.dispatch_snapshot = Some(());
-                        return;
-                    }
-                    ui.new_line();
-
-                    self.show_snapshots(ui);
-                }
-            });
-    }
-}
-
-impl<S> RuntimeEditor<S>
-where
-    S: RuntimeState + Component,
-{
-    fn show_snapshots(&mut self, ui: &imgui::Ui) {
-        for (id, section) in self.sections.iter_mut() {
-            if let Some(current) = self.runtime.current() {
-                section.state.merge_with(current);
-            }
-            ui.text(format!("{}: ", id));
-            ui.same_line();
-            ui.indent();
-
-            section.show_editor(ui);
-            if ui.button(format!("Apply {}", section.title)) {
-                // This will apply the sections current state and attributes to the current runtime
-                let mut clone = self.runtime.clone();
-                clone.state = Some(section.state.clone());
-                section.attributes.values().for_each(|a| {
-                    clone.attribute(a.clone());
                 });
-                if let Some(Value::TextBuffer(event)) = section.get_attr_value("context::") {
-                    clone = clone.parse_event(event);
-                }
-                let next = RuntimeEditor::from(clone);
-                self.runtime = next.runtime;
-                return;
-            }
 
-            ui.same_line();
-            if ui.button(format!("Remove {}", section.title)) {
-                self.dispatch_remove = Some(*id);
-                return;
-            }
-            ui.new_line();
-            ui.separator();
-            ui.unindent();
-        }
+                let frame_padding = ui.push_style_var(
+                    StyleVar::FramePadding([8.0, 5.0])
+                );
+
+                let window_padding = ui.push_style_var(
+                    StyleVar::WindowPadding([16.0, 16.0])
+                );
+                ui.set_window_font_scale(self.font_scale);
+                task_list.on_ui(app_world, ui);
+                ui.new_line();
+                frame_padding.end();
+                window_padding.end();
+            });
     }
 }

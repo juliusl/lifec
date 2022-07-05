@@ -8,7 +8,7 @@ edition = "2021"
 logos = "0.12.0"
 
 # Add's support for built-in editors
-atlier = { path = "../atlier" } #{ git = "https://github.com/juliusl/atlier.git"   }
+atlier = { git = "https://github.com/juliusl/atlier.git"   }
 imnodes = { git = "https://github.com/benmkw/imnodes-rs.git" }
 knot = { git = "https://github.com/juliusl/knot.git", branch="main"  }
 imgui = "0.8.2" 
@@ -18,3 +18,5 @@ serde = "1.0.137"
 chrono = "0.4.19"
 serde_json = "1.0.81"
 ron = "0.7.0"
+base64 = "0.13.0"
+tokio = { version = "1.19.2", features = ["default", "rt-multi-thread", "sync", "fs", "process", "io-util", "io-std", "macros"] }
