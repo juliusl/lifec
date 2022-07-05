@@ -1,5 +1,6 @@
 pub use atlier::system::{App, Value, Extension};
 pub use specs::{DenseVecStorage, HashMapStorage, DefaultVecStorage};
+pub use specs::storage::BTreeStorage;
 pub use specs::{Component, Entity, System, World, WorldExt, DispatcherBuilder};
 
 use imgui::{ChildWindow, MenuItem, Ui, Window};

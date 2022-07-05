@@ -1,8 +1,9 @@
-pub use atlier::system::{App, Extension, WindowEvent};
-use specs::{
-    Builder, Component, Entity, EntityBuilder,
-    World, WorldExt,
-};
+use crate::*;
+use crate::editor::List;
+use crate::editor::Task;
+use tokio::task::JoinHandle;
+use specs::Builder;
+use specs::EntityBuilder;
 
 mod block;
 pub use block::BlockContext;
@@ -30,11 +31,6 @@ pub use thunks::Thunk;
 pub use thunks::ThunkContext;
 pub use thunks::Timer;
 
-use crate::AttributeGraph;
-use crate::editor::List;
-use crate::editor::Task;
-use tokio::task::JoinHandle;
-
 /// This trait is to facilitate extending working with the attribute graph
 pub trait Plugin<T>
 where
@@ -59,8 +55,6 @@ where
     /// Transforms attribute graph into a thunk context and calls call_with_context
     /// Updates graph afterwards.
     fn call(attributes: &mut AttributeGraph) {
-        use crate::RuntimeState;
-
         let mut context = T::from(attributes.clone());
         let context = &mut context;
         Self::call_with_context(context);

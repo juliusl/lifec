@@ -1,9 +1,6 @@
 use super::{Call, List, Task, unique_title};
-use crate::{
-    plugins::{Engine, Timer, OpenDir, OpenFile, Process, Remote, Project, Plugin, Sequence, WriteFile},
-    Runtime
-};
-use crate::plugins::Extension;
+use crate::*;
+use crate::plugins::*;
 
 use imgui::{Ui, Window, StyleVar, Slider};
 use specs::{World, WorldExt, Join};
