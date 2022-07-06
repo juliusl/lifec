@@ -1,6 +1,8 @@
 use crate::*;
 use crate::editor::List;
 use crate::editor::Task;
+use tokio::select;
+use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 use specs::Builder;
 use specs::EntityBuilder;
@@ -237,5 +239,91 @@ pub trait Engine {
         } else {
             None
         }
+    }
+}
+
+impl<A, B> Plugin<ThunkContext> for (A, B) 
+where
+    A: Plugin<ThunkContext>,
+    B: Plugin<ThunkContext>,
+{
+    fn symbol() -> &'static str {
+        "combine"
+    }
+
+    fn description() -> &'static str {
+        "Combines two plugins by calling each one by one"
+    }
+
+    fn call_with_context(context: &mut ThunkContext) -> Option<AsyncContext> {
+        context.clone().task(|cancel_source| {
+            let tc = context.clone();
+            async {
+                let (upper_cancel_a, cancel_source_a) = oneshot::channel::<()>();
+                let (upper_cancel_b, cancel_source_b) = oneshot::channel::<()>();
+
+                if let Some(handle) = tc.handle() {
+                    let combined_task = handle.spawn(async move { 
+                        let mut tc = tc.clone();
+                        if let Some((handle, cancel)) = A::call_with_context(&mut tc) {
+                            select! {
+                                next = handle => {
+                                    match next {
+                                        Ok(next) => {
+                                            tc = next;
+                                        },
+                                        Err(err) => {
+                                            eprintln!("error {}", err);
+                                        },
+                                    }
+                                }
+                                _ = cancel_source_a => {
+                                    cancel.send(()).ok();
+                                }
+                            }
+                        }
+        
+                        if let Some((handle, cancel)) = B::call_with_context(&mut tc) {
+                            select! {
+                                next = handle => {
+                                    match next {
+                                        Ok(next) => {
+                                            tc = next;
+                                        },
+                                        Err(err) => {
+                                            eprintln!("error {}", err);
+                                        },
+                                    }
+                                }
+                                _ = cancel_source_b => {
+                                    cancel.send(()).ok();
+                                }
+                            }
+                        }
+
+                        Some(tc)
+                    });
+
+                    return select! {
+                        next = combined_task => {
+                            match next {
+                                Ok(next) => {
+                                    next
+                                },
+                                _ => None
+                            }
+                        }
+                        _ = cancel_source => {
+                            upper_cancel_a.send(()).ok();
+                            upper_cancel_b.send(()).ok();
+                            None
+                        }
+                    };
+                }
+
+             
+                None
+            }
+        })
     }
 }
