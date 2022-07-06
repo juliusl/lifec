@@ -685,13 +685,15 @@ impl Plugin<ThunkContext> for Runtime {
                 if let Some(project_src) = tc.as_ref().find_text("project_src") {
                     if let Some(project) = Project::load_file(project_src) {
                         let mut runtime = Runtime::new(project);
-                        runtime.install::<Call, OpenFile>();
                         runtime.install::<Call, WriteFile>();
+                        runtime.install::<Call, OpenFile>();
                         runtime.install::<Call, OpenDir>();
                         runtime.install::<Call, Process>();
                         runtime.install::<Call, Remote>();
                         runtime.install::<Call, Timer>();
                         runtime.install::<Call, Runtime>();
+
+                        // TODO - add some built in configs - 
 
                         runtime.start(&tc, cancel_source).await;
                     }
