@@ -638,9 +638,9 @@ impl Plugin<ThunkContext> for Runtime {
     }
 
     fn call_with_context(context: &mut ThunkContext) -> Option<AsyncContext> {
-        context.clone().task(|_| {
+        context.clone().task(|mut cancel_source| {
             let tc = context.clone();
-            async {
+            async move {
                 if let Some(project_src) = tc.as_ref().find_text("project_src") {
                     if let Some(project) = Project::load_file(project_src) {
                         let mut runtime = Runtime::new(project);
@@ -674,11 +674,25 @@ impl Plugin<ThunkContext> for Runtime {
 
                        let mut dispatcher = dispatcher_builder.build();
 
-                       dispatcher.dispatch(&world);
-                       runtime_editor.on_run(&world);
+                       for engine in call_names {
+                            let engine = runtime_editor.runtime().create_engine::<Call>(&world, engine);
+                            if let Some(start) = engine {
+                                // TODO 
+                                eprintln!("todo: start {:?}", start);
+                            }
+                       }
 
-                       world.maintain();
-                       runtime_editor.on_maintain(&mut world);
+                       loop {
+                            dispatcher.dispatch(&world);
+                            runtime_editor.on_run(&world);
+ 
+                            world.maintain();
+                            runtime_editor.on_maintain(&mut world);
+
+                            if ThunkContext::is_cancelled(&mut cancel_source) {
+                                break;
+                            }
+                       }
                     }
                 }
 
