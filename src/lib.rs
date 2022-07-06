@@ -782,6 +782,7 @@ impl Plugin<ThunkContext> for Runtime {
 
                         if let Some(runtime) = world.remove::<tokio::runtime::Runtime>() {
                             if let Some(handle) = tc.handle() {
+                                // dropping a tokio runtime needs to happen in a blocking context
                                 handle.spawn_blocking(move || {
                                     runtime.shutdown_timeout(Duration::from_secs(5));
                                 });
