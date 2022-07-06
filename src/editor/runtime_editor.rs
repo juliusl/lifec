@@ -65,13 +65,12 @@ impl Default for RuntimeEditor {
             font_scale: 1.0
         };
         default.runtime.install::<Call, Timer>();
-
         default.runtime.install::<Call, Remote>();
         default.runtime.install::<Call, Process>();
-
         default.runtime.install::<Call, OpenDir>();
         default.runtime.install::<Call, OpenFile>();
         default.runtime.install::<Call, WriteFile>();
+        default.runtime.install::<Call, Runtime>();
         default.listen(Self::on_open_file);
         default.listen(Self::on_open_dir);
         default

@@ -705,8 +705,9 @@ impl Plugin<ThunkContext> for Runtime {
                                 {
                                     if let Some((engine_name, _)) = engine_address.split_once("::")
                                     {
+                                        call_names.push(engine_name.to_string());
+                                        
                                         if let Value::Symbol(connect_to) = value {
-                                            call_names.push(engine_name.to_string());
                                             connections.push((engine_name.to_string(), connect_to));
                                         }
                                     }
@@ -722,6 +723,7 @@ impl Plugin<ThunkContext> for Runtime {
                         RuntimeEditor::configure_app_systems(&mut dispatcher_builder);
 
                         let mut dispatcher = dispatcher_builder.build();
+                        dispatcher.setup(&mut world);
 
                         let mut engine_table = HashMap::<String, Entity>::default();
 
@@ -734,6 +736,8 @@ impl Plugin<ThunkContext> for Runtime {
                             }
                         }
 
+                        let mut schedule = vec![];
+                        // Connect sequences
                         {
                             let mut sequences = world.write_component::<Sequence>();
                             for (from, to) in connections {
@@ -741,12 +745,27 @@ impl Plugin<ThunkContext> for Runtime {
                                     if let Some(to) = engine_table.get(&to) {
                                         if let Some(sequence) = (&mut sequences).get_mut(*from) {
                                             sequence.set_cursor(*to);
+                                            schedule.push(*from);
                                         }
                                     }
                                 }
                             }
                         }
 
+                        // Start beginning of events
+                        {
+                            let contexts = world.read_component::<ThunkContext>();
+                            let mut events = world.write_component::<Event>();
+                            for e in schedule {
+                                if let Some(event) = events.get_mut(e) {
+                                    if let Some(context) = contexts.get(e) {
+                                        event.fire(context.clone());
+                                    }
+                                }
+                            }
+                        }
+                        
+                        eprintln!("Starting loop");
                         loop {
                             dispatcher.dispatch(&world);
                             runtime_editor.on_run(&world);

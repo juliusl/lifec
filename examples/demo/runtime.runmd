@@ -1,0 +1,23 @@
+
+``` default runtime
+define first  call .symbol second
+define second call 
+```
+
+``` demo call
+define demo runtime .symbol  demo
+``` runtime
+add project_src .text runtime.runmd
+```
+
+``` first call
+define first timer .symbol first 
+``` timer
+add duration .int 5
+```
+
+``` second call
+define second timer .symbol second
+``` timer
+add duration .int 5
+```
