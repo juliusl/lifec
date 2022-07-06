@@ -1,5 +1,5 @@
 pub use atlier::system::{App, Extension, Value};
-use editor::{Call};
+use editor::{Call, RuntimeEditor};
 pub use specs::storage::BTreeStorage;
 pub use specs::{Component, DispatcherBuilder, Entity, System, World, WorldExt};
 pub use specs::{DefaultVecStorage, DenseVecStorage, HashMapStorage};
@@ -354,13 +354,13 @@ impl Runtime {
     pub fn create_engine<E>(
         &self,
         world: &World,
-        sequence_block_name: &'static str,
+        sequence_block_name: String,
     ) -> Option<Entity>
     where
         E: Engine,
     {
-        eprintln!("Creating engine for {}", sequence_block_name);
-        if let Some(block) = self.project.find_block(sequence_block_name) {
+        eprintln!("Creating engine for {}", &sequence_block_name);
+        if let Some(block) = self.project.find_block(&sequence_block_name) {
             if let Some(mut engine_root) = block.get_block(E::event_name()) {
                 eprintln!(
                     "Found engine root for {} {}",
@@ -401,11 +401,11 @@ impl Runtime {
                     }
                 }
 
-                engine_root.add_text_attr("sequence_name", sequence_block_name);
+                engine_root.add_text_attr("sequence_name", &sequence_block_name);
                 return E::initialize_sequence(engine_root, sequence, world);
             }
         } else {
-            eprintln!("{} block not found", sequence_block_name);
+            eprintln!("{} block not found", &sequence_block_name);
         }
 
         None
@@ -664,6 +664,21 @@ impl Plugin<ThunkContext> for Runtime {
                                 }
                             }
                         }
+
+                       let mut world = World::new();
+                       let mut dispatcher_builder = DispatcherBuilder::new();
+                       let mut runtime_editor = RuntimeEditor::new(runtime);
+
+                       RuntimeEditor::configure_app_world(&mut world);
+                       RuntimeEditor::configure_app_systems(&mut dispatcher_builder);
+
+                       let mut dispatcher = dispatcher_builder.build();
+
+                       dispatcher.dispatch(&world);
+                       runtime_editor.on_run(&world);
+
+                       world.maintain();
+                       runtime_editor.on_maintain(&mut world);
                     }
                 }
 

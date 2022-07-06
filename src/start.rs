@@ -17,7 +17,7 @@ where
     dispatcher.setup(&mut world);
     
     for sequence_name in call_sequence {
-        if let Some(start) = extension.as_ref().create_engine::<Call>(&world, sequence_name) {
+        if let Some(start) = extension.as_ref().create_engine::<Call>(&world, sequence_name.to_string()) {
             eprintln!("Created engine {:?}", start);
     
             let mut event = world.write_component::<Event>();
