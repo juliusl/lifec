@@ -12,6 +12,7 @@ use plugins::{
 };
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::time::Duration;
 use std::{any::Any, collections::BTreeMap};
 
 mod open;
@@ -764,7 +765,7 @@ impl Plugin<ThunkContext> for Runtime {
                                 }
                             }
                         }
-                        
+
                         eprintln!("Starting loop");
                         loop {
                             dispatcher.dispatch(&world);
@@ -774,7 +775,16 @@ impl Plugin<ThunkContext> for Runtime {
                             runtime_editor.on_maintain(&mut world);
 
                             if ThunkContext::is_cancelled(&mut cancel_source) {
+                                eprintln!("Cancelling loop");
                                 break;
+                            }
+                        }
+
+                        if let Some(runtime) = world.remove::<tokio::runtime::Runtime>() {
+                            if let Some(handle) = tc.handle() {
+                                handle.spawn_blocking(move || {
+                                    runtime.shutdown_timeout(Duration::from_secs(5));
+                                });
                             }
                         }
                     }
