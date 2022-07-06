@@ -227,12 +227,23 @@ impl Runtime {
     fn find_config_and_create(
         &self,
         world: &World,
+        block_name: impl AsRef<str>,
         config_name: impl AsRef<str>,
         create_event: CreateFn,
     ) -> Option<Entity> {
-        self.config
+        if let Some(created) = self.config
             .get(config_name.as_ref())
-            .and_then(|c| create_event(world, *c))
+            .and_then(|c| create_event(world, *c)) {
+                let mut tc = world.write_component::<ThunkContext>();
+
+                if let Some(tc) = tc.get_mut(created) {
+                    tc.block.block_name = block_name.as_ref().to_string();
+                }
+
+                Some(created)
+            } else {
+                None
+            }
     }
 
     fn find_config_block_and_create(
@@ -444,7 +455,7 @@ impl Runtime {
                             .and_then(|b| b.find_text("config"));
                         if let Some(config_name) = config {
                             eprintln!("config block {}", config_name);
-                            return self.find_config_and_create(world, config_name, create_event);
+                            return self.find_config_and_create(world, block.block_name, config_name, create_event);
                         }
 
                         let config_block = block
@@ -469,7 +480,26 @@ impl Runtime {
                         block_address.as_ref(),
                         config_name
                     );
-                    return self.find_config_and_create(world, config_name, create_event);
+                    
+                    let mut block_address = BlockAddress::lexer(block_address.as_ref());
+                    loop {
+                        match block_address.next() {
+                            Some(block_address) => match block_address {
+                                BlockAddress::Prefix => {
+                                    continue;
+                                },
+                                BlockAddress::Name(block_name) => {
+                                    return self.find_config_and_create(world, block_name, config_name, create_event);
+                                },
+                                BlockAddress::Error => {
+                                    return None
+                                },
+                            },
+                            None => {
+                                return None 
+                            },
+                        };
+                    }
                 }
                 atlier::system::Value::Symbol(config_block_name) => {
                     eprintln!(
