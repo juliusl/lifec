@@ -1,6 +1,6 @@
 use std::env;
 
-use lifec::{editor::*, plugins::*, AttributeGraph, open, start, Runtime};
+use lifec::{editor::*, plugins::*, AttributeGraph, open, start, Runtime, Extension, World, DispatcherBuilder, System};
 
 /// Demo app for the runtime, can swap projects by dropping a .runmd file in
 #[derive(Default)]
@@ -88,7 +88,7 @@ impl Extension for Demo {
     fn on_maintain(&'_ mut self, app_world: &mut World) {
         if self.1 {
             app_world.delete_all();
-            self.0.runtime().create_engine::<Call>(app_world, "demo");
+            self.0.runtime().create_engine::<Call>(app_world, "demo".to_string());
             self.1 = false;
         }
     }
@@ -121,7 +121,7 @@ fn main() {
 pub fn main_headless() {
     println!("Starting in headless mode, loading from .runmd");
     if let Some(file) = AttributeGraph::load_from_file(".runmd") {
-       start(Demo::load(file), "demo");
+       start(Demo::load(file), &["demo"]);
     }
 }
 

@@ -30,6 +30,8 @@ edit f_timer4::timer .symbol timer_config
 define g_process process
 edit g_process::process .symbol process_config
 
+define h_remote remote .symbol remote_config
+
 # Enables looping this sequence
 # add repeat .enable
 add repeat .text f_timer4
@@ -45,4 +47,8 @@ add duration .int_range 10, 0, 50
 
 ``` process_config process
 add command .text echo hello world
+```
+
+``` remote_config remote
+add command .text zsh
 ```
