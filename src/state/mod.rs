@@ -2149,6 +2149,7 @@ fn test_attribute_graph_dispatcher() {
     # but if you have an event such as `add` then you can start the next symbol w/ # to turn it into a name. 
     # after that point, you don't need to continue to add # to lookup the attribute, # will automatically get dropped
     # this implies that #test == test when defining a message
+    - this is a test comment
     add #File.txt             .text testing #file.txt
     add #test_.attr2          .text testing #test_.attr2
     add test_attr2            .text testing .text test.attr

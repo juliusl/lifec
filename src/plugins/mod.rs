@@ -223,6 +223,9 @@ pub trait Engine {
                 .write_component::<Sequence>()
                 .insert(first, sequence.clone())
                 .ok();
+            world.write_component::<Connection>()
+                .insert(first, Connection::default())
+                .ok();
             world
                 .write_component::<List<Task>>()
                 .insert(first, sequence_list)

@@ -152,6 +152,7 @@ impl Plugin<ThunkContext> for OpenDir {
                                                     }
                                                 }
                                             }
+                                        
                                         }
                                         None => break,
                                     }
