@@ -695,7 +695,7 @@ impl Plugin<ThunkContext> for Runtime {
 
                         // TODO - add some built in configs - 
 
-                        runtime.start(&tc, cancel_source).await;
+                        runtime.start(&tc, cancel_source);
                     }
                 }
 
@@ -706,10 +706,20 @@ impl Plugin<ThunkContext> for Runtime {
 }
 
 impl Runtime {
-    /// Starts the runtime w/ a thunk_context and cancel_source
+    /// Starts the runtime w/ the runtime editor extension
+    pub fn start(self, tc: &ThunkContext, cancel_source: tokio::sync::oneshot::Receiver<()>) {
+        let mut runtime_editor = RuntimeEditor::new(self);
+        
+        Self::start_with(&mut runtime_editor, tc, cancel_source);
+    }
+
+    /// Starts the runtime and extension w/ a thunk_context and cancel_source
     /// Can be used inside a plugin to customize a runtime.
-    pub async fn start(self, tc: &ThunkContext, mut cancel_source: tokio::sync::oneshot::Receiver<()>) {
-        let project = &self.project;
+    pub fn start_with<E>(extension: &mut E, tc: &ThunkContext, mut cancel_source: tokio::sync::oneshot::Receiver<()>) 
+    where 
+        E: Extension + AsRef<Runtime>
+    {
+        let project = &extension.as_ref().project;
 
         let mut call_names = vec![];
         let mut connections = vec![];
@@ -730,12 +740,7 @@ impl Runtime {
             }
         }
 
-        let mut world = World::new();
-        let mut dispatcher_builder = DispatcherBuilder::new();
-        let mut runtime_editor = RuntimeEditor::new(self);
-
-        RuntimeEditor::configure_app_world(&mut world);
-        RuntimeEditor::configure_app_systems(&mut dispatcher_builder);
+        let (mut world, dispatcher_builder) = E::standalone(); 
 
         let mut dispatcher = dispatcher_builder.build();
         dispatcher.setup(&mut world);
@@ -743,8 +748,8 @@ impl Runtime {
         let mut engine_table = HashMap::<String, Entity>::default();
 
         for engine in call_names {
-            if let Some(start) = runtime_editor
-                .runtime()
+            if let Some(start) = extension
+                .as_ref()
                 .create_engine::<Call>(&world, engine.to_string())
             {
                 engine_table.insert(engine, start);
@@ -783,10 +788,10 @@ impl Runtime {
         eprintln!("Starting loop");
         loop {
             dispatcher.dispatch(&world);
-            runtime_editor.on_run(&world);
+            extension.on_run(&world);
 
             world.maintain();
-            runtime_editor.on_maintain(&mut world);
+            extension.on_maintain(&mut world);
 
             if ThunkContext::is_cancelled(&mut cancel_source) {
                 eprintln!("Cancelling loop");
