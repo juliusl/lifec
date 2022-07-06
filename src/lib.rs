@@ -1,5 +1,6 @@
 pub use atlier::system::{App, Extension, Value};
 use editor::{Call, RuntimeEditor};
+use logos::{Logos, Lexer};
 pub use specs::storage::BTreeStorage;
 pub use specs::{Component, DispatcherBuilder, Entity, System, World, WorldExt};
 pub use specs::{DefaultVecStorage, DenseVecStorage, HashMapStorage};
@@ -700,4 +701,34 @@ impl Plugin<ThunkContext> for Runtime {
             }
         })
     }
+}
+
+#[derive(Logos, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BlockAddress {
+    /// Used for ordering, workaround for how things are stored in btree table 
+    /// ex. aa_{name}::{symbol}
+    #[regex(r"[a-z]*[a-z]_")]
+    Prefix,
+    /// Name of the block
+    #[regex(r"[a-z-.0-9]*::", from_block_address)]
+    Name(String),
+    // Logos requires one token variant to handle errors,
+    // it can be named anything you wish.
+    #[error]
+    // We can also use this variant to define whitespace,
+    // or any other matches we wish to skip.
+    #[regex(r"[ \t\n\f]+", logos::skip)]
+    Error,
+}
+
+fn from_block_address(lexer: &mut Lexer<BlockAddress>) -> Option<String> {
+    Some(lexer.slice().trim_end_matches("::").to_string())
+}
+
+#[test]
+fn test_block_address() {
+    let mut block_address = BlockAddress::lexer("a_azcli::install");
+
+    assert_eq!(block_address.next(), Some(BlockAddress::Prefix));
+    assert_eq!(block_address.next(), Some(BlockAddress::Name("azcli".to_string())));
 }
