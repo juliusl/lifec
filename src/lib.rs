@@ -202,7 +202,7 @@ impl Runtime {
     pub fn install<E, P>(&mut self)
     where
         E: Engine,
-        P: Plugin<ThunkContext> + Component + Send + Default,
+        P: Plugin<ThunkContext> + Send + Default,
     {
         let event = E::event::<P>();
         self.engine_plugin.insert(event.to_string(), E::create::<P>);
@@ -690,6 +690,7 @@ impl Plugin<ThunkContext> for Runtime {
                         runtime.install::<Call, Process>();
                         runtime.install::<Call, Remote>();
                         runtime.install::<Call, Timer>();
+                        runtime.install::<Call, Runtime>();
 
                         let project = &runtime.project;
 

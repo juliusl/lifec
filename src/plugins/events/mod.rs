@@ -52,7 +52,7 @@ impl Event {
     /// a handle to the tokio runtime is passed to this function to customize the task spawning
     pub fn from_plugin<P>(event_name: &'static str) -> Self
     where
-        P: Plugin<ThunkContext> + Component + Default + Send,
+        P: Plugin<ThunkContext> + Default + Send,
     {
         Self(event_name, Thunk::from_plugin::<P>(), None, None, None)
     }

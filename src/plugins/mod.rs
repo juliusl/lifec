@@ -130,7 +130,7 @@ pub trait Engine {
     /// Creates an instance of this engine
     fn create<P>(world: &World, config: fn(&mut ThunkContext)) -> Option<Entity>
     where
-        P: Plugin<ThunkContext> + Component + Send + Default,
+        P: Plugin<ThunkContext> + Send + Default,
     {
         let entities = world.entities();
         let mut events = world.write_component::<Event>();
@@ -176,7 +176,7 @@ pub trait Engine {
     /// Returns an event that runs the engine
     fn event<P>() -> Event
     where
-        P: Plugin<ThunkContext> + Component + Send + Default,
+        P: Plugin<ThunkContext> + Send + Default,
     {
         Event::from_plugin::<P>(Self::event_name())
     }
