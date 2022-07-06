@@ -1,13 +1,14 @@
 pub use atlier::system::{App, Extension, Value};
 use editor::{Call, RuntimeEditor};
-use logos::{Logos, Lexer};
+use logos::{Lexer, Logos};
 pub use specs::storage::BTreeStorage;
 pub use specs::{Component, DispatcherBuilder, Entity, System, World, WorldExt};
 pub use specs::{DefaultVecStorage, DenseVecStorage, HashMapStorage};
 
 use imgui::{ChildWindow, MenuItem, Ui, Window};
 use plugins::{
-    AsyncContext, BlockContext, Config, Engine, Event, Plugin, Project, Sequence, ThunkContext, OpenFile, WriteFile, OpenDir, Process, Remote, Timer,
+    AsyncContext, BlockContext, Config, Engine, Event, OpenDir, OpenFile, Plugin, Process, Project,
+    Remote, Sequence, ThunkContext, Timer, WriteFile,
 };
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -231,19 +232,21 @@ impl Runtime {
         config_name: impl AsRef<str>,
         create_event: CreateFn,
     ) -> Option<Entity> {
-        if let Some(created) = self.config
+        if let Some(created) = self
+            .config
             .get(config_name.as_ref())
-            .and_then(|c| create_event(world, *c)) {
-                let mut tc = world.write_component::<ThunkContext>();
+            .and_then(|c| create_event(world, *c))
+        {
+            let mut tc = world.write_component::<ThunkContext>();
 
-                if let Some(tc) = tc.get_mut(created) {
-                    tc.block.block_name = block_name.as_ref().to_string();
-                }
-
-                Some(created)
-            } else {
-                None
+            if let Some(tc) = tc.get_mut(created) {
+                tc.block.block_name = block_name.as_ref().to_string();
             }
+
+            Some(created)
+        } else {
+            None
+        }
     }
 
     fn find_config_block_and_create(
@@ -363,11 +366,7 @@ impl App for Runtime {
 impl Runtime {
     /// Creates a new engine,
     /// an engine is defined by a sequence of events.
-    pub fn create_engine<E>(
-        &self,
-        world: &World,
-        sequence_block_name: String,
-    ) -> Option<Entity>
+    pub fn create_engine<E>(&self, world: &World, sequence_block_name: String) -> Option<Entity>
     where
         E: Engine,
     {
@@ -455,7 +454,12 @@ impl Runtime {
                             .and_then(|b| b.find_text("config"));
                         if let Some(config_name) = config {
                             eprintln!("config block {}", config_name);
-                            return self.find_config_and_create(world, block.block_name, config_name, create_event);
+                            return self.find_config_and_create(
+                                world,
+                                block.block_name,
+                                config_name,
+                                create_event,
+                            );
                         }
 
                         let config_block = block
@@ -480,24 +484,25 @@ impl Runtime {
                         block_address.as_ref(),
                         config_name
                     );
-                    
+
                     let mut block_address = BlockAddress::lexer(block_address.as_ref());
                     loop {
                         match block_address.next() {
                             Some(block_address) => match block_address {
                                 BlockAddress::Prefix => {
                                     continue;
-                                },
+                                }
                                 BlockAddress::Name(block_name) => {
-                                    return self.find_config_and_create(world, block_name, config_name, create_event);
-                                },
-                                BlockAddress::Error => {
-                                    return None
-                                },
+                                    return self.find_config_and_create(
+                                        world,
+                                        block_name,
+                                        config_name,
+                                        create_event,
+                                    );
+                                }
+                                BlockAddress::Error => return None,
                             },
-                            None => {
-                                return None 
-                            },
+                            None => return None,
                         };
                     }
                 }
@@ -668,6 +673,10 @@ impl Plugin<ThunkContext> for Runtime {
         "runtime"
     }
 
+    fn description() -> &'static str {
+        "Starts a runtime w/ it's own standalone world"
+    }
+
     fn call_with_context(context: &mut ThunkContext) -> Option<AsyncContext> {
         context.clone().task(|mut cancel_source| {
             let tc = context.clone();
@@ -686,44 +695,68 @@ impl Plugin<ThunkContext> for Runtime {
 
                         let mut call_names = vec![];
 
+                        let mut connections = vec![];
+
                         for (_, block) in project.iter_block() {
                             if let Some(runtime_block) = block.get_block("runtime") {
-                                for (_, value) in runtime_block.find_symbol_values("call") {
-                                    if let Value::Symbol(sequence_name) = value {
-                                      call_names.push(sequence_name);
+                                for (engine_address, value) in
+                                    runtime_block.find_symbol_values("call")
+                                {
+                                    if let Some((engine_name, _)) = engine_address.split_once("::")
+                                    {
+                                        if let Value::Symbol(connect_to) = value {
+                                            call_names.push(engine_name.to_string());
+                                            connections.push((engine_name.to_string(), connect_to));
+                                        }
                                     }
                                 }
                             }
                         }
 
-                       let mut world = World::new();
-                       let mut dispatcher_builder = DispatcherBuilder::new();
-                       let mut runtime_editor = RuntimeEditor::new(runtime);
+                        let mut world = World::new();
+                        let mut dispatcher_builder = DispatcherBuilder::new();
+                        let mut runtime_editor = RuntimeEditor::new(runtime);
 
-                       RuntimeEditor::configure_app_world(&mut world);
-                       RuntimeEditor::configure_app_systems(&mut dispatcher_builder);
+                        RuntimeEditor::configure_app_world(&mut world);
+                        RuntimeEditor::configure_app_systems(&mut dispatcher_builder);
 
-                       let mut dispatcher = dispatcher_builder.build();
+                        let mut dispatcher = dispatcher_builder.build();
 
-                       for engine in call_names {
-                            let engine = runtime_editor.runtime().create_engine::<Call>(&world, engine);
-                            if let Some(start) = engine {
-                                // TODO 
-                                eprintln!("todo: start {:?}", start);
+                        let mut engine_table = HashMap::<String, Entity>::default();
+
+                        for engine in call_names {
+                            if let Some(start) = runtime_editor
+                                .runtime()
+                                .create_engine::<Call>(&world, engine.to_string())
+                            {
+                                engine_table.insert(engine, start);
                             }
-                       }
+                        }
 
-                       loop {
+                        {
+                            let mut sequences = world.write_component::<Sequence>();
+                            for (from, to) in connections {
+                                if let Some(from) = engine_table.get(&from) {
+                                    if let Some(to) = engine_table.get(&to) {
+                                        if let Some(sequence) = (&mut sequences).get_mut(*from) {
+                                            sequence.set_cursor(*to);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        loop {
                             dispatcher.dispatch(&world);
                             runtime_editor.on_run(&world);
- 
+
                             world.maintain();
                             runtime_editor.on_maintain(&mut world);
 
                             if ThunkContext::is_cancelled(&mut cancel_source) {
                                 break;
                             }
-                       }
+                        }
                     }
                 }
 
@@ -735,7 +768,7 @@ impl Plugin<ThunkContext> for Runtime {
 
 #[derive(Logos, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BlockAddress {
-    /// Used for ordering, workaround for how things are stored in btree table 
+    /// Used for ordering, workaround for how things are stored in btree table
     /// ex. aa_{name}::{symbol}
     #[regex(r"[a-z]*[a-z]_")]
     Prefix,
@@ -760,5 +793,8 @@ fn test_block_address() {
     let mut block_address = BlockAddress::lexer("a_azcli::install");
 
     assert_eq!(block_address.next(), Some(BlockAddress::Prefix));
-    assert_eq!(block_address.next(), Some(BlockAddress::Name("azcli".to_string())));
+    assert_eq!(
+        block_address.next(),
+        Some(BlockAddress::Name("azcli".to_string()))
+    );
 }

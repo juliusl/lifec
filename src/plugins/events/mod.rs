@@ -169,8 +169,8 @@ impl<'a> System<'a> for EventRuntime {
         &mut self,
         (
             runtime,
-            status_sender,
-            updated_sender,
+            status_update_channel,
+            thunk_complete_channel,
             project,
             entities,
             mut events,
@@ -186,11 +186,10 @@ impl<'a> System<'a> for EventRuntime {
             let Event(_, thunk, _, initial_context, task) = event;
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
-                    if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() })
-                    {
+                    if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() }) {
                         match contexts.insert(entity, thunk_context.clone()) {
                             Ok(_) => {
-                                updated_sender.send(entity).ok();
+                                thunk_complete_channel.send(entity).ok();
 
                                 // if the entity has a sequence, dispatch the next event
                                 if let Some(sequence) = sequences.get(entity) {
@@ -229,7 +228,7 @@ impl<'a> System<'a> for EventRuntime {
                     initial_context.as_ref().hash_code()
                 );
                 let thunk = thunk.clone();
-                let status_sender = status_sender.clone();
+                let status_sender = status_update_channel.clone();
                 let runtime_handle = runtime.handle().clone();
                 let mut context =
                     initial_context.enable_async(
