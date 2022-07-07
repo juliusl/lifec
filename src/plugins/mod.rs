@@ -153,6 +153,10 @@ pub trait Engine {
                 config(&mut initial_context);
                 initial_context.as_mut().set_parent_entity(entity);
 
+                initial_context.as_mut()
+                    .with_text("caveats", P::caveats())
+                    .add_text_attr("description", P::description());
+
                 match world
                     .write_component::<ThunkContext>()
                     .insert(entity, initial_context)

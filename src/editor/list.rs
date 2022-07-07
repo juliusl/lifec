@@ -55,14 +55,18 @@ where
                     .find_text("thunk_symbol")
                     .unwrap_or("entity".to_string());
 
-                let title = format!(
+                ui.text(format!(
                     "{} {} - {}:",
                     thunk_symbol,
                     context.block.block_name,
                     context.as_ref().hash_code()
-                );
+                ));
 
-                ui.text(title);
+                if let Some(description) = context.as_ref().find_text("description") {
+                    ui.new_line();
+                    ui.text(description);
+                }
+
                 item.on_ui(world, ui);
                 ui.separator();
             },
