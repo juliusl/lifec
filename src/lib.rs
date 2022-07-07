@@ -8,7 +8,7 @@ pub use specs::{DefaultVecStorage, DenseVecStorage, HashMapStorage};
 use imgui::{ChildWindow, MenuItem, Ui, Window};
 use plugins::{
     AsyncContext, BlockContext, Config, Engine, Event, OpenDir, OpenFile, Plugin, Process, Project,
-    Remote, Sequence, ThunkContext, Timer, WriteFile, 
+    Remote, Sequence, ThunkContext, Timer, WriteFile,
 };
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -365,6 +365,22 @@ impl App for Runtime {
 
 /// Methods for creating engines & plugins
 impl Runtime {
+    /// Creates a group of engines
+    pub fn create_engine_group<E>(&self, world: &World, blocks: &[impl AsRef<str>]) -> Vec<Entity>
+    where
+        E: Engine, 
+    {
+        let mut created = vec![];
+
+        for block in blocks.iter() {
+            if let Some(next) = self.create_engine::<E>(world, block.as_ref().to_string()) {
+                created.push(next);
+            }
+        }
+
+        created
+    }
+
     /// Creates a new engine,
     /// an engine is defined by a sequence of events.
     pub fn create_engine<E>(&self, world: &World, sequence_block_name: String) -> Option<Entity>
@@ -693,7 +709,7 @@ impl Plugin<ThunkContext> for Runtime {
                         runtime.install::<Call, Timer>();
                         runtime.install::<Call, Runtime>();
 
-                        // TODO - add some built in configs - 
+                        // TODO - add some built in configs -
 
                         runtime.start(&tc, cancel_source);
                     }
@@ -709,15 +725,18 @@ impl Runtime {
     /// Starts the runtime w/ the runtime editor extension
     pub fn start(self, tc: &ThunkContext, cancel_source: tokio::sync::oneshot::Receiver<()>) {
         let mut runtime_editor = RuntimeEditor::new(self);
-        
+
         Self::start_with(&mut runtime_editor, tc, cancel_source);
     }
 
     /// Starts the runtime and extension w/ a thunk_context and cancel_source
     /// Can be used inside a plugin to customize a runtime.
-    pub fn start_with<E>(extension: &mut E, tc: &ThunkContext, mut cancel_source: tokio::sync::oneshot::Receiver<()>) 
-    where 
-        E: Extension + AsRef<Runtime>
+    pub fn start_with<E>(
+        extension: &mut E,
+        tc: &ThunkContext,
+        mut cancel_source: tokio::sync::oneshot::Receiver<()>,
+    ) where
+        E: Extension + AsRef<Runtime>,
     {
         let project = &extension.as_ref().project;
 
@@ -725,13 +744,10 @@ impl Runtime {
         let mut connections = vec![];
         for (_, block) in project.iter_block() {
             if let Some(runtime_block) = block.get_block("runtime") {
-                for (engine_address, value) in
-                    runtime_block.find_symbol_values("call")
-                {
-                    if let Some((engine_name, _)) = engine_address.split_once("::")
-                    {
+                for (engine_address, value) in runtime_block.find_symbol_values("call") {
+                    if let Some((engine_name, _)) = engine_address.split_once("::") {
                         call_names.push(engine_name.to_string());
-                        
+
                         if let Value::Symbol(connect_to) = value {
                             connections.push((engine_name.to_string(), connect_to));
                         }
@@ -740,7 +756,7 @@ impl Runtime {
             }
         }
 
-        let (mut world, dispatcher_builder) = E::standalone(); 
+        let (mut world, dispatcher_builder) = E::standalone();
 
         let mut dispatcher = dispatcher_builder.build();
         dispatcher.setup(&mut world);
