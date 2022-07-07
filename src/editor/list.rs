@@ -64,7 +64,7 @@ where
 
                 if let Some(description) = context.as_ref().find_text("description") {
                     ui.new_line();
-                    ui.text(description);
+                    ui.text_wrapped(description);
                 }
 
                 item.on_ui(world, ui);
