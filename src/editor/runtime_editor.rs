@@ -15,6 +15,7 @@ pub struct RuntimeEditor {
     listeners: Vec<RuntimeEditorListener>,
     font_scale: f32,
     enable_complex: bool,
+    task_window_size: [f32; 2],
 }
 
 /// Allows runtime editor to use `crate::start` method
@@ -65,6 +66,7 @@ impl Default for RuntimeEditor {
             ],
             font_scale: 1.0,
             enable_complex: false,
+            task_window_size: [580.0, 700.0]
         };
         default.runtime.install::<Call, Timer>();
         default.runtime.install::<Call, Remote>();
@@ -101,6 +103,8 @@ impl Extension for RuntimeEditor {
 
             ui.menu("Tasks Window", ||{
                 ui.checkbox("Enable complex view", &mut self.enable_complex);
+                ui.separator();
+                ui.input_float2("Window Size",  &mut self.task_window_size).build();
             })
         });
 
@@ -293,7 +297,7 @@ impl RuntimeEditor {
 
         Window::new(format!("Tasks, engine: {}", title))
             .menu_bar(true)
-            .size([580.0, 500.0], imgui::Condition::Appearing)
+            .size( self.task_window_size, imgui::Condition::Appearing)
             .build(ui, || {
                 ui.menu_bar(|| {
                     ui.menu("Menu", ||{
