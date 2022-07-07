@@ -795,6 +795,7 @@ impl Runtime {
             for e in schedule {
                 if let Some(event) = events.get_mut(e) {
                     if let Some(context) = contexts.get(e) {
+                        eprintln!("firing event {}", event);
                         event.fire(context.clone());
                     }
                 }
