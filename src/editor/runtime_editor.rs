@@ -297,7 +297,7 @@ impl RuntimeEditor {
 
         Window::new(format!("Tasks, engine: {}", title))
             .menu_bar(true)
-            .size( self.task_window_size, imgui::Condition::Appearing)
+            .size( self.task_window_size, imgui::Condition::Always)
             .build(ui, || {
                 ui.menu_bar(|| {
                     ui.menu("Menu", ||{
