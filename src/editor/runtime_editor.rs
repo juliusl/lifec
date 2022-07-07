@@ -298,7 +298,7 @@ impl RuntimeEditor {
     pub fn task_window(&mut self, app_world: &specs::World, task_list: &mut List<Task>, ui: &Ui) {
         let title = task_list.title().unwrap_or("(All)".to_string());
 
-        Window::new(format!("Tasks, engine: {}", title))
+        Window::new(format!("Tasks, engine: {} ({}x{})", title, self.task_window_size[0], self.task_window_size[1]))
             .menu_bar(true)
             .size( self.task_window_size, imgui::Condition::Always)
             .build(ui, || {
