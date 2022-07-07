@@ -104,8 +104,11 @@ impl Extension for RuntimeEditor {
             ui.menu("Tasks Window", ||{
                 ui.checkbox("Enable complex view", &mut self.enable_complex);
                 ui.separator();
-                ui.input_float2("Window Size",  &mut self.task_window_size).build();
-            })
+
+                let [width, height] = &mut self.task_window_size;
+                Slider::new("Width", 500.0, 1000.0).build(ui, width);
+                Slider::new("Heifht", 500.0, 1000.0).build(ui, height);
+            });
         });
 
         // Window::new("table").build(ui, ||{
