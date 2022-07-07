@@ -726,13 +726,14 @@ impl Runtime {
     pub fn start(self, tc: &ThunkContext, cancel_source: tokio::sync::oneshot::Receiver<()>) {
         let mut runtime_editor = RuntimeEditor::new(self);
 
-        Self::start_with(&mut runtime_editor, tc, cancel_source);
+        Self::start_with(&mut runtime_editor, "runtime", tc, cancel_source);
     }
 
     /// Starts the runtime and extension w/ a thunk_context and cancel_source
     /// Can be used inside a plugin to customize a runtime.
     pub fn start_with<E>(
         extension: &mut E,
+        block_symbol: impl AsRef<str>,
         tc: &ThunkContext,
         mut cancel_source: tokio::sync::oneshot::Receiver<()>,
     ) where
@@ -743,7 +744,7 @@ impl Runtime {
         let mut call_names = vec![];
         let mut connections = vec![];
         for (_, block) in project.iter_block() {
-            if let Some(runtime_block) = block.get_block("runtime") {
+            if let Some(runtime_block) = block.get_block(block_symbol.as_ref()) {
                 for (engine_address, value) in runtime_block.find_symbol_values("call") {
                     if let Some((engine_name, _)) = engine_address.split_once("::") {
                         call_names.push(engine_name.to_string());
