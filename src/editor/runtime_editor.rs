@@ -14,6 +14,7 @@ pub struct RuntimeEditor {
     runtime: Runtime,
     listeners: Vec<RuntimeEditorListener>,
     font_scale: f32,
+    enable_complex: bool,
 }
 
 /// Allows runtime editor to use `crate::start` method
@@ -62,7 +63,8 @@ impl Default for RuntimeEditor {
             runtime: Default::default(),
             listeners: vec![
             ],
-            font_scale: 1.0
+            font_scale: 1.0,
+            enable_complex: false,
         };
         default.runtime.install::<Call, Timer>();
         default.runtime.install::<Call, Remote>();
@@ -96,6 +98,10 @@ impl Extension for RuntimeEditor {
                 Slider::new("font scale", 0.5, 4.0) .build(ui, &mut self.font_scale);
                 ui.separator();
             });
+
+            ui.menu("Tasks Window", ||{
+                ui.checkbox("Enable complex view", &mut self.enable_complex);
+            })
         });
 
         // Window::new("table").build(ui, ||{
@@ -106,8 +112,11 @@ impl Extension for RuntimeEditor {
         //     ]).on_ui(app_world, ui);
         // });
 
-        // This is all tasks,
-        self.task_window(app_world, &mut List::<Task>::simple(), ui);
+        if self.enable_complex {
+            self.task_window(app_world, &mut List::<Task>::edit_block_view(None), ui);
+        } else {
+            self.task_window(app_world, &mut List::<Task>::simple(), ui);
+        }
 
         // These are each active sequences
         let mut sequence_lists = app_world.write_component::<List::<Task>>();
