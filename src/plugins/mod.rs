@@ -57,6 +57,11 @@ where
         ""
     }
 
+    /// Returns any caveats for this plugin
+    fn caveats() -> &'static str {
+        ""
+    }
+
     /// Transforms attribute graph into a thunk context and calls call_with_context
     /// Updates graph afterwards.
     fn call(attributes: &mut AttributeGraph) {
