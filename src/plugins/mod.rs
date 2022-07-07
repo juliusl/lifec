@@ -303,6 +303,23 @@ where
                                 }
                             }
                         }
+
+                        let previous = tc.project
+                                .as_ref()
+                                .and_then(|p| p.transpile_blocks().ok())
+                                .unwrap_or_default()
+                                .trim()
+                                .to_string();
+
+                        if !previous.trim().is_empty() {
+                            let block_name = tc.block.block_name.to_string();
+                            eprintln!("Previous block left a message");
+                            tc.as_mut().add_message(
+                                block_name,
+                                "previous",
+                                previous,
+                            );
+                        }
         
                         if let Some((handle, cancel)) = B::call_with_context(&mut tc) {
                             select! {
