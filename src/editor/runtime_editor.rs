@@ -97,7 +97,7 @@ impl Extension for RuntimeEditor {
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
         ui.main_menu_bar(||{
             ui.menu("Window", ||{
-                Slider::new("font scale", 0.5, 4.0) .build(ui, &mut self.font_scale);
+                Slider::new("Font scale", 0.5, 4.0) .build(ui, &mut self.font_scale);
                 ui.separator();
             });
 
@@ -107,7 +107,7 @@ impl Extension for RuntimeEditor {
 
                 let [width, height] = &mut self.task_window_size;
                 Slider::new("Width", 500.0, 1000.0).build(ui, width);
-                Slider::new("Heifht", 500.0, 1000.0).build(ui, height);
+                Slider::new("Height", 500.0, 1000.0).build(ui, height);
             });
         });
 
