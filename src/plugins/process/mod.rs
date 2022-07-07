@@ -36,10 +36,10 @@ impl Plugin<ThunkContext> for Process {
                 let parts: Vec<&str> = command.split(" ").collect();
                 tc.update_progress(format!("``` {} process", tc.block.block_name), 0.10)
                     .await;
-                if let Some(command) = parts.get(0) {
-                    tc.update_progress(format!("add command .text {}", command), 0.10)
+                if let Some(program) = parts.get(0) {
+                    tc.update_progress(format!("add command .text {}", program), 0.10)
                         .await;
-                    let mut command_task = tokio::process::Command::new(&command);
+                    let mut command_task = tokio::process::Command::new(&program);
                     for (el, arg) in parts.iter().skip(1).enumerate() {
                         command_task.arg(arg);
                         tc.update_progress(format!("define arg{}    .text {}", el, arg), 0.10)
@@ -68,20 +68,25 @@ impl Plugin<ThunkContext> for Process {
                        output = command_task.output() => {
                             match output {
                                 Ok(output) => {
-                                // Completed process, publish result
-                                tc.update_progress("# Finished, recording output", 0.30).await;
-                                let timestamp_utc = Some(Utc::now().to_string());
-                                let timestamp_local = Some(Local::now().to_string());
-                                let elapsed = start_time
-                                    .and_then(|s| Some(Utc::now() - s))
-                                    .and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
-                                tc.as_mut()
-                                    .with_int("code", output.status.code().unwrap_or_default())
-                                    .with_binary("stdout", output.stdout)
-                                    .with_binary("stderr", output.stderr)
-                                    .with_text("timestamp_local", timestamp_local.unwrap_or_default())
-                                    .with_text("timestamp_utc", timestamp_utc.unwrap_or_default())
-                                    .add_text_attr("elapsed", elapsed.unwrap_or_default());
+                                    // Completed process, publish result
+                                    tc.update_progress("# Finished, recording output", 0.30).await;
+                                    let timestamp_utc = Some(Utc::now().to_string());
+                                    let timestamp_local = Some(Local::now().to_string());
+                                    let elapsed = start_time
+                                        .and_then(|s| Some(Utc::now() - s))
+                                        .and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
+
+                                    if let Some(project) = tc.project.as_mut() {
+                                        *project = project.with_block(program, "process", |c| {
+                                            c.with_int("code", output.status.code().unwrap_or_default())
+                                                .with_text("command", &command)
+                                                .with_binary("stdout", output.stdout)
+                                                .with_binary("stderr", output.stderr)
+                                                .with_text("timestamp_local", timestamp_local.unwrap_or_default())
+                                                .with_text("timestamp_utc", timestamp_utc.unwrap_or_default())
+                                            .add_text_attr("elapsed", elapsed.unwrap_or_default());
+                                        });
+                                    }
                                 }
                                 Err(err) => {
                                     tc.update_progress(format!("# error {}", err), 0.0).await;

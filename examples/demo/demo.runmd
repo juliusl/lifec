@@ -5,12 +5,17 @@ define c_timer   timer       .text    timer_complex
 define d_timer   timer       .symbol  timer_config
 define e_timer   timer       .empty
 define f_process process     .symbol  process_config
-define g_open    open_file   .symbol  file_config
-define h_write   write_file  .symbol  write_config
-define i_open    open_file   .symbol  file_config2
-define j_write   write_file  .symbol  write_config
+define g_println println     .symbol  println_config
+define h_open    open_file   .symbol  file_config
+define i_write   write_file  .symbol  write_config
+define j_open    open_file   .symbol  file_config2
+define k_write   write_file  .symbol  write_config
 add repeat .disable
 ```
+
+``` println_config println
+```
+
 ``` file_config2 open_file
 add file_src .text demo.runmd
 ```

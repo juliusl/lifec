@@ -19,6 +19,9 @@ pub use write_file::WriteFile;
 mod timer;
 pub use timer::Timer;
 
+mod println;
+pub use println::Println;
+
 use super::{BlockContext, Plugin, Project};
 use tokio::{runtime::Handle, sync::mpsc::Sender, sync::oneshot::channel, task::JoinHandle};
 
