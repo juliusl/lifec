@@ -366,14 +366,14 @@ impl App for Runtime {
 /// Methods for creating engines & plugins
 impl Runtime {
     /// Creates a group of engines
-    pub fn create_engine_group<E>(&self, world: &World, blocks: &[impl AsRef<str>]) -> Vec<Entity>
+    pub fn create_engine_group<E>(&self, world: &World, blocks: Vec<String>) -> Vec<Entity>
     where
         E: Engine, 
     {
         let mut created = vec![];
 
         for block in blocks.iter() {
-            if let Some(next) = self.create_engine::<E>(world, block.as_ref().to_string()) {
+            if let Some(next) = self.create_engine::<E>(world, block.to_string()) {
                 created.push(next);
             }
         }
