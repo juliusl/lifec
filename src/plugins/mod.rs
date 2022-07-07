@@ -242,10 +242,31 @@ pub trait Engine {
     }
 }
 
+type PluginTask = fn(&mut ThunkContext) -> Option<AsyncContext>;
+
+/// Combine plugins
+/// Example "Copy" plugin:
+/// ```
+/// use lifec::editor::Call;
+/// use lifec::plugins::{OpenFile, WriteFile};
+/// use lifec::Runtime;
+/// 
+/// let mut runtime = Runtime::default();
+/// runtime.install::<Call, (OpenFile, WriteFile)>();
+/// 
+/// ```
+pub fn combine<A, B>() -> PluginTask
+where
+    A: Plugin<ThunkContext> + Default + Send,
+    B: Plugin<ThunkContext> + Default + Send,
+{
+    <(A, B) as Plugin<ThunkContext>>::call_with_context
+}
+
 impl<A, B> Plugin<ThunkContext> for (A, B) 
 where
-    A: Plugin<ThunkContext>,
-    B: Plugin<ThunkContext>,
+    A: Plugin<ThunkContext> + Default + Send,
+    B: Plugin<ThunkContext> + Default + Send,
 {
     fn symbol() -> &'static str {
         "combine"
