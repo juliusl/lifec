@@ -289,11 +289,11 @@ impl RuntimeEditor {
     }
 
     pub fn task_window(&mut self, app_world: &specs::World, task_list: &mut List<Task>, ui: &Ui) {
-        let title = task_list.title().unwrap_or("all sequences".to_string());
+        let title = task_list.title().unwrap_or("(All)".to_string());
 
         Window::new(format!("Tasks, engine: {}", title))
             .menu_bar(true)
-            .size([580.0, 950.0], imgui::Condition::Appearing)
+            .size([580.0, 500.0], imgui::Condition::Appearing)
             .build(ui, || {
                 ui.menu_bar(|| {
                     ui.menu("Menu", ||{
