@@ -176,7 +176,7 @@ impl RuntimeEditor {
                 let mut project = Project::from(file_dir.as_ref().clone());
                 for (block_name, _) in project.iter_block_mut() {
                     // TODO, this seems to cause a slight issue
-                    eprintln!("found block {}", block_name);
+                    eprintln!("on_open_dir: found block {}", block_name);
                     // if let Some(file) = block.get_block("file") {
                     //     if let (Some(file_src), Some(content)) = (
                     //         file.as_ref().find_text("file_src"),
