@@ -490,7 +490,7 @@ impl Runtime {
                     loop {
                         match block_address.next() {
                             Some(block_address) => match block_address {
-                                BlockAddress::Prefix => {
+                                BlockAddress::Prefix | BlockAddress::Seperator => {
                                     continue;
                                 }
                                 BlockAddress::Name(block_name) => {
@@ -817,14 +817,17 @@ pub enum BlockAddress {
     #[regex(r"[a-z]*[a-z]_")]
     Prefix,
     /// Name of the block
-    #[regex(r"[a-z-.0-9]*::", from_block_address)]
+    #[regex(r"[a-z-.0-9]+", from_block_address)]
     Name(String),
+    /// Seperator between name and symbol
+    #[token("::")]
+    Seperator,
     // Logos requires one token variant to handle errors,
     // it can be named anything you wish.
     #[error]
     // We can also use this variant to define whitespace,
     // or any other matches we wish to skip.
-    #[regex(r"[ \t\n\f]+", logos::skip)]
+    #[regex(r"[ :\t\n\f]+", logos::skip)]
     Error,
 }
 
@@ -834,11 +837,16 @@ fn from_block_address(lexer: &mut Lexer<BlockAddress>) -> Option<String> {
 
 #[test]
 fn test_block_address() {
-    let mut block_address = BlockAddress::lexer("a_azcli::install");
+    let mut block_address = BlockAddress::lexer("a_azcli:jinja2::install");
 
     assert_eq!(block_address.next(), Some(BlockAddress::Prefix));
     assert_eq!(
         block_address.next(),
-        Some(BlockAddress::Name("azcli".to_string()))
+        Some(BlockAddress::Name("azcli".to_string())),
     );
+
+    assert_eq!(
+        block_address.next(),
+        Some(BlockAddress::Name("jinja2".to_string())),
+    )
 }
