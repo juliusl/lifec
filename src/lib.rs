@@ -768,6 +768,7 @@ impl Runtime {
                 .as_ref()
                 .create_engine::<Call>(&world, engine.to_string())
             {
+                eprintln!("Adding to engine table {}", engine);
                 engine_table.insert(engine, start);
             }
         }
