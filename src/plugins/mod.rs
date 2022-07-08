@@ -33,6 +33,7 @@ pub use thunks::Thunk;
 pub use thunks::ThunkContext;
 pub use thunks::Timer;
 pub use thunks::Println;
+pub use thunks::Clear;
 
 /// Async context returned if the plugin starts an async task
 pub type AsyncContext = (tokio::task::JoinHandle<ThunkContext>, tokio::sync::oneshot::Sender<()>);

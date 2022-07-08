@@ -22,6 +22,9 @@ pub use timer::Timer;
 mod println;
 pub use println::Println;
 
+mod clear;
+pub use clear::Clear;
+
 use super::{BlockContext, Plugin, Project};
 use tokio::{runtime::Handle, sync::mpsc::Sender, sync::oneshot::channel, task::JoinHandle};
 
