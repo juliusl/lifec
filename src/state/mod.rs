@@ -1,4 +1,4 @@
-use crate::{RuntimeDispatcher, RuntimeState};
+use crate::{RuntimeDispatcher, RuntimeState, plugins::{BlockContext, Project}};
 use atlier::system::{Attribute, Value};
 use imgui::TableFlags;
 use logos::Logos;
@@ -2070,6 +2070,40 @@ fn test_attribute_graph_block_dispatcher() {
         println!("{:#?}", demo4_block.find_text("block_name"));
         println!("{:#?}", demo4_block.find_text("block_symbol"));
         println!("{:#?}", demo4_block);
+    }
+}
+
+#[test]
+fn test_block_context_2() {
+    let test2 = r#"
+    ``` package make_mime
+    add    node_title  .text Package cloud_init files
+    add    work_dir    .text .config/cloud_init
+    add    file_dst    .text .run/cloud_init/user_data
+    define azcli  part .text install-azcli.yml_jinja2
+    define golang part .text install-golang.yml_jinja2
+    ```
+    "#;
+
+    let mut graph2 = AttributeGraph::from(0);
+    assert!(graph2.batch_mut(test2).is_ok());
+
+    let project = Project::from(graph2);
+
+    match project.clone().transpile() {
+        Ok(transpiled) =>  println!("transpiled: {transpiled}"),
+        Err(err) => assert!(false, "error: {err}"),
+    }
+
+    if let Some(package) = project.find_block("package") {
+        if let Some(package) = package.transpile().ok() {
+            eprintln!("{package}");
+        }
+
+        package.as_ref()
+            .find_imported_symbol_values("part")
+            .iter()
+            .for_each(|p| eprintln!("{:?}", p));
     }
 }
 

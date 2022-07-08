@@ -263,11 +263,30 @@ impl Runtime {
                 for (name, value) in config_block
                     .as_ref()
                     .iter_attributes()
-                    .filter(|a| a.is_stable())
-                    .map(|a| (a.name(), a.value()))
+                    .filter_map(|a| {
+                        if a.is_stable() {
+                            Some((a.name(), a.value()))
+                        } else {
+                            None
+                        }
+                    })
                 {
                     tc.as_mut().with(name, value.clone());
                 }
+
+                for a in config_block.as_ref().iter_attributes().filter(|a| !a.is_stable()) {
+                    if let Some((_, value)) = a.transient() {
+                        if let Value::Symbol(symbol) = a.value() {
+                            let symbol = symbol.trim_end_matches("::");
+                            let name = a.name().trim_end_matches(&format!("::{symbol}"));
+
+                            tc.as_mut()
+                                .define(name, symbol)
+                                .edit_as(value.clone());
+                        }
+                    }
+                }
+
                 tc.block.block_name = block_name.as_ref().to_string();
             }
 
