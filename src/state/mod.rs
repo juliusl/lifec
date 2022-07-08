@@ -169,14 +169,14 @@ impl AttributeGraph {
     /// finds and applies all messages to graph
     pub fn apply(&mut self, symbol: impl AsRef<str>) {
         for (name, value) in self.take_symbol_values(symbol.as_ref()) {
-            println!("Symbol '{}' {}", symbol.as_ref(), name);
+            eprintln!("Symbol '{}' {}", symbol.as_ref(), name);
             if let Value::BinaryVector(content) = value {
                 if let Some(content) = from_utf8(&content).ok() {
-                    println!("Applying {}\n{}", symbol.as_ref(), content);
+                    eprintln!("Applying {}", symbol.as_ref());
 
                     match self.batch_mut(content) {
                         Ok(_) => {
-                            println!("Applied {} {}", symbol.as_ref(), name);
+                            eprintln!("Applied {} {}", symbol.as_ref(), name);
                             self.find_remove(name);
                         }
                         Err(_) => {
