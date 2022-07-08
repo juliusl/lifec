@@ -132,7 +132,9 @@ where
                     .unwrap_or_default();
 
                 let mut flags = TreeNodeFlags::empty();
-                if item_index == 0 || context.as_ref().is_enabled("last_item").unwrap_or_default() {
+                if item_index == 0 
+                || context.as_ref().is_enabled("last_item").unwrap_or_default() 
+                || context.as_ref().is_enabled("default_open").unwrap_or_default() {
                     flags |= TreeNodeFlags::DEFAULT_OPEN;
                 }
 
