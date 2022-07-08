@@ -2493,6 +2493,7 @@ pub enum AttributeGraphEvents {
     ///        - Here is another helpful comment
     #[token("#")]
     #[token("-")]
+    #[token("``` md")]
     Comment,
     /// Usage:
     /// add test_attr .TEXT remaining text is the value
