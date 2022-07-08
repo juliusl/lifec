@@ -223,6 +223,7 @@ impl RuntimeEditor {
                 c.block.block_name = unique_title("new_timer");
                 c.as_mut()
                 .with_text("thunk_symbol", Timer::symbol())
+                .with_bool("default_open", true)
                 .with_int("duration", 0);
             },
             Timer::description(),
@@ -236,6 +237,7 @@ impl RuntimeEditor {
                 c.block.block_name = unique_title("new_process");
                 c.as_mut()
                 .with_text("thunk_symbol", Process::symbol())
+                .with_bool("default_open", true)
                 .with_text("command", "");
             },
             Process::description(),
@@ -249,6 +251,7 @@ impl RuntimeEditor {
                 c.block.block_name = unique_title("new_remote");
                 c.as_mut()
                 .with_text("thunk_symbol", Remote::symbol())
+                .with_bool("default_open", true)
                 .with_text("command", "");
             },
             Remote::description(),
@@ -262,6 +265,7 @@ impl RuntimeEditor {
                 c.block.block_name = unique_title("new_open_file");
                 c.as_mut()
                 .with_text("thunk_symbol", OpenFile::symbol())
+                .with_bool("default_open", true)
                 .with_text("file_src", "");
             },
             OpenFile::description(),
@@ -275,6 +279,7 @@ impl RuntimeEditor {
                 c.block.block_name = unique_title("new_open_dir");
                 c.as_mut()
                     .with_text("thunk_symbol", OpenDir::symbol())
+                    .with_bool("default_open", true)
                     .with_text("file_dir", "");
             },
             OpenDir::description(),
@@ -288,6 +293,7 @@ impl RuntimeEditor {
                 c.block.block_name = unique_title("new_write_file");
                 c.as_mut()
                     .with_text("thunk_symbol", WriteFile::symbol())
+                    .with_bool("default_open", true)
                     .add_text_attr("file_dst", "");
             }, 
             WriteFile::description(), 
