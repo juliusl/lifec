@@ -322,21 +322,22 @@ where
                                 .trim()
                                 .to_string();
 
+                        let mut next_tc = tc.clone();
                         if !previous.trim().is_empty() {
                             let block_name = tc.block.block_name.to_string();
-                            tc.as_mut().add_message(
+                            next_tc.as_mut().add_message(
                                 block_name,
                                 "previous",
                                 previous,
                             );
                         }
         
-                        if let Some((handle, cancel)) = B::call_with_context(&mut tc) {
+                        if let Some((handle, cancel)) = B::call_with_context(&mut next_tc) {
                             select! {
                                 next = handle => {
                                     match next {
-                                        Ok(next) => {
-                                            tc = next;
+                                        Ok(n) => {
+                                            next_tc = n;
                                         },
                                         Err(err) => {
                                             eprintln!("error {}", err);
@@ -349,7 +350,7 @@ where
                             }
                         }
 
-                        Some(tc)
+                        Some(next_tc)
                     });
 
                     return select! {
