@@ -759,7 +759,6 @@ impl Runtime {
                 .as_ref()
                 .create_engine::<Call>(&world, engine.to_string())
             {
-                eprintln!("Adding to engine table {}", engine);
                 engine_table.insert(engine, start);
             }
         }
@@ -803,7 +802,7 @@ impl Runtime {
             }
         }
 
-        eprintln!("Starting loop");
+        println!("-- Starting loop");
         loop {
             dispatcher.dispatch(&world);
             extension.on_run(&world);
@@ -812,7 +811,7 @@ impl Runtime {
             extension.on_maintain(&mut world);
 
             if ThunkContext::is_cancelled(&mut cancel_source) {
-                eprintln!("Cancelling loop");
+                eprintln!("-- Cancelling loop");
                 break;
             }
         }
