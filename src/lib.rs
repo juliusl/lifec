@@ -27,6 +27,9 @@ pub mod plugins;
 mod state;
 pub use state::AttributeGraph;
 
+mod trace;
+pub use trace::Trace;
+
 pub trait RuntimeDispatcher: AsRef<AttributeGraph> + AsMut<AttributeGraph>
 where
     Self: Sized,
