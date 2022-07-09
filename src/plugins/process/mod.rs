@@ -58,6 +58,11 @@ impl Plugin<ThunkContext> for Process {
                         }
                     }
 
+                    if let Some(current_dir) = tc.as_ref().find_text("current_dir") {
+                        tc.update_progress(format!("add current_dir .text {current_dir}"), 0.20).await;
+                        command_task.current_dir(current_dir);
+                    }
+
                     tc.update_progress("```", 0.20).await;
                     tc.update_progress("# Running", 0.20).await;
                     let start_time = Some(Utc::now());
