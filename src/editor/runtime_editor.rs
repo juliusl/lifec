@@ -78,7 +78,7 @@ impl Default for RuntimeEditor {
         default.runtime.install::<Call, Runtime>();
         default.runtime.install::<Call, Println>();
         default.listen(Self::on_open_file);
-        default.listen(Self::on_open_dir);
+        //default.listen(Self::on_open_dir);
         default
     }
 }
@@ -183,32 +183,31 @@ impl RuntimeEditor {
         }
     }
 
-    /// When open dir is called, this will schedule an open_file event for each file in the directory
-    fn on_open_dir(&mut self, world: &World) {
-        match self.runtime.listen::<OpenDir>(world) {
-            Some(file_dir) => {
-                let mut project = Project::from(file_dir.as_ref().clone());
-                for (block_name, _) in project.iter_block_mut() {
-                    // TODO, this seems to cause a slight issue
-                    eprintln!("on_open_dir: found block {}", block_name);
-                    // if let Some(file) = block.get_block("file") {
-                    //     if let (Some(file_src), Some(content)) = (
-                    //         file.as_ref().find_text("file_src"),
-                    //         file.as_ref().find_binary("content"),
-                    //     ) {
-                    //         self.runtime.schedule(world, &Call::event::<OpenFile>(), |g| {
-                    //             // Setting content will skip reading the file_src, unless refresh is enabled
-                    //             g.as_mut()
-                    //                 .with_binary("content", content)
-                    //                 .add_text_attr("file_src", file_src);
-                    //         });
-                    //     }
-                    // }
-                }
-            }
-            None => {}
-        }
-    }
+    // When open dir is called, this will schedule an open_file event for each file in the directory
+    // fn on_open_dir(&mut self, world: &World) {
+    //     match self.runtime.listen::<OpenDir>(world) {
+    //         Some(file_dir) => {
+    //             let mut project = Project::from(file_dir.as_ref().clone());
+    //             for (block_name, _) in project.iter_block_mut() {
+    //                 // TODO, this seems to cause a slight issue
+    //                 // if let Some(file) = block.get_block("file") {
+    //                 //     if let (Some(file_src), Some(content)) = (
+    //                 //         file.as_ref().find_text("file_src"),
+    //                 //         file.as_ref().find_binary("content"),
+    //                 //     ) {
+    //                 //         self.runtime.schedule(world, &Call::event::<OpenFile>(), |g| {
+    //                 //             // Setting content will skip reading the file_src, unless refresh is enabled
+    //                 //             g.as_mut()
+    //                 //                 .with_binary("content", content)
+    //                 //                 .add_text_attr("file_src", file_src);
+    //                 //         });
+    //                 //     }
+    //                 // }
+    //             }
+    //         }
+    //         None => {}
+    //     }
+    // }
 }
 
 impl RuntimeEditor {
