@@ -778,9 +778,7 @@ impl Runtime {
                             if !ignore.contains(from) {
                                 schedule.push(*from);
                                 ignore.insert(*from);
-                                eprintln!("\tscheduling, {:?} -> {:?}", from, to);
-                            } else {
-                                eprintln!("\tskip scheduling, {:?}", from);
+                                eprintln!("schedule:,\n\t{:?} -> {:?}", from, to);
                             }
                         }
                     }
