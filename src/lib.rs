@@ -810,8 +810,11 @@ impl Runtime {
 
                             if !ignore.contains(from) {
                                 schedule.push(*from);
+                                ignore.insert(*from);
+                                eprintln!("scheduling, {:?}", from);
+                            } else {
+                                eprintln!("skip scheduling, {:?}", from);
                             }
-                            ignore.insert(*from);
                         }
                     }
                 }
