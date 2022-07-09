@@ -10,7 +10,7 @@ use plugins::{
     AsyncContext, BlockContext, Config, Engine, Event, OpenDir, OpenFile, Plugin, Process, Project,
     Remote, Sequence, ThunkContext, Timer, WriteFile,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::time::Duration;
 use std::{any::Any, collections::BTreeMap};
@@ -797,6 +797,7 @@ impl Runtime {
         }
 
         let mut schedule = vec![];
+        let mut ignore = HashSet::<Entity>::default();
         // Connect sequences
         {
             let mut sequences = world.write_component::<Sequence>();
@@ -805,7 +806,11 @@ impl Runtime {
                     if let Some(to) = engine_table.get(&to) {
                         if let Some(sequence) = (&mut sequences).get_mut(*from) {
                             sequence.set_cursor(*to);
-                            schedule.push(*from);
+                            ignore.insert(*to);
+
+                            if !ignore.contains(from) {
+                                schedule.push(*from);
+                            }
                         }
                     }
                 }
