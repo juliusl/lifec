@@ -17,7 +17,9 @@ pub struct Sequence(
 #[derive(Component, Debug, Default, Clone)]
 #[storage(DefaultVecStorage)]
 pub struct Connection(
+    /// entities that are connected
     Sequence,
+    /// owner
     Option<Entity>,
     /// fork
     bool,
