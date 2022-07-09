@@ -778,9 +778,9 @@ impl Runtime {
                             if !ignore.contains(from) {
                                 schedule.push(*from);
                                 ignore.insert(*from);
-                                eprintln!("scheduling, {:?} -> {:?}", from, to);
+                                eprintln!("\tscheduling, {:?} -> {:?}", from, to);
                             } else {
-                                eprintln!("skip scheduling, {:?}", from);
+                                eprintln!("\tskip scheduling, {:?}", from);
                             }
                         }
                     }
@@ -795,7 +795,6 @@ impl Runtime {
             for e in schedule {
                 if let Some(event) = events.get_mut(e) {
                     if let Some(context) = contexts.get(e) {
-                        eprintln!("firing event {}", event);
                         event.fire(context.clone());
                     }
                 }
