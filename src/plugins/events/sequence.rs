@@ -19,6 +19,8 @@ pub struct Sequence(
 pub struct Connection(
     Sequence,
     Option<Entity>,
+    /// fork
+    bool,
 );
 
 impl Connection {
@@ -122,7 +124,7 @@ impl Sequence {
             link.set_cursor(to);
         }
 
-        Connection(link, None)
+        Connection(link, None, false)
     }
 
     /// Returns the entity that should be called at the end of the sequence.
