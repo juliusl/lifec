@@ -195,7 +195,6 @@ impl<'a> System<'a> for EventRuntime {
                                 if let Some(sequence) = sequences.get(entity) {
                                     let mut next = sequence.clone();
                                     if let Some(next_event) = next.next() {
-                                        eprintln!("sequence has next event");
                                         match sequences.insert(next_event, next.clone()).ok() {
                                             Some(_) => {
                                                 dispatch_queue.push((next_event, thunk_context));
@@ -203,7 +202,7 @@ impl<'a> System<'a> for EventRuntime {
                                             None => {}
                                         }
                                     } else {
-                                        eprintln!("seqeunce, completed");
+                                        eprintln!("-- seqeunce, completed");
                                         if let Some(cursor) = sequence.cursor() {
                                             eprintln!("-- found cursor {:?}", cursor);
                                             dispatch_queue.push((cursor, thunk_context));
