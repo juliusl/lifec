@@ -811,6 +811,7 @@ impl Runtime {
                             if !ignore.contains(from) {
                                 schedule.push(*from);
                             }
+                            ignore.insert(*from);
                         }
                     }
                 }
