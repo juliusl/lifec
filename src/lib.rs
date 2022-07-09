@@ -431,8 +431,8 @@ impl Runtime {
                                 self.create_plugin(world, block_address, value.clone(), *create_fn)
                             {
                                 println!(
-                                    "create event: \n\t{:?},\n\t{},\n\t{},\n\tconfig: {:?}",
-                                    created, engine_plugin_key, block_name, &value
+                                    "create event:\n\t{},\n\t{},\n\t{},\n\tconfig: {:?}",
+                                    created.id(), engine_plugin_key, block_name, &value
                                 );
                                 engine_root.add_int_attr(block_name, created.id() as i32);
                                 sequence.add(created);
