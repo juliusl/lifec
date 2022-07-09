@@ -172,7 +172,6 @@ impl AttributeGraph {
             eprintln!("Symbol '{}' {}", symbol.as_ref(), name);
             if let Value::BinaryVector(content) = value {
                 if let Some(content) = from_utf8(&content).ok() {
-                    eprintln!("Applying {}", symbol.as_ref());
 
                     match self.batch_mut(content) {
                         Ok(_) => {

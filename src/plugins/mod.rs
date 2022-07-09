@@ -324,7 +324,6 @@ where
 
                         if !previous.trim().is_empty() {
                             let block_name = tc.block.block_name.to_string();
-                            eprintln!("Previous block left a message");
                             tc.as_mut().add_message(
                                 block_name,
                                 "previous",

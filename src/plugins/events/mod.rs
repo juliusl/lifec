@@ -321,7 +321,6 @@ impl<'a> System<'a> for EventRuntime {
                                 .to_string();
 
                         if !previous.trim().is_empty() {
-                            eprintln!("Previous block left a message");
                             context.as_mut().add_message(
                                 event.to_string(),
                                 "previous",
