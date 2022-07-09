@@ -24,13 +24,17 @@ pub struct Connection(
 );
 
 impl Connection {
+    pub fn set_owner(&mut self, owner: Entity) {
+        self.1 = Some(owner);
+    }
+
+    pub fn enable_fork(&mut self) {
+        self.2 = true;
+    }
+
     pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
         let Self(sequence, ..) = self; 
         (sequence.last(), sequence.cursor())
-    }
-
-    pub fn set_owner(&mut self, owner: Entity) {
-        self.1 = Some(owner);
     }
 
     pub fn owner(&self) -> Option<Entity> {
