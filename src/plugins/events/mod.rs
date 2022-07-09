@@ -316,6 +316,7 @@ impl<'a> System<'a> for EventRuntime {
                     if let (Some(event), Some(context)) =
                         (events.get_mut(next), contexts.get_mut(next))
                     {
+                        let last_id = last.as_ref().entity();
                         let previous = last.project
                                 .and_then(|p| p.transpile_blocks().ok())
                                 .unwrap_or_default()
@@ -332,9 +333,11 @@ impl<'a> System<'a> for EventRuntime {
 
                         event.fire(context.clone());
                         println!(
-                            "dispatch event:\n\t{},\n\t{},\n\t{}",
-                            event,
+                            "dispatch event:\n\t{} -> {}\n\t{},\n\t{},\n\t{}",
+                            last_id,
+                            next.id(),
                             context.block.block_name,
+                            event,
                             context.as_ref().hash_code()
                         );
                     } else {
