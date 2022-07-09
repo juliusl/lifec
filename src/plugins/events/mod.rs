@@ -330,7 +330,7 @@ impl<'a> System<'a> for EventRuntime {
 
                         event.fire(context.clone());
                         println!(
-                            "dispatch event \n\t{}, \n\t{}, \n\t{}",
+                            "dispatch event:\n\t{},\n\t{},\n\t{}",
                             event,
                             context.block.block_name,
                             context.as_ref().hash_code()
