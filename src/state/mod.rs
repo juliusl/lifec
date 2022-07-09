@@ -1,4 +1,4 @@
-use crate::{RuntimeDispatcher, RuntimeState, plugins::{BlockContext, Project}};
+use crate::{RuntimeDispatcher, RuntimeState};
 use atlier::system::{Attribute, Value};
 use imgui::TableFlags;
 use logos::Logos;
@@ -2075,6 +2075,8 @@ fn test_attribute_graph_block_dispatcher() {
 
 #[test]
 fn test_block_context_2() {
+    use crate::plugins::Project;
+    
     let test2 = r#"
     ``` package make_mime
     add    node_title  .text Package cloud_init files
