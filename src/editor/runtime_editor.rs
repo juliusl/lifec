@@ -2,7 +2,7 @@ use super::{Call, List, Task, unique_title};
 use crate::*;
 use crate::plugins::*;
 
-use imgui::{Ui, Window, StyleVar, Slider};
+use imgui::{Ui, Window, StyleVar, Slider, Condition};
 use specs::{World, WorldExt, Join};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
@@ -302,6 +302,8 @@ impl RuntimeEditor {
                 self.task_window_size, 
                 imgui::Condition::Always
             )
+            .position([1300.0, 400.0], Condition::Appearing)
+            .position_pivot([0.5, 0.5])
             .resizable(false)
             .build(ui, || {
                 ui.menu_bar(|| {
