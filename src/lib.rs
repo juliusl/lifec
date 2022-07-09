@@ -409,16 +409,10 @@ impl Runtime {
     where
         E: Engine,
     {
-        eprintln!("Creating engine for {}", &sequence_block_name);
         if let Some(block) = self.project.find_block(&sequence_block_name) {
             if let Some(mut engine_root) = block.get_block(E::event_name()) {
-                eprintln!(
-                    "Found engine root for {} {}",
-                    block.block_name,
-                    E::event_name()
-                );
+         
                 let mut sequence = Sequence::default();
-
                 for (block_address, block_name, value) in
                     engine_root.clone().iter_attributes().filter_map(|a| {
                         let name = a.name();
@@ -429,19 +423,15 @@ impl Runtime {
                         }
                     })
                 {
-                    eprintln!(
-                        "Found definition for {}, {} {:?}",
-                        block_name, block_address, value
-                    );
+          
                     if let Some((_, block_symbol)) = block_address.split_once("::") {
                         let engine_plugin_key = format!("{} {}", "call", block_symbol);
-                        eprintln!("Looking for engine_plugin {}", engine_plugin_key);
                         if let Some(create_fn) = self.engine_plugin.get(&engine_plugin_key) {
                             if let Some(created) =
                                 self.create_plugin(world, block_address, value.clone(), *create_fn)
                             {
-                                eprintln!(
-                                    "\tCreated event {:?}, {}, {}, config: {:?}",
+                                println!(
+                                    "create event: \n\t{:?},\n\t{},\n\t{},\n\tconfig: {:?}",
                                     created, engine_plugin_key, block_name, &value
                                 );
                                 engine_root.add_int_attr(block_name, created.id() as i32);
@@ -480,19 +470,11 @@ impl Runtime {
         if let Some((block_name, plugin_symbol)) = block_address.as_ref().split_once("::") {
             match value {
                 atlier::system::Value::Empty => {
-                    eprintln!(
-                        "plugin symbol defined w/ block_address {}",
-                        block_address.as_ref(),
-                    );
-
-                    eprintln!("block_name: {}", block_name);
                     if let Some(block) = blocks.find_block(block_name) {
-                        eprintln!("found block {}", block.block_name);
                         let config = block
                             .get_block(plugin_symbol)
                             .and_then(|b| b.find_text("config"));
                         if let Some(config_name) = config {
-                            eprintln!("config block {}", config_name);
                             return self.find_config_and_create(
                                 world,
                                 block.block_name,
@@ -507,7 +489,6 @@ impl Runtime {
                             .and_then(|b| blocks.find_block(b));
 
                         if let Some(config_block) = config_block {
-                            eprintln!("config block {}", config_block.block_name);
                             return self.find_config_block_and_create(
                                 world,
                                 block_name,
@@ -518,12 +499,6 @@ impl Runtime {
                     }
                 }
                 atlier::system::Value::TextBuffer(config_name) => {
-                    eprintln!(
-                        "plugin symbol defined w/ block_address {}, config assigned: {}",
-                        block_address.as_ref(),
-                        config_name
-                    );
-
                     let mut block_address = BlockAddress::lexer(block_address.as_ref());
                     loop {
                         match block_address.next() {
@@ -546,14 +521,7 @@ impl Runtime {
                     }
                 }
                 atlier::system::Value::Symbol(config_block_name) => {
-                    eprintln!(
-                        "plugin symbol defined w/ block_address {}, looking for config block {} {}",
-                        block_address.as_ref(),
-                        config_block_name,
-                        plugin_symbol,
-                    );
                     if let Some(config_block) = blocks.find_block(config_block_name) {
-                        eprintln!("config block {}", config_block.block_name);
                         return self.find_config_block_and_create(
                             world,
                             block_name,
