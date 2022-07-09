@@ -1,4 +1,5 @@
 use specs::Entity;
+use specs::ReadStorage;
 use specs::World;
 use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage};
 use std::fmt::Display;
@@ -159,6 +160,7 @@ impl<'a> System<'a> for EventRuntime {
         Read<'a, sync::broadcast::Sender<Entity>, EventRuntime>,
         Read<'a, Project>,
         Entities<'a>,
+        ReadStorage<'a, Connection>,
         WriteStorage<'a, Event>,
         WriteStorage<'a, ThunkContext>,
         WriteStorage<'a, Sequence>,
@@ -173,6 +175,7 @@ impl<'a> System<'a> for EventRuntime {
             thunk_complete_channel,
             project,
             entities,
+            connections,
             mut events,
             mut contexts,
             mut sequences,
@@ -181,7 +184,7 @@ impl<'a> System<'a> for EventRuntime {
     ) {
         let mut dispatch_queue = vec![];
 
-        for (entity, event) in (&entities, &mut events).join() {
+        for (entity, _connection, event) in (&entities, connections.maybe(), &mut events).join() {
             let event_name = event.to_string();
             let Event(_, thunk, _, initial_context, task) = event;
             if let Some(current_task) = task.take() {
