@@ -96,28 +96,20 @@ impl Extension for RuntimeEditor {
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
         ui.main_menu_bar(||{
-            ui.menu("Window", ||{
+            ui.menu("Windows", ||{
                 Slider::new("Font scale", 0.5, 4.0) .build(ui, &mut self.font_scale);
                 ui.separator();
-            });
 
-            ui.menu("Tasks Window", ||{
-                ui.checkbox("Enable complex view", &mut self.enable_complex);
-                ui.separator();
-
-                let [width, height] = &mut self.task_window_size;
-                Slider::new("Width", 500.0, 1000.0).build(ui, width);
-                Slider::new("Height", 500.0, 1000.0).build(ui, height);
+                ui.menu("Tasks Window", ||{
+                    ui.checkbox("Enable complex view", &mut self.enable_complex);
+                    ui.separator();
+    
+                    let [width, height] = &mut self.task_window_size;
+                    Slider::new("Width", 500.0, 1000.0).build(ui, width);
+                    Slider::new("Height", 500.0, 1000.0).build(ui, height);
+                });
             });
         });
-
-        // Window::new("table").build(ui, ||{
-        //     List::<Task>::table(&[
-        //         "entity", 
-        //         "name",
-        //         "value"
-        //     ]).on_ui(app_world, ui);
-        // });
 
         if self.enable_complex {
             self.task_window(app_world, &mut List::<Task>::edit_block_view(None), ui);
