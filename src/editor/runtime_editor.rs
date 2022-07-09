@@ -303,7 +303,7 @@ impl RuntimeEditor {
         Window::new(format!("Tasks, engine: {}", title))
             .menu_bar(true)
             .size(self.task_window_size, imgui::Condition::Always)
-            .position([1300.0, 400.0], Condition::Appearing)
+            .position([1400.0, 400.0], Condition::Appearing)
             .position_pivot([0.5, 0.5])
             .resizable(false)
             .build(ui, || {
