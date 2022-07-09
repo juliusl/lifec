@@ -223,8 +223,8 @@ impl<'a> System<'a> for EventRuntime {
                 }
             } else if let Some(initial_context) = initial_context.take() {
                 println!(
-                    "start event: \n\t{:?}, \n\t{}, \n\t{}, \n\t{}",
-                    entity,
+                    "start event: \n\t{}, \n\t{}, \n\t{}, \n\t{}",
+                    entity.id(),
                     initial_context.block.block_name,
                     &event_name,
                     initial_context.as_ref().hash_code()
