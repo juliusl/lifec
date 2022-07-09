@@ -1,13 +1,13 @@
-use super::{Call, List, Task, unique_title};
-use crate::*;
+use super::{unique_title, Call, List, Task};
 use crate::plugins::*;
+use crate::*;
 
-use imgui::{Ui, Window, StyleVar, Slider, Condition};
-use specs::{World, WorldExt, Join};
+use imgui::{Condition, Slider, StyleVar, Ui, Window};
+use specs::{Join, World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
 /// Listener function, called when a thunk completes
-type RuntimeEditorListener = fn (&mut RuntimeEditor, world: &World);
+type RuntimeEditorListener = fn(&mut RuntimeEditor, world: &World);
 
 /// This struct is an environment and extension point for a lifec Runtime
 pub struct RuntimeEditor {
@@ -15,6 +15,7 @@ pub struct RuntimeEditor {
     listeners: Vec<RuntimeEditorListener>,
     font_scale: f32,
     enable_complex: bool,
+    show_all_engines: bool,
     task_window_size: [f32; 2],
 }
 
@@ -53,7 +54,7 @@ impl RuntimeEditor {
 
     /// Listen for thunk contexts from thunks that have completed their task
     pub fn listen(&mut self, listen: RuntimeEditorListener) {
-        self.listeners.push(listen);        
+        self.listeners.push(listen);
         eprintln!("Current runtime editor listeners {}", self.listeners.len());
     }
 }
@@ -62,11 +63,11 @@ impl Default for RuntimeEditor {
     fn default() -> Self {
         let mut default = Self {
             runtime: Default::default(),
-            listeners: vec![
-            ],
+            listeners: vec![],
             font_scale: 1.0,
+            show_all_engines: false,
             enable_complex: false,
-            task_window_size: [580.0, 700.0]
+            task_window_size: [580.0, 700.0],
         };
         default.runtime.install::<Call, Timer>();
         default.runtime.install::<Call, Remote>();
@@ -95,15 +96,16 @@ impl Extension for RuntimeEditor {
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
-        ui.main_menu_bar(||{
-            ui.menu("Windows", ||{
-                Slider::new("Font scale", 0.5, 4.0) .build(ui, &mut self.font_scale);
+        ui.main_menu_bar(|| {
+            ui.menu("Windows", || {
+                Slider::new("Font scale", 0.5, 4.0).build(ui, &mut self.font_scale);
                 ui.separator();
 
-                ui.menu("Tasks Window", ||{
+                ui.menu("Tasks Window", || {
                     ui.checkbox("Enable complex view", &mut self.enable_complex);
+                    ui.checkbox("Show all engines", &mut self.show_all_engines);
                     ui.separator();
-    
+
                     let [width, height] = &mut self.task_window_size;
                     Slider::new("Width", 500.0, 1000.0).build(ui, width);
                     Slider::new("Height", 500.0, 1000.0).build(ui, height);
@@ -117,14 +119,16 @@ impl Extension for RuntimeEditor {
             self.task_window(app_world, &mut List::<Task>::simple(), ui);
         }
 
-        // These are each active sequences
-        let mut sequence_lists = app_world.write_component::<List::<Task>>();
-        for sequence in (&mut sequence_lists).join() {
-            self.task_window(app_world, sequence, ui);
+        if self.show_all_engines {
+            // These are each active engines
+            let mut sequence_lists = app_world.write_component::<List<Task>>();
+            for sequence in (&mut sequence_lists).join() {
+                self.task_window(app_world, sequence, ui);
+            }
         }
 
-       // self.runtime.edit_ui(ui);
-       // self.runtime.display_ui(ui);
+        // self.runtime.edit_ui(ui);
+        // self.runtime.display_ui(ui);
     }
 
     fn on_window_event(
@@ -136,17 +140,19 @@ impl Extension for RuntimeEditor {
             atlier::system::WindowEvent::DroppedFile(file) => {
                 let file_src = format!("{:?}", &file);
                 if file.is_dir() {
-                    self.runtime.schedule(world, &Call::event::<OpenDir>(), |tc| {
-                        tc.as_mut()
-                            .add_text_attr("file_dir", &file_src.trim_matches('"'));
-                    })
-                    .and_then(|_| Some(()));
+                    self.runtime
+                        .schedule(world, &Call::event::<OpenDir>(), |tc| {
+                            tc.as_mut()
+                                .add_text_attr("file_dir", &file_src.trim_matches('"'));
+                        })
+                        .and_then(|_| Some(()));
                 } else {
-                    self.runtime.schedule(world, &Call::event::<OpenFile>(), |tc| {
-                        tc.as_mut()
-                            .add_text_attr("file_src", &file_src.trim_matches('"'));
-                    })
-                    .and_then(|_| Some(()));
+                    self.runtime
+                        .schedule(world, &Call::event::<OpenFile>(), |tc| {
+                            tc.as_mut()
+                                .add_text_attr("file_src", &file_src.trim_matches('"'));
+                        })
+                        .and_then(|_| Some(()));
                 }
             }
             _ => {}
@@ -155,9 +161,8 @@ impl Extension for RuntimeEditor {
 
     fn on_run(&'_ mut self, world: &specs::World) {
         // This drives status and progress updates of running tasks
-        List::<Task>::default()
-            .on_run(world);
-  
+        List::<Task>::default().on_run(world);
+
         // Listen for completed thunks
         for listener in self.listeners.clone().iter() {
             (listener)(self, world);
@@ -214,9 +219,9 @@ impl RuntimeEditor {
             |c| {
                 c.block.block_name = unique_title("new_timer");
                 c.as_mut()
-                .with_text("thunk_symbol", Timer::symbol())
-                .with_bool("default_open", true)
-                .with_int("duration", 0);
+                    .with_text("thunk_symbol", Timer::symbol())
+                    .with_bool("default_open", true)
+                    .with_int("duration", 0);
             },
             Timer::description(),
             ui,
@@ -228,9 +233,9 @@ impl RuntimeEditor {
             |c| {
                 c.block.block_name = unique_title("new_process");
                 c.as_mut()
-                .with_text("thunk_symbol", Process::symbol())
-                .with_bool("default_open", true)
-                .with_text("command", "");
+                    .with_text("thunk_symbol", Process::symbol())
+                    .with_bool("default_open", true)
+                    .with_text("command", "");
             },
             Process::description(),
             ui,
@@ -242,9 +247,9 @@ impl RuntimeEditor {
             |c| {
                 c.block.block_name = unique_title("new_remote");
                 c.as_mut()
-                .with_text("thunk_symbol", Remote::symbol())
-                .with_bool("default_open", true)
-                .with_text("command", "");
+                    .with_text("thunk_symbol", Remote::symbol())
+                    .with_bool("default_open", true)
+                    .with_text("command", "");
             },
             Remote::description(),
             ui,
@@ -256,9 +261,9 @@ impl RuntimeEditor {
             |c| {
                 c.block.block_name = unique_title("new_open_file");
                 c.as_mut()
-                .with_text("thunk_symbol", OpenFile::symbol())
-                .with_bool("default_open", true)
-                .with_text("file_src", "");
+                    .with_text("thunk_symbol", OpenFile::symbol())
+                    .with_bool("default_open", true)
+                    .with_text("file_src", "");
             },
             OpenFile::description(),
             ui,
@@ -279,16 +284,16 @@ impl RuntimeEditor {
         );
 
         self.runtime.create_event_menu_item(
-            app_world, 
-            &Call::event::<WriteFile>(), 
+            app_world,
+            &Call::event::<WriteFile>(),
             |c| {
                 c.block.block_name = unique_title("new_write_file");
                 c.as_mut()
                     .with_text("thunk_symbol", WriteFile::symbol())
                     .with_bool("default_open", true)
                     .add_text_attr("file_dst", "");
-            }, 
-            WriteFile::description(), 
+            },
+            WriteFile::description(),
             ui,
         );
     }
@@ -298,40 +303,29 @@ impl RuntimeEditor {
 
         Window::new(format!("Tasks, engine: {}", title))
             .menu_bar(true)
-            .size(
-                self.task_window_size, 
-                imgui::Condition::Always
-            )
+            .size(self.task_window_size, imgui::Condition::Always)
             .position([1300.0, 400.0], Condition::Appearing)
             .position_pivot([0.5, 0.5])
             .resizable(false)
             .build(ui, || {
                 ui.menu_bar(|| {
-                    ui.menu("Menu", ||{
-                        let frame_padding = ui.push_style_var(
-                            StyleVar::FramePadding([8.0, 5.0])
-                        );
-                        self.project_mut()
-                            .edit_project_menu(ui);
+                    ui.menu("Menu", || {
+                        let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
+                        self.project_mut().edit_project_menu(ui);
                         ui.separator();
-                        
+
                         self.edit_event_menu(app_world, ui);
                         ui.separator();
-                        
-                        self.runtime
-                            .menu(ui);
+
+                        self.runtime.menu(ui);
                         ui.separator();
                         frame_padding.end();
                     });
                 });
 
-                let frame_padding = ui.push_style_var(
-                    StyleVar::FramePadding([8.0, 5.0])
-                );
+                let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
 
-                let window_padding = ui.push_style_var(
-                    StyleVar::WindowPadding([16.0, 16.0])
-                );
+                let window_padding = ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
                 ui.set_window_font_scale(self.font_scale);
                 task_list.on_ui(app_world, ui);
                 ui.new_line();
