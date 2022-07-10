@@ -207,7 +207,7 @@ impl<'a> System<'a> for EventRuntime {
                                     } else {
                                         eprintln!("-- seqeunce, completed");
                                         if let Some(cursor) = sequence.cursor() {
-                                            eprintln!("-- found cursor {:?}", cursor);
+                                            eprintln!("-- found cursor {}", cursor.id());
                                             dispatch_queue.push((cursor, thunk_context));
                                         }
                                     }
