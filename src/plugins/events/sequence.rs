@@ -133,6 +133,14 @@ impl Sequence {
         Connection(link, None, false)
     }
 
+    /// Resets thre cursor
+    pub fn disconnect(&self) -> Self {
+        let mut clone = self.clone();
+
+        clone.1 = None;
+        clone
+    }
+
     /// Returns the entity that should be called at the end of the sequence.
     pub fn cursor(&self) -> Option<Entity> {
         self.1
