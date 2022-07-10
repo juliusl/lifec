@@ -432,7 +432,7 @@ impl Runtime {
                             {
                                 println!(
                                     "create event:\n\t{},\n\t{},\n\t{},\n\tconfig: {:?}",
-                                    created.id(), engine_plugin_key, block_name, &value
+                                    created.id(), block_name, engine_plugin_key, &value
                                 );
                                 engine_root.add_int_attr(block_name, created.id() as i32);
                                 sequence.add(created);
