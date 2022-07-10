@@ -808,7 +808,7 @@ impl Runtime {
             extension.on_maintain(&mut world);
 
             if ThunkContext::is_cancelled(&mut cancel_source) {
-                eprintln!("-- Cancelling loop");
+                println!("-- Cancelling loop");
                 break;
             }
         }
