@@ -2488,11 +2488,16 @@ pub enum AttributeGraphEvents {
     To,
     #[token("publish")]
     Publish,
-    /// Usage: # Here is a helpful comment
-    ///        - Here is another helpful comment
+    /// Usage:   # Here is a helpful comment
+    ///          - Here is another helpful comment
+    ///         // Here is anothet helpful comment
+    ///     ``` md Here is another helpful comment
+    ///  ``` runmd Here is another helpful comment
     #[token("#")]
     #[token("-")]
+    #[token("//")]
     #[token("``` md")]
+    #[token("``` runmd")]
     Comment,
     /// Usage:
     /// add test_attr .TEXT remaining text is the value
