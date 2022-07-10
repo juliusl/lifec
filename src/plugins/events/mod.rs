@@ -223,7 +223,7 @@ impl<'a> System<'a> for EventRuntime {
                 }
             } else if let Some(initial_context) = initial_context.take() {
                 println!(
-                    "start event: \n\t{}, \n\t{}, \n\t{}, \n\t{}",
+                    "start event:\n\t{}\n\t{}\n\t{}\n\t{}",
                     entity.id(),
                     initial_context.block.block_name,
                     &event_name,
@@ -333,7 +333,7 @@ impl<'a> System<'a> for EventRuntime {
 
                         event.fire(context.clone());
                         println!(
-                            "dispatch event:\n\t{} -> {}\n\t{},\n\t{},\n\t{}",
+                            "dispatch event:\n\t{} -> {}\n\t{}\n\t{}\n\t{}",
                             last_id,
                             next.id(),
                             context.block.block_name,
