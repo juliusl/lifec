@@ -10,6 +10,8 @@ define h_open    open_file   .symbol  file_config
 define i_write   write_file  .symbol  write_config
 define j_open    open_file   .symbol  file_config2
 define k_write   write_file  .symbol  write_config
+define l_expect  expect      .symbol  env
+define m_print   println     .symbol  println_config
 add repeat .disable
 ```
 
@@ -52,3 +54,8 @@ add duration .int_range 10, 0, 50
 # add file_name .text test.sh
 # add file_src  .text test/test2/test.sh
 # ```
+
+``` env expect
+define a_rust which .text cargo
+define b_elm  which .text elm
+```

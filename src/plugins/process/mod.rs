@@ -7,6 +7,9 @@ use tokio::{select, task::JoinHandle};
 mod remote;
 pub use remote::Remote;
 
+mod expect;
+pub use expect::Expect;
+
 /// The process component executes a command and records the output
 #[derive(Debug, Clone, Default, Component)]
 #[storage(HashMapStorage)]

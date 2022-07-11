@@ -21,6 +21,7 @@ pub use events::Connection;
 mod process;
 pub use process::Process;
 pub use process::Remote;
+pub use process::Expect;
 
 mod thunks;
 pub use thunks::Config;

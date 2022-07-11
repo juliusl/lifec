@@ -3,7 +3,7 @@ use crate::plugins::*;
 use crate::*;
 
 use imgui::{Condition, Slider, StyleVar, Ui, Window};
-use specs::{Join, World, WorldExt};
+use specs::{Join, World, WorldExt, shred::DefaultProvider};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
 /// Listener function, called when a thunk completes
@@ -77,6 +77,7 @@ impl Default for RuntimeEditor {
         default.runtime.install::<Call, WriteFile>();
         default.runtime.install::<Call, Runtime>();
         default.runtime.install::<Call, Println>();
+        default.runtime.install::<Call, Expect>();
         default.listen(Self::on_open_file);
         //default.listen(Self::on_open_dir);
         default
