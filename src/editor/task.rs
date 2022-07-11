@@ -6,7 +6,7 @@ use crate::*;
 
 #[derive(Default, Component, Clone)]
 #[storage(BTreeStorage)]
-pub struct Task(Option<StartButton>, Option<ProgressStatusBar>, Option<Sequence>);
+pub struct Task(Option<StartButton>, Option<ProgressStatusBar>, Option<Sequence>, Option<Connection>);
 
 impl Extension for Task {
     fn configure_app_world(world: &mut World) {
@@ -22,7 +22,14 @@ impl Extension for Task {
     }
 
     fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
-        if let Task(Some(start_button), ..) = self {
+        if let Task(Some(start_button), .., connection) = self {
+            if connection.is_some() {
+                ui.text("-->");
+                ui.same_line();
+                if ui.is_item_hovered() {
+                    ui.tooltip_text("This task has a connection component, which means it is the start of an engine.");
+                }
+            }
             start_button.on_ui(app_world, ui);
         }
 
@@ -33,7 +40,7 @@ impl Extension for Task {
             progress_status_bar.on_ui(app_world, ui);
         }
 
-        if let Task(.., Some(sequence)) = self {
+        if let Task(.., Some(sequence), _) = self {
             ui.text(format!("{}", sequence));
         }
     }
@@ -54,15 +61,17 @@ impl<'a> System<'a> for TaskSystem {
         ReadStorage<'a, StartButton>,
         ReadStorage<'a, ProgressStatusBar>,
         ReadStorage<'a, Sequence>,
+        ReadStorage<'a, Connection>,
     );
 
-    fn run(&mut self, (entities, mut tasks, start_events, progress, sequences): Self::SystemData) {
-        for (_, task, start_event, progress, sequence) in (
+    fn run(&mut self, (entities, mut tasks, start_events, progress, sequences, connections): Self::SystemData) {
+        for (_, task, start_event, progress, sequence, connection) in (
             &entities,
             &mut tasks,
             start_events.maybe(),
             progress.maybe(),
             sequences.maybe(),
+            connections.maybe(),
         )
             .join()
         {
@@ -74,6 +83,9 @@ impl<'a> System<'a> for TaskSystem {
             }
             if let Some(sequence) = sequence {
                 task.2 = Some(sequence.clone());
+            }
+            if let Some(connection) = connection {
+                task.3 = Some(connection.clone());
             }
         }
     }

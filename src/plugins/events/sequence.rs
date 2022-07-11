@@ -25,6 +25,24 @@ pub struct Connection(
     bool,
 );
 
+impl Display for Connection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let (Some(from), Some(to)) = self.connection() {
+            let from = from.id();
+            let to = to.id();
+            write!(f, "{from} -> {to} ")?;
+        }
+
+        if let Some(owner) = self.owner() {
+            let owner = owner.id();
+            write!(f, "owner: {owner} ")?;
+        }
+
+        let fork = self.2;
+        writeln!(f, " fork: {fork}")
+    }
+}
+
 impl Connection {
     pub fn set_owner(&mut self, owner: Entity) {
         self.1 = Some(owner);
