@@ -2,6 +2,7 @@ use std::future::Future;
 
 use crate::Extension;
 use crate::AttributeGraph;
+use hyper::client::HttpConnector;
 use imgui::Ui;
 use specs::Component;
 use specs::{storage::DenseVecStorage, Entity};
@@ -89,6 +90,9 @@ pub type CancelToken = tokio::sync::oneshot::Sender<()>;
 /// Cancel source stored by the thunk
 pub type CancelSource = tokio::sync::oneshot::Receiver<()>;
 
+/// Secure client for making http requests
+pub type SecureClient = hyper::Client<hyper_tls::HttpsConnector<HttpConnector>>;
+
 #[derive(Component)]
 #[storage(DenseVecStorage)]
 pub struct CancelThunk(
@@ -118,6 +122,8 @@ pub struct ThunkContext {
     pub handle: Option<Handle>,
     /// Sender for status updates for the thunk
     pub status_updates: Option<Sender<StatusUpdate>>,
+    /// Client for sending secure http requests
+    pub client: Option<SecureClient>
 }
 
 /// This block has all the async related features
@@ -138,15 +144,22 @@ impl ThunkContext {
         &self,
         entity: Entity,
         handle: Handle,
+        client: SecureClient,
         project: Option<Project>,
         status_updates: Option<Sender<StatusUpdate>>,
     ) -> ThunkContext {
         let mut async_enabled = self.clone();
         async_enabled.entity = Some(entity);
         async_enabled.handle = Some(handle);
+        async_enabled.client = Some(client);
         async_enabled.status_updates = status_updates;
         async_enabled.project = project;
         async_enabled
+    }
+
+    /// returns the secure client
+    pub fn client(&self) -> Option<SecureClient> {
+        self.client.clone()
     }
 
     /// returns a handle to a tokio runtime
@@ -217,6 +230,7 @@ impl From<AttributeGraph> for ThunkContext {
             project: None,
             entity: None,
             handle: None,
+            client: None,
             status_updates: None,
         }
     }

@@ -1,3 +1,5 @@
+use hyper::Client;
+use hyper_tls::HttpsConnector;
 use specs::Entity;
 use specs::ReadStorage;
 use specs::World;
@@ -232,10 +234,14 @@ impl<'a> System<'a> for EventRuntime {
                 let thunk = thunk.clone();
                 let status_sender = status_update_channel.clone();
                 let runtime_handle = runtime.handle().clone();
+                let https = HttpsConnector::new();
+                let client = Client::builder().build::<_, hyper::Body>(https);
+        
                 let mut context =
                     initial_context.enable_async(
                         entity, 
-                        runtime_handle, 
+                        runtime_handle,
+                        client,
                         Some(project.reload_source()), 
                         Some(status_sender)
                     );
