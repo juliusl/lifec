@@ -21,7 +21,7 @@ impl Plugin<ThunkContext> for Expect {
             async move {
                 let mut project = tc.clone().project.unwrap_or_default();
 
-                // Uses `which` crate to check program installation
+                // Uses `which` crate to check path for binaries
                 for (_, check) in tc.as_ref().find_symbol_values("which") {
                     if let Value::TextBuffer(command) = check {
                         match which(&command) {
