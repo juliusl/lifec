@@ -4,6 +4,7 @@ use logos::{Lexer, Logos};
 pub use specs::storage::BTreeStorage;
 pub use specs::{Component, DispatcherBuilder, Entity, System, World, WorldExt};
 pub use specs::{DefaultVecStorage, DenseVecStorage, HashMapStorage};
+pub use specs::{ReadStorage, WriteStorage};
 
 use imgui::{ChildWindow, MenuItem, Ui, Window};
 use plugins::{
