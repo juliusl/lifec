@@ -15,6 +15,7 @@ mod open_dir;
 pub use open_dir::OpenDir;
 
 mod write_file;
+use tokio::sync;
 use tokio::sync::oneshot;
 pub use write_file::WriteFile;
 
@@ -183,6 +184,11 @@ impl ThunkContext {
                 Err(_) => todo!(),
             }
         }
+    }
+
+    /// returns a clone of the dispatcher
+    pub fn dispatcher(&self) -> Option<sync::mpsc::Sender<AttributeGraph>> {
+        self.dispatcher.clone()
     }
 
     /// If async is enabled on the thunk context, this will spawn the task
