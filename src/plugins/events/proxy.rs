@@ -23,7 +23,7 @@ impl<'a> System<'a> for ProxyDispatcher {
 
     fn run(&mut self, (entities, contexts, mut proxies): Self::SystemData) {
         for (entity, context) in (&entities, &contexts).join() {
-            if !proxies.contains(entity) {
+            if context.as_ref().is_enabled("proxy").unwrap_or_default() && !proxies.contains(entity) {
                 match proxies.insert(entity, Proxy::default()) {
                     Ok(_) => {
                         if let Some(dispatcher) = self.0.dispatcher() {
