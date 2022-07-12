@@ -115,6 +115,11 @@ impl Event {
             Err(_) => None,
         }
     }
+
+    /// Creates a duplicate of this event
+    pub fn duplicate(&self) -> Self {
+        Self(self.0, self.1.clone(), self.2.clone(), None, None)
+    }
 }
 
 /// Event runtime drives the tokio::Runtime and schedules/monitors/orchestrates task entities
@@ -334,7 +339,24 @@ impl<'a> System<'a> for EventRuntime {
         // dispatch all queued messages
         loop {
             match dispatch_queue.pop() {
-                Some((next, last)) => {
+                Some((mut next, last)) => {
+                    if let Some(true) = connections.get(next).and_then(|c| Some(c.fork_enabled())) {
+                        let forked_event = events.get(next).and_then(|e| Some(e.duplicate()));
+                        let forked_context = contexts.get(next).and_then(|c| Some(c.clone()));
+
+                        if let (Some(event), Some(context)) = (forked_event, forked_context) {
+                            let fork = entities.create();
+                            let fork_id = fork.id();
+                            let log = format!("Forking, {fork_id}, {event}");
+                            if events.insert(fork, event).is_ok() {
+                                if contexts.insert(fork, context).is_ok() {
+                                    eprintln!("{}", log);
+                                    next = fork;
+                                }
+                            }
+                        }
+                    }
+
                     if let (Some(event), Some(context)) =
                         (events.get_mut(next), contexts.get_mut(next))
                     {

@@ -1,7 +1,6 @@
 use crate::editor::*;
 use crate::plugins::*;
 use crate::*;
-use hyper::client::conn;
 use imgui::MenuItem;
 use imgui::TableFlags;
 use imgui::TreeNodeFlags;

@@ -52,6 +52,10 @@ impl Connection {
         self.2 = true;
     }
 
+    pub fn fork_enabled(&self) -> bool {
+        self.2
+    }
+
     pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
         let Self(sequence, ..) = self; 
         (sequence.last(), sequence.cursor())
