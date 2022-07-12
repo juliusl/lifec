@@ -1,7 +1,8 @@
 
 ``` default runtime
 define first  call .symbol second
-define second call 
+define second call .symbol third
+define third  call
 ```
 
 ``` demo call
@@ -21,3 +22,8 @@ define second timer .symbol second
 ``` timer
 add duration .int 5
 ```
+
+``` third call
+define third println .symbol third 
+``` println
+```  

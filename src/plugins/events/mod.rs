@@ -25,6 +25,10 @@ use super::{Plugin, Thunk, ThunkContext};
 use crate::plugins::thunks::Config;
 use specs::storage::VecStorage;
 
+mod proxy;
+pub use proxy::Proxy;
+pub use proxy::ProxyDispatcher;
+
 mod listen;
 pub use listen::Listen;
 

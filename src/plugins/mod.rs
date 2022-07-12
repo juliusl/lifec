@@ -17,6 +17,8 @@ pub use events::EventRuntime;
 pub use events::Listen;
 pub use events::Sequence;
 pub use events::Connection;
+pub use events::Proxy;
+pub use events::ProxyDispatcher;
 
 mod process;
 pub use process::Process;

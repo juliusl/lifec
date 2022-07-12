@@ -1,0 +1,73 @@
+``` demo call
+define a_timer   timer       .text    timer_simple
+define b_timer   timer       .empty
+define c_timer   timer       .text    timer_complex
+define d_timer   timer       .symbol  timer_config
+define e_timer   timer       .empty
+define f_process process     .symbol  process_config
+define g_println println     .symbol  println_config
+define h_open    open_file   .symbol  file_config
+define i_write   write_file  .symbol  write_config
+define j_open    open_file   .symbol  file_config2
+define k_write   write_file  .symbol  write_config
+define l_expect  expect      .symbol  env
+define m_print   println     .symbol  println_config
+add repeat .disable
+```
+
+``` println_config println
+```
+
+``` file_config2 open_file
+add file_src .text demo.runmd
+```
+
+``` file_config open_file
+add file_src .text test.sh
+```
+
+``` write_config write_file
+add work_dir .text test/test2
+```
+
+``` process_config process
+add command .text sh test.sh
+```
+
+``` b_timer timer
+add config .text timer_simple
+```
+
+``` e_timer timer
+add config .symbol timer_config
+```
+
+``` timer_config timer
+add duration .int_range 10, 0, 50
+```
+
+# Expected output of sequence:
+#
+# ``` test.sh file
+# add content   .bin  IyEvYmluL3pzaAoKZWNobyBIZWxsbyBXb3JsZAplY2hvIEhlbGxvIFdvcmxkCg==
+# add file_ext  .text sh
+# add file_name .text test.sh
+# add file_src  .text test/test2/test.sh
+# ```
+
+``` env expect
+define a_rust which .text cargo
+define b_elm  which .text elm
+``` call
+define env expect .symbol env
+add    node_title .text   Demo expect
+```
+
+``` compile_elm expect
+define elm which            .text elm
+``` call
+add    node_title    .text   Expect Elm
+define a_elm expect  .symbol compile_elm
+define b_elm println .symbol compile_elm
+``` println
+```

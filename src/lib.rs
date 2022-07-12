@@ -9,7 +9,7 @@ pub use specs::{ReadStorage, WriteStorage, Entities, Join};
 use imgui::{ChildWindow, MenuItem, Ui, Window};
 use plugins::{
     AsyncContext, BlockContext, Config, Engine, Event, OpenDir, OpenFile, Plugin, Process, Project,
-    Remote, Sequence, ThunkContext, Timer, WriteFile,
+    Remote, Sequence, ThunkContext, Timer, WriteFile, Expect, Println,
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
@@ -30,6 +30,8 @@ pub use state::AttributeGraph;
 
 mod trace;
 pub use trace::Trace;
+
+use crate::plugins::ProxyDispatcher;
 
 pub trait RuntimeDispatcher: AsRef<AttributeGraph> + AsMut<AttributeGraph>
 where
@@ -707,6 +709,8 @@ impl Plugin<ThunkContext> for Runtime {
                         runtime.install::<Call, Remote>();
                         runtime.install::<Call, Timer>();
                         runtime.install::<Call, Runtime>();
+                        runtime.install::<Call, Expect>();
+                        runtime.install::<Call, Println>();
 
                         // TODO - add some built in configs -
 
@@ -756,7 +760,11 @@ impl Runtime {
             }
         }
 
-        let (mut world, dispatcher_builder) = E::standalone();
+        let (mut world, mut dispatcher_builder) = E::standalone();
+
+        if let Some(true) = tc.as_ref().is_enabled("proxy_dispatcher") {
+            dispatcher_builder.add(ProxyDispatcher::from(tc.clone()), "proxy_dispatcher", &[]);
+        }
 
         let mut dispatcher = dispatcher_builder.build();
         dispatcher.setup(&mut world);

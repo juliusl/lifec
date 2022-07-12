@@ -19,7 +19,6 @@ pub use task::Task;
 mod list;
 pub use list::List;
 
-use specs::prelude::*;
 pub use specs::prelude::WorldExt;
 pub use specs::prelude::Builder;
 pub use atlier::system::App;
