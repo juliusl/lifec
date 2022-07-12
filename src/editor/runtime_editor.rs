@@ -3,7 +3,7 @@ use crate::plugins::*;
 use crate::*;
 
 use imgui::{Condition, Slider, StyleVar, Ui, Window};
-use specs::{Join, World, WorldExt, shred::DefaultProvider};
+use specs::{Join, World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
 /// Listener function, called when a thunk completes
@@ -167,6 +167,25 @@ impl Extension for RuntimeEditor {
         // Listen for completed thunks
         for listener in self.listeners.clone().iter() {
             (listener)(self, world);
+        }
+
+        let mut rx = world.write_resource::<tokio::sync::mpsc::Receiver<AttributeGraph>>();
+        if let Some(graph) = rx.try_recv().ok() {
+            let project = Project::from(graph);
+            for (block_name, config_block) in project.iter_block() {
+                for (symbol, config) in config_block.to_blocks() {
+                    if let Some(installed_plugin) = self.runtime.find_plugin::<Call>(&symbol) {
+                        if let Some(created) = self.runtime().find_config_block_and_create(
+                            world,
+                            block_name,
+                            BlockContext::from(config),
+                            installed_plugin,
+                        ) {
+                            eprintln!("Received dispatch for `{block_name} {symbol}`, created {:?}", created);
+                        }
+                    }
+                }
+            }
         }
     }
 }

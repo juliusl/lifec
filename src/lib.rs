@@ -451,6 +451,14 @@ impl Runtime {
         None
     }
 
+    fn find_plugin<E>(&self, symbol: &String) -> Option<CreateFn> 
+    where
+        E: Engine
+    {
+        let engine_plugin_key = format!("{} {}", E::event_name(), symbol);
+        self.engine_plugin.get(&engine_plugin_key).and_then(|f| Some(*f))
+    }
+
     /// Reads/creates events from symbols defined at the root of the graph for a given plugin.
     /// Symbols defined at the root specify a block_address in the format,
     /// {block_name}::{block_symbol},

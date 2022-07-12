@@ -15,6 +15,7 @@ use tokio::{
     task::JoinHandle,
 };
 
+use crate::AttributeGraph;
 use crate::Extension;
 
 use super::Project;
@@ -155,10 +156,20 @@ impl SetupHandler<sync::broadcast::Sender<Entity>> for EventRuntime {
     }
 }
 
+/// Setup for tokio-mulitple-producers single-consumer channel for status updates
+impl SetupHandler<sync::mpsc::Sender<AttributeGraph>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<AttributeGraph>(10);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
 impl<'a> System<'a> for EventRuntime {
     type SystemData = (
         Read<'a, Runtime, EventRuntime>,
         Read<'a, Sender<StatusUpdate>, EventRuntime>,
+        Read<'a, Sender<AttributeGraph>, EventRuntime>,
         Read<'a, sync::broadcast::Sender<Entity>, EventRuntime>,
         Read<'a, Project>,
         Entities<'a>,
@@ -174,6 +185,7 @@ impl<'a> System<'a> for EventRuntime {
         (
             runtime,
             status_update_channel,
+            dispatcher,
             thunk_complete_channel,
             project,
             entities,
@@ -232,7 +244,6 @@ impl<'a> System<'a> for EventRuntime {
                     initial_context.as_ref().hash_code()
                 );
                 let thunk = thunk.clone();
-                let status_sender = status_update_channel.clone();
                 let runtime_handle = runtime.handle().clone();
                 let https = HttpsConnector::new();
                 let client = Client::builder().build::<_, hyper::Body>(https);
@@ -243,7 +254,8 @@ impl<'a> System<'a> for EventRuntime {
                         runtime_handle,
                         client,
                         Some(project.reload_source()), 
-                        Some(status_sender)
+                        Some( status_update_channel.clone()),
+                        Some(dispatcher.clone()),
                     );
 
                 let Thunk(thunk_name, thunk) = thunk;

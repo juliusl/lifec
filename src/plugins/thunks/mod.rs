@@ -2,6 +2,7 @@ use std::future::Future;
 
 use crate::Extension;
 use crate::AttributeGraph;
+use crate::RuntimeDispatcher;
 use hyper::client::HttpConnector;
 use imgui::Ui;
 use specs::Component;
@@ -121,9 +122,11 @@ pub struct ThunkContext {
     /// Tokio runtime handle, to spawn additional tasks 
     pub handle: Option<Handle>,
     /// Sender for status updates for the thunk
-    pub status_updates: Option<Sender<StatusUpdate>>,
+    status_updates: Option<Sender<StatusUpdate>>,
     /// Client for sending secure http requests
-    pub client: Option<SecureClient>
+    client: Option<SecureClient>,
+    /// Dispatcher for attribute graphs
+    dispatcher: Option<Sender<AttributeGraph>>,
 }
 
 /// This block has all the async related features
@@ -147,12 +150,14 @@ impl ThunkContext {
         client: SecureClient,
         project: Option<Project>,
         status_updates: Option<Sender<StatusUpdate>>,
+        dispatcher: Option<Sender<AttributeGraph>>,
     ) -> ThunkContext {
         let mut async_enabled = self.clone();
         async_enabled.entity = Some(entity);
         async_enabled.handle = Some(handle);
         async_enabled.client = Some(client);
         async_enabled.status_updates = status_updates;
+        async_enabled.dispatcher = dispatcher;
         async_enabled.project = project;
         async_enabled
     }
@@ -165,6 +170,19 @@ impl ThunkContext {
     /// returns a handle to a tokio runtime
     pub fn handle(&self) -> Option<Handle> {
         self.handle.as_ref().and_then(|h| Some(h.clone()))
+    }
+
+    /// dispatch runmd for a host to process
+    pub async fn dispatch(&self, runmd: impl AsRef<str>) {
+        if let Some(dispatcher) = &self.dispatcher {
+            let graph = AttributeGraph::from(0);
+            match graph.batch(runmd) {
+                Ok(msg) => {
+                    dispatcher.send(msg).await.ok();
+                },
+                Err(_) => todo!(),
+            }
+        }
     }
 
     /// If async is enabled on the thunk context, this will spawn the task
@@ -232,6 +250,7 @@ impl From<AttributeGraph> for ThunkContext {
             handle: None,
             client: None,
             status_updates: None,
+            dispatcher: None,
         }
     }
 }
