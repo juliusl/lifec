@@ -117,7 +117,7 @@ impl Extension for RuntimeEditor {
         if self.enable_complex {
             self.task_window(app_world, &mut List::<Task>::edit_block_view(None), ui);
         } else {
-            self.task_window(app_world, &mut List::<Task>::simple(), ui);
+            self.task_window(app_world, &mut List::<Task>::simple(false), ui);
         }
 
         if self.show_all_engines {

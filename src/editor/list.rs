@@ -1,6 +1,7 @@
 use crate::editor::*;
 use crate::plugins::*;
 use crate::*;
+use hyper::client::conn;
 use imgui::MenuItem;
 use imgui::TableFlags;
 use imgui::TreeNodeFlags;
@@ -18,6 +19,8 @@ pub struct List<Item>(
     Option<String>,
     /// Column Names
     Option<Vec<&'static str>>,
+    /// Show all
+    bool,
 )
 where
     Item: Extension + Component;
@@ -46,7 +49,7 @@ where
     }
 
     /// Returns a simple list view
-    pub fn simple() -> Self {
+    pub fn simple(show_all: bool) -> Self {
         List::<Item>(
             |context, item, world, ui| {
                 let thunk_symbol = context
@@ -73,6 +76,7 @@ where
             None,
             None,
             None,
+            show_all,
         )
     }
 
@@ -86,6 +90,7 @@ where
             None,
             None,
             Some(cols.to_vec()),
+            true
         )
     }
 
@@ -98,6 +103,7 @@ where
             None,
             None,
             None,
+            true
         )
     }
 
@@ -110,6 +116,7 @@ where
             None,
             None,
             None,
+            true
         )
     }
 
@@ -183,6 +190,7 @@ where
             sequence,
             None,
             None,
+            true,
         )
     }
 
@@ -215,6 +223,7 @@ where
             None,
             None,
             None,
+            true,
         )
     }
 }
@@ -255,6 +264,7 @@ where
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
         let mut contexts = app_world.write_component::<ThunkContext>();
+        let connections = app_world.read_component::<Connection>();
         let mut items = app_world.write_component::<Item>();
 
         let title = self.title().clone();
@@ -303,7 +313,11 @@ where
                     }
                 }
             } else {
-                for (context, item) in (&mut contexts, &mut items).join() {
+                for (context, item, connection) in (&mut contexts, &mut items, connections.maybe()).join() {
+                    if !self.4 && connection.is_none() {
+                        continue
+                    }
+
                     let List(layout, ..) = self;
                     context
                         .as_mut()
