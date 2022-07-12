@@ -19,7 +19,7 @@ pub struct List<Item>(
     Option<String>,
     /// Column Names
     Option<Vec<&'static str>>,
-    /// Show all
+    /// Show all (verbose)
     bool,
 )
 where

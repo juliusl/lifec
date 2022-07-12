@@ -178,9 +178,14 @@ impl Extension for RuntimeEditor {
                         if let Some(created) = self.runtime().find_config_block_and_create(
                             world,
                             block_name,
-                            BlockContext::from(config),
+                            BlockContext::from(config.clone()),
                             installed_plugin,
                         ) {
+                            if let Some(true) = config.is_enabled("enable_connection") {
+                                world.write_component::<Connection>().insert(created, Connection::default()).ok();
+                                world.write_component::<Sequence>().insert(created, Sequence::default()).ok();
+                            }
+
                             eprintln!("Received dispatch for `{block_name} {symbol}`, created {:?}", created);
                         }
                     }
