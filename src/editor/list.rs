@@ -314,7 +314,7 @@ where
                 }
             } else {
                 for (context, item, connection) in (&mut contexts, &mut items, connections.maybe()).join() {
-                    if !self.4 && connection.is_none() {
+                    if !self.4 && connection.is_none() && !context.as_ref().is_enabled("always_show").unwrap_or_default() {
                         continue
                     }
 
