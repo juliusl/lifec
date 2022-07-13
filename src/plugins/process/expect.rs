@@ -24,9 +24,11 @@ impl Plugin<ThunkContext> for Expect {
                 // Uses `which` crate to check path for binaries
                 for (_, check) in tc.as_ref().find_symbol_values("which") {
                     if let Value::TextBuffer(command) = check {
+                        tc.update_status_only(format!("checking {command}")).await;
                         match which(&command) {
                             Ok(path) => {
                                 let path = format!("{:?}", path).trim_matches('"').to_string();
+                                tc.update_status_only(format!("found {command} at {path}")).await;
 
                                 // Output results to path symbol for current block
                                 project = project.with_block("env", "path", |g| {
@@ -34,7 +36,9 @@ impl Plugin<ThunkContext> for Expect {
                                 });
                             }
                             Err(err) => {
-                                eprintln!("`expect` plugin error on symbol `which` for `{command}`: {err}");
+                                let log = format!("`expect` plugin error on symbol `which` for `{command}`: {err}");
+                                eprintln!("{log}");
+                                tc.update_status_only(format!("{log}")).await;
                                 tc.error(|g| {
                                     g.add_text_attr(&command, "missing");
                                 });
