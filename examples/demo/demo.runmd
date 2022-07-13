@@ -65,7 +65,7 @@ add    node_title       .text   Demo expect
 add    stop_on_error    .enable
 
 ``` az fix
-define az missing      .text test
+define az missing
 ``` missing
 add duration    .int 5
 add quiet       .enable
