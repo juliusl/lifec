@@ -1,3 +1,4 @@
+use atlier::system::Value;
 use specs::{Component, System, ReadStorage, Entities, WriteStorage, Join};
 use specs::storage::DefaultVecStorage;
 use crate::plugins::{ThunkContext, Project, BlockContext};
@@ -33,9 +34,22 @@ impl<'a> System<'a> for ProxyDispatcher {
                             if let (Some(block_name), Some(block_symbol)) = (graph.find_text("block_name"), graph.find_text("block_symbol")) {
                                 message = message.with_block(block_name, block_symbol, |c| {
                                     for attr in BlockContext::iter_block_attrs_mut(&mut graph) {
-                                        let (name, value) = (attr.name(), attr.value());
-
-                                        c.with(name, value.clone());
+                                        // TODO - this is copied from lib.rs, need to consolidate
+                                        if !attr.is_stable() {
+                                            if let Some((_, value)) = attr.transient() {
+                                                if let Value::Symbol(symbol) = attr.value() {
+                                                    let symbol = symbol.trim_end_matches("::");
+                                                    let name = attr.name().trim_end_matches(&format!("::{symbol}"));
+                        
+                                                    c.as_mut()
+                                                        .define(name, symbol)
+                                                        .edit_as(value.clone());
+                                                }
+                                            }
+                                        } else {
+                                            let (name, value) = (attr.name(), attr.value());
+                                            c.with(name, value.clone());
+                                        }
                                     }
                                 });
                             }
