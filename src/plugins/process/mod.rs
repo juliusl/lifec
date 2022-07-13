@@ -13,6 +13,9 @@ pub use expect::Expect;
 mod missing;
 pub use missing::Missing;
 
+mod check;
+pub use check::Check;
+
 /// The process component executes a command and records the output
 #[derive(Debug, Clone, Default, Component)]
 #[storage(HashMapStorage)]

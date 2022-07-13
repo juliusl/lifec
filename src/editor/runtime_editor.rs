@@ -78,6 +78,7 @@ impl Default for RuntimeEditor {
         default.runtime.install::<Call, Runtime>();
         default.runtime.install::<Call, Println>();
         default.runtime.install::<Call, Expect>();
+        default.runtime.install::<Call, Check>();
         default.runtime.install::<Fix, Missing>();
         default.listen(Self::on_open_file);
         //default.listen(Self::on_open_dir);
