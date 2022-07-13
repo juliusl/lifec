@@ -6,7 +6,15 @@ use crate::*;
 
 #[derive(Default, Component, Clone)]
 #[storage(BTreeStorage)]
-pub struct Task(Option<StartButton>, Option<ProgressStatusBar>, Option<Sequence>, Option<Connection>);
+pub struct Task(Option<StartButton>, Option<ProgressStatusBar>, Option<Sequence>, Option<Connection>, 
+    /// disable
+    bool);
+
+impl Task {
+    pub fn disable(&mut self) {
+        self.4 = true;
+    }
+}
 
 impl Extension for Task {
     fn configure_app_world(world: &mut World) {
@@ -22,7 +30,7 @@ impl Extension for Task {
     }
 
     fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
-        if let Task(Some(start_button), .., connection) = self {
+        if let Task(Some(start_button), .., connection, false) = self {
             if connection.is_some() {
                 ui.text("-->");
                 ui.same_line();
@@ -62,9 +70,10 @@ impl<'a> System<'a> for TaskSystem {
         ReadStorage<'a, ProgressStatusBar>,
         ReadStorage<'a, Sequence>,
         ReadStorage<'a, Connection>,
+        ReadStorage<'a, Archive>,
     );
 
-    fn run(&mut self, (entities, mut tasks, start_events, progress, sequences, connections): Self::SystemData) {
+    fn run(&mut self, (entities, mut tasks, start_events, progress, sequences, connections, archives): Self::SystemData) {
         for (_, task, start_event, progress, sequence, connection) in (
             &entities,
             &mut tasks,
@@ -86,6 +95,14 @@ impl<'a> System<'a> for TaskSystem {
             }
             if let Some(connection) = connection {
                 task.3 = Some(connection.clone());
+            }
+        }
+
+        for archive in archives.join() {
+            if let Some(archived) = archive.archived() {
+                if let Some(task) = tasks.get_mut(archived) {
+                    task.disable();
+                }
             }
         }
     }

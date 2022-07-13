@@ -10,6 +10,9 @@ pub use remote::Remote;
 mod expect;
 pub use expect::Expect;
 
+mod missing;
+pub use missing::Missing;
+
 /// The process component executes a command and records the output
 #[derive(Debug, Clone, Default, Component)]
 #[storage(HashMapStorage)]

@@ -1,4 +1,4 @@
-use super::{unique_title, Call, List, Task};
+use super::{unique_title, Call, List, Task, Fix};
 use crate::plugins::*;
 use crate::*;
 
@@ -78,6 +78,7 @@ impl Default for RuntimeEditor {
         default.runtime.install::<Call, Runtime>();
         default.runtime.install::<Call, Println>();
         default.runtime.install::<Call, Expect>();
+        default.runtime.install::<Fix, Missing>();
         default.listen(Self::on_open_file);
         //default.listen(Self::on_open_dir);
         default
@@ -90,6 +91,7 @@ impl Extension for RuntimeEditor {
         Task::configure_app_world(world);
         world.register::<Connection>();
         world.register::<Sequence>();
+        world.register::<Fix>();
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
@@ -187,10 +189,62 @@ impl Extension for RuntimeEditor {
                                 world.write_component::<Connection>().insert(created, Connection::default()).ok();
                                 world.write_component::<Sequence>().insert(created, Sequence::default()).ok();
                             }
-
                         }
                     }
                 }
+            }
+        }
+
+
+        let mut rx = world.write_resource::<tokio::sync::mpsc::Receiver<ErrorContext>>();
+        if let Some(error) = rx.try_recv().ok() {
+            for (name, problem) in error.errors() {
+                if let Some(block) = self.project().find_block(&name) {
+                    if let Some(mut fix_config) = block.get_block(&problem) {
+                        if let Some(previous_attempt) = error.previous_attempt() {
+                            fix_config.merge(&previous_attempt);
+                        }
+
+                        let auto_mode = fix_config.is_enabled("auto").unwrap_or_default();
+
+                        if let Some(installed_plugin) = self.runtime.find_plugin::<Fix>(&problem) {
+                            if let Some(created) = self.runtime().find_config_block_and_create(
+                                world,
+                                &name,
+                                BlockContext::from(fix_config.clone()),
+                                installed_plugin,
+                            ) {
+                                eprintln!("Received error dispatch for `{name} {problem}`, created {:?}", created);
+        
+                                if let Some(stopped) = error.stopped() {
+                                    world.write_component::<ErrorContext>().insert(stopped, error.set_fix_entity(created)).ok();
+    
+                                    let created_id = created.id();
+                                    let stopped_id = stopped.id();
+                                    eprintln!("Setting fix cursor to stopped entity {created_id} -> {stopped_id}");
+                                    let mut seq = Sequence::default();
+                                    seq.set_cursor(stopped);
+
+                                    if let Some(stopped) =  world.write_component::<Sequence>().get(stopped) {
+                                        let connection = seq.connect(stopped);
+                                        world.write_component::<Connection>().insert(created, connection).ok();
+                                    }
+
+                                    world.write_component::<Sequence>().insert(created, seq).ok();
+                                }
+
+                                if auto_mode {
+                                    if let Some(context) = world.read_component::<ThunkContext>().get(created) {
+                                        if let Some(event) = world.write_component::<Event>().get_mut(created) {
+                                            event.fire(context.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
             }
         }
     }

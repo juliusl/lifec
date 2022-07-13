@@ -24,8 +24,10 @@ mod process;
 pub use process::Process;
 pub use process::Remote;
 pub use process::Expect;
+pub use process::Missing;
 
 mod thunks;
+pub use thunks::ErrorContext;
 pub use thunks::Config;
 pub use thunks::CancelThunk;
 pub use thunks::OpenDir;
@@ -37,6 +39,16 @@ pub use thunks::ThunkContext;
 pub use thunks::Timer;
 pub use thunks::Println;
 pub use thunks::Clear;
+
+#[derive(Component, Default)]
+#[storage(DefaultVecStorage)]
+pub struct Archive(Option<Entity>);
+
+impl Archive {
+    pub fn archived(&self) -> Option<Entity> {
+        self.0
+    }
+}
 
 /// Async context returned if the plugin starts an async task
 pub type AsyncContext = (tokio::task::JoinHandle<ThunkContext>, tokio::sync::oneshot::Sender<()>);
@@ -157,9 +169,13 @@ pub trait Engine {
                 config(&mut initial_context);
                 initial_context.as_mut().set_parent_entity(entity);
 
-                initial_context.as_mut()
-                    .with_text("caveats", P::caveats())
-                    .add_text_attr("description", P::description());
+                if !P::caveats().is_empty() {
+                    initial_context.as_mut().add_text_attr("caveats", P::caveats());
+                }
+
+                if !P::description().is_empty() {
+                    initial_context.as_mut().add_text_attr("description", P::description());
+                }
 
                 match world
                     .write_component::<ThunkContext>()

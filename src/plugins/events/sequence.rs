@@ -38,8 +38,10 @@ impl Display for Connection {
             write!(f, "owner: {owner} ")?;
         }
 
-        let fork = self.2;
-        writeln!(f, " fork: {fork}")
+        // let fork = self.2;
+        // writeln!(f, " fork: {fork}")
+
+        Ok(())
     }
 }
 

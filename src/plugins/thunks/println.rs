@@ -15,6 +15,11 @@ impl Plugin<ThunkContext> for Println {
             let mut tc = context.clone();
             async move {
                 tc.as_mut().apply("previous");
+
+                if tc.as_ref().is_enabled("debug").unwrap_or_default() {
+                    eprintln!("{:#?}", tc.as_ref());
+                }
+
                 Some(tc) 
             }
         })

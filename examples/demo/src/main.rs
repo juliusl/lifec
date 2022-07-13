@@ -10,6 +10,8 @@ impl Demo {
     fn new() -> Self {
         let mut demo = Demo::default();
 
+        //demo.0.runtime_mut().install::<Fix, Expect>();
+
         demo.0
             .runtime_mut()
             .add_config(Config("timer_simple", |tc| {

@@ -253,9 +253,16 @@ impl ThunkContext {
     pub fn get_errors(&self) -> Option<ErrorContext> {
         self.block.get_block("error").and_then(|b| { 
             let mut b = b;
-            b.add_bool_attr("stop_on_error", self.as_ref().is_enabled("stop_on_error").unwrap_or_default());
-        
-            Some(ErrorContext::from(b)) 
+            
+            if self.as_ref().is_enabled("stop_on_error").unwrap_or_default() {
+                b.add_bool_attr("stop_on_error", true);
+
+                if let Some(stopped) = self.entity {
+                    return Some(ErrorContext::new(BlockContext::from(b), Some(stopped)))
+                }
+            }
+
+            Some(ErrorContext::new(BlockContext::from(b), None)) 
         })
     }
 }

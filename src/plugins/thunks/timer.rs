@@ -42,8 +42,12 @@ impl Plugin<ThunkContext> for Timer {
                     let elapsed = start.elapsed();
                     let progress = elapsed.as_secs_f32() / duration;
                     if progress < 1.0 {
-                        tc.update_progress(format!("elapsed {} ms", elapsed.as_millis()), progress)
-                            .await;
+                        
+                        if tc.as_ref().is_enabled("quiet").unwrap_or_default() {
+                            tc.update_progress("", progress).await;
+                        } else {
+                            tc.update_progress(format!("elapsed {} ms", elapsed.as_millis()), progress).await;
+                        }
                     } else {
                         tc.as_mut()
                             .add_text_attr("elapsed", format!("{:?}", elapsed));

@@ -18,6 +18,7 @@ use tokio::{
 use crate::AttributeGraph;
 use crate::Extension;
 
+use super::Archive;
 use super::Project;
 use super::thunks::CancelThunk;
 use super::thunks::ErrorContext;
@@ -176,11 +177,21 @@ impl SetupHandler<sync::mpsc::Sender<AttributeGraph>> for EventRuntime {
     }
 }
 
+/// Setup for tokio-mulitple-producers single-consumer channel for status updates
+impl SetupHandler<sync::mpsc::Sender<ErrorContext>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<ErrorContext>(10);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
 impl<'a> System<'a> for EventRuntime {
     type SystemData = (
         Read<'a, Runtime, EventRuntime>,
         Read<'a, Sender<StatusUpdate>, EventRuntime>,
         Read<'a, Sender<AttributeGraph>, EventRuntime>,
+        Read<'a, Sender<ErrorContext>, EventRuntime>,
         Read<'a, sync::broadcast::Sender<Entity>, EventRuntime>,
         Read<'a, Project>,
         Entities<'a>,
@@ -190,6 +201,7 @@ impl<'a> System<'a> for EventRuntime {
         WriteStorage<'a, Sequence>,
         WriteStorage<'a, CancelThunk>,
         WriteStorage<'a, ErrorContext>,
+        WriteStorage<'a, Archive>,
     );
 
     fn run(
@@ -198,6 +210,7 @@ impl<'a> System<'a> for EventRuntime {
             runtime,
             status_update_channel,
             dispatcher,
+            error_dispatcher,
             thunk_complete_channel,
             project,
             entities,
@@ -207,6 +220,7 @@ impl<'a> System<'a> for EventRuntime {
             mut sequences,
             mut cancel_tokens,
             mut error_contexts,
+            mut archives
         ): Self::SystemData,
     ) {
         let mut dispatch_queue = vec![];
@@ -219,8 +233,37 @@ impl<'a> System<'a> for EventRuntime {
                     if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() }) {
                         if let Some(error_context) = thunk_context.get_errors() {
                             eprintln!("creating error context");
+                            let thunk_context = thunk_context.clone();
 
-                            if error_contexts.insert(entity, error_context.clone()).is_ok() {
+                            if let Some(previous) = error_contexts.insert(entity, error_context.clone()).ok() {
+                                if let Some(previous) = previous.and_then(|p| p.fixer()) {
+                                    match archives.get_mut(entity) {
+                                        Some(archive) =>{
+                                            if let Some(previous) = archive.0.take() {
+                                                let previous_id = previous.id();
+                                                match entities.delete(previous) {
+                                                    Ok(_) => {
+                                                        eprintln!("deleting previous fix attempt {previous_id}");
+                                                    },
+                                                    Err(err) => {
+                                                        eprintln!("error deleting previous entity {err}");
+                                                    },
+                                                }
+                                            }
+                                            archive.0 = Some(previous);
+                                        }
+                                        None => {
+                                            archives.insert(entity, Archive(Some(previous))).ok();
+
+                                            if let Some(archiving) = contexts.get(previous) {
+                                                runtime.block_on( async { archiving.update_status_only("Archived").await });
+                                            }
+                                        },
+                                    }
+                                }
+
+                                runtime.block_on(async { error_dispatcher.send(error_context.clone()).await }).ok();
+
                                 if error_context.stop_on_error() {
                                     eprintln!("Error detected, and `stop_on_error` is enabled, stopping at {}", entity.id());
                                     let mut clone = thunk_context.clone();

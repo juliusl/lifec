@@ -1,9 +1,9 @@
 ``` demo call
 define a_timer   timer       .text    timer_simple
 define b_timer   timer       .empty
-define c_timer   timer       .text    timer_complex
-define d_timer   timer       .symbol  timer_config
-define e_timer   timer       .empty
+#define c_timer   timer       .text    timer_complex
+#define d_timer   timer       .symbol  timer_config
+#define e_timer   timer       .empty
 define f_process process     .symbol  process_config
 define g_println println     .symbol  println_config
 define h_open    open_file   .symbol  file_config
@@ -56,17 +56,28 @@ add duration .int_range 10, 0, 50
 # ```
 
 ``` env expect
-define a_rust which .text cargo
-define b_elm  which .text elm
-define c_azcli which .text az
+define a_rust which     .text cargo
+define b_elm  which     .text elm
+define c_azcli which    .text az
 ``` call
-define env expect .symbol env
-add    node_title .text   Demo expect
-add    stop_on_error .enable
+define env expect       .symbol env
+add    node_title       .text   Demo expect
+add    stop_on_error    .enable
+
+``` az fix
+define az missing      .text test
+``` missing
+add duration    .int 5
+add quiet       .enable
+add command     .text echo hello world
+add debug       .disable
+add auto        .disable
+# add required_os .text windows
 ```
 
 ``` compile_elm expect
 define elm which            .text elm
+define elm fix              .text install_elm 
 ``` call
 add    node_title    .text   Expect Elm
 define a_elm expect  .symbol compile_elm
