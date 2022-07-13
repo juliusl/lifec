@@ -25,7 +25,6 @@ pub use process::Process;
 pub use process::Remote;
 pub use process::Expect;
 pub use process::Missing;
-pub use process::Check;
 
 mod thunks;
 pub use thunks::ErrorContext;
