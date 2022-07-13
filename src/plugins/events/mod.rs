@@ -20,6 +20,7 @@ use crate::Extension;
 
 use super::Project;
 use super::thunks::CancelThunk;
+use super::thunks::ErrorContext;
 use super::thunks::StatusUpdate;
 use super::{Plugin, Thunk, ThunkContext};
 use crate::plugins::thunks::Config;
@@ -131,6 +132,7 @@ impl Extension for EventRuntime {
         world.register::<Event>();
         world.register::<ThunkContext>();
         world.register::<CancelThunk>();
+        world.register::<ErrorContext>();
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
@@ -187,6 +189,7 @@ impl<'a> System<'a> for EventRuntime {
         WriteStorage<'a, ThunkContext>,
         WriteStorage<'a, Sequence>,
         WriteStorage<'a, CancelThunk>,
+        WriteStorage<'a, ErrorContext>,
     );
 
     fn run(
@@ -203,6 +206,7 @@ impl<'a> System<'a> for EventRuntime {
             mut contexts,
             mut sequences,
             mut cancel_tokens,
+            mut error_contexts,
         ): Self::SystemData,
     ) {
         let mut dispatch_queue = vec![];
@@ -213,6 +217,25 @@ impl<'a> System<'a> for EventRuntime {
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
                     if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() }) {
+                        if let Some(error_context) = thunk_context.get_errors() {
+                            eprintln!("creating error context");
+
+                            if error_contexts.insert(entity, error_context.clone()).is_ok() {
+                                if error_context.stop_on_error() {
+                                    eprintln!("Error detected, and `stop_on_error` is enabled, stopping at {}", entity.id());
+                                    let mut clone = thunk_context.clone();
+
+                                    clone.as_mut().with_text(
+                                        "thunk_symbol", 
+                                        format!("Stopped -> {}", thunk.0)
+                                    );
+
+                                    contexts.insert(entity, clone).ok();
+                                    continue;
+                                }
+                            }
+                        }
+
                         match contexts.insert(entity, thunk_context.clone()) {
                             Ok(_) => {
                                 thunk_complete_channel.send(entity).ok();

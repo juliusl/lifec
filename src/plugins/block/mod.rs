@@ -114,7 +114,7 @@ impl BlockContext {
     /// returns a block if it exists within the context
     pub fn get_block(&self, block_symbol: impl AsRef<str>) -> Option<AttributeGraph> {
         if self.block_symbols.contains(block_symbol.as_ref()) {
-            self.graph.find_block("", block_symbol)
+            self.graph.find_block(&self.block_name, block_symbol)
         } else {
             None
         }

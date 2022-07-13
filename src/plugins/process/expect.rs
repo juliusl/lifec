@@ -35,9 +35,8 @@ impl Plugin<ThunkContext> for Expect {
                             }
                             Err(err) => {
                                 eprintln!("`expect` plugin error on symbol `which` for `{command}`: {err}");
-                                
-                                project = project.with_block("env", "missing", |g| {
-                                    g.add_text_attr(&command, "");
+                                tc.error(|g| {
+                                    g.add_text_attr(&command, "missing");
                                 });
                             }
                         }

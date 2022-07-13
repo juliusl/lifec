@@ -58,9 +58,11 @@ add duration .int_range 10, 0, 50
 ``` env expect
 define a_rust which .text cargo
 define b_elm  which .text elm
+define c_azcli which .text az
 ``` call
 define env expect .symbol env
 add    node_title .text   Demo expect
+add    stop_on_error .enable
 ```
 
 ``` compile_elm expect

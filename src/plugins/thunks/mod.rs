@@ -28,6 +28,9 @@ pub use println::Println;
 mod clear;
 pub use clear::Clear;
 
+mod error;
+pub use error::ErrorContext;
+
 use super::{BlockContext, Plugin, Project};
 use tokio::{runtime::Handle, sync::mpsc::Sender, sync::oneshot::channel, task::JoinHandle};
 
@@ -245,7 +248,18 @@ impl ThunkContext {
     pub async fn update_status_only(&self, status: impl AsRef<str>) {
         self.update_progress(status, 0.0).await;
     }
+
+    /// returns an error context if an error block exists
+    pub fn get_errors(&self) -> Option<ErrorContext> {
+        self.block.get_block("error").and_then(|b| { 
+            let mut b = b;
+            b.add_bool_attr("stop_on_error", self.as_ref().is_enabled("stop_on_error").unwrap_or_default());
+        
+            Some(ErrorContext::from(b)) 
+        })
+    }
 }
+
 
 impl From<AttributeGraph> for ThunkContext {
     fn from(g: AttributeGraph) -> Self {
