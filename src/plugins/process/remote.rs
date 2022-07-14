@@ -46,6 +46,14 @@ impl Plugin<ThunkContext> for Remote {
                     tc.update_progress("```", 0.10).await;
                     command_task.stdout(Stdio::piped());
 
+                    if let Some(current_dir) = tc.as_ref().find_text("current_dir") {
+                        tc.update_progress(format!("add current_dir .text {current_dir}"), 0.20).await;
+                        command_task.current_dir(current_dir);
+                    }
+
+                    Process::resolve_args(&tc, &mut command_task).await;
+                    Process::resolve_env(&tc, &mut command_task).await;
+
                     if let Some(mut child) = command_task.spawn().ok() {
                         if let Some(stdout) = child.stdout.take() {
                             let mut reader = BufReader::new(stdout).lines();

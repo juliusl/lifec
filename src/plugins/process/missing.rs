@@ -1,6 +1,6 @@
 use crate::plugins::{Plugin, ThunkContext, Println, combine, Timer};
 
-use super::{Process, Remote};
+use super::Remote;
 
 #[derive(Default)]
 pub struct Missing; 

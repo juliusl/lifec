@@ -4,7 +4,7 @@ use super::{thunks::CancelToken, Plugin, ThunkContext};
 use atlier::system::Value;
 use chrono::{Local, Utc};
 use specs::{Component, HashMapStorage};
-use tokio::{select, task::JoinHandle};
+use tokio::{select, task::JoinHandle, process::Command};
 
 mod remote;
 pub use remote::Remote;
@@ -29,6 +29,54 @@ impl Process {
             Some(command) 
         } else {
             tc.as_ref().find_text("command")
+        }
+    }
+
+    async fn resolve_args(tc: &ThunkContext, command: &mut Command) {
+        for (arg, value) in tc.clone().as_ref().find_symbol_values("arg") {
+            let arg = arg.trim_end_matches("::arg");
+            match value {
+                Value::Bool(true) => {
+                    tc.update_status_only(format!("define {arg} arg .enable")).await;
+                    if arg.len() == 1 {
+                        let arg = format!("-{arg}");
+                        command.arg(arg);
+                    } else {
+                        let arg = format!("--{arg}");
+                        command.arg(arg);
+                    }
+                },
+                Value::Symbol(reference) => {
+                    if let Some(value) = tc.as_ref().find_text(&reference) {
+                        tc.update_status_only(format!("define {arg} arg .symbol {reference}")).await;
+                        if arg.len() == 1 {
+                            let arg = format!("-{arg}");
+                            command.arg(arg).arg(value);
+                        } else {
+                            let arg = format!("--{arg}");
+                            command.arg(arg).arg(value);
+                        }
+                    }
+                },
+                _ => continue 
+            }
+        }
+    }
+
+    async fn resolve_env(tc: &ThunkContext, command: &mut Command) {
+        for (env, value) in tc.as_ref().find_symbol_values("env") {
+            let env = env.trim_end_matches("::env");
+            match value {
+                Value::Symbol(reference) => {
+                    tc.update_status_only(format!("define {env} env .symbol {reference}")).await;
+                    if let Some(value) = tc.as_ref().find_text(reference) {
+                        command.env(env, value);
+                    }
+                },
+                _ => {
+                    continue;
+                }
+            }
         }
     }
 }
@@ -64,17 +112,8 @@ impl Plugin<ThunkContext> for Process {
                             .await;
                     }
 
-                    for (_, arg) in tc.as_ref().find_symbol_values("arg") {
-                        if let Value::TextBuffer(arg) = arg {
-                            let parts: Vec<&str> = arg.split(" ").collect();
-
-                            for (e, arg) in parts.iter().enumerate() {
-                                command_task.arg(arg);
-                                tc.update_progress(format!("add arg{0}{0}    .text {1}", e, arg), 0.20)
-                                .await;
-                            }
-                        }
-                    }
+                    Self::resolve_args(&tc, &mut command_task).await;
+                    Self::resolve_env(&tc, &mut command_task).await;
 
                     if let Some(current_dir) = tc.as_ref().find_text("current_dir") {
                         tc.update_progress(format!("add current_dir .text {current_dir}"), 0.20).await;
