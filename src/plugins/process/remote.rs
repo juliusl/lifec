@@ -8,6 +8,8 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::select;
 
+use super::Process;
+
 #[derive(Component, Default)]
 #[storage(DenseVecStorage)]
 pub struct Remote;
@@ -29,9 +31,7 @@ impl Plugin<ThunkContext> for Remote {
             let log = context.clone();
             let child_handle = context.handle().clone();
             async move {
-                let cmd = tc.as_ref()
-                    .find_text("command")
-                    .unwrap_or("echo missing command".to_string());
+                let cmd = Process::resolve_command(&tc).unwrap_or("echo missing command".to_string());
                 let parts: Vec<&str> = cmd.split(" ").collect();
                 tc.update_progress(format!("``` {} process", tc.block.block_name), 0.10)
                             .await;

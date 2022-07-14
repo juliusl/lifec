@@ -1,6 +1,6 @@
 use crate::plugins::{Plugin, ThunkContext, Println, combine, Timer};
 
-use super::Process;
+use super::{Process, Remote};
 
 #[derive(Default)]
 pub struct Missing; 
@@ -36,6 +36,6 @@ impl Plugin<ThunkContext> for Missing {
             }
         }
 
-        combine::<Timer, (Process, Println)>()(context)
+        combine::<Timer, (Remote, Println)>()(context)
     }
 }
