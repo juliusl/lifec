@@ -144,6 +144,7 @@ where
                     flags |= TreeNodeFlags::DEFAULT_OPEN;
                 }
 
+                let edit_transient = context.as_ref().is_enabled("edit_transient").unwrap_or_default();
                 if ui.collapsing_header(
                     format!(
                         "{} {} - {}",
@@ -179,6 +180,8 @@ where
                                 format!("{} {}:{:#04x}", attr.name(), attr.id(), item_index as u16),
                                 ui,
                             );
+                        } else if edit_transient {
+                            attr.edit_ui(ui);
                         }
                     }
                     item.on_ui(world, ui);
