@@ -25,7 +25,7 @@ impl Plugin<ThunkContext> for Expect {
 
                 // Uses `which` crate to check path for binaries
                 for (name, check) in tc.as_ref().find_symbol_values("which") {
-                    if let Some((_, os)) = name.split_once("::") {
+                    if let Some((_, os)) = name.trim_end_matches("::which").split_once("::") {
                         if os != OS {
                             eprintln!("skipping {name}");
                             continue;
