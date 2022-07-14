@@ -8,6 +8,17 @@ use crate::plugins::{Plugin, ThunkContext};
 #[derive(Default)]
 pub struct Expect;
 
+impl Expect {
+    pub fn should_expect(name: impl AsRef<str>, symbol: impl AsRef<str>) -> bool {
+        let symbol = symbol.as_ref();
+        if let Some((_, os)) = name.as_ref().trim_end_matches(&format!("::{symbol}")).split_once("::") {
+            return os == OS;
+        }
+
+        true
+    }
+}
+
 impl Plugin<ThunkContext> for Expect {
     fn symbol() -> &'static str {
         "expect"
@@ -25,11 +36,9 @@ impl Plugin<ThunkContext> for Expect {
 
                 // Uses `which` crate to check path for binaries
                 for (name, check) in tc.as_ref().find_symbol_values("which") {
-                    if let Some((_, os)) = name.trim_end_matches("::which").split_once("::") {
-                        if os != OS {
-                            eprintln!("skipping {name}");
-                            continue;
-                        }
+                    if !Self::should_expect(&name, "which") {
+                        eprintln!("skipping {name}");
+                        continue;
                     }
 
                     if let Value::TextBuffer(command) = check {
