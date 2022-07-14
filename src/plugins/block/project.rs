@@ -106,6 +106,16 @@ impl Project {
         }
     }
 
+    /// Interprets content and returns a project
+    pub fn load_content(content: impl AsRef<str>) -> Option<Project> {
+        let mut graph = AttributeGraph::from(0);
+        if graph.batch_mut(content.as_ref()).is_ok() {
+            Some(Project::from(graph))
+        } else {
+            None
+        }
+    }
+
     pub fn replace_block(&mut self, mut block_context: BlockContext) -> bool {
         let block_name = block_context.block_name.to_string();
         block_context.as_mut().with_bool("project_selected", false);
