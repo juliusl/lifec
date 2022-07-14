@@ -5,7 +5,8 @@ define b_timer   timer       .empty
 #define d_timer   timer       .symbol  timer_config
 #define e_timer   timer       .empty
 define f_process process     .symbol  process_config
-define g_println println     .symbol  println_config
+define g_redirect redirect   .symbol  redirect_config
+# define g_println println     .symbol  println_config
 define h_open    open_file   .symbol  file_config
 define i_write   write_file  .symbol  write_config
 define j_open    open_file   .symbol  file_config2
@@ -32,6 +33,11 @@ add work_dir .text test/test2
 
 ``` process_config process
 add command .text sh test.sh
+```
+
+``` redirect_config redirect 
+add redirect_stdout .text stdout
+add redirect_stderr .text .stderr
 ```
 
 ``` b_timer timer

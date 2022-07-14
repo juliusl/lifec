@@ -1,6 +1,6 @@
 use crate::plugins::thunks::CancelToken;
 use crate::plugins::{Plugin, ThunkContext};
-use chrono::{Local, Utc};
+use chrono::Utc;
 use specs::storage::DenseVecStorage;
 use specs::Component;
 use std::process::Stdio;
@@ -68,20 +68,9 @@ impl Plugin<ThunkContext> for Remote {
                                     output = child.wait_with_output() => {
                                          match output {
                                              Ok(output) => {
-                                             // Completed process, publish result
-                                             tc.update_progress("# Finished, recording output", 0.30).await;
-                                             let timestamp_utc = Some(Utc::now().to_string());
-                                             let timestamp_local = Some(Local::now().to_string());
-                                             let elapsed = start_time
-                                                 .and_then(|s| Some(Utc::now() - s))
-                                                 .and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
-                                             tc.as_mut()
-                                                 .with_int("code", output.status.code().unwrap_or_default())
-                                                 .with_binary("stdout", output.stdout)
-                                                 .with_binary("stderr", output.stderr)
-                                                 .with_text("timestamp_local", timestamp_local.unwrap_or_default())
-                                                 .with_text("timestamp_utc", timestamp_utc.unwrap_or_default())
-                                                 .add_text_attr("elapsed", elapsed.unwrap_or_default());
+                                                // Completed process, publish result
+                                                tc.update_progress("# Finished, recording output", 0.30).await;
+                                                Process::resolve_output(&mut tc, cmd, start_time, output);
                                              }
                                              Err(err) => {
                                                  tc.update_progress(format!("# error {}", err), 0.0).await;

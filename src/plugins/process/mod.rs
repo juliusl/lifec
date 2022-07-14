@@ -1,8 +1,8 @@
-use std::env::consts::OS;
+use std::{env::consts::OS, process::Output};
 
 use super::{thunks::CancelToken, Plugin, ThunkContext};
 use atlier::system::Value;
-use chrono::{Local, Utc};
+use chrono::{Local, Utc, DateTime};
 use specs::{Component, HashMapStorage};
 use tokio::{select, task::JoinHandle, process::Command};
 
@@ -14,6 +14,9 @@ pub use expect::Expect;
 
 mod missing;
 pub use missing::Missing;
+
+mod redirect;
+pub use redirect::Redirect;
 
 /// The process component executes a command and records the output
 #[derive(Debug, Clone, Default, Component)]
@@ -79,6 +82,33 @@ impl Process {
             }
         }
     }
+
+    fn resolve_output(tc: &mut ThunkContext, command: impl AsRef<str>, start_time: Option<DateTime<Utc>>, output: Output) {
+        let program = command.as_ref()
+            .split_once(" ")
+            .and_then(|(program, _)| Some(program.to_string()))
+            .unwrap_or_default();
+
+        let command = command.as_ref().to_string();
+
+        let timestamp_utc = Some(Utc::now().to_string());
+        let timestamp_local = Some(Local::now().to_string());
+        let elapsed = start_time
+            .and_then(|s| Some(Utc::now() - s))
+            .and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
+
+        if let Some(project) = tc.project.as_mut() {
+            *project = project.with_block(program, "process", |c| {
+                c.with_int("code", output.status.code().unwrap_or_default())
+                    .with_text("command", &command)
+                    .with_binary("stdout", output.stdout)
+                    .with_binary("stderr", output.stderr)
+                    .with_text("timestamp_local", timestamp_local.unwrap_or_default())
+                    .with_text("timestamp_utc", timestamp_utc.unwrap_or_default())
+                .add_text_attr("elapsed", elapsed.unwrap_or_default());
+            });
+        }
+    }
 }
 
 
@@ -132,23 +162,7 @@ impl Plugin<ThunkContext> for Process {
                                 Ok(output) => {
                                     // Completed process, publish result
                                     tc.update_progress("# Finished, recording output", 0.30).await;
-                                    let timestamp_utc = Some(Utc::now().to_string());
-                                    let timestamp_local = Some(Local::now().to_string());
-                                    let elapsed = start_time
-                                        .and_then(|s| Some(Utc::now() - s))
-                                        .and_then(|d| Some(format!("{} ms", d.num_milliseconds())));
-
-                                    if let Some(project) = tc.project.as_mut() {
-                                        *project = project.with_block(program, "process", |c| {
-                                            c.with_int("code", output.status.code().unwrap_or_default())
-                                                .with_text("command", &command)
-                                                .with_binary("stdout", output.stdout.to_vec())
-                                                .with_binary("stderr", output.stderr)
-                                                .with_text("timestamp_local", timestamp_local.unwrap_or_default())
-                                                .with_text("timestamp_utc", timestamp_utc.unwrap_or_default())
-                                            .add_text_attr("elapsed", elapsed.unwrap_or_default());
-                                        });
-                                    }
+                                    Self::resolve_output(&mut tc, command, start_time, output);
                                 }
                                 Err(err) => {
                                     tc.update_progress(format!("# error {}", err), 0.0).await;
