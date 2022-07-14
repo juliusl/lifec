@@ -66,6 +66,11 @@ where
                 if let Some(description) = context.as_ref().find_text("description") {
                     ui.new_line();
                     ui.text_wrapped(description);
+                    if let Some(caveats) = context.as_ref().find_text("caveats") {
+                        if ui.is_item_hovered() {
+                            ui.tooltip_text(caveats);
+                        }
+                    }
                 }
 
                 let clone = context.clone();
