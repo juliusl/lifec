@@ -81,6 +81,15 @@ impl Plugin<ThunkContext> for OpenFile {
                         }
                     } else {
                         tc.update_status_only("content found, refresh disabled, skipping read").await;
+                        if let Some(content) = tc.as_ref().find_binary("content") {
+                            if let Some(project) = tc.project.as_mut() {
+                                *project = project.with_block(file_name, "file", |c| {
+                                    c.with_text("file_name", file_name)
+                                    .with_text("file_ext", file_ext) 
+                                    .add_binary_attr("content", content);
+                                });
+                            }
+                        }
                     } 
                 }
                 tc.as_mut().add_text_attr("elapsed", format!("{:?}", start.elapsed()));
