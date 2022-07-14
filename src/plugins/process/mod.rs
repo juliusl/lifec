@@ -1,3 +1,5 @@
+use std::env::consts::OS;
+
 use super::{thunks::CancelToken, Plugin, ThunkContext};
 use atlier::system::Value;
 use chrono::{Local, Utc};
@@ -18,6 +20,19 @@ pub use missing::Missing;
 #[storage(HashMapStorage)]
 pub struct Process;
 
+impl Process {
+    fn resolve_command(tc: &ThunkContext) -> Option<String> {
+        let os = OS;
+        let os_command = format!("command_{os}");
+
+        if let Some(command) = tc.as_ref().find_text(os_command) {
+            Some(command) 
+        } else {
+            tc.as_ref().find_text("command")
+        }
+    }
+}
+
 
 impl Plugin<ThunkContext> for Process {
     fn symbol() -> &'static str {
@@ -34,10 +49,7 @@ impl Plugin<ThunkContext> for Process {
         context.clone().task(|cancel_source| {
             let mut tc = context.clone();
             async move {
-                let command = tc
-                    .as_ref()
-                    .find_text("command")
-                    .unwrap_or("echo missing command".to_string());
+                let command = Self::resolve_command(&tc).unwrap_or("echo missing command".to_string());
                 // Creating a new tokio command
                 let parts: Vec<&str> = command.split(" ").collect();
                 tc.update_progress(format!("``` {} process", tc.block.block_name), 0.10)
@@ -91,7 +103,7 @@ impl Plugin<ThunkContext> for Process {
                                         *project = project.with_block(program, "process", |c| {
                                             c.with_int("code", output.status.code().unwrap_or_default())
                                                 .with_text("command", &command)
-                                                .with_binary("stdout", output.stdout)
+                                                .with_binary("stdout", output.stdout.to_vec())
                                                 .with_binary("stderr", output.stderr)
                                                 .with_text("timestamp_local", timestamp_local.unwrap_or_default())
                                                 .with_text("timestamp_utc", timestamp_utc.unwrap_or_default())
