@@ -52,7 +52,6 @@ where
         List::<Item>(
             |context, item, world, ui| {
                 let thunk_symbol = context
-                    .block
                     .as_ref()
                     .find_text("thunk_symbol")
                     .unwrap_or("entity".to_string());
@@ -67,6 +66,17 @@ where
                 if let Some(description) = context.as_ref().find_text("description") {
                     ui.new_line();
                     ui.text_wrapped(description);
+                }
+
+                let clone = context.clone();
+                if clone.as_ref().is_enabled("edit_form").unwrap_or_default() {
+                    for (_, value) in context.as_ref().iter_transient_values() {
+                        if let Value::Symbol(symbol) = value {
+                            if let Some(attr) = context.as_mut().find_attr_mut(&symbol) {
+                                attr.edit_value(clone.label(symbol), ui);
+                            }
+                        }
+                    }
                 }
 
                 item.on_ui(world, ui);
