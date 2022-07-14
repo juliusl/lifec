@@ -1,3 +1,5 @@
+use std::env::consts::OS;
+
 use atlier::system::Value;
 use which::which;
 
@@ -22,7 +24,14 @@ impl Plugin<ThunkContext> for Expect {
                 let mut project = tc.clone().project.unwrap_or_default();
 
                 // Uses `which` crate to check path for binaries
-                for (_, check) in tc.as_ref().find_symbol_values("which") {
+                for (name, check) in tc.as_ref().find_symbol_values("which") {
+                    if let Some((_, os)) = name.split_once("::") {
+                        if os != OS {
+                            eprintln!("skipping {name}");
+                            continue;
+                        }
+                    }
+
                     if let Value::TextBuffer(command) = check {
                         tc.update_status_only(format!("checking {command}")).await;
                         match which(&command) {
