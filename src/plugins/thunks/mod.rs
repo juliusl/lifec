@@ -246,7 +246,13 @@ impl ThunkContext {
 
     /// optionally, update status of the thunk execution
     pub async fn update_status_only(&self, status: impl AsRef<str>) {
-        self.update_progress(status, 0.0).await;
+        self.update_progress(&status, 0.0).await;
+
+        if self.as_ref().is_enabled("debug").unwrap_or_default() {
+            let block_name = &self.block.block_name;
+            let status = status.as_ref();
+            eprintln!("debug {block_name}\t{status}"); 
+        }
     }
 
     /// returns an error context if an error block exists

@@ -177,6 +177,8 @@ impl Extension for RuntimeEditor {
             for (block_name, config_block) in project.iter_block() {
                 for (symbol, config) in config_block.to_blocks() {
                     if let Some(installed_plugin) = self.runtime.find_plugin::<Call>(&symbol) {
+                        let auto_mode = config.is_enabled("auto").unwrap_or_default();
+
                         if let Some(created) = self.runtime().find_config_block_and_create(
                             world,
                             block_name,
@@ -188,6 +190,14 @@ impl Extension for RuntimeEditor {
                             if let Some(true) = config.is_enabled("enable_connection") {
                                 world.write_component::<Connection>().insert(created, Connection::default()).ok();
                                 world.write_component::<Sequence>().insert(created, Sequence::default()).ok();
+                            }
+
+                            if auto_mode {
+                                if let Some(context) = world.read_component::<ThunkContext>().get(created) {
+                                    if let Some(event) = world.write_component::<Event>().get_mut(created) {
+                                        event.fire(context.clone());
+                                    }
+                                }
                             }
                         }
                     }

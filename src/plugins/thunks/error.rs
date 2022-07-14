@@ -30,6 +30,10 @@ impl ErrorContext {
 
     pub fn errors(&self) -> Vec<(String, String)> {
         self.0.get_block("error").unwrap_or_default().iter_attributes().filter_map(|a| {
+            if a.name().starts_with("block_") {
+                return None;
+            }
+
             let name = a.name();
             match a.value() {
                 atlier::system::Value::TextBuffer(error) => {
