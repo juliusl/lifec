@@ -307,8 +307,10 @@ impl RuntimeEditor {
             app_world,
             &Call::event::<Timer>(),
             |c| {
-                c.block.block_name = unique_title("new_timer");
+                let title = unique_title("new_timer");
+                c.block.block_name = title.to_string();
                 c.as_mut()
+                    .with_text("node_title", title)
                     .with_text("thunk_symbol", Timer::symbol())
                     .with_bool("default_open", true)
                     .with_int("duration", 0);
@@ -321,8 +323,10 @@ impl RuntimeEditor {
             app_world,
             &Call::event::<Process>(),
             |c| {
-                c.block.block_name = unique_title("new_process");
+                let title = unique_title("new_process");
+                c.block.block_name = title.to_string();
                 c.as_mut()
+                    .with_text("node_title", title)
                     .with_text("thunk_symbol", Process::symbol())
                     .with_bool("default_open", true)
                     .with_text("command", "");
@@ -335,8 +339,10 @@ impl RuntimeEditor {
             app_world,
             &Call::event::<Remote>(),
             |c| {
-                c.block.block_name = unique_title("new_remote");
+                let title = unique_title("new_remote");
+                c.block.block_name = title.to_string();
                 c.as_mut()
+                    .with_text("node_title", title)
                     .with_text("thunk_symbol", Remote::symbol())
                     .with_bool("default_open", true)
                     .with_text("command", "");
@@ -349,8 +355,10 @@ impl RuntimeEditor {
             app_world,
             &Call::event::<OpenFile>(),
             |c| {
-                c.block.block_name = unique_title("new_open_file");
+                let title = unique_title("new_open_file");
+                c.block.block_name = title.to_string();
                 c.as_mut()
+                    .with_text("node_title", title)
                     .with_text("thunk_symbol", OpenFile::symbol())
                     .with_bool("default_open", true)
                     .with_text("file_src", "");
@@ -363,8 +371,10 @@ impl RuntimeEditor {
             app_world,
             &Call::event::<OpenDir>(),
             |c| {
-                c.block.block_name = unique_title("new_open_dir");
+                let title = unique_title("new_open_dir");
+                c.block.block_name = title.to_string();
                 c.as_mut()
+                    .with_text("node_title", title)
                     .with_text("thunk_symbol", OpenDir::symbol())
                     .with_bool("default_open", true)
                     .with_text("file_dir", "");
@@ -377,13 +387,31 @@ impl RuntimeEditor {
             app_world,
             &Call::event::<WriteFile>(),
             |c| {
-                c.block.block_name = unique_title("new_write_file");
+                let title = unique_title("new_write_file");
+                c.block.block_name = title.to_string();
                 c.as_mut()
+                    .with_text("node_title", title)
                     .with_text("thunk_symbol", WriteFile::symbol())
                     .with_bool("default_open", true)
                     .add_text_attr("file_dst", "");
             },
             WriteFile::description(),
+            ui,
+        );
+
+        self.runtime.create_event_menu_item(
+            app_world,
+            &Call::event::<Println>(),
+            |c| {
+                let title = unique_title("new_println");
+                c.block.block_name = title.to_string();
+                c.as_mut()
+                    .with_text("node_title", title)
+                    .with_text("thunk_symbol", Println::symbol())
+                    .with_bool("default_open", true)
+                    .add_text_attr("file_dst", "");
+            },
+            Println::description(),
             ui,
         );
     }
