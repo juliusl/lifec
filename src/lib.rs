@@ -9,7 +9,7 @@ pub use specs::{ReadStorage, WriteStorage, Entities, Join};
 use imgui::{ChildWindow, MenuItem, Ui, Window};
 use plugins::{
     AsyncContext, BlockContext, Config, Engine, Event, OpenDir, OpenFile, Plugin, Process, Project,
-    Remote, Sequence, ThunkContext, Timer, WriteFile, Expect, Println,
+    Remote, Sequence, ThunkContext, Timer, WriteFile, Expect, Println, Connection,
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
@@ -323,7 +323,10 @@ impl Runtime {
         ui.menu("Edit", || {
             let label = format!("Add '{}' event", event.to_string());
             if MenuItem::new(label).build(ui) {
-                self.create_with_fn(world, event, config_fn);
+                if let Some(created) = self.create_with_fn(world, event, config_fn) {
+                    world.write_component().insert(created, Sequence::default()).ok();
+                    world.write_component().insert(created, Connection::default()).ok();
+                }
             }
             if ui.is_item_hovered() {
                 ui.tooltip_text(tooltip);
