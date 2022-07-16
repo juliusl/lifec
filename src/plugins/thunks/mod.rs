@@ -31,6 +31,9 @@ pub use clear::Clear;
 mod error;
 pub use error::ErrorContext;
 
+mod dispatch;
+pub use dispatch::Dispatch;
+
 use super::{BlockContext, Plugin, Project};
 use tokio::{runtime::Handle, sync::mpsc::Sender, sync::oneshot::channel, task::JoinHandle};
 
