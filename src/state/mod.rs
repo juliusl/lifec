@@ -734,6 +734,14 @@ impl AttributeGraph {
         })
     }
 
+    /// Find an int pair value from an attribute
+    pub fn find_int_pair(&self, with_name: impl AsRef<str>) -> Option<(i32, i32)> {
+        self.find_attr_value(with_name).and_then(|n| match n {
+             Value::IntPair(a, b) => Some((*a, *b)),
+            _ => None,
+        })
+    }
+
     /// Finds a float value of an attribute
     pub fn find_float(&self, with_name: impl AsRef<str>) -> Option<f32> {
         self.find_attr_value(with_name).and_then(|n| match n {
