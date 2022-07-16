@@ -264,7 +264,7 @@ impl BlockContext {
             atlier::system::Value::FloatPair(val1, val2) => {
                 writeln!(
                     src,
-                    "{} {}, .FLOAT_PAIR {}, {}",
+                    "{} {}, .float2 {}, {}",
                     event.as_ref(),
                     name.as_ref(),
                     val1,
@@ -274,7 +274,7 @@ impl BlockContext {
             atlier::system::Value::FloatRange(val1, val2, val3) => {
                 writeln!(
                     src,
-                    "{} {} .FLOAT_RANGE {}, {}, {}",
+                    "{} {} .float3 {}, {}, {}",
                     event.as_ref(),
                     name.as_ref(),
                     val1,

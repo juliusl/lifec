@@ -1798,7 +1798,7 @@ impl AttributeGraph {
                 AttributeGraphElements::Symbol(_) | AttributeGraphElements::Name(_) => {
                     todo!("unrecognized element")
                 }
-                AttributeGraphElements::Error => todo!("error parsing next value"),
+                AttributeGraphElements::Error => panic!("error parsing next value {}", element_lexer.slice()),
             },
             _ => Err(AttributeGraphErrors::NotEnoughArguments),
         }
