@@ -40,6 +40,7 @@ pub use thunks::ThunkContext;
 pub use thunks::Timer;
 pub use thunks::Println;
 pub use thunks::Clear;
+pub use thunks::Dispatch;
 
 #[derive(Component, Default)]
 #[storage(DefaultVecStorage)]

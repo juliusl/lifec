@@ -2,7 +2,7 @@ use crate::plugins::Plugin;
 
 use super::ThunkContext;
 
-
+#[derive(Default)]
 pub struct Dispatch;
 
 impl Plugin<ThunkContext> for Dispatch {
