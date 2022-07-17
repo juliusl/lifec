@@ -393,6 +393,21 @@ impl App for Runtime {
 
 /// Methods for creating engines & plugins
 impl Runtime {
+
+    /// Starts an event in the world w/ an entity
+    /// 
+    /// Caveats: This will write to the Event component, so it cannot be called if there Event is already borrowed.
+    /// It's safest after calling creat_event
+    pub fn start_event(event: Entity, world: &World) {
+        if let Some(context) = world.read_component::<ThunkContext>().get(event)
+        {
+            if let Some(event) = world.write_component::<Event>().get_mut(event)
+            {
+                event.fire(context.to_owned());
+            }
+        }
+    }
+
     /// Creates a group of engines
     pub fn create_engine_group<E>(&self, world: &World, blocks: Vec<String>) -> Vec<Entity>
     where
