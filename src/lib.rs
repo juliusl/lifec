@@ -393,7 +393,6 @@ impl App for Runtime {
 
 /// Methods for creating engines & plugins
 impl Runtime {
-
     /// Starts an event in the world w/ an entity
     /// 
     /// Caveats: This will write to the Event component, so it cannot be called if there Event is already borrowed.
@@ -684,23 +683,30 @@ impl Runtime {
     /// Schedules a new event with a registered config, returns an entity if the event was created
     /// started. If the config does not exist, this is a no-op.
     pub fn schedule_with_config(
-        &mut self,
+        &self,
         world: &World,
         event: &Event,
         config_name: &'static str,
     ) -> Option<Entity> {
         if let Some(entity) = self.create_with_name(world, event, config_name) {
-            let mut contexts = world.write_component::<ThunkContext>();
-            let mut events = world.write_component::<Event>();
-            if let Some(tc) = contexts.get_mut(entity) {
-                if let Some(event) = events.get_mut(entity) {
-                    event.fire(tc.clone());
-                    return Some(entity);
-                }
-            }
+            Self::start_event(entity, world);
+            Some(entity)
+        } else {
+            None 
         }
+    }
 
-        None
+    /// Creates and starts a new event, and returns the entity if successful 
+    pub fn schedule_with_engine<E, P>(
+        &self,
+        world: &World,
+        config_name: &'static str
+    ) -> Option<Entity> 
+    where
+        E: Engine,
+        P: Plugin<ThunkContext> + Component + Send + Default
+    {
+        self.schedule_with_config(world, &E::event::<P>(), config_name)
     }
 }
 
