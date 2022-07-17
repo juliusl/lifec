@@ -678,7 +678,7 @@ impl Runtime {
 
     /// Schedule a new event on this runtime, returns an entity if the event was created/started
     pub fn schedule(
-        &mut self,
+        &self,
         world: &World,
         event: &Event,
         config: impl FnOnce(&mut ThunkContext),
