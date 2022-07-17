@@ -4,12 +4,12 @@ use logos::{Lexer, Logos};
 pub use specs::storage::BTreeStorage;
 pub use specs::{Component, DispatcherBuilder, Entity, System, World, WorldExt};
 pub use specs::{DefaultVecStorage, DenseVecStorage, HashMapStorage};
-pub use specs::{ReadStorage, WriteStorage, Entities, Join};
+pub use specs::{Entities, Join, ReadStorage, WriteStorage};
 
 use imgui::{ChildWindow, MenuItem, Ui, Window};
 use plugins::{
-    AsyncContext, BlockContext, Config, Engine, Event, OpenDir, OpenFile, Plugin, Process, Project,
-    Remote, Sequence, ThunkContext, Timer, WriteFile, Expect, Println, Connection,
+    AsyncContext, BlockContext, Config, Connection, Engine, Event, Expect, OpenDir, OpenFile,
+    Plugin, Println, Process, Project, Remote, Sequence, ThunkContext, Timer, WriteFile,
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
@@ -266,29 +266,27 @@ impl Runtime {
         if let Some(created) = create_event(world, |_| {}) {
             let mut tc = world.write_component::<ThunkContext>();
             if let Some(tc) = tc.get_mut(created) {
-                for (name, value) in config_block
-                    .as_ref()
-                    .iter_attributes()
-                    .filter_map(|a| {
-                        if a.is_stable() {
-                            Some((a.name(), a.value()))
-                        } else {
-                            None
-                        }
-                    })
-                {
+                for (name, value) in config_block.as_ref().iter_attributes().filter_map(|a| {
+                    if a.is_stable() {
+                        Some((a.name(), a.value()))
+                    } else {
+                        None
+                    }
+                }) {
                     tc.as_mut().with(name, value.clone());
                 }
 
-                for a in config_block.as_ref().iter_attributes().filter(|a| !a.is_stable()) {
+                for a in config_block
+                    .as_ref()
+                    .iter_attributes()
+                    .filter(|a| !a.is_stable())
+                {
                     if let Some((_, value)) = a.transient() {
                         if let Value::Symbol(symbol) = a.value() {
                             let symbol = symbol.trim_end_matches("::");
                             let name = a.name().trim_end_matches(&format!("::{symbol}"));
 
-                            tc.as_mut()
-                                .define(name, symbol)
-                                .edit_as(value.clone());
+                            tc.as_mut().define(name, symbol).edit_as(value.clone());
                         }
                     }
                 }
@@ -324,8 +322,14 @@ impl Runtime {
             let label = format!("Add '{}' event", event.to_string());
             if MenuItem::new(label).build(ui) {
                 if let Some(created) = self.create_with_fn(world, event, config_fn) {
-                    world.write_component().insert(created, Sequence::default()).ok();
-                    world.write_component().insert(created, Connection::default()).ok();
+                    world
+                        .write_component()
+                        .insert(created, Sequence::default())
+                        .ok();
+                    world
+                        .write_component()
+                        .insert(created, Connection::default())
+                        .ok();
                 }
             }
             if ui.is_item_hovered() {
@@ -394,14 +398,12 @@ impl App for Runtime {
 /// Methods for creating engines & plugins
 impl Runtime {
     /// Starts an event in the world w/ an entity
-    /// 
+    ///
     /// Caveats: This will write to the Event component, so it cannot be called if there Event is already borrowed.
     /// It's safest after calling creat_event
     pub fn start_event(event: Entity, world: &World) {
-        if let Some(context) = world.read_component::<ThunkContext>().get(event)
-        {
-            if let Some(event) = world.write_component::<Event>().get_mut(event)
-            {
+        if let Some(context) = world.read_component::<ThunkContext>().get(event) {
+            if let Some(event) = world.write_component::<Event>().get_mut(event) {
                 event.fire(context.to_owned());
             }
         }
@@ -410,7 +412,7 @@ impl Runtime {
     /// Creates a group of engines
     pub fn create_engine_group<E>(&self, world: &World, blocks: Vec<String>) -> Vec<Entity>
     where
-        E: Engine, 
+        E: Engine,
     {
         let mut created = vec![];
 
@@ -431,7 +433,6 @@ impl Runtime {
     {
         if let Some(block) = self.project.find_block(&sequence_block_name) {
             if let Some(mut engine_root) = block.get_block(E::event_name()) {
-         
                 let mut sequence = Sequence::default();
                 for (block_address, block_name, value) in
                     engine_root.clone().iter_attributes().filter_map(|a| {
@@ -443,7 +444,6 @@ impl Runtime {
                         }
                     })
                 {
-          
                     if let Some((_, block_symbol)) = block_address.split_once("::") {
                         let engine_plugin_key = format!("{} {}", "call", block_symbol);
                         if let Some(create_fn) = self.engine_plugin.get(&engine_plugin_key) {
@@ -452,7 +452,10 @@ impl Runtime {
                             {
                                 println!(
                                     "create event:\n\t{}\n\t{}\n\t{}\n\tconfig: {:?}",
-                                    created.id(), block_name, engine_plugin_key, &value
+                                    created.id(),
+                                    block_name,
+                                    engine_plugin_key,
+                                    &value
                                 );
                                 engine_root.add_int_attr(block_name, created.id() as i32);
                                 sequence.add(created);
@@ -471,12 +474,14 @@ impl Runtime {
         None
     }
 
-    fn find_plugin<E>(&self, symbol: &String) -> Option<CreateFn> 
+    fn find_plugin<E>(&self, symbol: &String) -> Option<CreateFn>
     where
-        E: Engine
+        E: Engine,
     {
         let engine_plugin_key = format!("{} {}", E::event_name(), symbol);
-        self.engine_plugin.get(&engine_plugin_key).and_then(|f| Some(*f))
+        self.engine_plugin
+            .get(&engine_plugin_key)
+            .and_then(|f| Some(*f))
     }
 
     /// Reads/creates events from symbols defined at the root of the graph for a given plugin.
@@ -658,6 +663,19 @@ impl Runtime {
         self.create_with_name(world, &E::event::<P>(), config_name)
     }
 
+    /// Creates a new event, returns an entity if successful
+    pub fn create_event_with<E, P>(
+        &self,
+        world: &World,
+        config_fn: fn(&mut ThunkContext),
+    ) -> Option<Entity>
+    where
+        E: Engine,
+        P: Plugin<ThunkContext> + Component + Send + Default,
+    {
+        self.create_with_fn(world, &E::event::<P>(), config_fn)
+    }
+
     /// Schedule a new event on this runtime, returns an entity if the event was created/started
     pub fn schedule(
         &mut self,
@@ -692,19 +710,19 @@ impl Runtime {
             Self::start_event(entity, world);
             Some(entity)
         } else {
-            None 
+            None
         }
     }
 
-    /// Creates and starts a new event, and returns the entity if successful 
+    /// Creates and starts a new event, and returns the entity if successful
     pub fn schedule_with_engine<E, P>(
         &self,
         world: &World,
-        config_name: &'static str
-    ) -> Option<Entity> 
+        config_name: &'static str,
+    ) -> Option<Entity>
     where
         E: Engine,
-        P: Plugin<ThunkContext> + Component + Send + Default
+        P: Plugin<ThunkContext> + Component + Send + Default,
     {
         self.schedule_with_config(world, &E::event::<P>(), config_name)
     }
