@@ -10,10 +10,52 @@ pub struct Resources(
 );
 
 impl Resources {
-    /// Reads a string from file, from the src path specified by an attribute
+    /// Reads a string from file
     ///
     /// If the file doesn't exist, unpacks the resource from an embedded resource if it exists.
     pub async fn read_string<C>(
+        &self,
+        tc: &ThunkContext,
+        src: &String,
+    ) -> Option<String>
+    where
+        C: RustEmbed,
+    {
+        self.unpack_resource::<C>(&tc, &src).await;
+
+        match tokio::fs::read_to_string(&src).await {
+            Ok(content) => Some(content),
+            Err(err) => {
+                eprintln!("error reading file {src}, {err}");
+                None
+            }
+        }
+    }
+
+    /// Reads binary content from a file
+    /// 
+    /// If the file doesn't exist, unpacks the resource from an embedded resource if it exists.
+    pub async fn read_binary<C>(
+        &self,
+        tc: &ThunkContext,
+        src: &String,
+    ) -> Option<Vec<u8>>
+    where
+        C: RustEmbed,
+    {
+        self.unpack_resource::<C>(&tc, &src).await;
+
+        match tokio::fs::read(&src).await {
+            Ok(content) => Some(content),
+            Err(err) => {
+                eprintln!("error reading file {src}, {err}");
+                None
+            }
+        }
+    }
+
+    /// Reads String from a file, from the src path specified by an attribute
+    pub async fn read_string_from<C>(
         &self,
         tc: &ThunkContext,
         attribute_name: &String,
@@ -22,24 +64,14 @@ impl Resources {
         C: RustEmbed,
     {
         if let Some(src) = tc.as_ref().find_text(attribute_name) {
-            self.unpack_resource::<C>(&tc, &src).await;
-
-            match tokio::fs::read_to_string(&src).await {
-                Ok(content) => Some(content),
-                Err(err) => {
-                    eprintln!("error reading file {src}, {err}");
-                    None
-                }
-            }
-        } else {
+            self.read_string::<C>(tc, &src).await
+        }  else {
             None
         }
     }
 
-    /// Reads binary content from a file, with the src specified by a text attribute.
-    /// 
-    /// If the file doesn't exist, unpacks the resource from an embedded resource if it exists.
-    pub async fn read_binary<C>(
+    /// Reads binary from a file, from the src path specified by an attribute
+    pub async fn read_binary_from<C>(
         &self,
         tc: &ThunkContext,
         attribute_name: &String,
@@ -48,16 +80,8 @@ impl Resources {
         C: RustEmbed,
     {
         if let Some(src) = tc.as_ref().find_text(attribute_name) {
-            self.unpack_resource::<C>(&tc, &src).await;
-
-            match tokio::fs::read(&src).await {
-                Ok(content) => Some(content),
-                Err(err) => {
-                    eprintln!("error reading file {src}, {err}");
-                    None
-                }
-            }
-        } else {
+            self.read_binary::<C>(tc, &src).await
+        }  else {
             None
         }
     }
