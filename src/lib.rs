@@ -16,6 +16,9 @@ use std::fmt::Display;
 use std::time::Duration;
 use std::{any::Any, collections::BTreeMap};
 
+mod resources;
+pub use resources::Resources;
+
 mod open;
 pub use open::open;
 
