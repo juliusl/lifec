@@ -16,7 +16,7 @@ impl Resources {
     pub async fn read_string<C>(
         &self,
         tc: &ThunkContext,
-        attribute_name: impl AsRef<str>,
+        attribute_name: &String,
     ) -> Option<String>
     where
         C: RustEmbed,
@@ -42,7 +42,7 @@ impl Resources {
     pub async fn read_binary<C>(
         &self,
         tc: &ThunkContext,
-        attribute_name: impl AsRef<str>,
+        attribute_name: &String,
     ) -> Option<Vec<u8>>
     where
         C: RustEmbed,
