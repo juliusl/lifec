@@ -4,7 +4,10 @@ use std::path::PathBuf;
 use crate::plugins::ThunkContext;
 
 /// Handles unpacking resources for a `RustEmbed` source
-pub struct Resources(&'static str);
+pub struct Resources(
+    /// folder prefix
+    pub &'static str
+);
 
 impl Resources {
     /// Reads a string from file, from the src path specified by an attribute
