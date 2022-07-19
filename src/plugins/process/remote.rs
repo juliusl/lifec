@@ -55,8 +55,9 @@ impl Plugin<ThunkContext> for Remote {
                     Process::resolve_env(&tc, &mut command_task).await;
 
                     if let Some(mut child) = command_task.spawn().ok() {
-                        if let Some(stdout) = child.stdout.take() {
+                        if let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take()) {
                             let mut reader = BufReader::new(stdout).lines();
+                            let mut stderr_reader = BufReader::new(stderr).lines();
                             let (child_cancel_tx, child_cancel_rx) = tokio::sync::oneshot::channel::<()>();
 
                             if let Some(handle) = child_handle {
@@ -85,6 +86,8 @@ impl Plugin<ThunkContext> for Remote {
                                 tc
                             });
 
+                            let log = log.clone();
+                            let log_stderr = log.clone();
                             // Reads child's stdout, so that stdin can continue to work
                             let reader_task = handle.spawn(async move {
                                 while let Ok(line) = reader.next_line().await {
@@ -92,6 +95,19 @@ impl Plugin<ThunkContext> for Remote {
                                         Some(line) => {
                                             eprintln!("{}", line);
                                             log.update_status_only(line).await;
+                                        },
+                                        None => {
+
+                                        },
+                                    }
+                                }
+                            });
+                            let stderr_reader_task = handle.spawn(async move {
+                                while let Ok(line) = stderr_reader.next_line().await {
+                                    match line {
+                                        Some(line) => {
+                                            eprintln!("{}", line);
+                                            log_stderr.update_status_only(line).await;
                                         },
                                         None => {
 
@@ -120,6 +136,7 @@ impl Plugin<ThunkContext> for Remote {
                             };
 
                             reader_task.abort();
+                            stderr_reader_task.abort();
                             eprintln!("");
                             eprintln!("remote canceled");
                             return output;
