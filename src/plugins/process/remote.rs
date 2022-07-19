@@ -45,6 +45,7 @@ impl Plugin<ThunkContext> for Remote {
                     }
                     tc.update_progress("```", 0.10).await;
                     command_task.stdout(Stdio::piped());
+                    command_task.stderr(Stdio::piped());
 
                     if let Some(current_dir) = tc.as_ref().find_text("current_dir") {
                         tc.update_progress(format!("add current_dir .text {current_dir}"), 0.20).await;
