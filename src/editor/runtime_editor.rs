@@ -55,7 +55,7 @@ impl RuntimeEditor {
     /// Listen for thunk contexts from thunks that have completed their task
     pub fn listen(&mut self, listen: RuntimeEditorListener) {
         self.listeners.push(listen);
-        eprintln!("Current runtime editor listeners {}", self.listeners.len());
+        event!(Level::TRACE, "Current runtime editor listeners {}", self.listeners.len());
     }
 }
 

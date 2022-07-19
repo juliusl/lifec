@@ -442,7 +442,8 @@ impl<'a> System<'a> for EventRuntime {
                         }
 
                         event.fire(context.clone());
-                        println!(
+                        tracing::event!(
+                            tracing::Level::DEBUG,
                             "dispatch event:\n\t{} -> {}\n\t{}\n\t{}\n\t{}",
                             last_id,
                             next.id(),
