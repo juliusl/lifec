@@ -863,7 +863,7 @@ impl Runtime {
             }
         }
 
-        println!("--- Starting loop");
+        event!(Level::INFO, "Starting loop");
         loop {
             dispatcher.dispatch(&world);
             extension.on_run(&world);
@@ -872,7 +872,7 @@ impl Runtime {
             extension.on_maintain(&mut world);
 
             if ThunkContext::is_cancelled(&mut cancel_source) {
-                println!("--- Cancelling loop");
+                event!(Level::INFO, "Cancelling loop");
                 break;
             }
         }

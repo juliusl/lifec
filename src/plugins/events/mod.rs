@@ -4,6 +4,7 @@ use specs::Entity;
 use specs::ReadStorage;
 use specs::World;
 use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage};
+use tracing::Level;
 use std::fmt::Display;
 use tokio::sync::broadcast;
 use tokio::{
@@ -14,6 +15,7 @@ use tokio::{
     },
     task::JoinHandle,
 };
+use tracing::event;
 
 use crate::AttributeGraph;
 use crate::Extension;
@@ -294,9 +296,9 @@ impl<'a> System<'a> for EventRuntime {
                                             None => {}
                                         }
                                     } else {
-                                        eprintln!("-- seqeunce, completed");
+                                        event!(Level::DEBUG, "seqeunce, completed");
                                         if let Some(cursor) = sequence.cursor() {
-                                            eprintln!("-- found cursor {}", cursor.id());
+                                            event!(Level::DEBUG, "found cursor {}", cursor.id());
                                             dispatch_queue.push((cursor, thunk_context));
                                         }
                                     }
@@ -311,7 +313,8 @@ impl<'a> System<'a> for EventRuntime {
                     *task = Some(current_task);
                 }
             } else if let Some(initial_context) = initial_context.take() {
-                println!(
+                event!(
+                    Level::DEBUG,
                     "start event:\n\t{}\n\t{}\n\t{}\n\t{}",
                     entity.id(),
                     initial_context.block.block_name,
