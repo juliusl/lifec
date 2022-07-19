@@ -5,6 +5,7 @@ use logos::Logos;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, Entity};
+use tracing::{event, Level};
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     fmt::Display,
@@ -217,7 +218,7 @@ impl AttributeGraph {
                 let loaded = loading.define("src", "file");
                 loaded.edit_as(Value::TextBuffer(path.as_ref().to_string()));
 
-                eprintln!("loading {}", path.as_ref());
+                event!(Level::TRACE, "loading .runmd file {}", path.as_ref());
                 Some(loading)
             }
             Err(err) => {

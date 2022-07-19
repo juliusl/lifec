@@ -274,7 +274,7 @@ impl RuntimeEditor {
         match self.runtime.listen::<OpenFile>(world) {
             Some(file) => {
                 if self.project_mut().import(file.as_ref().clone()) {
-                    eprintln!("Imported file to project");
+                    event!(Level::TRACE, "Imported file to project");
                 }
             }
             None => {}
