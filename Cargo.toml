@@ -24,3 +24,4 @@ hyper-tls = "0.5.0"
 hyper = { version = "0.14.20", features = [ "full" ] }
 which = "4.2.5"
 rust-embed = "6.4.0"
+tracing = "0.1.35"

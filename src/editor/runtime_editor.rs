@@ -55,7 +55,7 @@ impl RuntimeEditor {
     /// Listen for thunk contexts from thunks that have completed their task
     pub fn listen(&mut self, listen: RuntimeEditorListener) {
         self.listeners.push(listen);
-        eprintln!("Current runtime editor listeners {}", self.listeners.len());
+        event!(Level::TRACE, "Current runtime editor listeners {}", self.listeners.len());
     }
 }
 
@@ -177,7 +177,14 @@ impl Extension for RuntimeEditor {
             let project = Project::from(graph);
             for (block_name, config_block) in project.iter_block() {
                 for (symbol, config) in config_block.to_blocks() {
-                    if let Some(installed_plugin) = self.runtime.find_plugin::<Call>(&symbol) {
+                    if let Some(project_src) = config.find_text("project_src") {
+                        if let Some(project) = Project::load_file(project_src) {
+                            *self.project_mut() = project; 
+                            if let Some(engine) = self.runtime().create_engine::<Call>(world, config_block.block_name.to_string()) {
+                                eprintln!("created engine {}", engine.id());
+                            }
+                        }
+                    } else if let Some(installed_plugin) = self.runtime.find_plugin::<Call>(&symbol) {
                         let auto_mode = config.is_enabled("auto").unwrap_or_default();
 
                         if let Some(created) = self.runtime().find_config_block_and_create(

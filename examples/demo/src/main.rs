@@ -1,6 +1,7 @@
 use std::env;
 
 use lifec::{editor::*, plugins::*, AttributeGraph, open, start, Runtime, Extension, World, DispatcherBuilder, System};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 /// Demo app for the runtime, can swap projects by dropping a .runmd file in
 #[derive(Default)]
@@ -98,6 +99,11 @@ impl Extension for Demo {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
+    tracing_subscriber::fmt::Subscriber::builder()
+        .with_env_filter(EnvFilter::from_default_env())
+        .compact()
+        .init();
 
     for (index, arg) in args.iter().enumerate() {
         println!("add arg{} {}", index, arg);

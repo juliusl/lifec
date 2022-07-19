@@ -6,6 +6,7 @@ pub use specs::{Component, DispatcherBuilder, Entity, System, World, WorldExt};
 pub use specs::{DefaultVecStorage, DenseVecStorage, HashMapStorage};
 pub use specs::{Entities, Join, ReadStorage, WriteStorage};
 
+use tracing::{event, Level};
 use imgui::{ChildWindow, MenuItem, Ui, Window};
 use plugins::{
     AsyncContext, BlockContext, Config, Connection, Engine, Event, Expect, OpenDir, OpenFile,
@@ -217,7 +218,7 @@ impl Runtime {
         let event = E::event::<P>();
         self.engine_plugin.insert(event.to_string(), E::create::<P>);
 
-        println!("install event: {}", event.to_string());
+        event!(Level::INFO, "install event: {}", event.to_string());
     }
 
     /// Registers a config w/ this runtime
@@ -453,7 +454,8 @@ impl Runtime {
                             if let Some(created) =
                                 self.create_plugin(world, block_address, value.clone(), *create_fn)
                             {
-                                println!(
+                                event!(
+                                    Level::DEBUG, 
                                     "create event:\n\t{}\n\t{}\n\t{}\n\tconfig: {:?}",
                                     created.id(),
                                     block_name,
