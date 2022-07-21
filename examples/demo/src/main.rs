@@ -68,6 +68,12 @@ impl Extension for Demo {
                 block.update_block("combo", |a| {
                     a.combo_box("combo test", "combo_test", ui);
                 });
+
+                block.get_block("combo")
+                    .unwrap_or_default()
+                    .edit_attr_custom("combo_test_choice", |attr|{
+                        attr.edit_value("chosen", ui);
+                    });
              }
         });
     }

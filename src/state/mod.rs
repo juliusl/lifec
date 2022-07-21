@@ -1431,8 +1431,9 @@ impl AttributeGraph {
         let label = label.as_ref();
         let symbol = with_symbol.as_ref();
         let key = format!("{symbol}_choice_index");
+        let mut choice = 0;
         if let Some(Value::Int(index)) = self.as_mut().find_attr_value_mut(&key) {
-            let mut choice = *index as usize;
+            choice = *index as usize;
             if ui.combo(format!("{label} {id}"), &mut choice, &choices, |(name, _)| {
                 Cow::from(name.as_str().trim_end_matches(&format!("::{symbol}")))
             } ) {
@@ -1440,6 +1441,10 @@ impl AttributeGraph {
             }
         } else {
             self.as_mut().add_int_attr(key, 0);
+        }
+
+        if let Some((_, value)) = choices.get(choice) {
+            self.as_mut().with(format!("{symbol}_choice"), value.clone());
         }
      }
 }
