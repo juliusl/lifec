@@ -62,6 +62,14 @@ impl Extension for Demo {
     fn on_ui(&'_ mut self, app_world: &World, ui: &'_ imgui::Ui<'_>) {
         let Demo(editor, ..) = self;
         editor.on_ui(app_world, ui);
+
+        imgui::Window::new("Combo example").size([800.0, 600.0], imgui::Condition::Appearing).build(ui, || {
+            if let Some(block) = self.0.project_mut().find_block_mut("test") {
+                block.update_block("combo", |a| {
+                    a.combo_box("combo test", "combo_test", ui);
+                });
+             }
+        });
     }
 
     fn on_window_event(&'_ mut self, app_world: &World, event: &'_ WindowEvent<'_>) {

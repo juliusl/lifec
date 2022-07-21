@@ -90,3 +90,10 @@ define a_elm expect  .symbol compile_elm
 define b_elm println .symbol compile_elm
 ``` println
 ```
+
+``` test combo
+define test_val1 combo_test  .text test
+define test_val2 combo_test  .int 0
+define test_val3 combo_test  .float 10.0
+define test_val4 combo_test  .text test3
+```
