@@ -293,7 +293,9 @@ impl<'a> System<'a> for EventRuntime {
                                             Some(_) => {
                                                 dispatch_queue.push((next_event, thunk_context));
                                             }
-                                            None => {}
+                                            None => {
+                                                event!(Level::TRACE, "Initialized sequence for {}", next_event.id());
+                                            }
                                         }
                                     } else {
                                         event!(Level::DEBUG, "seqeunce, completed");
@@ -346,7 +348,7 @@ impl<'a> System<'a> for EventRuntime {
                         Ok(existing) => {
                             // If an existing cancel token existed, send a message now
                             if let Some(CancelThunk(cancel)) = existing {
-                                eprintln!("swapping cancel token for: {:?}", entity);
+                                event!(Level::TRACE, "swapping cancel token for: {:?}", entity);
                                 cancel.send(()).ok();
                             }
 
@@ -400,7 +402,7 @@ impl<'a> System<'a> for EventRuntime {
                         Err(_) => {}
                     }
                 } else {
-                    eprintln!("Task didn't start, which means the thunk has already completed");
+                    event!(Level::TRACE, "Task didn't start, which means the thunk has already completed");
                 }
             }
         }
@@ -419,7 +421,7 @@ impl<'a> System<'a> for EventRuntime {
                             let log = format!("Forking, {fork_id}, {event}");
                             if events.insert(fork, event).is_ok() {
                                 if contexts.insert(fork, context).is_ok() {
-                                    eprintln!("{}", log);
+                                    event!(Level::TRACE, "{}", log);
                                     next = fork;
                                 }
                             }
@@ -445,7 +447,7 @@ impl<'a> System<'a> for EventRuntime {
                         }
 
                         event.fire(context.clone());
-                        tracing::event!(
+                        event!(
                             tracing::Level::DEBUG,
                             "dispatch event:\n\t{} -> {}\n\t{}\n\t{}\n\t{}",
                             last_id,
@@ -455,7 +457,7 @@ impl<'a> System<'a> for EventRuntime {
                             context.as_ref().hash_code()
                         );
                     } else {
-                        eprintln!("Next event does not exist");
+                        event!(Level::WARN, "Next event does not exist");
                     }
                 }
                 None => break,

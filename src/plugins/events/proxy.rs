@@ -1,6 +1,7 @@
 use atlier::system::Value;
 use specs::{Component, System, ReadStorage, Entities, WriteStorage, Join};
 use specs::storage::DefaultVecStorage;
+use tracing::{event, Level};
 use crate::plugins::{ThunkContext, Project, BlockContext};
 
 #[derive(Component, Default)]
@@ -56,15 +57,16 @@ impl<'a> System<'a> for ProxyDispatcher {
 
                             match dispatcher.try_send(message.as_ref().clone()) {
                                 Ok(_) => {
-                                    eprintln!("proxied {:?}", entity);
+                                    event!(Level::DEBUG, "proxied {:?}", entity);
                                 },
                                 Err(err) => {
-                                    eprintln!("error proxying {err}");
+                                    event!(Level::ERROR, "error proxying {err}");
                                 },
                             }
                         }
                     },
-                    Err(_) => {
+                    Err(err) => {
+                        event!(Level::ERROR, "error inserting proxy component for {}, error: {err}", entity.id());
                     },
                 }
             }
