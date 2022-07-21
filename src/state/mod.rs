@@ -702,7 +702,13 @@ impl AttributeGraph {
 
     /// Finds the value of an attribute by name that is owned by `self.entity`.
     pub fn find_attr_value(&self, with_name: impl AsRef<str>) -> Option<&Value> {
-        self.find_attr(with_name).and_then(|a| Some(a.value()))
+        let name = with_name.as_ref().to_string();
+        let key = format!("{:#010x}::{name}::", self.entity);
+        if let Some(attr) = self.index.get(&key) {
+            Some(&attr.value)
+        } else {
+            None
+        }
     }
 
     /// Finds a text value of an attribute
