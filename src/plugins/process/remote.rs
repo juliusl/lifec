@@ -94,6 +94,10 @@ impl Plugin<ThunkContext> for Remote {
                                 while let Ok(line) = reader.next_line().await {
                                     match line {
                                         Some(line) => {
+                                            for byte in line.as_bytes() {
+                                                log.send_char(*byte).await;
+                                            }
+
                                             eprintln!("{}", line);
                                             log.update_status_only(line).await;
                                         },
