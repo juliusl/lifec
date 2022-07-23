@@ -17,6 +17,8 @@ pub use open_dir::OpenDir;
 mod write_file;
 use tokio::sync;
 use tokio::sync::oneshot;
+use tracing::Level;
+use tracing::event;
 pub use write_file::WriteFile;
 
 mod timer;
@@ -134,6 +136,8 @@ pub struct ThunkContext {
     client: Option<SecureClient>,
     /// Dispatcher for attribute graphs
     dispatcher: Option<Sender<AttributeGraph>>,
+    /// Channel to send bytes to a char_device
+    char_device: Option<Sender<(u32, u8)>>,
 }
 
 /// This block has all the async related features
@@ -167,6 +171,27 @@ impl ThunkContext {
         async_enabled.dispatcher = dispatcher;
         async_enabled.project = project;
         async_enabled
+    }
+
+    /// Sets a "char_device" a plugin can use to transmit char_bytes
+    /// 
+    /// Caveat: The context must have async enabled.
+    pub fn set_char_device(&mut self, tx: Sender<(u32, u8)>) {
+        self.char_device = Some(tx);
+    }
+
+    /// Sends a character to a the char_device if it exists 
+    /// 
+    /// Caveat: If `set_char_device`/`enable_async` haven't been called this is a no-op
+    pub async fn send_char(&self, c: u8) {
+        if let Some(entity) = self.entity {
+            if let Some(char_device) = &self.char_device {
+                match char_device.send((entity.id(), c)).await {
+                    Ok(_) => event!(Level::TRACE, "sent byte for {:?}", entity),
+                    Err(err) => event!(Level::ERROR, "error sending byte to char_device, {err}, {:?}", entity),
+                }
+            }
+        }
     }
 
     /// returns the secure client
@@ -287,6 +312,7 @@ impl From<AttributeGraph> for ThunkContext {
             client: None,
             status_updates: None,
             dispatcher: None,
+            char_device: None,
         }
     }
 }
