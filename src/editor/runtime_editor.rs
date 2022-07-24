@@ -89,7 +89,7 @@ impl RuntimeEditor {
     }
 
     /// Creates the engine from a dropped_dir path
-    fn create_default(&self, app_world: &World) -> Option<Entity> {
+    pub fn create_default(&self, app_world: &World) -> Option<Entity> {
         self.runtime()
             .create_engine_group::<Call>(
                 app_world,
