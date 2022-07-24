@@ -32,6 +32,9 @@ pub mod plugins;
 
 mod state;
 pub use state::AttributeGraph;
+pub use state::AttributeGraphEvents;
+pub use state::AttributeGraphElements;
+pub use state::AttributeGraphErrors;
 
 mod trace;
 pub use trace::Trace;
