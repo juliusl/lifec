@@ -1,7 +1,8 @@
-use super::{unique_title, Call, List, Task, Fix};
+use super::{unique_title, Call, Fix, List, Task};
 use crate::plugins::*;
 use crate::*;
 
+use atlier::system::WindowEvent;
 use imgui::{Condition, Slider, StyleVar, Ui, Window};
 use specs::{Join, World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
@@ -55,7 +56,47 @@ impl RuntimeEditor {
     /// Listen for thunk contexts from thunks that have completed their task
     pub fn listen(&mut self, listen: RuntimeEditorListener) {
         self.listeners.push(listen);
-        event!(Level::TRACE, "Current runtime editor listeners {}", self.listeners.len());
+        event!(
+            Level::TRACE,
+            "Current runtime editor listeners {}",
+            self.listeners.len()
+        );
+    }
+
+    /// Loads a project from a file
+    pub fn load_project(&mut self, file_path: impl AsRef<str>) -> Option<()> {
+        if let Some(file) = AttributeGraph::load_from_file(file_path) {
+            *self.project_mut().as_mut() = file;
+            *self.project_mut() = self.project_mut().reload_source();
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    /// Scans the project creating all engines found in the file
+    pub fn create_engine_parts(&self, app_world: &World) -> Vec<Entity> {
+        let mut engines = vec![];
+        for (block_name, block) in self.project().iter_block() {
+            if let Some(_) = block.get_block("call") {
+                engines.push(block_name);
+            }
+        }
+
+        let engines = engines.iter().map(|e| e.to_string());
+        self.runtime()
+            .create_engine_group::<Call>(app_world, engines.collect())
+    }
+
+    /// Creates the engine from a dropped_dir path
+    fn create_default(&self, app_world: &World) -> Option<Entity> {
+        self.runtime()
+            .create_engine_group::<Call>(
+                app_world,
+                vec!["default"].iter().map(|s| s.to_string()).collect(),
+            )
+            .get(0)
+            .and_then(|e| Some(*e))
     }
 }
 
@@ -161,6 +202,34 @@ impl Extension for RuntimeEditor {
             }
             _ => {}
         }
+
+        match event {
+            WindowEvent::DroppedFile(dropped_file_path) => {
+                if dropped_file_path.is_dir() {
+                    let path = dropped_file_path.join(".runmd");
+                    if path.exists() {
+                        if let Some(_) = self.load_project(path.to_str().unwrap_or_default()) {
+                            self.create_default(world);
+                        }
+                    }
+                } else if "runmd" == dropped_file_path.extension().unwrap_or_default() {
+                    if let Some(_) =
+                        self.load_project(dropped_file_path.to_str().unwrap_or_default())
+                    {
+                        self.create_engine_parts(world);
+                    }
+                }
+            }
+            WindowEvent::CloseRequested => {
+                let mut cancel_source = world.write_component::<CancelThunk>();
+                for cancel_thunk in (&world.entities()).join() {
+                    if let Some(cancel_thunk) = cancel_source.remove(cancel_thunk) {
+                        cancel_thunk.0.send(()).ok();
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     fn on_run(&'_ mut self, world: &specs::World) {
@@ -179,12 +248,16 @@ impl Extension for RuntimeEditor {
                 for (symbol, config) in config_block.to_blocks() {
                     if let Some(project_src) = config.find_text("project_src") {
                         if let Some(project) = Project::load_file(project_src) {
-                            *self.project_mut() = project; 
-                            if let Some(engine) = self.runtime().create_engine::<Call>(world, config_block.block_name.to_string()) {
+                            *self.project_mut() = project;
+                            if let Some(engine) = self
+                                .runtime()
+                                .create_engine::<Call>(world, config_block.block_name.to_string())
+                            {
                                 eprintln!("created engine {}", engine.id());
                             }
                         }
-                    } else if let Some(installed_plugin) = self.runtime.find_plugin::<Call>(&symbol) {
+                    } else if let Some(installed_plugin) = self.runtime.find_plugin::<Call>(&symbol)
+                    {
                         let auto_mode = config.is_enabled("auto").unwrap_or_default();
 
                         if let Some(created) = self.runtime().find_config_block_and_create(
@@ -193,16 +266,29 @@ impl Extension for RuntimeEditor {
                             BlockContext::from(config.clone()),
                             installed_plugin,
                         ) {
-                            eprintln!("Received dispatch for `{block_name} {symbol}`, created {:?}", created);
+                            eprintln!(
+                                "Received dispatch for `{block_name} {symbol}`, created {:?}",
+                                created
+                            );
 
                             if let Some(true) = config.is_enabled("enable_connection") {
-                                world.write_component::<Connection>().insert(created, Connection::default()).ok();
-                                world.write_component::<Sequence>().insert(created, Sequence::default()).ok();
+                                world
+                                    .write_component::<Connection>()
+                                    .insert(created, Connection::default())
+                                    .ok();
+                                world
+                                    .write_component::<Sequence>()
+                                    .insert(created, Sequence::default())
+                                    .ok();
                             }
 
                             if auto_mode {
-                                if let Some(context) = world.read_component::<ThunkContext>().get(created) {
-                                    if let Some(event) = world.write_component::<Event>().get_mut(created) {
+                                if let Some(context) =
+                                    world.read_component::<ThunkContext>().get(created)
+                                {
+                                    if let Some(event) =
+                                        world.write_component::<Event>().get_mut(created)
+                                    {
                                         event.fire(context.clone());
                                     }
                                 }
@@ -212,7 +298,6 @@ impl Extension for RuntimeEditor {
                 }
             }
         }
-
 
         let mut rx = world.write_resource::<tokio::sync::mpsc::Receiver<ErrorContext>>();
         if let Some(error) = rx.try_recv().ok() {
@@ -232,28 +317,46 @@ impl Extension for RuntimeEditor {
                                 BlockContext::from(fix_config.clone()),
                                 installed_plugin,
                             ) {
-                                eprintln!("Received error dispatch for `{name} {problem}`, created {:?}", created);
-        
+                                eprintln!(
+                                    "Received error dispatch for `{name} {problem}`, created {:?}",
+                                    created
+                                );
+
                                 if let Some(stopped) = error.stopped() {
-                                    world.write_component::<ErrorContext>().insert(stopped, error.set_fix_entity(created)).ok();
-    
+                                    world
+                                        .write_component::<ErrorContext>()
+                                        .insert(stopped, error.set_fix_entity(created))
+                                        .ok();
+
                                     let created_id = created.id();
                                     let stopped_id = stopped.id();
                                     eprintln!("Setting fix cursor to stopped entity {created_id} -> {stopped_id}");
                                     let mut seq = Sequence::default();
                                     seq.set_cursor(stopped);
 
-                                    if let Some(stopped) =  world.write_component::<Sequence>().get(stopped) {
+                                    if let Some(stopped) =
+                                        world.write_component::<Sequence>().get(stopped)
+                                    {
                                         let connection = seq.connect(stopped);
-                                        world.write_component::<Connection>().insert(created, connection).ok();
+                                        world
+                                            .write_component::<Connection>()
+                                            .insert(created, connection)
+                                            .ok();
                                     }
 
-                                    world.write_component::<Sequence>().insert(created, seq).ok();
+                                    world
+                                        .write_component::<Sequence>()
+                                        .insert(created, seq)
+                                        .ok();
                                 }
 
                                 if auto_mode {
-                                    if let Some(context) = world.read_component::<ThunkContext>().get(created) {
-                                        if let Some(event) = world.write_component::<Event>().get_mut(created) {
+                                    if let Some(context) =
+                                        world.read_component::<ThunkContext>().get(created)
+                                    {
+                                        if let Some(event) =
+                                            world.write_component::<Event>().get_mut(created)
+                                        {
                                             event.fire(context.clone());
                                         }
                                     }
@@ -262,7 +365,6 @@ impl Extension for RuntimeEditor {
                         }
                     }
                 }
-
             }
         }
     }
