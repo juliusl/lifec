@@ -1,4 +1,5 @@
 pub use atlier::system::{App, Extension, Value};
+pub use atlier::system::{combine, combine_default};
 use editor::{Call, RuntimeEditor};
 use logos::{Lexer, Logos};
 pub use specs::storage::BTreeStorage;
