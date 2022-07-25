@@ -97,6 +97,7 @@ impl Plugin<ThunkContext> for Remote {
                                             for byte in line.as_bytes() {
                                                 log.send_char(*byte).await;
                                             }
+                                            log.send_char(b'\r').await;
 
                                             eprintln!("{}", line);
                                             log.update_status_only(line).await;
