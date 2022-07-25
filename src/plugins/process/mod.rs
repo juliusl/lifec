@@ -160,6 +160,9 @@ impl Plugin<ThunkContext> for Process {
                        output = command_task.output() => {
                             match output {
                                 Ok(output) => {
+                                    for b in output.stdout.clone() {
+                                        tc.send_char(b).await;
+                                    }
                                     // Completed process, publish result
                                     tc.update_progress("# Finished, recording output", 0.30).await;
                                     Self::resolve_output(&mut tc, command, start_time, output);
