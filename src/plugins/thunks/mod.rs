@@ -15,6 +15,11 @@ mod open_dir;
 pub use open_dir::OpenDir;
 
 mod write_file;
+use tokio::io;
+use tokio::io::AsyncBufReadExt;
+use tokio::io::BufReader;
+use tokio::net::TcpListener;
+use tokio::select;
 use tokio::sync;
 use tokio::sync::oneshot;
 use tracing::Level;
@@ -173,16 +178,59 @@ impl ThunkContext {
         async_enabled
     }
 
-    /// Sets a "char_device" a plugin can use to transmit char_bytes
+    /// Enables the context to output bytes
     /// 
     /// Caveat: The context must have async enabled.
-    pub fn set_char_device(&mut self, tx: Sender<(u32, u8)>) {
-        self.char_device = Some(tx);
+    pub fn enable_output(&self, tx: Sender<(u32, u8)>) -> Self {
+        let mut output_enabled = self.clone();
+        output_enabled.char_device = Some(tx);
+        output_enabled
+    }
+
+    /// Enables a tcp listener for this context to listen to 
+    /// 
+    /// Returns a line reader when a connection has been made
+    /// 
+    pub async fn enable_listener(
+        &self,
+        cancel_source: &mut oneshot::Receiver<()>,
+    ) -> Option<io::Lines<BufReader<tokio::net::TcpStream>>> {
+       if let Some(_) = self.dispatcher {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let local_addr = listener.local_addr().expect("was just created").to_string();
+            
+            // Listener plugin doesn't currently exist --
+            self.dispatch(format!(
+            r#"
+            ``` {0} listener
+            add node_title         .text    Listener for {0}
+            add address            .text    {local_addr}
+            add enable_connection  .enable
+            add proxy              .enable
+            add default_open       .enable
+            ```
+            "#, self.block.block_name).trim()).await; 
+
+            event!(Level::DEBUG, "Thunkc context is listener on {local_addr}");
+            select! {
+                Ok((stream, address)) = listener.accept() => {
+                    event!(Level::DEBUG, "{address} is connecting");
+                    Some(BufReader::new(stream).lines())
+                },
+                _ = cancel_source => {
+                    event!(Level::WARN, "{local_addr} is being cancelled");
+                    None 
+                }
+            }
+       } else {
+            event!(Level::ERROR, "Did not have a dispatcher to enable this w/ the runtime ");
+            None
+       }
     }
 
     /// Sends a character to a the char_device if it exists 
     /// 
-    /// Caveat: If `set_char_device`/`enable_async` haven't been called this is a no-op
+    /// Caveat: If `enable_output`/`enable_async` haven't been called this is a no-op
     pub async fn send_char(&self, c: u8) {
         if let Some(entity) = self.entity {
             if let Some(char_device) = &self.char_device {
@@ -279,7 +327,7 @@ impl ThunkContext {
         if self.as_ref().is_enabled("debug").unwrap_or_default() {
             let block_name = &self.block.block_name;
             let status = status.as_ref();
-            eprintln!("debug {block_name}\t{status}"); 
+            event!(Level::DEBUG, "{block_name}\t{status}"); 
         }
     }
 
