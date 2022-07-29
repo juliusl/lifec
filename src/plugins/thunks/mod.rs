@@ -215,6 +215,7 @@ impl ThunkContext {
             select! {
                 Ok((stream, address)) = listener.accept() => {
                     event!(Level::DEBUG, "{address} is connecting");
+                    
                     Some(BufReader::new(stream).lines())
                 },
                 _ = cancel_source => {

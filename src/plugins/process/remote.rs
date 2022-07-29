@@ -3,8 +3,10 @@ use crate::plugins::{Plugin, ThunkContext};
 use chrono::Utc;
 use specs::storage::DenseVecStorage;
 use specs::Component;
+use tokio::sync::oneshot;
+use tracing::{event, Level};
 use std::process::Stdio;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, BufReader, AsyncWriteExt};
 use tokio::process::Command;
 use tokio::select;
 
@@ -26,7 +28,7 @@ impl Plugin<ThunkContext> for Remote {
     fn call_with_context(
         context: &mut ThunkContext,
     ) -> Option<(tokio::task::JoinHandle<ThunkContext>, CancelToken)> {
-        context.clone().task(|cancel_source| {
+        context.clone().task(|mut cancel_source| {
             let mut tc = context.clone();
             let log = context.clone();
             let child_handle = context.handle().clone();
@@ -44,6 +46,14 @@ impl Plugin<ThunkContext> for Remote {
                                 .await;
                     }
                     tc.update_progress("```", 0.10).await;
+                    
+                    let enable_stdin_shell = tc.as_ref().is_enabled("enable_listener").unwrap_or_default();
+                    if enable_stdin_shell {
+                        // Normally stdin would be from the terminal window, 
+                        // enable this attribute to use the built in shell
+                        command_task.stdin(Stdio::piped());
+                    }
+
                     command_task.stdout(Stdio::piped());
                     command_task.stderr(Stdio::piped());
 
@@ -61,8 +71,57 @@ impl Plugin<ThunkContext> for Remote {
                             let mut stderr_reader = BufReader::new(stderr).lines();
                             let (child_cancel_tx, child_cancel_rx) = tokio::sync::oneshot::channel::<()>();
 
+                            let (stdin_task, mut input_cancel) = if enable_stdin_shell {
+                                let mut stdin = child.stdin.take().expect("If stdin can't be taken, then the child would hang");
+                                // Starts a listener and dispatches the address to the underlying runtime
+                                // under the listener block at address ``` {block_name} listener
+                                let mut reader = tc
+                                    .enable_listener(&mut cancel_source)
+                                    .await
+                                    .expect("expected a reader");
+    
+                                let (input_cancel, mut input_cancel_source) = oneshot::channel::<()>();
+                                (Some(tc.handle().expect("needs to exist").spawn(async move {
+                                    loop {
+                                        match reader.next_line().await {
+                                            Ok(Some(line)) => {
+                                                let line = format!("{line}\n").replace('\r', "");
+                                                event!(Level::TRACE, "{line}");
+                                                match stdin.write_all(line.as_bytes()).await {
+                                                    Ok(_) => {
+                                                        event!(Level::TRACE, "Wrote to child stdin OK");
+                                                    },
+                                                    Err(err) => {
+                                                        event!(Level::ERROR, "Could not write to child_task's stdin {err}");
+                                                        break;
+                                                    },
+                                                }
+                                            },
+                                            Err(err) => {
+                                                event!(Level::ERROR, "Could not read from listener {err}");
+                                                break;
+                                            },
+                                            _ => {
+                                                event!(Level::TRACE, "Didn't read anything");
+                                                break;
+                                            }
+                                        }
+
+                                        if ThunkContext::is_cancelled(&mut input_cancel_source) {
+                                            break;
+                                        }
+
+                                        if let Some(err) = stdin.flush().await.err() {
+                                            event!(Level::ERROR, "error flushing stdin {err}");
+                                        }
+                                    }
+                                })), Some(input_cancel))
+                            } else {
+                                (None, None)
+                            };
+
                             if let Some(handle) = child_handle {
-                                let _child_task = handle.spawn(async move {
+                                let _child_task = handle.clone().spawn(async move {
                                 tc.update_progress("# child process started, stdout/stdin are being piped to console", 0.50).await;
                                 let start_time = Some(Utc::now());
 
@@ -89,8 +148,10 @@ impl Plugin<ThunkContext> for Remote {
 
                             let log = log.clone();
                             let log_stderr = log.clone();
+
                             // Reads child's stdout, so that stdin can continue to work
-                            let reader_task = handle.spawn(async move {
+                            let reader_task = log.handle().unwrap().spawn(async move {
+                                event!(Level::DEBUG, "starting to listen to stdout");
                                 while let Ok(line) = reader.next_line().await {
                                     match line {
                                         Some(line) => {
@@ -103,12 +164,13 @@ impl Plugin<ThunkContext> for Remote {
                                             log.update_status_only(line).await;
                                         },
                                         None => {
-
+                                            break;
                                         },
                                     }
                                 }
                             });
-                            let stderr_reader_task = handle.spawn(async move {
+                            let stderr_reader_task = log_stderr.handle().unwrap().spawn(async move {
+                                event!(Level::DEBUG, "starting to listen to stderr");
                                 while let Ok(line) = stderr_reader.next_line().await {
                                     match line {
                                         Some(line) => {
@@ -116,7 +178,8 @@ impl Plugin<ThunkContext> for Remote {
                                             log_stderr.update_status_only(line).await;
                                         },
                                         None => {
-
+                                            event!(Level::WARN, "Didn't read anything from stderr");
+                                            break;
                                         },
                                     }
                                 }
@@ -137,10 +200,17 @@ impl Plugin<ThunkContext> for Remote {
                                 }
                                 _ = cancel_source => {
                                     child_cancel_tx.send(()).ok();
+
+                                    if let Some(input_cancel) = input_cancel.take() {
+                                        input_cancel.send(()).ok();
+                                    }
                                     None
                                 }
                             };
 
+                            if let Some(task) = stdin_task {
+                                task.abort();
+                            }
                             reader_task.abort();
                             stderr_reader_task.abort();
                             eprintln!("");
