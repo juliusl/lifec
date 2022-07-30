@@ -173,7 +173,12 @@ impl Plugin<ThunkContext> for Remote {
                                 event!(Level::DEBUG, "starting to listen to stderr");
                                 while let Ok(line) = stderr_reader.next_line().await {
                                     match line {
-                                        Some(line) => {
+                                        Some(line) => {      
+                                            for byte in line.as_bytes() {
+                                                log_stderr.send_char(*byte).await;
+                                            }
+                                            log_stderr.send_char(b'\r').await;
+                                        
                                             eprintln!("{}", line);
                                             log_stderr.update_status_only(line).await;
                                         },
