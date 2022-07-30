@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::sync::Arc;
 
 use crate::Extension;
 use crate::AttributeGraph;
@@ -19,6 +20,7 @@ use tokio::io;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::BufReader;
 use tokio::net::TcpListener;
+use tokio::net::UdpSocket;
 use tokio::select;
 use tokio::sync;
 use tokio::sync::oneshot;
@@ -141,8 +143,18 @@ pub struct ThunkContext {
     client: Option<SecureClient>,
     /// Dispatcher for attribute graphs
     dispatcher: Option<Sender<AttributeGraph>>,
-    /// Channel to send bytes to a char_device
+    /// Channel to send bytes to a listening char_device
     char_device: Option<Sender<(u32, u8)>>,
+    /// UDP socket, 
+    /// 
+    /// Notes: Since UDP is connectionless, it can be shared, cloned, and stored in the 
+    /// context,
+    /// 
+    /// In comparison, `enable_listener()` would start, 
+    ///     1) wait for a connection to be made,
+    ///     2) wait for the connection to close, 
+    ///     3) and cannot be stored in the context,
+    udp_socket: Option<Arc<UdpSocket>>,
 }
 
 /// This block has all the async related features
@@ -225,6 +237,26 @@ impl ThunkContext {
             event!(Level::ERROR, "Did not have a dispatcher to enable this w/ the runtime ");
             None
        }
+    }
+
+    /// Creates a UDP socket for this context, and saves the address to the underlying graph
+    /// 
+    pub async fn enable_socket(&mut self) -> Option<Arc<UdpSocket>> {
+        match UdpSocket::bind("127.0.0.1:0").await {
+            Ok(socket) => {
+                if let Some(address) = socket.local_addr().ok().and_then(|a| Some(a.to_string())) {
+                    event!(Level::DEBUG, "created socket at {address}");
+                    self.as_mut().add_text_attr("address", address);
+                    self.udp_socket = Some(Arc::new(socket));
+                }
+
+                self.udp_socket.clone()
+            },
+            Err(err) => {
+                event!(Level::ERROR, "could not enable socket {err}");
+                None
+            },
+        }
     }
 
     /// Sends a character to a the char_device if it exists 
@@ -354,7 +386,6 @@ impl ThunkContext {
     }
 }
 
-
 impl From<AttributeGraph> for ThunkContext {
     fn from(g: AttributeGraph) -> Self {
         Self {
@@ -366,6 +397,7 @@ impl From<AttributeGraph> for ThunkContext {
             status_updates: None,
             dispatcher: None,
             char_device: None,
+            udp_socket: None,
         }
     }
 }
