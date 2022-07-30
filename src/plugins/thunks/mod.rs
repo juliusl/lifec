@@ -181,10 +181,8 @@ impl ThunkContext {
     /// Enables the context to output bytes
     /// 
     /// Caveat: The context must have async enabled.
-    pub fn enable_output(&self, tx: Sender<(u32, u8)>) -> Self {
-        let mut output_enabled = self.clone();
-        output_enabled.char_device = Some(tx);
-        output_enabled
+    pub fn enable_output(&mut self, tx: Sender<(u32, u8)>) {
+        self.char_device = Some(tx);
     }
 
     /// Enables a tcp listener for this context to listen to 
