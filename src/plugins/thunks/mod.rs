@@ -232,12 +232,18 @@ impl ThunkContext {
     /// Caveat: If `enable_output`/`enable_async` haven't been called this is a no-op
     pub async fn send_char(&self, c: u8) {
         if let Some(entity) = self.entity {
+            event!(Level::TRACE, "sending message to {}", entity.id());
             if let Some(char_device) = &self.char_device {
+                event!(Level::TRACE, "has char device");
                 match char_device.send((entity.id(), c)).await {
                     Ok(_) => event!(Level::TRACE, "sent byte for {:?}", entity),
                     Err(err) => event!(Level::ERROR, "error sending byte to char_device, {err}, {:?}", entity),
                 }
+            } else {
+                event!(Level::WARN, "missing char device");
             }
+        } else {
+            event!(Level::WARN, "entity is not set to send_char");
         }
     }
 
