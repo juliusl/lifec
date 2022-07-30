@@ -209,7 +209,7 @@ impl ThunkContext {
             ```
             "#, self.block.block_name).trim()).await; 
 
-            event!(Level::DEBUG, "Thunkc context is listener on {local_addr}");
+            event!(Level::DEBUG, "Thunk context is listening on {local_addr}");
             select! {
                 Ok((stream, address)) = listener.accept() => {
                     event!(Level::DEBUG, "{address} is connecting");
