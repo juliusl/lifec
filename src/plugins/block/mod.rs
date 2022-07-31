@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+mod address;
+pub use address::BlockAddress;
+
 mod project;
 pub use project::Project;
 

@@ -10,6 +10,7 @@ use specs::EntityBuilder;
 mod block;
 pub use block::BlockContext;
 pub use block::Project;
+pub use block::BlockAddress;
 
 mod events;
 pub use events::Event;

@@ -1,9 +1,11 @@
 use std::future::Future;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use crate::Extension;
 use crate::AttributeGraph;
 use crate::RuntimeDispatcher;
+use atlier::system::Value;
 use hyper::client::HttpConnector;
 use imgui::Ui;
 use specs::Component;
@@ -43,6 +45,7 @@ pub use error::ErrorContext;
 mod dispatch;
 pub use dispatch::Dispatch;
 
+use super::block::BlockAddress;
 use super::{BlockContext, Plugin, Project};
 use tokio::{runtime::Handle, sync::mpsc::Sender, sync::oneshot::channel, task::JoinHandle};
 
@@ -246,7 +249,11 @@ impl ThunkContext {
             Ok(socket) => {
                 if let Some(address) = socket.local_addr().ok().and_then(|a| Some(a.to_string())) {
                     event!(Level::DEBUG, "created socket at {address}");
-                    self.as_mut().add_text_attr("address", address);
+
+                    // Add the socket address as a transient value
+                    self.as_mut()
+                        .define("socket", "address")
+                        .edit_as(Value::TextBuffer(address));
                     self.udp_socket = Some(Arc::new(socket));
                 }
 
@@ -383,6 +390,33 @@ impl ThunkContext {
 
             Some(ErrorContext::new(BlockContext::from(b), None)) 
         })
+    }
+
+    /// Returns the underlying socket if enabled
+    /// 
+    pub fn socket(&self) -> Option<Arc<UdpSocket>> {
+        self.udp_socket.clone()
+    }
+}
+
+/// Methods for working with the scoket
+///  
+impl ThunkContext {
+    /// If the socket is enabled for this context, returns the SocketAddr for the socket
+    /// 
+    pub fn socket_address(&self) -> Option<SocketAddr> {
+        self.socket().and_then(|s| s.local_addr().ok())
+    }
+    
+    /// If the socket is enabled for this context, returns the block address
+    /// 
+    pub fn to_block_address(&self) -> Option<BlockAddress> {
+        if let Some(socket_addr) = self.socket_address() {
+            let address = BlockAddress::new(self);
+            Some(address.with_socket_addr(socket_addr))
+        } else {
+            None
+        }
     }
 }
 

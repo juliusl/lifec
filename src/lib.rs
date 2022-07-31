@@ -541,14 +541,14 @@ impl Runtime {
                     }
                 }
                 atlier::system::Value::TextBuffer(config_name) => {
-                    let mut block_address = BlockAddress::lexer(block_address.as_ref());
+                    let mut block_address = BlockIdentifier::lexer(block_address.as_ref());
                     loop {
                         match block_address.next() {
                             Some(block_address) => match block_address {
-                                BlockAddress::Prefix | BlockAddress::Seperator => {
+                                BlockIdentifier::Prefix | BlockIdentifier::Seperator => {
                                     continue;
                                 }
-                                BlockAddress::Name(block_name) => {
+                                BlockIdentifier::Name(block_name) => {
                                     return self.find_config_and_create(
                                         world,
                                         block_name,
@@ -556,7 +556,7 @@ impl Runtime {
                                         create_event,
                                     );
                                 }
-                                BlockAddress::Error => return None,
+                                BlockIdentifier::Error => return None,
                             },
                             None => return None,
                         };
@@ -893,13 +893,13 @@ impl Runtime {
 }
 
 #[derive(Logos, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum BlockAddress {
+pub enum BlockIdentifier {
     /// Used for ordering, workaround for how things are stored in btree table
     /// ex. aa_{name}::{symbol}
     #[regex(r"[a-z]*[a-z]_")]
     Prefix,
     /// Name of the block
-    #[regex(r"[a-z-.0-9]+", from_block_address)]
+    #[regex(r"[a-z-.0-9]+", from_block_identifier)]
     Name(String),
     /// Seperator between name and symbol
     #[token("::")]
@@ -913,22 +913,22 @@ pub enum BlockAddress {
     Error,
 }
 
-fn from_block_address(lexer: &mut Lexer<BlockAddress>) -> Option<String> {
+fn from_block_identifier(lexer: &mut Lexer<BlockIdentifier>) -> Option<String> {
     Some(lexer.slice().trim_end_matches("::").to_string())
 }
 
 #[test]
-fn test_block_address() {
-    let mut block_address = BlockAddress::lexer("a_azcli:jinja2::install");
+fn test_block_identifier() {
+    let mut block_identifier = BlockIdentifier::lexer("a_azcli:jinja2::install");
 
-    assert_eq!(block_address.next(), Some(BlockAddress::Prefix));
+    assert_eq!(block_identifier.next(), Some(BlockIdentifier::Prefix));
     assert_eq!(
-        block_address.next(),
-        Some(BlockAddress::Name("azcli".to_string())),
+        block_identifier.next(),
+        Some(BlockIdentifier::Name("azcli".to_string())),
     );
 
     assert_eq!(
-        block_address.next(),
-        Some(BlockAddress::Name("jinja2".to_string())),
+        block_identifier.next(),
+        Some(BlockIdentifier::Name("jinja2".to_string())),
     )
 }
