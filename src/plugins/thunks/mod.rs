@@ -209,7 +209,9 @@ impl ThunkContext {
         cancel_source: &mut oneshot::Receiver<()>,
     ) -> Option<io::Lines<BufReader<tokio::net::TcpStream>>> {
        if let Some(_) = self.dispatcher {
-            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = self.as_ref().find_text("address").unwrap_or("127.0.0.1:0".to_string());
+            
+            let listener = TcpListener::bind(address).await.expect("needs to be able to bind to an address");
             let local_addr = listener.local_addr().expect("was just created").to_string();
             
             // Listener plugin doesn't currently exist --
@@ -225,6 +227,10 @@ impl ThunkContext {
             "#, self.block.block_name).trim()).await; 
 
             event!(Level::DEBUG, "Thunk context is listening on {local_addr}");
+            self.update_status_only(
+                format!("Lisenting on {local_addr}")
+            ).await;
+
             select! {
                 Ok((stream, address)) = listener.accept() => {
                     event!(Level::DEBUG, "{address} is connecting");
