@@ -1,12 +1,8 @@
 use atlier::system::Value;
-use specs::{Component, System, ReadStorage, Entities, WriteStorage, Join};
-use specs::storage::DefaultVecStorage;
+use specs::{System, ReadStorage, Entities, WriteStorage, Join};
 use tracing::{event, Level};
+use crate::plugins::network::Proxy;
 use crate::plugins::{ThunkContext, Project, BlockContext};
-
-#[derive(Component, Default)]
-#[storage(DefaultVecStorage)]
-pub struct Proxy;
 
 pub struct ProxyDispatcher(ThunkContext); 
 

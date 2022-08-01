@@ -178,7 +178,7 @@ impl ThunkContext {
         &self,
         entity: Entity,
         handle: Handle,
-        client: SecureClient,
+        client: Option<SecureClient>,
         project: Option<Project>,
         status_updates: Option<Sender<StatusUpdate>>,
         dispatcher: Option<Sender<AttributeGraph>>,
@@ -186,7 +186,7 @@ impl ThunkContext {
         let mut async_enabled = self.clone();
         async_enabled.entity = Some(entity);
         async_enabled.handle = Some(handle);
-        async_enabled.client = Some(client);
+        async_enabled.client = client;
         async_enabled.status_updates = status_updates;
         async_enabled.dispatcher = dispatcher;
         async_enabled.project = project;

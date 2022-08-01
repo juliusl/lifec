@@ -185,6 +185,53 @@ impl Default for Runtime {
     }
 }
 
+/// Consolidates elements to start and create events into a struct
+/// Can be returned by a runtime
+pub struct EventBuilder<'a> {
+    event: Event,
+    create_fn: CreateFn,
+    runtime: &'a Runtime 
+}
+
+impl<'a> EventBuilder<'a> {
+    /// Sets the config for the event
+    pub fn set_config(&mut self, config: Config) -> &mut Self {
+        self.event.set_config(config);
+        self
+    }
+
+    /// Sets the config from a config registered with the runtime
+    /// 
+    /// If the config doesn't exist then this is a no-op
+    /// 
+    pub fn set_config_by_name(&mut self, name: impl AsRef<str>) -> &mut Self {
+        if let Some(config_fn) = self.runtime.config.get(name.as_ref()) {
+            self.event.set_config(Config("from_runtime", *config_fn));
+        }
+
+        self
+    }
+
+    /// Creates the event w/ the world and returns the entity
+    /// 
+    pub fn create(&self, world: &World) -> Option<Entity> {
+        (self.create_fn)(world, |_|{})
+    }
+
+    /// Creates and schedules an event to start
+    /// 
+    pub fn schedule(&self, world: &World) -> Option<Entity> {
+        if let Some(created) = self.create(world) {
+            Runtime::start_event(created, world);
+
+            Some(created)
+        } else {
+            event!(Level::WARN, "did not schedule event {}", self.event);
+            None
+        }
+    }
+}
+
 impl Runtime {
     /// Returns a runtime from a project, with no plugins installed
     pub fn new(project: Project) -> Self {
@@ -193,6 +240,20 @@ impl Runtime {
             engine_plugin: BTreeMap::default(),
             config: BTreeMap::default(),
             receivers: HashMap::default(),
+        }
+    }
+
+    /// Creates a new event builder
+    /// 
+    pub fn event_builder<'a, E, P>(&'a self) -> EventBuilder 
+    where
+        E: Engine,
+        P: Plugin<ThunkContext> + Send + Default
+    {
+        EventBuilder {
+            create_fn: E::create::<P>,
+            event: E::event::<P>(),
+            runtime: &self,
         }
     }
 
@@ -230,14 +291,6 @@ impl Runtime {
         let Config(name, config_fn) = config;
 
         self.config.insert(name.to_string(), config_fn);
-    }
-
-    /// Generate runtime_state from the underlying project graph
-    pub fn state<S>(&self) -> S
-    where
-        S: RuntimeState,
-    {
-        S::from(self.project.as_ref().clone())
     }
 
     fn find_config_and_create(
@@ -765,7 +818,7 @@ impl Plugin<ThunkContext> for Runtime {
 
                         // TODO - add some built in configs -
 
-                        runtime.start(&tc, cancel_source);
+                        runtime.start::<Call>(&tc, cancel_source);
                     }
                 }
 
@@ -777,29 +830,38 @@ impl Plugin<ThunkContext> for Runtime {
 
 impl Runtime {
     /// Starts the runtime w/ the runtime editor extension
-    pub fn start(self, tc: &ThunkContext, cancel_source: tokio::sync::oneshot::Receiver<()>) {
+    pub fn start<E>(self, tc: &ThunkContext, cancel_source: tokio::sync::oneshot::Receiver<()>) 
+        where 
+        E: Engine
+    {
         let mut runtime_editor = RuntimeEditor::new(self);
 
-        Self::start_with(&mut runtime_editor, "runtime", tc, cancel_source);
+        Self::start_with::<RuntimeEditor, E>(
+            &mut runtime_editor, 
+            "runtime".to_string(), 
+            tc, 
+            cancel_source
+        );
     }
 
     /// Starts the runtime and extension w/ a thunk_context and cancel_source
     /// Can be used inside a plugin to customize a runtime.
-    pub fn start_with<E>(
-        extension: &mut E,
-        block_symbol: impl AsRef<str>,
+    pub fn start_with<Ext, E>(
+        extension: &mut Ext,
+        block_symbol: String,
         tc: &ThunkContext,
         mut cancel_source: tokio::sync::oneshot::Receiver<()>,
     ) where
-        E: Extension + AsRef<Runtime>,
+        Ext: Extension + AsRef<Runtime>,
+        E: Engine
     {
         let project = &extension.as_ref().project;
 
         let mut call_names = vec![];
         let mut connections = vec![];
         for (_, block) in project.iter_block() {
-            if let Some(runtime_block) = block.get_block(block_symbol.as_ref()) {
-                for (engine_address, value) in runtime_block.find_symbol_values("call") {
+            if let Some(runtime_block) = block.get_block(&block_symbol) {
+                for (engine_address, value) in runtime_block.find_symbol_values(E::event_name()) {
                     if let Some((engine_name, _)) = engine_address.split_once("::") {
                         call_names.push(engine_name.to_string());
 
@@ -811,9 +873,9 @@ impl Runtime {
             }
         }
 
-        let (mut world, mut dispatcher_builder) = E::standalone();
+        let (mut world, mut dispatcher_builder) = E::standalone::<Ext>();
 
-        if let Some(true) = tc.as_ref().is_enabled("proxy_dispatcher") {
+        if tc.as_ref().is_enabled("proxy_dispatcher").unwrap_or_default() {
             dispatcher_builder.add(ProxyDispatcher::from(tc.clone()), "proxy_dispatcher", &[]);
         }
 

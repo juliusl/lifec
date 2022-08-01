@@ -8,9 +8,15 @@ use specs::Builder;
 use specs::EntityBuilder;
 
 mod block;
-pub use block::BlockContext;
 pub use block::Project;
+pub use block::BlockContext;
 pub use block::BlockAddress;
+
+mod network;
+pub use network::NetworkEvent;
+pub use network::NetworkTask;
+pub use network::Proxy;
+pub use network::ProxiedMessage;
 
 mod events;
 pub use events::Event;
@@ -18,7 +24,6 @@ pub use events::EventRuntime;
 pub use events::Listen;
 pub use events::Sequence;
 pub use events::Connection;
-pub use events::Proxy;
 pub use events::ProxyDispatcher;
 
 mod process;
@@ -58,7 +63,7 @@ impl Archive {
 pub type AsyncContext = (tokio::task::JoinHandle<ThunkContext>, tokio::sync::oneshot::Sender<()>);
 
 /// This trait is to facilitate extending working with the attribute graph
-pub trait Plugin<T>
+pub trait Plugin<T = ThunkContext>
 where
     T: AsRef<AttributeGraph>
         + AsMut<AttributeGraph>
@@ -82,17 +87,7 @@ where
     fn caveats() -> &'static str {
         ""
     }
-
-    /// Transforms attribute graph into a thunk context and calls call_with_context
-    /// Updates graph afterwards.
-    fn call(attributes: &mut AttributeGraph) {
-        let mut context = T::from(attributes.clone());
-        let context = &mut context;
-        Self::call_with_context(context);
-
-        *attributes = attributes.merge_with(context.as_ref());
-    }
-
+    
     /// Parses entity from a .runmd file and add's T as a component from the parsed graph.
     /// Calls handle to handle any actions on the graph before T::from(graph)
     /// Calls init to complete building the entity.
@@ -273,6 +268,20 @@ pub trait Engine {
         } else {
             None
         }
+    }
+
+    /// standalone sets up a new specs environment with this extension
+    fn standalone<'a, 'b, E>() -> (World, DispatcherBuilder::<'a, 'b>) 
+    where
+        E: Extension 
+    {
+        let mut world = World::new();
+        let mut dispatcher_builder = DispatcherBuilder::new();
+
+        E::configure_app_world(&mut world);
+        E::configure_app_systems(&mut dispatcher_builder);
+
+        (world, dispatcher_builder)
     }
 }
 

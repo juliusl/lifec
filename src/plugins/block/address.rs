@@ -81,11 +81,15 @@ pub struct BlockAddress {
 }
 
 impl BlockAddress {
-    /// Enable an address in proxy mode
-    pub async fn enable_proxy(&self, world: &World) -> Option<Self> {
-        let proxy = self.clone().open();
+    pub fn enable_proxy_mode(&mut self) {
+        self.hash_code = 0;
+    }
 
-        let entity = proxy.entity();
+    /// Creates a proxy for the current address
+    pub async fn create_proxy(&self, world: &World) -> Option<Self> {
+        let dest = self.clone().open();
+
+        let entity = dest.entity();
         let entity = world.entities().entity(entity);
 
         match world.read_component::<ThunkContext>().get(entity) {
@@ -100,7 +104,7 @@ impl BlockAddress {
                         // this signifies that it is in proxy mode, so the state is always considered transient
                         proxy_address.hash_code = 0;
                         let proxy_address = proxy_address.open();
-                        if let Some((from, _)) = proxy_address.connect(&proxy) {
+                        if let Some((from, _)) = proxy_address.connect(&dest) {
                             match world.write_component().insert(proxy_entity, from.clone()) {
                                 Ok(_) => {
                                     event!(
@@ -110,7 +114,7 @@ impl BlockAddress {
                                     );
                                     match world
                                         .write_component()
-                                        .insert(proxy_entity, Proxy::default())
+                                        .insert(proxy_entity, Proxy::from((hosting, from.clone())))
                                     {
                                         Ok(_) => {
                                             event!(
@@ -136,8 +140,11 @@ impl BlockAddress {
                     }
                 
                 }
+            
             }
-            _ => {}
+            _ => {
+
+            }
         }
 
         None
@@ -681,7 +688,7 @@ fn test_proxy_mode() {
         test_world.maintain();
 
         if let Some(main_block_address) = main.to_block_address() {
-            if let Some(proxy_address) = main_block_address.enable_proxy(&test_world).await {
+            if let Some(proxy_address) = main_block_address.create_proxy(&test_world).await {
                 if let Some((dest_entity, dest_address)) = proxy_address.connected() {
                     
                     eprintln!("Proxy:       \t{:#?},\t\t\t{:#?},\t{:#?}", proxy_address.hash_code, proxy_address.entity(), proxy_address.socket_addr().expect("proxy should have an address"));

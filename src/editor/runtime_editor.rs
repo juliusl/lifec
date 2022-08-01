@@ -93,7 +93,7 @@ impl RuntimeEditor {
         self.runtime()
             .create_engine_group::<Call>(
                 app_world,
-                vec!["default"].iter().map(|s| s.to_string()).collect(),
+                vec!["default".to_string()],
             )
             .get(0)
             .and_then(|e| Some(*e))
@@ -247,17 +247,27 @@ impl Extension for RuntimeEditor {
             for (block_name, config_block) in project.iter_block() {
                 for (symbol, config) in config_block.to_blocks() {
                     if let Some(project_src) = config.find_text("project_src") {
+                        event!(
+                            Level::DEBUG, 
+                            "got dispatch w/ {project_src}"
+                        );
                         if let Some(project) = Project::load_file(project_src) {
+                            event!(
+                                Level::DEBUG,
+                                "setting active project, {}", project.as_ref().hash_code()
+                            );
                             *self.project_mut() = project;
                             if let Some(engine) = self
                                 .runtime()
                                 .create_engine::<Call>(world, config_block.block_name.to_string())
                             {
-                                eprintln!("created engine {}", engine.id());
+                                event!(
+                                    Level::INFO, 
+                                    "created engine {}", engine.id()
+                                );
                             }
                         }
-                    } else if let Some(installed_plugin) = self.runtime.find_plugin::<Call>(&symbol)
-                    {
+                    } else if let Some(installed_plugin) = self.runtime.find_plugin::<Call>(&symbol) {
                         let auto_mode = config.is_enabled("auto").unwrap_or_default();
 
                         if let Some(created) = self.runtime().find_config_block_and_create(
@@ -266,7 +276,8 @@ impl Extension for RuntimeEditor {
                             BlockContext::from(config.clone()),
                             installed_plugin,
                         ) {
-                            eprintln!(
+                            event!(
+                                Level::INFO,
                                 "Received dispatch for `{block_name} {symbol}`, created {:?}",
                                 created
                             );
@@ -317,7 +328,8 @@ impl Extension for RuntimeEditor {
                                 BlockContext::from(fix_config.clone()),
                                 installed_plugin,
                             ) {
-                                eprintln!(
+                                event!(
+                                    Level::INFO,
                                     "Received error dispatch for `{name} {problem}`, created {:?}",
                                     created
                                 );
@@ -330,7 +342,10 @@ impl Extension for RuntimeEditor {
 
                                     let created_id = created.id();
                                     let stopped_id = stopped.id();
-                                    eprintln!("Setting fix cursor to stopped entity {created_id} -> {stopped_id}");
+                                    event!(
+                                        Level::INFO, 
+                                        "Setting fix cursor to stopped entity {created_id} -> {stopped_id}"
+                                    );
                                     let mut seq = Sequence::default();
                                     seq.set_cursor(stopped);
 

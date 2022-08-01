@@ -21,6 +21,7 @@ use crate::AttributeGraph;
 use crate::Extension;
 
 use super::Archive;
+use super::BlockAddress;
 use super::Project;
 use super::thunks::CancelThunk;
 use super::thunks::ErrorContext;
@@ -30,7 +31,6 @@ use crate::plugins::thunks::Config;
 use specs::storage::VecStorage;
 
 mod proxy;
-pub use proxy::Proxy;
 pub use proxy::ProxyDispatcher;
 
 mod listen;
@@ -75,7 +75,15 @@ impl Event {
     }
 
     /// Prepares an event for the event runtime to start, cancel any previous join_handle
-    pub fn fire(&mut self, thunk_context: ThunkContext) {
+    /// 
+    /// Caveats: If the event has a config set, it will configure the context, before setting it
+    /// 
+    pub fn fire(&mut self, mut thunk_context: ThunkContext) {
+        if let Some(Config(name, config)) = self.2 {
+            event!(Level::TRACE, "detected config {name} for event: {}", self.0);
+            config(&mut thunk_context);
+        }
+
         self.3 = Some(thunk_context);
 
         // cancel any current task
@@ -204,6 +212,7 @@ impl<'a> System<'a> for EventRuntime {
         WriteStorage<'a, CancelThunk>,
         WriteStorage<'a, ErrorContext>,
         WriteStorage<'a, Archive>,
+        WriteStorage<'a, BlockAddress>,
     );
 
     fn run(
@@ -222,7 +231,8 @@ impl<'a> System<'a> for EventRuntime {
             mut sequences,
             mut cancel_tokens,
             mut error_contexts,
-            mut archives
+            mut archives,
+            mut block_addresses,
         ): Self::SystemData,
     ) {
         let mut dispatch_queue = vec![];
@@ -233,6 +243,20 @@ impl<'a> System<'a> for EventRuntime {
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
                     if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() }) {
+                        // If the context enabled it's address, add the block address to world storage
+                        if thunk_context.socket_address().is_some() && !block_addresses.contains(entity) {
+                            if let Some(block_address) = thunk_context.to_block_address() {
+                                match block_addresses.insert(entity, block_address) {
+                                    Ok(_) => {
+                                        event!(Level::DEBUG, "inserted new block address for {:?}", entity);
+                                    },
+                                    Err(err) => {
+                                        event!(Level::ERROR, "Error inserting block address {err}");
+                                    },
+                                }
+                            }
+                        }
+
                         if let Some(error_context) = thunk_context.get_errors() {
                             eprintln!("creating error context");
                             let thunk_context = thunk_context.clone();
@@ -327,12 +351,12 @@ impl<'a> System<'a> for EventRuntime {
                 let runtime_handle = runtime.handle().clone();
                 let https = HttpsConnector::new();
                 let client = Client::builder().build::<_, hyper::Body>(https);
-        
+                
                 let mut context =
                     initial_context.enable_async(
                         entity, 
                         runtime_handle,
-                        client,
+                        Some(client),
                         Some(project.reload_source()), 
                         Some( status_update_channel.clone()),
                         Some(dispatcher.clone()),
