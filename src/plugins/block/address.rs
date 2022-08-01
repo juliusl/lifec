@@ -421,14 +421,14 @@ impl BlockAddress {
 impl BlockAddress {
     /// If connected, returns the connected entity
     ///  
-    fn connected_entity(&self) -> u32 {
+    pub fn connected_entity(&self) -> u32 {
         let [a, b] = self.entity_block();
         b ^ a
     }
 
     /// If connected, returns the connected socket address
     ///  
-    fn connected_address(&self) -> Option<SocketAddr> {
+    pub fn connected_address(&self) -> Option<SocketAddr> {
         if self.ip_block_d == 0 && self.ip_block_e == 0 && self.ip_block_f == 0 {
             None
         } else if self.ip_block_a == self.ip_block_d

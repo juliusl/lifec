@@ -19,9 +19,10 @@ pub struct Sequence(
 pub struct Connection(
     /// entities that are connected
     Sequence,
-    /// owner
+    /// This entity is a third-party of the connection, which owns this component.
+    /// This is to make garbage collecting these connections easier.
     Option<Entity>,
-    /// fork
+    /// Fork, means that this connection is not exclusive bewteen two entities
     bool,
 );
 

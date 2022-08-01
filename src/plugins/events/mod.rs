@@ -30,8 +30,8 @@ use super::{Plugin, Thunk, ThunkContext};
 use crate::plugins::thunks::Config;
 use specs::storage::VecStorage;
 
-mod proxy;
-pub use proxy::ProxyDispatcher;
+mod proxy_dispatcher;
+pub use proxy_dispatcher::ProxyDispatcher;
 
 mod listen;
 pub use listen::Listen;

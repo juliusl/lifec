@@ -4,6 +4,13 @@ use tracing::{event, Level};
 use crate::plugins::network::Proxy;
 use crate::plugins::{ThunkContext, Project, BlockContext};
 
+/// Proxy dispatcher is a system for use in the standalone runtime context,
+/// 
+/// For example from the UI, you want an isolated runtime, this system allows the isolated runtime to dispatch
+/// graphs to the owning UI.
+/// 
+/// Caveat: This re-uses the Proxy component found in network/proxy.rs to represent that the has completed it's dispatch.
+/// In order to re-dispatch any particular entity, only the proxy component needs to be removed
 pub struct ProxyDispatcher(ThunkContext); 
 
 impl From<ThunkContext> for ProxyDispatcher {

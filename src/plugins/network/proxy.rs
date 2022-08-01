@@ -6,11 +6,11 @@ use specs::storage::DenseVecStorage;
 use tokio::net::UdpSocket;
 use tracing::{event, Level};
 
-use crate::plugins::{ThunkContext, BlockAddress, EventRuntime};
+use crate::plugins::{ThunkContext, BlockAddress, EventRuntime, Connection};
 
 use super::NetworkEvent;
 
-/// Proxy component, that enables support for handling network boundaries
+/// Component for running proxy network systems
 /// 
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
@@ -25,18 +25,20 @@ pub struct Proxy(
 /// 
 #[derive(Serialize, Deserialize)]
 pub struct ProxiedMessage {
+    /// Source of the message being sent
     src: SocketAddr,
+    /// The data that was sent
     data: Vec<u8>,
 }
 
 impl Proxy {
-    /// Returns the underlying socket
+    /// Returns the underlying udp socket
     /// 
-    pub fn socket(&self) -> Option<Arc<UdpSocket>> {
+    pub fn udp_socket(&self) -> Option<Arc<UdpSocket>> {
         self.0.clone().and_then(|tc| tc.socket().clone())
     }
 
-    /// Proxies the next message to the upstream socket
+    /// Handles receibing and proxying the next message to the upstream socket
     /// 
     /// Returns the bytes sent as well as the entity_id of the upstream entity
     /// 
@@ -52,7 +54,7 @@ impl Proxy {
                 &proxied_message
             ).ok().unwrap_or_default();
 
-            if let Some((upstream_entity, sent)) = self.send_upstream(&proxied_message.to_vec()).await {
+            if let Some(NetworkEvent::Proxied(upstream_entity, sent)) = self.send_upstream(&proxied_message.to_vec()).await {
                 if sent != proxied_message.len() {
                     todo!("the entire message wasn't pushed")
                 }
@@ -70,8 +72,8 @@ impl Proxy {
     /// 
     /// Returns the the number of bytes read, and the src address
     /// 
-    async fn receive(&self, received: &mut [u8]) -> Option<NetworkEvent> {
-        if let Some(socket) = self.socket() {
+    pub async fn receive(&self, received: &mut [u8]) -> Option<NetworkEvent> {
+        if let Some(socket) = self.udp_socket() {
             socket.recv_from(received).await.ok().and_then(|(s, addr)| Some(NetworkEvent::Received(s, addr)))
         } else {
             None 
@@ -82,14 +84,14 @@ impl Proxy {
     /// 
     /// Returns the upstream entity id, and len of message sent upstream
     /// 
-    async fn send_upstream(&self, message: &[u8]) -> Option<(u32, usize)> {
+    pub async fn send_upstream(&self, message: &[u8]) -> Option<NetworkEvent> {
         if let Proxy(Some(_), Some(address)) = self {
             if let (
                 Some((upstream_entity, upstream_address)),
                 Some(socket)
-             ) = ( address.connected() , self.socket() ){
+             ) = ( address.connected() , self.udp_socket() ){
                 if let Some(sent) = socket.send_to(message, upstream_address).await.ok() {
-                    Some( (upstream_entity, sent) )
+                    Some( NetworkEvent::Proxied(upstream_entity, sent) )
                 } else {
                     None
                 }
@@ -221,7 +223,7 @@ fn test_socket_proxies() {
         let proxy_a_impl = test_world.read_component::<Proxy>().get(proxy_a_entity).expect("retrieved").clone();
         let proxy_b_impl = test_world.read_component::<Proxy>().get(proxy_b_entity).expect("retrieved").clone();
 
-        if let (Some(sock_a), Some(sock_b)) = (proxy_a_impl.socket(), proxy_b_impl.socket()) {
+        if let (Some(sock_a), Some(sock_b)) = (proxy_a_impl.udp_socket(), proxy_b_impl.udp_socket()) {
             let sock_a_addr = sock_a.local_addr().ok().unwrap();
             let sock_b_addr = sock_b.local_addr().ok().unwrap();
             
@@ -276,7 +278,12 @@ fn test_socket_proxies() {
     })
 }
 
-/// Proxy runtime looks for thunk contexts that have enabled `enable_proxy_socket`
+/// Proxy runtime looks for thunk contexts that have a bool attribute `enable_proxy_socket` enabled,
+/// and do not alreay have a Proxy component installed.
+/// 
+/// If enabled, this system will create a socket for the context if it doesn't already exist, and then create
+/// a proxy_entity to host the new proxy component.
+/// 
 #[derive(Default)]
 pub struct ProxyRuntime;
 
@@ -386,7 +393,7 @@ fn test_proxy_runtime() {
         let proxy_a_impl = &proxies.get(proxy_a_entity).unwrap();
         let proxy_b_impl = &proxies.get(proxy_b_entity).unwrap();
     
-        if let (Some(sock_a), Some(sock_b)) = (proxy_a_impl.socket(), proxy_b_impl.socket()) {
+        if let (Some(sock_a), Some(sock_b)) = (proxy_a_impl.udp_socket(), proxy_b_impl.udp_socket()) {
             let sock_a_addr = sock_a.local_addr().ok().unwrap();
             let sock_b_addr = sock_b.local_addr().ok().unwrap();
             
