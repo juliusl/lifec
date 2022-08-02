@@ -2,7 +2,6 @@ use crate::Extension;
 use crate::editor::App;
 use crate::System;
 
-
 /// Opens a new window w/ the provided App and Extension
 pub fn open<A, E>(
     title: &str,

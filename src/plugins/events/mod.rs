@@ -196,6 +196,16 @@ impl SetupHandler<sync::mpsc::Sender<ErrorContext>> for EventRuntime {
     }
 }
 
+/// Setup for a built-in runtime for the world
+/// 
+/// Note: Trying to move more things to this runtime-space
+/// 
+impl SetupHandler<super::Runtime> for EventRuntime {
+    fn setup(world: &mut World) {
+        world.insert(super::Runtime::default());
+    }
+}
+
 impl<'a> System<'a> for EventRuntime {
     type SystemData = (
         Read<'a, Runtime, EventRuntime>,
