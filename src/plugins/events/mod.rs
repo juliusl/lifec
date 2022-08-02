@@ -358,7 +358,7 @@ impl<'a> System<'a> for EventRuntime {
                         runtime_handle,
                         Some(client),
                         Some(project.reload_source()), 
-                        Some( status_update_channel.clone()),
+                        Some(status_update_channel.clone()),
                         Some(dispatcher.clone()),
                     );
 

@@ -32,7 +32,6 @@ pub use process::Remote;
 pub use process::Expect;
 pub use process::Missing;
 pub use process::Redirect;
-pub use process::Listener;
 
 mod thunks;
 pub use thunks::ErrorContext;

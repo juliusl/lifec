@@ -47,7 +47,28 @@ where
         self.2 = Some(title.as_ref().to_string());
     }
 
-    /// Returns a simple list view
+    /// Returns a simple view for the thunk context, w/ editing
+    /// off by default. 
+    /// 
+    /// If there is a "form to fill out" for a plugin, then by enabling
+    /// `edit_form`, transient attributes w/ a symbol transient will add editing for the attribute named by that symbol
+    /// 
+    /// For example, 
+    /// 
+    /// ```no_run
+    /// ``` test example
+    /// define edit_name example .symbol name
+    /// 
+    /// add name .text Cool Name  
+    /// ```
+    /// ```
+    /// 
+    /// Would display a single input for editing the `name` attribute. The underlying plugin does not need to add any special
+    /// logic in order to use this feature. 
+    /// 
+    /// Note: If trying to edit a transient attribute instead of a stable one, then the format of the attribute name is
+    /// {name}::{symbol}, so for example to edit edit_name defined above, the symbol value would need to be `edit_name::example`
+    /// 
     pub fn simple(show_all: bool) -> Self {
         List::<Item>(
             |context, item, world, ui| {
@@ -92,20 +113,6 @@ where
             None,
             None,
             show_all,
-        )
-    }
-
-    /// Returns a table view with cols
-    pub fn table(cols: &[&'static str]) -> Self {
-        List::<Item>(
-            |context, _, world, ui| {
-                // context.as_mut().apply("previous");
-                context.on_ui(world, ui);
-            },
-            None,
-            None,
-            Some(cols.to_vec()),
-            true
         )
     }
 

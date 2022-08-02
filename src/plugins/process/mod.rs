@@ -18,9 +18,6 @@ pub use missing::Missing;
 mod redirect;
 pub use redirect::Redirect;
 
-mod listener;
-pub use listener::Listener;
-
 /// The process component executes a command and records the output
 #[derive(Debug, Clone, Default, Component)]
 #[storage(HashMapStorage)]

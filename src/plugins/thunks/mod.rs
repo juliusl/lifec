@@ -2,7 +2,6 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use crate::Extension;
 use crate::AttributeGraph;
 use crate::RuntimeDispatcher;
 use atlier::system::Value;
@@ -126,8 +125,19 @@ impl From<CancelToken> for CancelThunk {
     }
 }
 
-/// ThunkContext provides common methods for updating the underlying state graph,
-/// in the context of a thunk. If async is enabled, then the context will have a handle to the tokio runtime.
+/// Thunk context is the major component for thunks, 
+/// 
+/// Contains utilities for working with async code, such as network/io
+/// while storing and updating data via an underlying block context. 
+/// 
+/// Optionally, if a plugin sets the project field before it returns, and another plugin is scheduled to run
+/// after, the event runtime will pass the project as a binary attribute called 'previous' to the next plugin.
+/// Binary data passed in this manner can then be unpacked to the current graph using .apply("previous"). 
+/// 
+/// All fields of this context are intentionally safe to clone, share, and stored. Once an event has used a context,
+/// that context will keep it's async deps for subsequent calls. This ensures that as long as a plugin only makes changes
+/// to the context once, on subsequent calls of the plugin, the context will remain the same.
+/// 
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
@@ -173,7 +183,12 @@ impl ThunkContext {
         }
     }
 
-    /// enable async features for the context
+    /// Enable async features for this context.
+    /// 
+    /// As long as the thunk context was used w/ a plugin once w/ the event runtime,
+    /// the event runtime will always enable all of the below fields in the context.
+    /// 
+    /// These fields are set as optional, to make extending the architecture, and testing easier. 
     pub fn enable_async(
         &self,
         entity: Entity,
@@ -193,38 +208,32 @@ impl ThunkContext {
         async_enabled
     }
 
-    /// Enables the context to output bytes
+    /// Enables output to a char_device, a plugin can use to output bytes to. 
     /// 
-    /// Caveat: The context must have async enabled.
+    /// The implementation of the char_device, can choose how to handle this output, 
+    /// but in general this is mainly useful for tty type of situations. For example,
+    /// the Process and Remote plugins write to this device.
+    /// 
     pub fn enable_output(&mut self, tx: Sender<(u32, u8)>) {
         self.char_device = Some(tx);
     }
 
-    /// Enables a tcp listener for this context to listen to 
+    /// Enables a tcp listener for this context to listen to. accepts the first listener, creates a connection
+    /// and then exits after the connection is dropped.
     /// 
-    /// Returns a line reader when a connection has been made
+    /// Returns a buffered reader over each line sent over the stream.
     /// 
     pub async fn enable_listener(
         &self,
         cancel_source: &mut oneshot::Receiver<()>,
     ) -> Option<io::Lines<BufReader<tokio::net::TcpStream>>> {
        if let Some(_) = self.dispatcher {
-            let address = self.as_ref().find_text("address").unwrap_or("127.0.0.1:0".to_string());
+            let address = self.as_ref()
+                .find_text("address")
+                .unwrap_or("127.0.0.1:0".to_string());
             
             let listener = TcpListener::bind(address).await.expect("needs to be able to bind to an address");
             let local_addr = listener.local_addr().expect("was just created").to_string();
-            
-            // Listener plugin doesn't currently exist --
-            self.dispatch(format!(
-            r#"
-            ``` {0} listener
-            add node_title         .text    Listener for {0}
-            add address            .text    {local_addr}
-            add enable_connection  .enable
-            add proxy              .enable
-            add default_open       .enable
-            ```
-            "#, self.block.block_name).trim()).await; 
 
             event!(Level::DEBUG, "Thunk context is listening on {local_addr}");
             self.update_status_only(
@@ -251,7 +260,11 @@ impl ThunkContext {
     /// Creates a UDP socket for this context, and saves the address to the underlying graph
     /// 
     pub async fn enable_socket(&mut self) -> Option<Arc<UdpSocket>> {
-        match UdpSocket::bind("127.0.0.1:0").await {
+        let address = self.as_ref()
+            .find_text("address")
+            .unwrap_or("127.0.0.1:0".to_string());
+
+        match UdpSocket::bind(address).await {
             Ok(socket) => {
                 if let Some(address) = socket.local_addr().ok().and_then(|a| Some(a.to_string())) {
                     event!(Level::DEBUG, "created socket at {address}");
@@ -292,17 +305,32 @@ impl ThunkContext {
         }
     }
 
-    /// returns the secure client
+    /// Returns a secure http client. By default this context will only 
+    /// support http using a secure client, 
+    /// 
+    /// If a plugin wishes to make insecure requests,
+    /// they must generate an insecure http client at runtime.
+    /// 
     pub fn client(&self) -> Option<SecureClient> {
         self.client.clone()
     }
 
-    /// returns a handle to a tokio runtime
+    /// Returns a handle to the tokio runtime for spawning additional tasks. Uncommon to use in most cases,
+    /// as .task() is a more ergonomic api to use. 
+    /// 
+    /// Caveat: enable_async() must be called, for this to be enabled. Will automatically be enabled by the
+    /// event runtime once the plugin using this context starts.
+    /// 
     pub fn handle(&self) -> Option<Handle> {
         self.handle.as_ref().and_then(|h| Some(h.clone()))
     }
 
-    /// dispatch runmd for a host to process
+    /// Dipatches .runmd to a listener capable of interpreting and creating blocks at runtime
+    /// 
+    /// Note: Since thunk context is clonable, it's easy to inject into other libraries such as logos and poem.
+    /// For example, if running a runtime within a plugin that hosts a web api, you can use this method within 
+    /// request handlers to dispatch blocks to the hosting runtime.
+    /// 
     pub async fn dispatch(&self, runmd: impl AsRef<str>) {
         if let Some(dispatcher) = &self.dispatcher {
             let graph = AttributeGraph::from(0);
@@ -315,13 +343,16 @@ impl ThunkContext {
         }
     }
 
-    /// returns a clone of the dispatcher
+    /// Returns the underlying dispatch transmitter
+    /// 
     pub fn dispatcher(&self) -> Option<sync::mpsc::Sender<AttributeGraph>> {
         self.dispatcher.clone()
     }
 
-    /// If async is enabled on the thunk context, this will spawn the task
-    /// otherwise, this call will result in a no-op
+    /// Spawns and executes a task that will be managed by the event runtime
+    /// 
+    /// Caveat: async must be enabled for this api to work, otherwise it will result in a 
+    /// no-op
     pub fn task<F>(
         &self,
         task: impl FnOnce(CancelSource) -> F,
@@ -352,7 +383,8 @@ impl ThunkContext {
         }
     }
 
-    /// optionally, update progress of the thunk execution
+    /// Sends an update for the status and progress
+    /// 
     pub async fn update_progress(&self, status: impl AsRef<str>, progress: f32) {
         if let ThunkContext {
             status_updates: Some(status_updates),
@@ -370,7 +402,10 @@ impl ThunkContext {
         }
     }
 
-    /// optionally, update status of the thunk execution
+    /// Updates status of thunk execution
+    ///
+    /// TODO: The ergonomics of this api and the one above need some improvement,
+    ///  
     pub async fn update_status_only(&self, status: impl AsRef<str>) {
         self.update_progress(&status, 0.0).await;
 
@@ -381,7 +416,14 @@ impl ThunkContext {
         }
     }
 
-    /// returns an error context if an error block exists
+    /// Returns the error context this context has an error block
+    /// 
+    /// Notes: When a plugin completes, the event_runtime will call this method 
+    /// to determine how to handle the error. 
+    /// 
+    /// If the graph contains a bool `stop_on_error`, the event runtime will 
+    /// not execute any of the next events in the sequence
+    ///  
     pub fn get_errors(&self) -> Option<ErrorContext> {
         self.block.get_block("error").and_then(|b| { 
             let mut b = b;
@@ -397,17 +439,17 @@ impl ThunkContext {
             Some(ErrorContext::new(BlockContext::from(b), None)) 
         })
     }
-
-    /// Returns the underlying socket if enabled
-    /// 
-    pub fn socket(&self) -> Option<Arc<UdpSocket>> {
-        self.udp_socket.clone()
-    }
 }
 
 /// Methods for working with the scoket
 ///  
 impl ThunkContext {
+    /// Returns the underlying udp socket, if a socket has been enabled on this context
+    /// 
+    pub fn socket(&self) -> Option<Arc<UdpSocket>> {
+        self.udp_socket.clone()
+    }
+
     /// If the socket is enabled for this context, returns the SocketAddr for the socket
     /// 
     pub fn socket_address(&self) -> Option<SocketAddr> {
@@ -423,6 +465,26 @@ impl ThunkContext {
         } else {
             None
         }
+    }
+}
+
+/// Some utility methods
+/// 
+impl ThunkContext {
+    /// Updates error block
+    pub fn error(&mut self, record: impl Fn(&mut AttributeGraph)) {
+        if !self.block.update_block("error", &record) {
+            self.block.add_block("error", record);
+        }
+    }
+
+    /// Formats a label that is unique to this state
+    pub fn label(&self, label: impl AsRef<str>) -> impl AsRef<str> {
+        format!(
+            "{} {:#2x}",
+            label.as_ref(),
+            self.as_ref().hash_code() as u16
+        )
     }
 }
 
@@ -451,49 +513,5 @@ impl AsRef<AttributeGraph> for ThunkContext {
 impl AsMut<AttributeGraph> for ThunkContext {
     fn as_mut(&mut self) -> &mut AttributeGraph {
         self.block.as_mut()
-    }
-}
-
-impl ThunkContext {
-    /// Updates error block
-    pub fn error(&mut self, record: impl Fn(&mut AttributeGraph)) {
-        if !self.block.update_block("error", &record) {
-            self.block.add_block("error", record);
-        }
-    }
-
-    /// Formats a label that is unique to this state
-    pub fn label(&self, label: impl AsRef<str>) -> impl AsRef<str> {
-        format!(
-            "{} {:#2x}",
-            label.as_ref(),
-            self.as_ref().hash_code() as u16
-        )
-    }
-}
-
-impl Extension for ThunkContext {
-    /// table view to debug backend
-    fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {
-        if let Some(entity) = self.entity {
-            for attr in self.as_mut().iter_mut_attributes() {
-                if ui.table_next_column() {
-                    ui.text(format!("{}", entity.id()));
-                }
-
-                if ui.table_next_column() {
-                    ui.text(attr.name());
-                }
-
-                if ui.table_next_column() {
-                    ui.text(format!("{}", attr.value())
-                        .split_once("::Reference")
-                        .and_then(|(a, _)| Some(a)).unwrap_or_default()
-                    );
-                }
-    
-                ui.table_next_row();
-            }
-        }
     }
 }

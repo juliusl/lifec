@@ -4,11 +4,23 @@ use super::{ProgressStatusBar, StartButton};
 use crate::plugins::*;
 use crate::*;
 
+/// This component drives visibility actions for running engines
+/// within the runtime
+/// 
 #[derive(Default, Component, Clone)]
 #[storage(BTreeStorage)]
-pub struct Task(Option<StartButton>, Option<ProgressStatusBar>, Option<Sequence>, Option<Connection>, 
-    /// disable
-    bool);
+pub struct Task(
+    /// Start button to start a task sequence
+    Option<StartButton>,
+    /// Progress bar w/ status updates
+    Option<ProgressStatusBar>,
+    /// Sequence of events that will be executed
+    Option<Sequence>,
+    /// Connection to the next task
+    Option<Connection>, 
+    /// Disables the task, removing the start button
+    bool
+);
 
 impl Task {
     pub fn disable(&mut self) {
