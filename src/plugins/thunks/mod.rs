@@ -35,9 +35,6 @@ pub use timer::Timer;
 mod println;
 pub use println::Println;
 
-mod clear;
-pub use clear::Clear;
-
 mod error;
 pub use error::ErrorContext;
 
