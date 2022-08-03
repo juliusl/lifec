@@ -1,6 +1,7 @@
 use std::env::consts::OS;
 
 use atlier::system::Value;
+use tracing::{event, Level};
 use which::which;
 
 use crate::plugins::{Plugin, ThunkContext};
@@ -55,7 +56,7 @@ impl Plugin<ThunkContext> for Expect {
                             }
                             Err(err) => {
                                 let log = format!("`expect` plugin error on symbol `which` for `{command}`: {err}");
-                                eprintln!("{log}");
+                                event!(Level::ERROR, "{log}");
                                 tc.update_status_only(format!("{log}")).await;
                                 tc.error(|g| {
                                     g.add_text_attr(&command, "missing");

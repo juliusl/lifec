@@ -7,6 +7,9 @@ use tokio::task::JoinHandle;
 use specs::Builder;
 use specs::EntityBuilder;
 
+mod secure;
+pub use secure::Secure;
+
 mod block;
 pub use block::Project;
 pub use block::BlockContext;
@@ -181,7 +184,8 @@ pub trait Engine {
                 {
                     Ok(_) => Some(entity),
                     Err(err) => {
-                        eprintln!(
+                        event!(
+                            Level::ERROR,
                             "could not finish creating event {}, {}, src_desc: inserting context",
                             P::symbol(),
                             err
@@ -192,7 +196,8 @@ pub trait Engine {
                 }
             }
             Err(err) => {
-                eprintln!(
+                event!(
+                    Level::ERROR,
                     "could not finish creating event {}, {}, src_desc: inserting event",
                     P::symbol(),
                     err
@@ -234,13 +239,13 @@ pub trait Engine {
             }
             
             if let Some(text) = engine_root.as_ref().find_text("repeat") {
-                eprintln!("Looking for {}, to set cursor", text);
+                event!(Level::DEBUG, "Looking for {}, to set cursor", text);
                 if let Some(entity) = engine_root.as_ref().find_int(text) {
                     let entity = world.entities().entity(entity as u32);
                     sequence.set_cursor(entity);               
-                    eprintln!("Cursor found");
+                    event!(Level::DEBUG, "Cursor found");
                 } else {
-                    eprintln!("Cursor not found");
+                    event!(Level::DEBUG, "Cursor not found");
                 }
             }
             let mut sequence_list = List::<Task>::edit_block_view(Some(sequence_list));
@@ -336,7 +341,7 @@ where
                                             tc = next;
                                         },
                                         Err(err) => {
-                                            eprintln!("error {}", err);
+                                            event!(Level::ERROR, "error {}", err);
                                         },
                                     }
                                 }
@@ -371,7 +376,7 @@ where
                                             next_tc = n;
                                         },
                                         Err(err) => {
-                                            eprintln!("error {}", err);
+                                            event!(Level::ERROR, "error {}", err);
                                         },
                                     }
                                 }

@@ -94,7 +94,7 @@ impl Event {
     /// Thunks must manage their own cancellation by using the cancel_source.
     pub fn cancel(&mut self) {
         if let Some(task) = self.4.as_mut() {
-            eprintln!("cancelling existing join_handle");
+            event!(Level::TRACE, "cancelling existing join_handle");
             task.abort();
         }
     }
@@ -198,7 +198,7 @@ impl SetupHandler<sync::mpsc::Sender<ErrorContext>> for EventRuntime {
 
 /// Setup for a built-in runtime for the world
 /// 
-/// Note: Trying to move more things to this runtime-space
+/// TODO: Trying to move more things to this runtime-space
 /// 
 impl SetupHandler<super::Runtime> for EventRuntime {
     fn setup(world: &mut World) {
@@ -268,7 +268,7 @@ impl<'a> System<'a> for EventRuntime {
                         }
 
                         if let Some(error_context) = thunk_context.get_errors() {
-                            eprintln!("creating error context");
+                            event!(Level::ERROR, "plugin error context generated");
                             let thunk_context = thunk_context.clone();
 
                             if let Some(previous) = error_contexts.insert(entity, error_context.clone()).ok() {
@@ -279,10 +279,10 @@ impl<'a> System<'a> for EventRuntime {
                                                 let previous_id = previous.id();
                                                 match entities.delete(previous) {
                                                     Ok(_) => {
-                                                        eprintln!("deleting previous fix attempt {previous_id}");
+                                                        event!(Level::WARN, "deleting previous fix attempt {previous_id}");
                                                     },
                                                     Err(err) => {
-                                                        eprintln!("error deleting previous entity {err}");
+                                                        event!(Level::ERROR, "error deleting previous entity {err}");
                                                     },
                                                 }
                                             }
@@ -301,7 +301,7 @@ impl<'a> System<'a> for EventRuntime {
                                 runtime.block_on(async { error_dispatcher.send(error_context.clone()).await }).ok();
 
                                 if error_context.stop_on_error() {
-                                    eprintln!("Error detected, and `stop_on_error` is enabled, stopping at {}", entity.id());
+                                    event!(Level::ERROR, "Error detected, and `stop_on_error` is enabled, stopping at {}", entity.id());
                                     let mut clone = thunk_context.clone();
 
                                     clone.as_mut().with_text(
@@ -341,7 +341,7 @@ impl<'a> System<'a> for EventRuntime {
                                 }
                             }
                             Err(err) => {
-                                eprintln!("# error completing: {}, {}", &event_name, err);
+                                event!(Level::ERROR, "error completing: {}, {err}", &event_name);
                             }
                         }
                     }

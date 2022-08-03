@@ -36,9 +36,6 @@ pub use state::AttributeGraphEvents;
 pub use state::AttributeGraphElements;
 pub use state::AttributeGraphErrors;
 
-mod trace;
-pub use trace::Trace;
-
 use crate::plugins::ProxyDispatcher;
 
 pub trait RuntimeDispatcher: AsRef<AttributeGraph> + AsMut<AttributeGraph>
@@ -530,7 +527,7 @@ impl Runtime {
                 return E::initialize_sequence(engine_root, sequence, world);
             }
         } else {
-            eprintln!("{} block not found", &sequence_block_name);
+            event!(Level::ERROR, "{} block not found", &sequence_block_name);
         }
 
         None
@@ -626,7 +623,7 @@ impl Runtime {
                     }
                 }
                 _ => {
-                    eprintln!("No config found for {}", block_address.as_ref());
+                    event!(Level::WARN, "No config found for {}", block_address.as_ref());
                 }
             }
         }

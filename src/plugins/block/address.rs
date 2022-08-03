@@ -397,13 +397,13 @@ impl BlockAddress {
     pub fn connected(&self) -> Option<(u32, SocketAddr)> {
         // If this is open, then returns None, as it is not connected
         if self.is_opened() {
-            eprintln!("Is opened");
+            event!(Level::TRACE, "not connected");
             None
         } else {
             if let (e, Some(a)) = (self.connected_entity(), self.connected_address()) {
                 Some((e, a))
             } else {
-                eprintln!("does not have connected entity and address");
+                event!(Level::WARN, "does not have connected entity and address");
                 None
             }
         }

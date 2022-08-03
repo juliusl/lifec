@@ -159,8 +159,6 @@ impl Plugin<ThunkContext> for Remote {
                                                 log.send_char(*byte).await;
                                             }
                                             log.send_char(b'\r').await;
-
-                                            eprintln!("{}", line);
                                             log.update_status_only(line).await;
                                         },
                                         None => {
@@ -218,8 +216,7 @@ impl Plugin<ThunkContext> for Remote {
                             }
                             reader_task.abort();
                             stderr_reader_task.abort();
-                            eprintln!("");
-                            eprintln!("remote canceled");
+                            event!(Level::INFO, "remote canceled");
                             return output;
                         }
                     }

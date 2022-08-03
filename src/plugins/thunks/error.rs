@@ -1,5 +1,6 @@
 use specs::{Component, Entity};
 use specs::storage::HashMapStorage;
+use tracing::{event, Level};
 
 use crate::AttributeGraph;
 use crate::plugins::BlockContext;
@@ -51,8 +52,7 @@ impl ErrorContext {
     }
 
     pub fn set_previous_attempt(&mut self, previous: AttributeGraph) {
-
-        eprintln!("previous {:#?}", previous);
+        event!(Level::INFO, "previous {:#?}", previous);
 
         self.0.add_block("previous_attempt", |c| {
             c.copy(&previous);

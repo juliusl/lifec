@@ -1,4 +1,5 @@
 use rust_embed::RustEmbed;
+use tracing::{event, Level};
 use std::path::PathBuf;
 
 use crate::plugins::ThunkContext;
@@ -26,7 +27,7 @@ impl Resources {
         match tokio::fs::read_to_string(&src).await {
             Ok(content) => Some(content),
             Err(err) => {
-                eprintln!("error reading file {src}, {err}");
+                event!(Level::ERROR, "error reading file {src}, {err}");
                 None
             }
         }
@@ -48,7 +49,7 @@ impl Resources {
         match tokio::fs::read(&src).await {
             Ok(content) => Some(content),
             Err(err) => {
-                eprintln!("error reading file {src}, {err}");
+                event!(Level::ERROR, "error reading file {src}, {err}");
                 None
             }
         }
@@ -101,7 +102,7 @@ impl Resources {
                         .await;
                 }
                 Err(err) => {
-                    eprintln!("error loading resource {prefix} {err}");
+                    event!(Level::ERROR, "error loading resource {prefix} {err}");
                 }
             }
         }
@@ -116,7 +117,7 @@ impl Resources {
                         .await;
                     }
                     Err(err) => {
-                        eprintln!("error loading resource {prefix} {err}");
+                        event!(Level::ERROR, "error loading resource {prefix} {err}");
                     }
                 }
             }

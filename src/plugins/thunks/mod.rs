@@ -298,7 +298,7 @@ impl ThunkContext {
                     Err(err) => event!(Level::ERROR, "error sending byte to char_device, {err}, {:?}", entity),
                 }
             } else {
-                event!(Level::WARN, "missing char device");
+                event!(Level::TRACE, "missing char device");
             }
         } else {
             event!(Level::WARN, "entity is not set to send_char");

@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use tracing::{event, Level};
+
 use crate::plugins::{ThunkContext, Plugin};
 
 #[derive(Default)]
@@ -34,10 +36,10 @@ impl Plugin<ThunkContext> for Redirect {
 
                             match tokio::fs::write(redirect_stdout, stdout).await {
                                 Ok(_) => {
-                                    
+                                    event!(Level::TRACE, "redirected stdout");
                                 },
                                 Err(err) => {
-                                    eprintln!("error redirecting stdout {err}");
+                                    event!(Level::ERROR, "error redirecting stdout {err}");
                                 },
                             }
                         }
@@ -56,10 +58,10 @@ impl Plugin<ThunkContext> for Redirect {
 
                             match tokio::fs::write(redirect_stderr, stderr).await {
                                 Ok(_) => {
-                                    
+                                    event!(Level::TRACE, "redirected stderr");
                                 },
                                 Err(err) => {
-                                    eprintln!("error redirecting stderr {err}");
+                                    event!(Level::ERROR, "error redirecting stderr {err}");
                                 },
                             }
                         }

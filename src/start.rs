@@ -1,4 +1,5 @@
 use specs::{World, DispatcherBuilder, WorldExt};
+use tracing::{event, Level};
 
 use crate::{Extension, Runtime, editor::Call, plugins::{Event, ThunkContext}};
 
@@ -18,7 +19,7 @@ where
     
     for sequence_name in call_sequence {
         if let Some(start) = extension.as_ref().create_engine::<Call>(&world, sequence_name.to_string()) {
-            eprintln!("Created engine {:?}", start);
+            event!(Level::INFO, "Created engine {:?}", start);
     
             let mut event = world.write_component::<Event>();
             let tc = world.read_component::<ThunkContext>();

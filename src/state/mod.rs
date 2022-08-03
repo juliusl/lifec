@@ -119,7 +119,7 @@ impl AttributeGraph {
                 self.add_binary_attr(path, content);
             }
             Err(err) => {
-                eprintln!("file not added {}", err);
+                event!(Level::ERROR, "file not added {err}");
             }
         }
     }
@@ -177,8 +177,8 @@ impl AttributeGraph {
                         Ok(_) => {
                             self.find_remove(name);
                         }
-                        Err(_) => {
-                            eprintln!("could not apply events");
+                        Err(err) => {
+                            event!(Level::ERROR, "could not apply events, {:?}", err);
                         }
                     }
                 }
@@ -222,7 +222,7 @@ impl AttributeGraph {
                 Some(loading)
             }
             Err(err) => {
-                eprintln!("Could not load {}, {:?}", path.as_ref(), err);
+                event!(Level::ERROR, "Could not load {}, {:?}", path.as_ref(), err);
                 None
             }
         }
@@ -650,7 +650,7 @@ impl AttributeGraph {
     /// This behavior is to enforce that attributes should be added with the below api's.
     pub fn import_attribute(&mut self, external_attribute: &Attribute) {
         if external_attribute.id() == self.entity {
-            eprintln!("Warning: No-Op, Trying to import an attribute that is not external to this graph, add this attribute by value instead");
+            event!(Level::WARN, "No-Op, Trying to import an attribute that is not external to this graph, add this attribute by value instead");
             return;
         }
         self.add_attribute(external_attribute.clone());
@@ -1404,7 +1404,7 @@ impl AttributeGraph {
                         .replace(&format!("{}::", first_part), &symbol);
                     self.index.insert(key, attr);
                 } else {
-                    eprintln!("symbol value was empty");
+                    event!(Level::WARN, "symbol value was empty");
                 }
             } else {
                 self.index.insert(attr.to_string(), attr);

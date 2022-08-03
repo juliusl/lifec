@@ -1,3 +1,5 @@
+use tracing::{event, Level};
+
 use crate::plugins::{Plugin, ThunkContext, Println, combine, Timer};
 
 use super::Remote;
@@ -24,7 +26,7 @@ impl Plugin<ThunkContext> for Missing {
             let current_os = std::env::consts::OS;
             if required_os != current_os { 
                 let log = format!("Cannot use fix, required OS {required_os}, current OS {current_os}");
-                eprintln!("{log}");
+                event!(Level::ERROR, "{log}");
 
                  return context.clone().task(|_| {
                     let tc = context.clone();
