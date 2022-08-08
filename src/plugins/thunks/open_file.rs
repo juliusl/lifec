@@ -19,27 +19,6 @@ use super::{ThunkContext, CancelToken};
 #[storage(DenseVecStorage)]
 pub struct OpenFile;
 
-impl Listen for OpenFile {
-    fn listen(runtime: &mut crate::Runtime, world: &World) -> Option<AttributeGraph> {
-        if let Some(mut thunk_context) = runtime.listen::<Self>(world) {
-            if thunk_context.as_ref().contains_attribute("file_src") {
-                let block_name = thunk_context.block.block_name.to_string();
-                Some(
-                    thunk_context
-                        .as_mut()
-                        .with_text("block_name", block_name)
-                        .with_text("block_symbol", "file")
-                        .to_owned()
-                )
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-}
-
 impl Plugin<ThunkContext> for OpenFile {
     fn symbol() -> &'static str {
         "open_file"

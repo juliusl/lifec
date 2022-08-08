@@ -121,8 +121,6 @@ impl Default for RuntimeEditor {
         default.runtime.install::<Call, Expect>();
         default.runtime.install::<Fix, Missing>();
         default.runtime.install::<Call, Redirect>();
-        default.listen(Self::on_open_file);
-        //default.listen(Self::on_open_dir);
         default
     }
 }
@@ -181,28 +179,6 @@ impl Extension for RuntimeEditor {
         world: &specs::World,
         event: &'_ atlier::system::WindowEvent<'_>,
     ) {
-        match event {
-            atlier::system::WindowEvent::DroppedFile(file) => {
-                let file_src = format!("{:?}", &file);
-                if file.is_dir() {
-                    self.runtime
-                        .schedule(world, &Call::event::<OpenDir>(), |tc| {
-                            tc.as_mut()
-                                .add_text_attr("file_dir", &file_src.trim_matches('"'));
-                        })
-                        .and_then(|_| Some(()));
-                } else {
-                    self.runtime
-                        .schedule(world, &Call::event::<OpenFile>(), |tc| {
-                            tc.as_mut()
-                                .add_text_attr("file_src", &file_src.trim_matches('"'));
-                        })
-                        .and_then(|_| Some(()));
-                }
-            }
-            _ => {}
-        }
-
         match event {
             WindowEvent::DroppedFile(dropped_file_path) => {
                 if dropped_file_path.is_dir() {
@@ -386,17 +362,6 @@ impl Extension for RuntimeEditor {
 }
 
 impl RuntimeEditor {
-    /// When open file is called, this will import the file to the current project
-    fn on_open_file(&mut self, world: &World) {
-        match self.runtime.listen::<OpenFile>(world) {
-            Some(file) => {
-                if self.project_mut().import(file.as_ref().clone()) {
-                    event!(Level::TRACE, "Imported file to project");
-                }
-            }
-            None => {}
-        }
-    }
 
     // When open dir is called, this will schedule an open_file event for each file in the directory
     // fn on_open_dir(&mut self, world: &World) {

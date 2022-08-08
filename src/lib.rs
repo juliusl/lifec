@@ -254,23 +254,6 @@ impl Runtime {
         }
     }
 
-    /// Returns the next thunk context that has been updated by the event runtime, if registered to broadcasts.
-    /// Uses the plugin symbol as the subscriber key.
-    pub fn listen<P>(&mut self, world: &World) -> Option<ThunkContext>
-    where
-        P: Plugin<ThunkContext>,
-    {
-        self.listen_with(world, P::symbol())
-    }
-
-    /// Subscribe to thunk contexts updates, with the plugin symbol as the subscriber key
-    pub fn subscribe<P>(&mut self, world: &World)
-    where
-        P: Plugin<ThunkContext>,
-    {
-        self.subscribe_with(world, P::symbol());
-    }
-
     /// Install an engine into the runtime. An engine provides functions for creating new component instances.
     pub fn install<E, P>(&mut self)
     where
@@ -629,39 +612,6 @@ impl Runtime {
         }
 
         None
-    }
-}
-
-/// Methods for accessing broadcast channel
-impl Runtime {
-    /// Returns the next thunk context that has been updated by the event runtime, if registered to broadcasts
-    /// If the subscriber key did not exist, this method will subscribe_with the key so that the next call is successful.
-    pub fn listen_with(
-        &mut self,
-        world: &World,
-        with_key: impl AsRef<str>,
-    ) -> Option<ThunkContext> {
-        if let Some(rx) = self.receivers.get_mut(with_key.as_ref()) {
-            match rx.try_recv() {
-                Ok(entity) => {
-                    let contexts = world.read_component::<ThunkContext>();
-                    contexts.get(entity).and_then(|c| Some(c.clone()))
-                }
-                Err(_) => None,
-            }
-        } else {
-            // If not already subscribed, the plugin will miss any events it generated before calling listen
-            // this is probably not too bad since this is called inside the loop, so in most situations, the subscriber will get a
-            // chance to subscribe before it has a chance to make any changes
-            self.subscribe_with(world, with_key);
-            None
-        }
-    }
-
-    /// Subscribe to thunk contexts updates, with a subscriber key
-    pub fn subscribe_with(&mut self, world: &World, with_key: impl AsRef<str>) {
-        self.receivers
-            .insert(with_key.as_ref().to_string(), Event::subscribe(world));
     }
 }
 

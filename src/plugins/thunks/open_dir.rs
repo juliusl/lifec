@@ -16,39 +16,6 @@ use super::{ThunkContext, CancelToken};
 #[storage(DenseVecStorage)]
 pub struct OpenDir;
 
-impl Listen for OpenDir {
-    fn listen(runtime: &mut Runtime, world: &World) -> Option<AttributeGraph> {
-        if let Some(next) = runtime.listen::<Self>(world) {
-            // listen for file_dir events, and ingest files
-            if let Some(file_dir) = next
-                .as_ref()
-                .find_text("file_dir")
-                .and_then(|dir| Some(PathBuf::from(dir)))
-            {
-                let mut unwrapping = AttributeGraph::from(0);
-                unwrapping.add_text_attr("block_name", file_dir.to_str().unwrap_or_default());
-                unwrapping.add_text_attr("block_symbol", "file_dir");
-
-                for (file_name, content) in next.as_ref().find_symbol_values("file") {
-                    let mut file_src = file_dir.clone();
-                    file_src.set_file_name(file_name.trim_end_matches("::file"));
-
-                    if let Value::BinaryVector(vec) = content {
-                        if let Some(content) = from_utf8(&vec).ok() {
-                            if unwrapping.batch_mut(content).is_ok() {
-                                eprintln!("unwrapped file block {}", file_name);
-                            }
-                        }
-                    }
-                }
-
-                return Some(unwrapping);
-            }
-        }
-        None
-    }
-}
-
 impl Plugin<ThunkContext> for OpenDir {
     fn symbol() -> &'static str {
         "open_dir"
