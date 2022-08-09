@@ -15,6 +15,10 @@ use std::{
     str::from_utf8, borrow::Cow,
 };
 
+mod v2;
+pub use v2::AttributeIndex;
+pub use v2::Query;
+
 /// Attribute graph is a component that indexes attributes for an entity
 /// It is designed to be a general purpose enough to be the common element of runtime state storage
 #[derive(Debug, Default, Component, Clone, Hash, Serialize, Deserialize, PartialEq, PartialOrd)]
@@ -722,8 +726,8 @@ impl AttributeGraph {
         })
     }
 
-      /// Finds a symbol value of an attribute
-      pub fn find_symbol(&self, with_name: impl AsRef<str>) -> Option<String> {
+    /// Finds a symbol value of an attribute
+    pub fn find_symbol(&self, with_name: impl AsRef<str>) -> Option<String> {
         self.find_attr_value(with_name).and_then(|n| {
             if let Value::Symbol(text) = n {
                 Some(text.to_string())
@@ -1561,19 +1565,6 @@ impl RuntimeDispatcher for AttributeGraph {
 
 /// These are handlers for dispatched messages
 impl AttributeGraph {
-    fn on_publish(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
-        let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
-
-        match element_lexer.next() {
-            Some(AttributeGraphElements::Symbol(attr_name)) => {
-                self.find_update_attr(attr_name, |a| a.edit_self());
-                Ok(())
-            }
-            Some(_) => Err(AttributeGraphErrors::WrongArugment),
-            None => Err(AttributeGraphErrors::NotEnoughArguments),
-        }
-    }
-
     pub fn next_block(&mut self, with_name: impl AsRef<str>, symbol_name: impl AsRef<str>) -> u32 {
         if let None = self.find_parent_block() {
             let parent_entity = self.entity() as i32;
@@ -1623,6 +1614,19 @@ impl AttributeGraph {
 
         self.with_text("block_name", block_name)
             .with_text("block_symbol", block_symbol);
+    }
+
+    fn on_publish(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
+        let mut element_lexer = AttributeGraphElements::lexer(msg.as_ref());
+
+        match element_lexer.next() {
+            Some(AttributeGraphElements::Symbol(attr_name)) => {
+                self.find_update_attr(attr_name, |a| a.edit_self());
+                Ok(())
+            }
+            Some(_) => Err(AttributeGraphErrors::WrongArugment),
+            None => Err(AttributeGraphErrors::NotEnoughArguments),
+        }
     }
 
     fn on_block(&mut self, msg: impl AsRef<str>) -> Result<(), AttributeGraphErrors> {
@@ -2595,11 +2599,14 @@ pub enum AttributeGraphElements {
     #[token(".float3", graph_lexer::from_float_range)]
     #[token(".FLOAT_RANGE", graph_lexer::from_float_range)]
     FloatRange(Value),
-    /// binary vector element parses remaining as 3 comma delimitted f32's
+    /// binary vector element, currently parses the remaining as base64 encoded data
     #[token(".bin", graph_lexer::from_binary_vector_base64)]
     #[token(".base64", graph_lexer::from_binary_vector_base64)]
     #[token(".BINARY_VECTOR", graph_lexer::from_binary_vector_base64)]
     BinaryVector(Value),
+    /// symbol value implies that the value is of symbolic quality, 
+    /// and though no explicit validations are in place, the value of the symbol
+    /// should be valid in many contexts that require an identifier
     #[token(".symbol", graph_lexer::from_symbol)]
     SymbolValue(Value),
     /// empty element parses

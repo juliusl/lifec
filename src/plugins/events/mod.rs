@@ -188,6 +188,15 @@ impl SetupHandler<sync::mpsc::Sender<AttributeGraph>> for EventRuntime {
 }
 
 /// Setup for tokio-mulitple-producers single-consumer channel for status updates
+impl SetupHandler<sync::mpsc::Receiver<AttributeGraph>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<AttributeGraph>(10);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
+/// Setup for tokio-mulitple-producers single-consumer channel for status updates
 impl SetupHandler<sync::mpsc::Sender<ErrorContext>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         let (tx, rx) = mpsc::channel::<ErrorContext>(10);

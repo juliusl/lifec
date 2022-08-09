@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use crate::AttributeGraph;
 use crate::RuntimeDispatcher;
+use crate::state::AttributeIndex;
 use atlier::system::Value;
 use hyper::client::HttpConnector;
 use imgui::Ui;
@@ -165,6 +166,28 @@ pub struct ThunkContext {
     ///     2) wait for the connection to close, 
     ///     3) and cannot be stored in the context,
     udp_socket: Option<Arc<UdpSocket>>,
+}
+
+impl AttributeIndex for ThunkContext {
+    fn entity_id(&self) -> u32 {
+        self.entity.and_then(|e| Some(e.id())).unwrap_or_default()
+    }
+
+    fn add_attribute(&mut self, attr: atlier::system::Attribute) {
+        self.as_mut().add_attribute(attr)
+    }
+
+    fn define(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) -> &mut atlier::system::Attribute {
+        self.as_mut().define(name, symbol)
+    }
+
+    fn find_value(&self, with_name: impl AsRef<str>) -> Option<&Value> {
+        self.as_ref().find_attr_value(with_name)
+    }
+
+    fn find_transient(&self, with_name: impl AsRef<str>, with_symbol: impl AsRef<str>) -> Option<&atlier::system::Attribute> {
+        self.as_ref().find_attr(format!("{}::{}", with_name.as_ref(), with_symbol.as_ref()))
+    }
 }
 
 /// This block has all the async related features

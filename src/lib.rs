@@ -30,11 +30,16 @@ pub use start::start;
 pub mod editor;
 pub mod plugins;
 
+mod catalog;
+pub use catalog::Catalog;
+
 mod state;
 pub use state::AttributeGraph;
 pub use state::AttributeGraphEvents;
 pub use state::AttributeGraphElements;
 pub use state::AttributeGraphErrors;
+pub use state::Query;
+pub use state::AttributeIndex;
 
 use crate::plugins::ProxyDispatcher;
 
@@ -161,25 +166,17 @@ pub type CreateFn = fn(&World, fn(&mut ThunkContext)) -> Option<Entity>;
 pub type ConfigFn = fn(&mut ThunkContext);
 
 /// Runtime provides access to the underlying project, and function tables for creating components
+/// 
+#[derive(Component, Default)]
+#[storage(DefaultVecStorage)]
 pub struct Runtime {
+    /// Project loaded w/ this runtime, typically from a .runmd file
+    /// The project file usually contains different configurations for event scheduling
     project: Project,
     /// Table for creating new event components
     engine_plugin: BTreeMap<String, CreateFn>,
     /// Table for thunk configurations
     config: BTreeMap<String, ConfigFn>,
-    /// Table of broadcast receivers
-    receivers: HashMap<String, tokio::sync::broadcast::Receiver<Entity>>,
-}
-
-impl Default for Runtime {
-    fn default() -> Self {
-        Self {
-            project: Default::default(),
-            engine_plugin: BTreeMap::default(),
-            config: BTreeMap::default(),
-            receivers: HashMap::default(),
-        }
-    }
 }
 
 /// Consolidates elements to start and create events into a struct
@@ -236,7 +233,6 @@ impl Runtime {
             project,
             engine_plugin: BTreeMap::default(),
             config: BTreeMap::default(),
-            receivers: HashMap::default(),
         }
     }
 
