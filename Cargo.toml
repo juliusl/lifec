@@ -12,7 +12,7 @@ atlier = { git = "https://github.com/juliusl/atlier.git"   }
 imnodes = { git = "https://github.com/benmkw/imnodes-rs.git" }
 knot = { git = "https://github.com/juliusl/knot.git", branch="main"  }
 imgui = "0.8.2" 
-specs = { version = "0.17.0", features = ["default", "derive"] }
+specs = { version = "0.17.0", features = ["default", "derive", "shred-derive"] }
 rand = "0.8.5"
 serde = "1.0.137"
 chrono = "0.4.19"

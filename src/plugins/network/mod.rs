@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use atlier::system::Extension;
+use atlier::system::{Extension, Value};
 use specs::{Component, Join, Read, WorldExt, WriteStorage};
 use specs::{DenseVecStorage, Entities, ReadStorage, System};
 use tokio::task::JoinHandle;
@@ -33,9 +33,14 @@ pub enum NetworkEvent {
     /// This event is created when a proxy component has sent bytes
     /// to an upstream entity
     Proxied(
-        /// upstream entity id
+        /// upstream entity id to notify,
+        /// 
+        /// This id belongs to the entity that spawned the proxy
         u32,
-        /// bytes sent upstream
+        /// bytes sent upstream, 
+        /// 
+        /// *note* usually udp sockets need to implement their own protocols,
+        /// so this value can be used to figure out 
         usize,
     ),
     Default,
@@ -132,7 +137,15 @@ impl<'a> System<'a> for NetworkRuntime {
                                         entity.id(),
                                         upstream_context.block.block_name
                                     );
-                                    upstream_event.fire(upstream_context.clone());
+
+                                    // By going through the proxy instead of receiving the message directly,
+                                    // the plugin can interpret the transient value to figure out what type of message
+                                    // it need's to process next.
+                                    let mut upstream_context = upstream_context.clone();
+                                    upstream_context.as_mut()
+                                        .define("proxy", "received")
+                                        .edit_as(Value::Int(sent as i32));
+                                    upstream_event.fire(upstream_context);
                                 }
                             }, 
                             _ => {

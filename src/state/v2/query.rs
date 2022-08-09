@@ -1,4 +1,7 @@
+use std::{sync::Arc, any::Any};
+
 use atlier::system::{Attribute, Value};
+use specs::{Component, DefaultVecStorage};
 use tracing::{event, Level};
 
 use crate::{AttributeIndex, catalog::Item};
@@ -12,14 +15,15 @@ use crate::{AttributeIndex, catalog::Item};
 /// When a parameter is evaluated, this query visits a destination type that implements `catalog::Item` and passes
 /// the found value.
 /// 
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub struct Query<'a, I> 
+#[derive(Component, Default, Clone, Hash, PartialEq, Eq)]
+#[storage(DefaultVecStorage)]
+pub struct Query<I> 
 where
-    I: AttributeIndex
+    I: AttributeIndex + Clone + Default + Sync + Send + Any
 {
     /// This is a reference to the source index, that will be used when evaluating this query
     /// 
-    pub src: &'a I,
+    pub src: Arc<I>,
     
     /// The entity_id is generally the id portion from a specs::Entity,
     /// 
@@ -34,20 +38,20 @@ where
     pub search_params: Vec<Attribute>
 }
 
-impl<'a, I> Query<'a, I>
+impl<I> Query<I>
 where
-    I: AttributeIndex
+    I: AttributeIndex + Clone + Default + Sync + Send + Any
 {
     /// Evaluates the current search parameters, by looping through each transient attribute
     /// and a value is found, visits the dest item
     /// 
     pub fn evaluate(&self, dest: &mut impl Item) {
-        self.evaluate_with(self.src, dest)
+        self.evaluate_with(self.src.clone(), dest)
     }
 
     /// Evaluates the current search parameters with a `src` that implements `AttributeIndex`
     /// 
-    pub fn evaluate_with(&self, src: &impl AttributeIndex, dest: &mut impl Item) {
+    pub fn evaluate_with(&self, src: Arc<I>, dest: &mut impl Item) {
         for search in self.search_params.iter() {
             if let Some((name, _)) = search.transient() {
                 if let Some(value) = src.find_value(name) {
@@ -84,7 +88,8 @@ where
         Self: Clone
     {
         let mut cached = self.clone();
-        cached.cache_with(cached.src);
+        let src = cached.src.clone();
+        cached.cache_with(&src);
         cached
     }
 
@@ -94,7 +99,7 @@ where
     /// 
     /// A value is cached by committing that value to the search parameter attribute
     /// 
-    pub fn cache_with(&mut self, src: &impl AttributeIndex) {
+    pub fn cache_with(&mut self, src: &Arc<I>) {
         for search in self.search_params.iter_mut() {
             if let Some((name, value)) = search.clone().transient() {
                 if let Some(caching) = src.find_value(name) {

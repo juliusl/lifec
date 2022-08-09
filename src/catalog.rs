@@ -10,6 +10,8 @@ use tracing::{event, Level};
 ///     relationships w/ other data in the catalog, 
 /// This process is refferred to as a "look-up" or "search", and most commonly a "query".
 /// 
+/// A catalog reader is a system data type for systems that need to read items
+/// 
 #[derive(SystemData)]
 pub struct CatalogReader<'a, I> 
 where
@@ -19,6 +21,9 @@ where
     pub items: ReadStorage<'a, I>,
 }
 
+/// A catalog writer is a system data type for indexing, and writing
+/// items to world storage.
+/// 
 #[derive(SystemData)]
 pub struct CatalogWriter<'a, I> 
 where
@@ -36,7 +41,7 @@ where
 /// Default visit methods emit a WARN level event, to track cases where an attribute value is deserialized
 /// but not handled by the implementing type.
 /// 
-/// By implementing a visit method, the implementing type is responsible for validating and setting it's own state, and doesn't need
+/// By implementing a visit method, the implementing type is responsible for validating and interpreting attributes to set it's own state, and doesn't need
 /// to concern itself w/ storage of attributes.
 /// 
 pub trait Item 
@@ -115,7 +120,13 @@ where
         event!(Level::WARN, "visit_text not implemented {:#?}", self)
     }
 
-    /// Visits self w/ a name and value and calls the corresponding visit api.
+    /// Visits self w/ a name and reference value
+    /// 
+    fn visit_reference(&mut self, _name: impl AsRef<str>, _value: u64) {
+        event!(Level::WARN, "visit_reference not implemented {:#?}", self)
+    }
+
+    /// Visits self w/ a name and value and calls the corresponding visit method
     /// 
     fn visit(&mut self, name: impl AsRef<str>, value: &Value) {
         match value {
@@ -129,7 +140,7 @@ where
             Value::FloatRange(f0, f1, f2) => self.visit_float_range(name, [*f0, *f1, *f2]),
             Value::BinaryVector(v) => self.visit_binary_vec(name, v.to_vec()),
             Value::Symbol(s) => self.visit_symbol(name, s),
-            Value::Reference(_) => unimplemented!("reference value is not implemented"),
+            Value::Reference(r) => self.visit_reference(name, *r),
             Value::Empty => unimplemented!("empty value is not implemented"),
         }
     }

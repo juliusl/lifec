@@ -1,3 +1,5 @@
+use std::{sync::Arc, any::Any};
+
 use atlier::system::{Attribute, Value};
 
 use crate::Query;
@@ -353,13 +355,21 @@ pub trait AttributeIndex {
         })
     }
 
-
     /// Creates a new query, for evaluating state from the index
     /// 
     fn query(&self) -> Query<Self> 
     where
-        Self: Sized
+        Self: Sized + Clone + Default + Send + Sync + Any
     {
-        Query { src: self, entity_id: self.entity_id(), search_params: vec![] }
+        self.query_with(vec![])
+    }
+
+    /// Creates a new query, for evaluating state from the index w/ search_params
+    /// 
+    fn query_with(&self, search_params: Vec<Attribute>) -> Query<Self> 
+    where
+        Self: Sized + Clone + Default + Send + Sync + Any
+    {
+        Query { src: Arc::new(self.clone()), entity_id: self.entity_id(), search_params }
     }
 }
