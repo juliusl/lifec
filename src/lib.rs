@@ -31,7 +31,9 @@ pub mod editor;
 pub mod plugins;
 
 mod catalog;
-pub use catalog::Catalog;
+pub use catalog::CatalogReader;
+pub use catalog::CatalogWriter;
+pub use catalog::Item;
 
 mod state;
 pub use state::AttributeGraph;

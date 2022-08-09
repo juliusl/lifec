@@ -1,51 +1,31 @@
-use std::{collections::BTreeMap, fmt::Debug};
-
+use std::fmt::Debug;
+use specs::prelude::*;
 use atlier::system::Value;
-use specs::{System, Entity, ReadStorage, Entities, Join, WriteStorage};
-use tokio::sync::mpsc;
 use tracing::{event, Level};
 
-use crate::{AttributeGraph, Runtime, plugins::ThunkContext};
-
-/// A catalog is a service to store and retrieve data. Typically data is retrieved using human-friendly
+/// A catalog is used to store and retrieve a collection of items. Typically data is retrieved using human-friendly
 /// concepts, 
 ///     such as tagging features or categories relevant to the data, 
 ///     physical states such as size or age, 
 ///     relationships w/ other data in the catalog, 
 /// This process is refferred to as a "look-up" or "search", and most commonly a "query".
 /// 
-/// The process of storing this data is typically called "indexing". 
-/// 
-/// This system provides this functionality to entities, that need it at runtime. The aim
-/// is not to reinvent the actual indexing/querying capabilities of already existing db formats.
-/// Instead this system should merely bootstrap db's to the entities in a way that the implementation is opaque 
-/// to users. Since lifec plugins only use attributes for data, config, bootstrapping in this context means to 
-/// read/write the backing db w/ attribute data.
-/// 
-pub struct Catalog {
-    /// Receivers, 
-    receivers: BTreeMap<Entity, mpsc::Receiver<AttributeGraph>>
+#[derive(SystemData)]
+pub struct CatalogReader<'a, I> 
+where
+    I: Item + Component
+{
+    pub entities: Entities<'a>,
+    pub items: ReadStorage<'a, I>,
 }
 
-impl<'a> System<'a> for Catalog {
-    type SystemData = (
-        Entities<'a>,
-        ReadStorage<'a, Runtime>,
-        WriteStorage<'a, ThunkContext>,
-    );
-
-    fn run(&mut self, (entities, runtimes, _thunk_contexts): Self::SystemData) {
-        for (entity, _runtime) in (&entities, &runtimes).join() {
-            match self.receivers.get(&entity) {
-                Some(_rx) => {
-                    todo!()
-                },
-                None => {
-                    
-                },
-            }
-        }
-    }
+#[derive(SystemData)]
+pub struct CatalogWriter<'a, I> 
+where
+    I: Item + Component
+{
+    pub entities: Entities<'a>,
+    pub items: WriteStorage<'a, I>,
 }
 
 /// The intention of this trait is to combine indexing / deserialization semantics into a single trait
