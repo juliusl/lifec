@@ -1,4 +1,3 @@
-
 mod control_cube;
 pub use control_cube::ControlCube;
 
@@ -75,6 +74,11 @@ pub struct Node {
 /// 
 /// Therefore when a cube is transmitted, it will be a sequence of a 
 /// 512 byte frame, followed by a 64 byte frame, 
+/// 
+/// # Background
+/// 
+/// Current design limits for this protocol include a max blob length of 4 GB's per node, meaning a single cube
+/// can represent at most 32 GB's worth of data.
 /// 
 pub struct Cube {
     /// Node identity data, max 512 bytes
