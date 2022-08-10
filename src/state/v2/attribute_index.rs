@@ -17,7 +17,7 @@ pub trait AttributeIndex {
     /// 
     /// This will always be the stable value from the attribute
     ///
-    fn find_value(&self, with_name: impl AsRef<str>) -> Option<&Value>;
+    fn find_value(&self, with_name: impl AsRef<str>) -> Option<Value>;
 
     /// Finds a transient attribute defined in the index
     ///
@@ -61,7 +61,7 @@ pub trait AttributeIndex {
     ///
     fn find_bool(&self, with_name: impl AsRef<str>) -> Option<bool> {
         if let Some(Value::Bool(a)) = self.find_value(with_name) {
-            Some(*a)
+            Some(a)
         } else {
             None
         }
@@ -71,7 +71,7 @@ pub trait AttributeIndex {
     ///
     fn find_int(&self, with_name: impl AsRef<str>) -> Option<i32> {
         if let Some(Value::Int(a)) = self.find_value(with_name) {
-            Some(*a)
+            Some(a)
         } else {
             None
         }
@@ -81,7 +81,7 @@ pub trait AttributeIndex {
     ///
     fn find_int_pair(&self, with_name: impl AsRef<str>) -> Option<(i32, i32)> {
         if let Some(Value::IntPair(a, b)) = self.find_value(with_name) {
-            Some((*a, *b))
+            Some((a, b))
         } else {
             None
         }
@@ -91,7 +91,7 @@ pub trait AttributeIndex {
     ///
     fn find_int_range(&self, with_name: impl AsRef<str>) -> Option<(i32, i32, i32)> {
         if let Some(Value::IntRange(a, b, c)) = self.find_value(with_name) {
-            Some((*a, *b, *c))
+            Some((a, b, c))
         } else {
             None
         }
@@ -101,7 +101,7 @@ pub trait AttributeIndex {
     ///
     fn find_float(&self, with_name: impl AsRef<str>) -> Option<f32> {
         if let Some(Value::Float(a)) = self.find_value(with_name) {
-            Some(*a)
+            Some(a)
         } else {
             None
         }
@@ -111,7 +111,7 @@ pub trait AttributeIndex {
     ///
     fn find_float_pair(&self, with_name: impl AsRef<str>) -> Option<(f32, f32)> {
         if let Some(Value::FloatPair(a, b)) = self.find_value(with_name) {
-            Some((*a, *b))
+            Some((a, b))
         } else {
             None
         }
@@ -121,7 +121,7 @@ pub trait AttributeIndex {
     ///
     fn find_float_range(&self, with_name: impl AsRef<str>) -> Option<(f32, f32, f32)> {
         if let Some(Value::FloatRange(a, b, c)) = self.find_value(with_name) {
-            Some((*a, *b, *c))
+            Some((a, b, c))
         } else {
             None
         }

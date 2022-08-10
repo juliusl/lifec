@@ -181,8 +181,8 @@ impl AttributeIndex for ThunkContext {
         self.as_mut().define(name, symbol)
     }
 
-    fn find_value(&self, with_name: impl AsRef<str>) -> Option<&Value> {
-        self.as_ref().find_attr_value(with_name)
+    fn find_value(&self, with_name: impl AsRef<str>) -> Option<Value> {
+        self.as_ref().find_attr_value(with_name).and_then(|v| Some(v.clone()))
     }
 
     fn find_transient(&self, with_name: impl AsRef<str>, with_symbol: impl AsRef<str>) -> Option<&atlier::system::Attribute> {
@@ -225,6 +225,7 @@ impl ThunkContext {
         async_enabled.status_updates = status_updates;
         async_enabled.dispatcher = dispatcher;
         async_enabled.project = project;
+        async_enabled.as_mut().set_parent_entity(entity);
         async_enabled
     }
 

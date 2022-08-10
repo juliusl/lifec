@@ -4,7 +4,10 @@ use atlier::system::{Attribute, Value};
 use specs::{Component, DefaultVecStorage};
 use tracing::{event, Level};
 
-use crate::{AttributeIndex, catalog::Item};
+use crate::{AttributeIndex, catalog::Item, plugins::{ThunkContext, Thunk}};
+
+use super::Operation;
+
 
 /// A query is used to materialize types that implement `catalog::Item`
 /// 
@@ -42,20 +45,50 @@ impl<I> Query<I>
 where
     I: AttributeIndex + Clone + Default + Sync + Send + Any
 {
+    /// Returns a thunk that can be lazily evaluated w/ a src index, using
+    /// the current search parameters, and provided item that implements Into<ThunkContext>
+    /// 
+    /// Optionally, if a thunk is provided, it will be evaluated w/ the thunk context, and
+    /// if the thunk spawns a task, that task will be returned in the Operation object. The thunk will
+    /// get a chance to modify the context as well before returning the task.
+    /// 
+    pub fn thunk<Alt>(&'_ self, item: impl Item + Into<ThunkContext> + Clone, thunk: Option<Thunk>) -> impl Fn(Arc<Alt>) -> Operation 
+    where 
+        Alt: AttributeIndex
+    {
+        let c = self.clone();
+        move |src| {
+            let mut item = item.clone();
+            c.evaluate_with(&src, &mut item);
+            let mut context = item.into();
+
+            let mut task = None;
+            if let Some(Thunk(name, func)) = thunk.as_ref() {
+                event!(Level::DEBUG, "Calling thunk {name}, from query thunk");
+                task = (func)(&mut context);
+            }
+
+            Operation { context, task }
+        }
+    }
+
     /// Evaluates the current search parameters, by looping through each transient attribute
     /// and a value is found, visits the dest item
     /// 
     pub fn evaluate(&self, dest: &mut impl Item) {
-        self.evaluate_with(self.src.clone(), dest)
+        self.evaluate_with(&self.src, dest)
     }
 
     /// Evaluates the current search parameters with a `src` that implements `AttributeIndex`
     /// 
-    pub fn evaluate_with(&self, src: Arc<I>, dest: &mut impl Item) {
+    pub fn evaluate_with<Alt>(&self, src: &Arc<Alt>, dest: &mut impl Item) 
+    where
+        Alt: AttributeIndex
+    {
         for search in self.search_params.iter() {
             if let Some((name, _)) = search.transient() {
                 if let Some(value) = src.find_value(name) {
-                    dest.visit(name, value);
+                    dest.visit(name, &value);
                 }
             }
         }

@@ -303,16 +303,16 @@ type PluginTask = fn(&mut ThunkContext) -> Option<AsyncContext>;
 /// ```
 pub fn combine<A, B>() -> PluginTask
 where
-    A: Plugin<ThunkContext> + Default + Send,
-    B: Plugin<ThunkContext> + Default + Send,
+    A: Plugin + Default + Send,
+    B: Plugin + Default + Send,
 {
-    <(A, B) as Plugin<ThunkContext>>::call_with_context
+    <(A, B) as Plugin>::call_with_context
 }
 
-impl<A, B> Plugin<ThunkContext> for (A, B) 
+impl<A, B> Plugin for (A, B) 
 where
-    A: Plugin<ThunkContext> + Default + Send,
-    B: Plugin<ThunkContext> + Default + Send,
+    A: Plugin + Default + Send,
+    B: Plugin + Default + Send,
 {
     fn symbol() -> &'static str {
         "combine"

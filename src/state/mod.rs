@@ -18,6 +18,7 @@ use std::{
 mod v2;
 pub use v2::AttributeIndex;
 pub use v2::Query;
+pub use v2::Operation;
 
 /// Attribute graph is a component that indexes attributes for an entity
 /// It is designed to be a general purpose enough to be the common element of runtime state storage

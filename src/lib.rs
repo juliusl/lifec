@@ -42,6 +42,7 @@ pub use state::AttributeGraphElements;
 pub use state::AttributeGraphErrors;
 pub use state::Query;
 pub use state::AttributeIndex;
+pub use state::Operation;
 
 use crate::plugins::ProxyDispatcher;
 

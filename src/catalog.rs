@@ -45,8 +45,6 @@ where
 /// to concern itself w/ storage of attributes.
 /// 
 pub trait Item 
-where
-    Self: Debug
 {
     /// Returns a reference to implementing type
     /// 
@@ -63,67 +61,67 @@ where
     /// Visits self w/ a name and bool 
     /// 
     fn visit_bool(&mut self, _name: impl AsRef<str>, _value: bool) {
-        event!(Level::WARN, "visit_bool not implemented {:#?}", self)
+        event!(Level::WARN, "visit_bool not implemented")
     }
 
     /// Visits self w/ a name and int 
     /// 
     fn visit_int(&mut self, _name: impl AsRef<str>, _value: i32) {
-        event!(Level::WARN, "visit_int not implemented {:#?}", self)
+        event!(Level::WARN, "visit_int not implemented")
     }
 
     /// Visits self w/ a name and int_pair
     /// 
     fn visit_int_pair(&mut self, _name: impl AsRef<str>, _value: [i32; 2]) {
-        event!(Level::WARN, "visit_int_pair not implemented {:#?}", self)
+        event!(Level::WARN, "visit_int_pair not implemented")
     }
 
     /// Visits self w/ a name and int_range
     /// 
     fn visit_int_range(&mut self, _name: impl AsRef<str>, _value: [i32; 3]) {
-        event!(Level::WARN, "visit_int_range not implemented {:#?}", self)
+        event!(Level::WARN, "visit_int_range not implemented")
     }
 
     /// Visits self w/ a name and float
     /// 
     fn visit_float(&mut self, _name: impl AsRef<str>, _value: f32) {
-        event!(Level::WARN, "visit_float not implemented {:#?}", self)
+        event!(Level::WARN, "visit_float not implemented")
     }
 
     /// Visits self w/ a name and a float pair
     /// 
     fn visit_float_pair(&mut self, _name: impl AsRef<str>, _value: [f32; 2]) {
-        event!(Level::WARN, "visit_float_pair not implemented {:#?}", self)
+        event!(Level::WARN, "visit_float_pair not implemented")
     }
 
     /// Visits self w/ a name and float range
     /// 
     fn visit_float_range(&mut self, _name: impl AsRef<str>, _value: [f32; 3]) {
-        event!(Level::WARN, "visit_float_range not implemented {:#?}", self)
+        event!(Level::WARN, "visit_float_range not implemented")
     }
 
     /// Visits self w/ a name and binary vector
     /// 
     fn visit_binary_vec(&mut self, _name: impl AsRef<str>, _value: impl Into<Vec<u8>>) {
-        event!(Level::WARN, "visit_binary_vec not implemented {:#?}", self)
+        event!(Level::WARN, "visit_binary_vec not implemented")
     }
 
     /// Visits self w/ a name and symbol
     /// 
     fn visit_symbol(&mut self, _name: impl AsRef<str>, _value: impl AsRef<str>) {
-        event!(Level::WARN, "visit_symbol not implemented {:#?}", self)
+        event!(Level::WARN, "visit_symbol not implemented")
     }
 
     /// Visits self w/ a name and text
     /// 
     fn visit_text(&mut self, _name: impl AsRef<str>, _value: impl AsRef<str>) {
-        event!(Level::WARN, "visit_text not implemented {:#?}", self)
+        event!(Level::WARN, "visit_text not implemented")
     }
 
-    /// Visits self w/ a name and reference value
+    /// Visits self w/ a name and value
     /// 
     fn visit_reference(&mut self, _name: impl AsRef<str>, _value: u64) {
-        event!(Level::WARN, "visit_reference not implemented {:#?}", self)
+        event!(Level::WARN, "visit_reference not implemented")
     }
 
     /// Visits self w/ a name and value and calls the corresponding visit method
