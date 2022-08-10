@@ -1,6 +1,6 @@
 use crate::plugins::BlockAddress;
 
-use super::node::Node;
+use super::Node;
 
 /// A data cube is the initial cube processed in the tesseract protocol,
 /// 

@@ -1,6 +1,6 @@
 use crate::plugins::BlockAddress;
 
-use super::node::Node;
+use super::Node;
 
 /// The control cube is established in the protocol, 
 /// after the datacube has completed its setup. 
