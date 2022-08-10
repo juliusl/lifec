@@ -1,6 +1,8 @@
 use super::BlockContext;
+use crate::plugins::ThunkContext;
 use crate::state::AttributeGraph;
 use crate::RuntimeDispatcher;
+use atlier::system::Value;
 use imgui::Ui;
 use specs::storage::HashMapStorage;
 use specs::Component;
@@ -26,6 +28,48 @@ impl Project {
         Self::load_file(".runmd")
     }
 
+    /// Configures a thunk context from a block in the project
+    /// 
+    /// The block is found by using the block name from the thunk context's block context,
+    /// and from the attribute `plugin_symbol` if set. If not set, and a config_block is found, 
+    /// will use the current graph state returned by config_block.as_ref()
+    /// 
+    pub fn configure(&self, tc: &mut ThunkContext) {
+        if let Some(config_block) = self.find_block(&tc.block.block_name) {
+            let config = if let Some(plugin_symbol) = tc.as_ref().find_text("plugin_symbol") {
+                config_block.get_block(plugin_symbol).unwrap_or(config_block.as_ref().clone())
+            } else {
+                config_block.as_ref().clone()
+            };
+
+            for (name, value) in config.iter_attributes().filter_map(|a| {
+                if a.is_stable() {
+                    Some((a.name(), a.value()))
+                } else {
+                    None
+                }
+            }) {
+                tc.as_mut().with(name, value.clone());
+            }
+
+            for a in config
+                .iter_attributes()
+                .filter(|a| !a.is_stable())
+            {
+                if let Some((_, value)) = a.transient() {
+                    if let Value::Symbol(symbol) = a.value() {
+                        let symbol = symbol.trim_end_matches("::");
+                        let name = a.name().trim_end_matches(&format!("::{symbol}"));
+
+                        tc.as_mut().define(name, symbol).edit_as(value.clone());
+                    }
+                }
+            }
+
+            tc.block.block_name = config_block.block_name.to_string();
+        }
+    }
+
     pub fn index_hash_code(&self) -> u64 {
         let mut hasher = DefaultHasher::default();
         let hasher = &mut hasher;
@@ -49,8 +93,8 @@ impl Project {
         match self.transpile_blocks() {
             Ok(root) => {
                 writeln!(src, "{}", root)?;
-            },
-            Err(_) => {},
+            }
+            Err(_) => {}
         }
 
         Ok(src)
@@ -60,7 +104,7 @@ impl Project {
         let mut src = String::default();
 
         for (_, block) in self.block_index.iter() {
-            let transpiled =  block.transpile()?;
+            let transpiled = block.transpile()?;
             writeln!(src, "{}", transpiled)?;
         }
 

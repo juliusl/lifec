@@ -1,4 +1,3 @@
-use std::fmt::Debug;
 use specs::prelude::*;
 use atlier::system::Value;
 use tracing::{event, Level};

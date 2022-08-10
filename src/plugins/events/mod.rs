@@ -60,6 +60,12 @@ impl Display for Event {
 }
 
 impl Event {
+    /// Returns the a clone of the inner thunk
+    /// 
+    pub fn thunk(&self) -> Thunk {
+        self.1.clone()
+    }
+
     /// Creates an event component, with a task created with on_event
     /// a handle to the tokio runtime is passed to this function to customize the task spawning
     pub fn from_plugin<P>(event_name: &'static str) -> Self

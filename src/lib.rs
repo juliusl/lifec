@@ -11,10 +11,11 @@ use tracing::{event, Level};
 use imgui::{ChildWindow, MenuItem, Ui, Window};
 use plugins::{
     AsyncContext, BlockContext, Config, Connection, Engine, Event, Expect, OpenDir, OpenFile,
-    Plugin, Println, Process, Project, Remote, Sequence, ThunkContext, Timer, WriteFile,
+    Plugin, Println, Process, Project, Remote, Sequence, ThunkContext, Timer, WriteFile, Thunk,
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
+use std::sync::Arc;
 use std::time::Duration;
 use std::{any::Any, collections::BTreeMap};
 
@@ -170,7 +171,7 @@ pub type ConfigFn = fn(&mut ThunkContext);
 
 /// Runtime provides access to the underlying project, and function tables for creating components
 /// 
-#[derive(Component, Default)]
+#[derive(Component, Default, Clone)]
 #[storage(DefaultVecStorage)]
 pub struct Runtime {
     /// Project loaded w/ this runtime, typically from a .runmd file
@@ -182,31 +183,40 @@ pub struct Runtime {
     config: BTreeMap<String, ConfigFn>,
 }
 
-/// Consolidates elements to start and create events into a struct
-/// Can be returned by a runtime
-pub struct EventBuilder<'a> {
+/// Event builder returned by a runtime, that can be used to schedule events w/ a world
+/// 
+pub struct EventBuilder {
     event: Event,
     create_fn: CreateFn,
-    runtime: &'a Runtime 
+    runtime: Arc<Runtime>, 
 }
 
-impl<'a> EventBuilder<'a> {
+impl EventBuilder {
     /// Sets the config for the event
-    pub fn set_config(&mut self, config: Config) -> &mut Self {
+    /// 
+    pub fn set_config(&mut self, config: Config) {
         self.event.set_config(config);
-        self
     }
 
     /// Sets the config from a config registered with the runtime
     /// 
     /// If the config doesn't exist then this is a no-op
     /// 
-    pub fn set_config_by_name(&mut self, name: impl AsRef<str>) -> &mut Self {
+    pub fn set_config_from_runtime(&mut self, name: impl AsRef<str>) {
         if let Some(config_fn) = self.runtime.config.get(name.as_ref()) {
             self.event.set_config(Config("from_runtime", *config_fn));
         }
+    }
 
-        self
+    /// Configures the event to configure the context from the project 
+    /// 
+    /// **Caveat** The block name of the context's block context must be set
+    pub fn set_config_from_project(&mut self) {
+        self.event.set_config(Config("from_project", |mut tc| {
+            if let Some(project) = tc.clone().project.as_ref() {
+                project.configure(&mut tc);
+            }
+        }));
     }
 
     /// Creates the event w/ the world and returns the entity
@@ -227,10 +237,17 @@ impl<'a> EventBuilder<'a> {
             None
         }
     }
+
+    /// Returns the event's plugin thunk
+    /// 
+    pub fn thunk(&self) -> Thunk {
+        self.event.thunk()
+    }
 }
 
 impl Runtime {
     /// Returns a runtime from a project, with no plugins installed
+    /// 
     pub fn new(project: Project) -> Self {
         Self {
             project,
@@ -239,17 +256,17 @@ impl Runtime {
         }
     }
 
-    /// Creates a new event builder
+    /// Creates a new event builder, for an engine/plugin pair
     /// 
     pub fn event_builder<'a, E, P>(&'a self) -> EventBuilder 
     where
         E: Engine,
-        P: Plugin<ThunkContext> + Send + Default
+        P: Plugin + Send + Default
     {
         EventBuilder {
             create_fn: E::create::<P>,
             event: E::event::<P>(),
-            runtime: &self,
+            runtime: Arc::new(self.clone()),
         }
     }
 
@@ -257,7 +274,7 @@ impl Runtime {
     pub fn install<E, P>(&mut self)
     where
         E: Engine,
-        P: Plugin<ThunkContext> + Send + Default,
+        P: Plugin + Send + Default,
     {
         let event = E::event::<P>();
         self.engine_plugin.insert(event.to_string(), E::create::<P>);
