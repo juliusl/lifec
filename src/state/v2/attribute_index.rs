@@ -355,7 +355,10 @@ pub trait AttributeIndex {
         })
     }
 
-    /// Creates a new query, for evaluating state from the index
+    /// Creates a new empty query, for evaluating state from an index
+    /// 
+    /// **Note** Once a query is created, the same query can be reused w/ other index sources. This allows 
+    /// the search parameters to be declared once, and reused w/ other sources.
     /// 
     fn query(&self) -> Query<Self> 
     where
@@ -365,6 +368,9 @@ pub trait AttributeIndex {
     }
 
     /// Creates a new query, for evaluating state from the index w/ search_params
+    /// 
+    /// **Note** Once a query is created, the same query can be reused w/ other index sources. This allows 
+    /// the search parameters to be declared once, and reused w/ other sources.
     /// 
     fn query_with(&self, search_params: Vec<Attribute>) -> Query<Self> 
     where
