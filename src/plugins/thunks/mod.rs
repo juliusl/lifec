@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use crate::AttributeGraph;
+use crate::Operation;
 use crate::RuntimeDispatcher;
 use crate::state::AttributeIndex;
 use atlier::system::Value;
@@ -154,6 +155,8 @@ pub struct ThunkContext {
     client: Option<SecureClient>,
     /// Dispatcher for attribute graphs
     dispatcher: Option<Sender<AttributeGraph>>,
+    /// Dispatcher for attribute graphs
+    operation_dispatcher: Option<Sender<Operation>>,
     /// Channel to send bytes to a listening char_device
     char_device: Option<Sender<(u32, u8)>>,
     /// UDP socket, 
@@ -203,30 +206,112 @@ impl ThunkContext {
         }
     }
 
-    /// Enable async features for this context.
+    /// Returns a context w/ async features enabled
     /// 
-    /// As long as the thunk context was used w/ a plugin once w/ the event runtime,
-    /// the event runtime will always enable all of the below fields in the context.
+    /// **Caveat** As long as the thunk context was used w/ a plugin and event runtime,
+    /// these dependencies will be injected at runtime. This is so the context can be configured
+    /// w/o needing to initialize additional async dependencies.
     /// 
-    /// These fields are set as optional, to make extending the architecture, and testing easier. 
+    /// **Caveat** This method will set the parent entity for the underlying attribute graph,
+    /// and also update all attributes currently in context
+    /// 
     pub fn enable_async(
         &self,
         entity: Entity,
         handle: Handle,
-        client: Option<SecureClient>,
-        project: Option<Project>,
-        status_updates: Option<Sender<StatusUpdate>>,
-        dispatcher: Option<Sender<AttributeGraph>>,
     ) -> ThunkContext {
         let mut async_enabled = self.clone();
         async_enabled.entity = Some(entity);
         async_enabled.handle = Some(handle);
-        async_enabled.client = client;
-        async_enabled.status_updates = status_updates;
-        async_enabled.dispatcher = dispatcher;
-        async_enabled.project = project;
         async_enabled.as_mut().set_parent_entity(entity);
         async_enabled
+    }
+
+    /// Returns a context w/ an https client
+    /// 
+    /// The event runtime creates a client on setup, and passes a clone to each thunk context
+    /// when enabling this dependency. HTTPS clients are intended to be cheap to clone, and the 
+    /// underlying connection pool will be reused.
+    /// 
+    pub fn enable_https_client(
+        &mut self,
+        client: SecureClient
+    ) -> &mut ThunkContext {
+        self.client = Some(client);
+        self
+    }
+
+    /// Returns a context w/ a project
+    /// 
+    /// Setting the project allows this context to configure itself
+    /// from the blocks defined in the project. 
+    /// 
+    /// **Caveat** When this is called from the event runtime, the following order will 
+    /// be used to determine which project is chosen, 
+    /// - Entity has a `Project` component
+    /// - Entity has a `Runtime` component
+    /// - World's project resource
+    /// 
+    /// ## The `previous` graph event message
+    /// 
+    /// When the event runtime executes a sequence, the event runtime will transpile
+    /// the project, and send it as a graph message under the moniker `previous`. When
+    /// a plugin executes, it can apply this state to it's current graph in order to use the results.
+    /// 
+    /// i.e. `tc.as_mut().apply("previous")`
+    /// 
+    /// This method of passing state forward is an explicit gesture. And has high-overhead because the project must be 
+    /// transpiled in order to send state forward. 
+    /// 
+    /// If multiple plugins need to share state, it is more performant to create a composite plugin using combine::<A, B>
+    /// A composite plugin will share the same thunk context between each plugin, which bypasses the need to transpile the project.
+    /// However, a composite plugin **must** take into account how each plugin will interpret attributes during execution. This is usually
+    /// not really an issue, as long as stable attributes are used and declared consistently. 
+    /// 
+    pub fn enable_project(
+        &mut self,
+        project: Project
+    ) -> &mut ThunkContext {
+        self.project = Some(project);
+        self
+
+        // TODO: Check block name
+    }
+
+    /// Returns a context w/ a dispatcher 
+    /// 
+    /// Plugins using this context will be able to dispatch attribute graphs to the underlying
+    /// runtime.
+    /// 
+    pub fn enable_dispatcher(
+        &mut self,
+        dispatcher: Sender<AttributeGraph>,
+    ) -> &mut ThunkContext {
+        self.dispatcher = Some(dispatcher);
+        self
+    }
+
+    /// Returns a context w/ an operation dispatcher
+    /// 
+    /// Plugins using this context will be able to dispatch operations for the underlying system to
+    /// handle.
+    /// 
+    pub fn enable_operation_dispatcher(
+        &mut self,
+        dispatcher: Sender<Operation>,
+    ) -> &mut ThunkContext {
+        self.operation_dispatcher = Some(dispatcher);
+        self
+    }
+
+    /// Returns a context w/ the status update channel enabled
+    /// 
+    pub fn enable_status_updates(
+        &mut self,
+        status_updates: Sender<StatusUpdate>,
+    ) -> &mut ThunkContext {
+        self.status_updates = Some(status_updates);
+        self 
     }
 
     /// Enables output to a char_device, a plugin can use to output bytes to. 
@@ -519,6 +604,7 @@ impl From<AttributeGraph> for ThunkContext {
             client: None,
             status_updates: None,
             dispatcher: None,
+            operation_dispatcher: None,
             char_device: None,
             udp_socket: None,
         }

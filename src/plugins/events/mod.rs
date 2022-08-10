@@ -4,7 +4,6 @@ use specs::Entity;
 use specs::ReadStorage;
 use specs::World;
 use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage};
-use tracing::Level;
 use std::fmt::Display;
 use tokio::sync::broadcast;
 use tokio::{
@@ -16,16 +15,18 @@ use tokio::{
     task::JoinHandle,
 };
 use tracing::event;
+use tracing::Level;
 
 use crate::AttributeGraph;
 use crate::Extension;
 
+use super::thunks::CancelThunk;
+use super::thunks::ErrorContext;
+use super::thunks::SecureClient;
+use super::thunks::StatusUpdate;
 use super::Archive;
 use super::BlockAddress;
 use super::Project;
-use super::thunks::CancelThunk;
-use super::thunks::ErrorContext;
-use super::thunks::StatusUpdate;
 use super::{Plugin, Thunk, ThunkContext};
 use crate::plugins::thunks::Config;
 use specs::storage::VecStorage;
@@ -37,8 +38,8 @@ mod listen;
 pub use listen::Listen;
 
 mod sequence;
-pub use sequence::Sequence;
 pub use sequence::Connection;
+pub use sequence::Sequence;
 
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
 #[derive(Component)]
@@ -61,7 +62,7 @@ impl Display for Event {
 
 impl Event {
     /// Returns the a clone of the inner thunk
-    /// 
+    ///
     pub fn thunk(&self) -> Thunk {
         self.1.clone()
     }
@@ -81,9 +82,9 @@ impl Event {
     }
 
     /// Prepares an event for the event runtime to start, cancel any previous join_handle
-    /// 
+    ///
     /// Caveats: If the event has a config set, it will configure the context, before setting it
-    /// 
+    ///
     pub fn fire(&mut self, mut thunk_context: ThunkContext) {
         if let Some(Config(name, config)) = self.2 {
             event!(Level::TRACE, "detected config {name} for event: {}", self.0);
@@ -142,7 +143,9 @@ impl Event {
 
 /// Event runtime drives the tokio::Runtime and schedules/monitors/orchestrates task entities
 #[derive(Default)]
-pub struct EventRuntime;
+pub struct EventRuntime {
+    https_client: Option<SecureClient>,
+}
 
 impl Extension for EventRuntime {
     fn configure_app_world(world: &mut specs::World) {
@@ -150,6 +153,8 @@ impl Extension for EventRuntime {
         world.register::<ThunkContext>();
         world.register::<CancelThunk>();
         world.register::<ErrorContext>();
+        world.register::<Project>();
+        world.register::<crate::Runtime>();
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
@@ -212,9 +217,9 @@ impl SetupHandler<sync::mpsc::Sender<ErrorContext>> for EventRuntime {
 }
 
 /// Setup for a built-in runtime for the world
-/// 
+///
 /// TODO: Trying to move more things to this runtime-space
-/// 
+///
 impl SetupHandler<super::Runtime> for EventRuntime {
     fn setup(world: &mut World) {
         world.insert(super::Runtime::default());
@@ -231,6 +236,8 @@ impl<'a> System<'a> for EventRuntime {
         Read<'a, Project>,
         Entities<'a>,
         ReadStorage<'a, Connection>,
+        ReadStorage<'a, Project>,
+        ReadStorage<'a, crate::Runtime>,
         WriteStorage<'a, Event>,
         WriteStorage<'a, ThunkContext>,
         WriteStorage<'a, Sequence>,
@@ -239,6 +246,12 @@ impl<'a> System<'a> for EventRuntime {
         WriteStorage<'a, Archive>,
         WriteStorage<'a, BlockAddress>,
     );
+
+    fn setup(&mut self, _: &mut World) {
+        let https = HttpsConnector::new();
+        let client = Client::builder().build::<_, hyper::Body>(https);
+        self.https_client = Some(client);
+    }
 
     fn run(
         &mut self,
@@ -251,6 +264,8 @@ impl<'a> System<'a> for EventRuntime {
             project,
             entities,
             connections,
+            projects,
+            lifec_runtimes,
             mut events,
             mut contexts,
             mut sequences,
@@ -262,22 +277,37 @@ impl<'a> System<'a> for EventRuntime {
     ) {
         let mut dispatch_queue = vec![];
 
-        for (entity, _connection, event) in (&entities, connections.maybe(), &mut events).join() {
+        for (entity, _connection, _project, _lifec_runtime, event) in (
+            &entities,
+            connections.maybe(),
+            projects.maybe(),
+            lifec_runtimes.maybe(),
+            &mut events,
+        )
+            .join()
+        {
             let event_name = event.to_string();
             let Event(_, thunk, _, initial_context, task) = event;
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
-                    if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() }) {
+                    if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() })
+                    {
                         // If the context enabled it's address, add the block address to world storage
-                        if thunk_context.socket_address().is_some() && !block_addresses.contains(entity) {
+                        if thunk_context.socket_address().is_some()
+                            && !block_addresses.contains(entity)
+                        {
                             if let Some(block_address) = thunk_context.to_block_address() {
                                 match block_addresses.insert(entity, block_address) {
                                     Ok(_) => {
-                                        event!(Level::DEBUG, "inserted new block address for {:?}", entity);
-                                    },
+                                        event!(
+                                            Level::DEBUG,
+                                            "inserted new block address for {:?}",
+                                            entity
+                                        );
+                                    }
                                     Err(err) => {
                                         event!(Level::ERROR, "Error inserting block address {err}");
-                                    },
+                                    }
                                 }
                             }
                         }
@@ -286,19 +316,24 @@ impl<'a> System<'a> for EventRuntime {
                             event!(Level::ERROR, "plugin error context generated");
                             let thunk_context = thunk_context.clone();
 
-                            if let Some(previous) = error_contexts.insert(entity, error_context.clone()).ok() {
+                            if let Some(previous) =
+                                error_contexts.insert(entity, error_context.clone()).ok()
+                            {
                                 if let Some(previous) = previous.and_then(|p| p.fixer()) {
                                     match archives.get_mut(entity) {
-                                        Some(archive) =>{
+                                        Some(archive) => {
                                             if let Some(previous) = archive.0.take() {
                                                 let previous_id = previous.id();
                                                 match entities.delete(previous) {
                                                     Ok(_) => {
                                                         event!(Level::WARN, "deleting previous fix attempt {previous_id}");
-                                                    },
+                                                    }
                                                     Err(err) => {
-                                                        event!(Level::ERROR, "error deleting previous entity {err}");
-                                                    },
+                                                        event!(
+                                                            Level::ERROR,
+                                                            "error deleting previous entity {err}"
+                                                        );
+                                                    }
                                                 }
                                             }
                                             archive.0 = Some(previous);
@@ -307,21 +342,27 @@ impl<'a> System<'a> for EventRuntime {
                                             archives.insert(entity, Archive(Some(previous))).ok();
 
                                             if let Some(archiving) = contexts.get(previous) {
-                                                runtime.block_on( async { archiving.update_status_only("Archived").await });
+                                                runtime.block_on(async {
+                                                    archiving.update_status_only("Archived").await
+                                                });
                                             }
-                                        },
+                                        }
                                     }
                                 }
 
-                                runtime.block_on(async { error_dispatcher.send(error_context.clone()).await }).ok();
+                                runtime
+                                    .block_on(async {
+                                        error_dispatcher.send(error_context.clone()).await
+                                    })
+                                    .ok();
 
                                 if error_context.stop_on_error() {
                                     event!(Level::ERROR, "Error detected, and `stop_on_error` is enabled, stopping at {}", entity.id());
                                     let mut clone = thunk_context.clone();
 
                                     clone.as_mut().with_text(
-                                        "thunk_symbol", 
-                                        format!("Stopped -> {}", thunk.0)
+                                        "thunk_symbol",
+                                        format!("Stopped -> {}", thunk.0),
                                     );
 
                                     contexts.insert(entity, clone).ok();
@@ -343,7 +384,11 @@ impl<'a> System<'a> for EventRuntime {
                                                 dispatch_queue.push((next_event, thunk_context));
                                             }
                                             None => {
-                                                event!(Level::TRACE, "Initialized sequence for {}", next_event.id());
+                                                event!(
+                                                    Level::TRACE,
+                                                    "Initialized sequence for {}",
+                                                    next_event.id()
+                                                );
                                             }
                                         }
                                     } else {
@@ -363,6 +408,8 @@ impl<'a> System<'a> for EventRuntime {
                 } else {
                     *task = Some(current_task);
                 }
+            // An event starts by passing an initial_context to the event
+            // the runtime takes this context and configures it before calling the thunk
             } else if let Some(initial_context) = initial_context.take() {
                 event!(
                     Level::DEBUG,
@@ -374,18 +421,31 @@ impl<'a> System<'a> for EventRuntime {
                 );
                 let thunk = thunk.clone();
                 let runtime_handle = runtime.handle().clone();
-                let https = HttpsConnector::new();
-                let client = Client::builder().build::<_, hyper::Body>(https);
-                
-                let mut context =
-                    initial_context.enable_async(
-                        entity, 
-                        runtime_handle,
-                        Some(client),
-                        Some(project.reload_source()), 
-                        Some(status_update_channel.clone()),
-                        Some(dispatcher.clone()),
-                    );
+                let client = self
+                    .https_client
+                    .clone()
+                    .expect("client should've been created on setup()");
+
+                let mut context = initial_context
+                    .enable_async(entity, runtime_handle)
+                    .enable_https_client(client)
+                    .enable_dispatcher(dispatcher.clone())
+                    .enable_project({
+                        if let Some(project) = _project {
+                            // If the entity has a project component, prioritize using that
+                            project.clone()
+                        } else if let Some(runtime) = _lifec_runtime {
+                            // Otherwise if the entity has a runtime component, use the project 
+                            // from the runtime. A runtime usually is configured w/ a project on start-up
+                            // so this is less explicit then directly setting the project component
+                            runtime.project.clone()
+                        } else {
+                            // Otherwise, use the common project set w/ the current world
+                            project.reload_source()
+                        }
+                    })
+                    .enable_status_updates(status_update_channel.clone())
+                    .to_owned();
 
                 let Thunk(thunk_name, thunk) = thunk;
                 // TODO it would be really helpful to add a macro for these status updates
@@ -401,12 +461,10 @@ impl<'a> System<'a> for EventRuntime {
                                 cancel.send(()).ok();
                             }
 
-                            let mut started = context.clone();                            
-                            started.as_mut()
-                                .with_text(
-                                    "thunk_symbol", 
-                                    format!("Running -> {}", thunk_name)
-                                );
+                            let mut started = context.clone();
+                            started
+                                .as_mut()
+                                .with_text("thunk_symbol", format!("Running -> {}", thunk_name));
 
                             // Initializes and starts the task by spawning it on the runtime
                             *task = Some(runtime.spawn(async move {
@@ -451,7 +509,10 @@ impl<'a> System<'a> for EventRuntime {
                         Err(_) => {}
                     }
                 } else {
-                    event!(Level::TRACE, "Task didn't start, which means the thunk has already completed");
+                    event!(
+                        Level::TRACE,
+                        "Task didn't start, which means the thunk has already completed"
+                    );
                 }
             }
         }
@@ -460,6 +521,7 @@ impl<'a> System<'a> for EventRuntime {
         loop {
             match dispatch_queue.pop() {
                 Some((mut next, last)) => {
+                    // TODO: This is tricky, probably will re-write
                     if let Some(true) = connections.get(next).and_then(|c| Some(c.fork_enabled())) {
                         let forked_event = events.get(next).and_then(|e| Some(e.duplicate()));
                         let forked_context = contexts.get(next).and_then(|c| Some(c.clone()));
@@ -481,18 +543,17 @@ impl<'a> System<'a> for EventRuntime {
                         (events.get_mut(next), contexts.get_mut(next))
                     {
                         let last_id = last.as_ref().entity();
-                        let previous = last.project
-                                .and_then(|p| p.transpile_blocks().ok())
-                                .unwrap_or_default()
-                                .trim()
-                                .to_string();
+                        let previous = last
+                            .project
+                            .and_then(|p| p.transpile_blocks().ok())
+                            .unwrap_or_default()
+                            .trim()
+                            .to_string();
 
                         if !previous.trim().is_empty() {
-                            context.as_mut().add_message(
-                                event.to_string(),
-                                "previous",
-                                previous,
-                            );
+                            context
+                                .as_mut()
+                                .add_message(event.to_string(), "previous", previous);
                         }
 
                         event.fire(context.clone());

@@ -142,8 +142,8 @@ fn test_socket_proxies() {
         .set_parent_entity(entity_b);
     test_world.maintain();
 
-    a = a.enable_async(entity_a, runtime.handle().clone(), None, None, None, None);
-    b = b.enable_async(entity_b, runtime.handle().clone(), None, None, None, None);
+    a = a.enable_async(entity_a, runtime.handle().clone());
+    b = b.enable_async(entity_b, runtime.handle().clone());
 
     test_world.write_component().insert(entity_a, a.clone()).ok();
     test_world.write_component().insert(entity_b, b.clone()).ok();
