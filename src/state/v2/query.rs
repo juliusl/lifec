@@ -48,11 +48,11 @@ where
     /// Returns a thunk that can be lazily evaluated w/ a src index, using
     /// the current search parameters, and provided item that implements Into<ThunkContext>
     /// 
-    /// Optionally, if a thunk is provided, it will be evaluated w/ the thunk context, and
+    /// Optionally, if a plugin thunk is provided, it will be evaluated w/ the thunk context, and
     /// if the thunk spawns a task, that task will be returned in the Operation object. The thunk will
     /// get a chance to modify the context as well before returning the task.
     /// 
-    pub fn thunk<Alt>(&'_ self, item: impl Item + Into<ThunkContext> + Clone, thunk: Option<Thunk>) -> impl Fn(Arc<Alt>) -> Operation 
+    pub fn thunk<Alt>(&'_ self, item: impl Item + Into<ThunkContext> + Clone, plugin_thunk: Option<Thunk>) -> impl Fn(Arc<Alt>) -> Operation 
     where 
         Alt: AttributeIndex
     {
@@ -63,7 +63,7 @@ where
             let mut context = item.into();
 
             let mut task = None;
-            if let Some(Thunk(name, func)) = thunk.as_ref() {
+            if let Some(Thunk(name, func)) = plugin_thunk.as_ref() {
                 event!(Level::DEBUG, "Calling thunk {name}, from query thunk");
                 task = (func)(&mut context);
             }
