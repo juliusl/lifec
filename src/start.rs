@@ -4,7 +4,7 @@ use tracing::{event, Level};
 use crate::{Extension, Runtime, editor::Call, plugins::{Event, ThunkContext}};
 
 /// start creates an engine from the runtime, and begins the world in a loop
-pub fn start<E>(mut extension: E, call_sequence: &[&'static str])
+pub fn start<E>(mut extension: E, call_sequence: &[String])
 where
     E: Extension + AsRef<Runtime> + 'static
 {
