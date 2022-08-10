@@ -4,9 +4,10 @@ use tracing::{event, Level};
 use crate::{Extension, Runtime, editor::Call, plugins::{Event, ThunkContext}};
 
 /// start creates an engine from the runtime, and begins the world in a loop
-pub fn start<E>(mut extension: E, call_sequence: &[String])
+pub fn start<E, S>(mut extension: E, call_sequence: Vec<S>)
 where
-    E: Extension + AsRef<Runtime> + 'static
+    E: Extension + AsRef<Runtime> + 'static,
+    S: AsRef<str> + ToString,
 {
     let mut world = World::new();
     let mut dipatch_builder = DispatcherBuilder::new();
