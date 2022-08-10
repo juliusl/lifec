@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::{plugins::{ThunkContext, AsyncContext}, Item};
 use atlier::system::Value;
 use specs::{Component, DefaultVecStorage, Entity};
@@ -48,14 +50,16 @@ impl Operation {
     /// 
     pub fn item(entity: Entity, handle: tokio::runtime::Handle) -> Self {
         let tc = ThunkContext::default();
-        let context = tc.enable_async(entity, handle, None, None, None, None);
+        let context = tc.enable_async(entity, handle);
         Self { context, task: None }
     }
 
-    /// **Destructive method** - calling this method will take and resolve the task, and update the operations
-    /// context if applicable. Returns a clone of the updated context if the task was waited on.
+    /// **Destructive** - calling this method will take and handle resolving this task to completion,
     /// 
-    /// If None is returned, then the operation's context is the latest.
+    /// Returns some context if the task returned a context, also sets that context as the current context of the operation,
+    /// otherwise returns None
+    /// 
+    /// **Note** If None is returned, that implies that self.context is the latest state
     /// 
     pub async fn task(&mut self, cancel_source: Receiver<()>) -> Option<ThunkContext>  {
         if let Some((task, cancel)) = self.task.take() {
@@ -83,15 +87,62 @@ impl Operation {
         }
     }
 
+    /// **Destructive** - calling this method will take and handle resolving this task to completion,
+    /// 
     /// Blocks the current thread indefinitely, until the task completes
     /// 
+    /// If successfuly returns the resulting thunk context, and updates it's current context.
+    /// 
+    /// **See .task() for other mutation details**
+    /// 
     pub fn wait(&mut self) -> Option<ThunkContext> {
-        if let Some((task, _)) = self.task.as_mut() {
+        if let Some((task, _)) = self.task.take() {
             if let Some(handle) = self.context.handle() {
                 return handle.block_on(async {
                     match task.await {
-                        Ok(tc) => Some(tc),
-                        Err(_) => {
+                        Ok(tc) => {
+                            self.context = tc.clone();
+                            Some(tc)
+                        },
+                        Err(err) => {
+                            event!(Level::ERROR, "operation's task returned an error, {err}");
+                            None
+                        },
+                    }
+                })
+            }
+        }
+
+        None
+    }
+
+    /// **Destructive** - calling this method will take and handle resolving this task to completion,
+    /// 
+    /// Blocks the current thread to wait for the underlying task to complete
+    /// 
+    /// The task must complete before the timeout expires
+    /// 
+    /// If successfuly returns the resulting thunk context, and updates it's current context.
+    /// 
+    /// **See .task() for other mutation details**
+    /// 
+    pub fn wait_with_timeout(&mut self, timeout: Duration) -> Option<ThunkContext> {
+        if let Some((task, _)) = self.task.take() {
+            if let Some(handle) = self.context.handle() {
+                return handle.block_on(async {
+                    match tokio::time::timeout(timeout, task).await {
+                        Ok(result) => match result {
+                            Ok(tc) => {
+                                self.context = tc.clone();
+                                Some(tc)
+                            },
+                            Err(err) => {
+                                event!(Level::ERROR, "operation's task returned an error, {err}");
+                                None
+                            },
+                        },
+                        Err(elapsed) => {
+                            event!(Level::ERROR, "operation timed out, elapsed {elapsed}");
                             None
                         },
                     }
@@ -344,7 +395,7 @@ mod tests {
                 .to_owned();
             let mut tc = ThunkContext::from(src);
             if let (Some(handle), Some(entity)) = (self.handle, self.entity) {
-                tc = tc.enable_async(entity, handle, None, None, None, None);
+                tc = tc.enable_async(entity, handle);
             }
             tc 
         }
