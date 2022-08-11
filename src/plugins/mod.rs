@@ -20,6 +20,7 @@ pub use network::NetworkEvent;
 pub use network::NetworkTask;
 pub use network::Proxy;
 pub use network::ProxiedMessage;
+pub use network::NetworkRuntime;
 
 mod events;
 pub use events::Event;

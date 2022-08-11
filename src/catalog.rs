@@ -32,7 +32,8 @@ where
     pub items: WriteStorage<'a, I>,
 }
 
-/// The intention of this trait is to combine indexing / deserialization semantics into a single trait
+/// The intention of this trait is to combine indexing / deserialization semantics into a single trait using the 
+/// Visitor pattern.
 /// Serde traits could have been used instead, but after examination seemed a bit overkill for the needs of this
 /// trait. That being said, an implementation based on serde would allow more interop options, and make the runtime more flexible
 /// as a whole.
@@ -43,8 +44,7 @@ where
 /// By implementing a visit method, the implementing type is responsible for validating and interpreting attributes to set it's own state, and doesn't need
 /// to concern itself w/ storage of attributes.
 /// 
-pub trait Item 
-{
+pub trait Item {
     /// Returns a reference to implementing type
     /// 
     fn item_ref(&self) -> &Self {

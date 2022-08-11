@@ -21,6 +21,7 @@ pub struct NetworkRuntime;
 
 /// Network events returned by network tasks
 ///
+#[derive(Debug)]
 pub enum NetworkEvent {
     /// This event is created when a proxy component has received bytes
     ///
@@ -34,13 +35,13 @@ pub enum NetworkEvent {
     /// to an upstream entity
     Proxied(
         /// upstream entity id to notify,
-        /// 
+        ///
         /// This id belongs to the entity that spawned the proxy
         u32,
-        /// bytes sent upstream, 
-        /// 
+        /// bytes sent upstream,
+        ///
         /// *note* usually udp sockets need to implement their own protocols,
-        /// so this value can be used to figure out 
+        /// so this value can be used to figure out
         usize,
     ),
     Default,
@@ -94,17 +95,9 @@ impl Extension for NetworkRuntime {
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
-        dispatcher.add(
-            NetworkRuntime::default(),
-            "network_runtime",
-            &[],
-        );
+        dispatcher.add(NetworkRuntime::default(), "network_runtime", &[]);
 
-        dispatcher.add(
-            ProxyRuntime::default(),
-            "proxy_runtime",
-            &["event_runtime"],
-        );
+        dispatcher.add(ProxyRuntime::default(), "proxy_runtime", &["event_runtime"]);
     }
 }
 
@@ -142,15 +135,14 @@ impl<'a> System<'a> for NetworkRuntime {
                                     // the plugin can interpret the transient value to figure out what type of message
                                     // it need's to process next.
                                     let mut upstream_context = upstream_context.clone();
-                                    upstream_context.as_mut()
+                                    upstream_context
+                                        .as_mut()
                                         .define("proxy", "received")
                                         .edit_as(Value::Int(sent as i32));
                                     upstream_event.fire(upstream_context);
                                 }
-                            }, 
-                            _ => {
-
                             }
+                            _ => {}
                         }
                     }
                 });
@@ -161,8 +153,8 @@ impl<'a> System<'a> for NetworkRuntime {
 
 #[test]
 fn test_network_systems() {
-    use specs::World;
     use specs::DispatcherBuilder;
+    use specs::World;
     let mut test_world = World::new();
     let test_world = &mut test_world;
     let mut test_dispatcher = DispatcherBuilder::new();
@@ -171,21 +163,32 @@ fn test_network_systems() {
     EventRuntime::configure_app_systems(&mut test_dispatcher);
     NetworkRuntime::configure_app_world(test_world);
     NetworkRuntime::configure_app_systems(&mut test_dispatcher);
-    
+
     let mut test_dispatcher = test_dispatcher.build();
     test_dispatcher.setup(test_world);
-    
+
     let test_entity = test_world.entities().create();
     test_world.maintain();
     test_dispatcher.dispatch(&test_world);
-   
+
     // Test inserting a task that has completed, gets handled
-    test_world.write_component().insert(test_entity, NetworkTask(Some(tokio_runtime.spawn(async {
-        eprintln!("called");
-        NetworkEvent::Proxied(0, 0)
-    })))).ok();
+    test_world
+        .write_component()
+        .insert(
+            test_entity,
+            NetworkTask(Some(tokio_runtime.spawn(async {
+                eprintln!("called");
+                NetworkEvent::Proxied(0, 0)
+            }))),
+        )
+        .ok();
     test_world.maintain();
     test_dispatcher.dispatch(&test_world);
+    test_world.maintain();
 
-    assert!(test_world.read_component::<NetworkTask>().get(test_entity).and_then(|t| t.0.as_ref()).is_none())
+    assert!(test_world
+        .read_component::<NetworkTask>()
+        .get(test_entity)
+        .and_then(|t| t.0.as_ref())
+        .is_none());
 }

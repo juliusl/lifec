@@ -71,7 +71,7 @@ impl Event {
     /// a handle to the tokio runtime is passed to this function to customize the task spawning
     pub fn from_plugin<P>(event_name: &'static str) -> Self
     where
-        P: Plugin<ThunkContext> + Default + Send,
+        P: Plugin + Default + Send,
     {
         Self(event_name, Thunk::from_plugin::<P>(), None, None, None)
     }
@@ -114,27 +114,6 @@ impl Event {
             .unwrap_or_default()
     }
 
-    /// subscribe to get a notification when the runtime editor has updated an entity
-    pub fn subscribe(world: &World) -> sync::broadcast::Receiver<Entity> {
-        let sender = world.write_resource::<sync::broadcast::Sender<Entity>>();
-
-        sender.subscribe()
-    }
-
-    /// receive the next updated thunkcontext from world,
-    /// Note: this receives from the world's global receiver, to receive full broadcast, use Event::subscribe to get a receiver
-    pub fn receive(world: &World) -> Option<ThunkContext> {
-        let mut receiver = world.write_resource::<sync::broadcast::Receiver<Entity>>();
-
-        match receiver.try_recv() {
-            Ok(entity) => {
-                let contexts = world.read_component::<ThunkContext>();
-                contexts.get(entity).and_then(|c| Some(c.clone()))
-            }
-            Err(_) => None,
-        }
-    }
-
     /// Creates a duplicate of this event
     pub fn duplicate(&self) -> Self {
         Self(self.0, self.1.clone(), self.2.clone(), None, None)
@@ -143,9 +122,7 @@ impl Event {
 
 /// Event runtime drives the tokio::Runtime and schedules/monitors/orchestrates task entities
 #[derive(Default)]
-pub struct EventRuntime {
-    https_client: Option<SecureClient>,
-}
+pub struct EventRuntime;
 
 impl Extension for EventRuntime {
     fn configure_app_world(world: &mut specs::World) {
@@ -226,9 +203,18 @@ impl SetupHandler<super::Runtime> for EventRuntime {
     }
 }
 
+impl SetupHandler<SecureClient> for EventRuntime {
+    fn setup(world: &mut World) {
+        let https = HttpsConnector::new();
+        let client = Client::builder().build::<_, hyper::Body>(https);
+        world.insert(client);
+    }
+}
+
 impl<'a> System<'a> for EventRuntime {
     type SystemData = (
         Read<'a, Runtime, EventRuntime>,
+        Read<'a, SecureClient, EventRuntime>,
         Read<'a, Sender<StatusUpdate>, EventRuntime>,
         Read<'a, Sender<AttributeGraph>, EventRuntime>,
         Read<'a, Sender<ErrorContext>, EventRuntime>,
@@ -247,16 +233,11 @@ impl<'a> System<'a> for EventRuntime {
         WriteStorage<'a, BlockAddress>,
     );
 
-    fn setup(&mut self, _: &mut World) {
-        let https = HttpsConnector::new();
-        let client = Client::builder().build::<_, hyper::Body>(https);
-        self.https_client = Some(client);
-    }
-
     fn run(
         &mut self,
         (
             runtime,
+            https_client,
             status_update_channel,
             dispatcher,
             error_dispatcher,
@@ -421,21 +402,17 @@ impl<'a> System<'a> for EventRuntime {
                 );
                 let thunk = thunk.clone();
                 let runtime_handle = runtime.handle().clone();
-                let client = self
-                    .https_client
-                    .clone()
-                    .expect("client should've been created on setup()");
 
                 let mut context = initial_context
                     .enable_async(entity, runtime_handle)
-                    .enable_https_client(client)
+                    .enable_https_client(https_client.clone())
                     .enable_dispatcher(dispatcher.clone())
                     .enable_project({
                         if let Some(project) = _project {
                             // If the entity has a project component, prioritize using that
                             project.clone()
                         } else if let Some(runtime) = _lifec_runtime {
-                            // Otherwise if the entity has a runtime component, use the project 
+                            // Otherwise if the entity has a runtime component, use the project
                             // from the runtime. A runtime usually is configured w/ a project on start-up
                             // so this is less explicit then directly setting the project component
                             runtime.project.clone()
@@ -447,10 +424,8 @@ impl<'a> System<'a> for EventRuntime {
                     .enable_status_updates(status_update_channel.clone())
                     .to_owned();
 
+                // TODO: This might be a good place to refactor w/ v2 operation
                 let Thunk(thunk_name, thunk) = thunk;
-                // TODO it would be really helpful to add a macro for these status updates
-                // OR could implement AsyncWrite, so you can do:
-                // ``` writeln!(context, "# event received", &event_name, hash_code).await.ok();
 
                 if let Some((handle, cancel_token)) = thunk(&mut context) {
                     match cancel_tokens.insert(entity, CancelThunk::from(cancel_token)) {
@@ -518,59 +493,52 @@ impl<'a> System<'a> for EventRuntime {
         }
 
         // dispatch all queued messages
-        loop {
-            match dispatch_queue.pop() {
-                Some((mut next, last)) => {
-                    // TODO: This is tricky, probably will re-write
-                    if let Some(true) = connections.get(next).and_then(|c| Some(c.fork_enabled())) {
-                        let forked_event = events.get(next).and_then(|e| Some(e.duplicate()));
-                        let forked_context = contexts.get(next).and_then(|c| Some(c.clone()));
+        while let Some((mut next, last)) = dispatch_queue.pop() {
+            // TODO: This is tricky, probably will re-write
+            if let Some(true) = connections.get(next).and_then(|c| Some(c.fork_enabled())) {
+                let forked_event = events.get(next).and_then(|e| Some(e.duplicate()));
+                let forked_context = contexts.get(next).and_then(|c| Some(c.clone()));
 
-                        if let (Some(event), Some(context)) = (forked_event, forked_context) {
-                            let fork = entities.create();
-                            let fork_id = fork.id();
-                            let log = format!("Forking, {fork_id}, {event}");
-                            if events.insert(fork, event).is_ok() {
-                                if contexts.insert(fork, context).is_ok() {
-                                    event!(Level::TRACE, "{}", log);
-                                    next = fork;
-                                }
-                            }
+                if let (Some(event), Some(context)) = (forked_event, forked_context) {
+                    let fork = entities.create();
+                    let fork_id = fork.id();
+                    let log = format!("Forking, {fork_id}, {event}");
+                    if events.insert(fork, event).is_ok() {
+                        if contexts.insert(fork, context).is_ok() {
+                            event!(Level::TRACE, "{}", log);
+                            next = fork;
                         }
-                    }
-
-                    if let (Some(event), Some(context)) =
-                        (events.get_mut(next), contexts.get_mut(next))
-                    {
-                        let last_id = last.as_ref().entity();
-                        let previous = last
-                            .project
-                            .and_then(|p| p.transpile_blocks().ok())
-                            .unwrap_or_default()
-                            .trim()
-                            .to_string();
-
-                        if !previous.trim().is_empty() {
-                            context
-                                .as_mut()
-                                .add_message(event.to_string(), "previous", previous);
-                        }
-
-                        event.fire(context.clone());
-                        event!(
-                            tracing::Level::DEBUG,
-                            "dispatch event:\n\t{} -> {}\n\t{}\n\t{}\n\t{}",
-                            last_id,
-                            next.id(),
-                            context.block.block_name,
-                            event,
-                            context.as_ref().hash_code()
-                        );
-                    } else {
-                        event!(Level::WARN, "Next event does not exist");
                     }
                 }
-                None => break,
+            }
+
+            if let (Some(event), Some(context)) = (events.get_mut(next), contexts.get_mut(next)) {
+                let last_id = last.as_ref().entity();
+                let previous = last
+                    .project
+                    .and_then(|p| p.transpile_blocks().ok())
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string();
+
+                if !previous.trim().is_empty() {
+                    context
+                        .as_mut()
+                        .add_message(event.to_string(), "previous", previous);
+                }
+
+                event.fire(context.clone());
+                event!(
+                    tracing::Level::DEBUG,
+                    "dispatch event:\n\t{} -> {}\n\t{}\n\t{}\n\t{}",
+                    last_id,
+                    next.id(),
+                    context.block.block_name,
+                    event,
+                    context.as_ref().hash_code()
+                );
+            } else {
+                event!(Level::WARN, "Next event does not exist");
             }
         }
     }

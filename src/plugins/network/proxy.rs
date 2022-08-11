@@ -360,6 +360,7 @@ fn test_proxy_runtime() {
     
     let mut test_dispatcher = test_dispatcher.build();
     test_dispatcher.setup(test_world);
+    test_dispatcher.dispatch(&test_world);
     
     let test_entity_a = test_world.entities().create();
     let mut tc = ThunkContext::default();

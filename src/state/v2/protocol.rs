@@ -4,6 +4,8 @@ pub use control_cube::ControlCube;
 mod data_cube;
 pub use data_cube::DataCube;
 
+use crate::{Runtime, plugins::Project};
+
 /// # Tesseract protocol - runtime start-up protocol
 /// 
 /// This protocol is to procedurely begin a runtime. A runtime can host a number of different,
@@ -31,7 +33,11 @@ pub use data_cube::DataCube;
 /// Vice-versa, to make the protocol forward compatible when adding new features, new cube-types can be inserted after the initial,
 /// data cube -> control cube sequence.
 /// 
-pub struct Protocol;
+pub trait Protocol {
+    /// Returns a runtime, installing any required plugins and configs
+    /// 
+    fn create_runtime(project: Project) -> Runtime;
+}
 
 /// A node is basically an extent, w/ 64 byte limit used for the identity, and the current
 /// length of the blob this node represents.
@@ -85,4 +91,25 @@ pub struct Cube {
     node_ids: [[u8; 64]; 8],
     /// Blob length data from nodes, max 64 bytes
     blob_lens: [usize; 8],
+}
+
+mod test {
+    use super::Protocol;
+
+    #[test]
+    fn test_protocol() {
+        use crate::plugins::Project;
+
+        TestProtocol::create_runtime(Project::default());
+        
+        
+    }
+
+    struct TestProtocol; 
+
+    impl Protocol for TestProtocol {
+        fn create_runtime(project: crate::plugins::Project) -> crate::Runtime {
+            crate::Runtime::new(project)
+        }
+    }
 }

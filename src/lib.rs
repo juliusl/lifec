@@ -45,6 +45,9 @@ pub use state::Query;
 pub use state::AttributeIndex;
 pub use state::Operation;
 
+mod host;
+pub use host::Host;
+
 use crate::plugins::ProxyDispatcher;
 
 pub trait RuntimeDispatcher: AsRef<AttributeGraph> + AsMut<AttributeGraph>
@@ -211,6 +214,7 @@ impl EventBuilder {
     /// Configures the event to configure the context from the project 
     /// 
     /// **Caveat** The block name of the context's block context must be set
+    /// 
     pub fn set_config_from_project(&mut self) {
         self.event.set_config(Config("from_project", |mut tc| {
             if let Some(project) = tc.clone().project.as_ref() {

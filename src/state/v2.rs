@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::{plugins::{ThunkContext, AsyncContext}, Item};
 use atlier::system::Value;
 use specs::{Component, DefaultVecStorage, Entity};
-use tokio::{sync::oneshot::Receiver, select};
+use tokio::{sync::oneshot::Receiver, select, time::Instant};
 use tracing::{event, Level};
 
 mod attribute_index;
@@ -14,7 +14,7 @@ pub use query::Query;
 
 pub mod protocol;
 
-/// [V2 Concept] - An operation encapsulates an async task and it's context
+/// An operation encapsulates an async task and it's context
 /// Where the result of the task is the next version of the context.
 /// 
 /// If a task exists, a join handle, and a oneshot that can be used to signal 
@@ -31,11 +31,48 @@ pub mod protocol;
 /// Although, Operation implements Clone, it will not try to clone the underlying task if one exists.
 /// This is useful for introspection on the initial_context used w/ an existing task.
 /// 
+/// # Background
+/// 
+/// In general, an event is generated outside of the host system/runtime. The event runtime is focused on 
+/// serializing these events so that even though the events originate outside of the system from many places, state changes to the system as a whole
+/// are processed from a single place. This is mostly good enough for simple cases.
+/// 
+/// The design of the operation type is focused on creating a self-contained version of what the event runtime does. This allows
+/// plugins to implement more complicated sequences of tasks without taxing the event runtime. 
+/// 
+/// If this type did not exist, plugins would need to spawn additional events, and in order to get the results of those events,
+/// the event runtime would need to maintain the relationship hierachy between all events. This would be out of scope of the primary
+/// function of the event runtime, and lead to an unpredictable amount of entities being generated at runtime. 
+/// 
+/// Since an operation is self-contained, lifecycle management is shifted over to the plugin. To put it differently,
+/// operations are useful for *internal* transitions, where as events are useful for *external* transitions.
+/// 
+/// This lets the event runtime to treat the operation as just another component of the entity.
+/// 
 #[derive(Component, Default)]
 #[storage(DefaultVecStorage)]
 pub struct Operation {
     pub context: ThunkContext,
     pub task: Option<AsyncContext>,
+}
+
+/// This type contains perf information for the operation
+/// 
+struct Perf {
+    start: Instant,
+    duration: Option<Duration>,
+}
+
+impl Default for Perf {
+    fn default() -> Self {
+        Self { start: Instant::now(), duration: None }
+    }
+}
+
+impl Drop for Perf {
+    fn drop(&mut self) {
+        event!(Level::TRACE, "duration: {:?}", self.duration)
+    }
 }
 
 impl Clone for Operation {
@@ -152,6 +189,19 @@ impl Operation {
 
         None
     }
+
+    /// Waits for the underlying task to complete if the task is ready,
+    /// **otherwise** No-OP
+    /// 
+    pub fn wait_if_ready(&mut self) -> Option<ThunkContext> {
+        if let Some(task) = self.task.as_ref() {
+            if task.0.is_finished() {
+                return self.wait();
+            }
+        }
+
+        None 
+    }
 }
 
 impl Into<ThunkContext> for Operation {
@@ -212,8 +262,16 @@ mod tests {
 
     use crate::{catalog::Item, plugins::{ThunkContext, Plugin}, AttributeGraph};
 
+    /// This test demonstrates how to use the v2 api's 
+    /// 
+    /// - Shows how to create/reuse a query
+    /// - Shows different ways to evaluate a query such as cached, alternate sources, etc
+    /// - Shows an example of generating a thunk from a query, and how to use that thunk to drive a plugin thunk
+    /// - Shows how the operation type can be used as both a catalog item and an attribute index, and how to switch in between
+    /// - Shows the minimum dependencies needed to drive an operation
+    /// 
     #[test]
-    fn test_query() {
+    fn test_v2_api() {
         use specs::{World, WorldExt};
         use crate::{AttributeGraph, plugins::ThunkContext, plugins::Thunk, state::AttributeIndex};
         use std::sync::Arc;
