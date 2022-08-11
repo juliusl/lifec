@@ -47,6 +47,7 @@ pub use state::Operation;
 
 mod host;
 pub use host::Host;
+pub use host::HostExitCode;
 
 use crate::plugins::ProxyDispatcher;
 
