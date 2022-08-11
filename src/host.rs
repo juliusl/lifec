@@ -14,6 +14,7 @@ use crate::{
 
 /// Exit instructions for the callers of Host
 /// 
+#[derive(Debug)]
 pub enum HostExitCode {
     OK,
     RestartRequested,
