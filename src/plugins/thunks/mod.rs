@@ -74,6 +74,11 @@ impl AsRef<Config> for Config {
 }
 
 impl Thunk {
+    /// Returns the symbol for the thunk
+    pub fn symbol(&self) -> &'static str {
+        self.0
+    }
+    
     /// Generates a thunk from a plugin impl
     pub fn from_plugin<P>() -> Self
     where

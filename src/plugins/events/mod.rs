@@ -5,6 +5,7 @@ use specs::ReadStorage;
 use specs::World;
 use specs::{shred::SetupHandler, Component, Entities, Join, Read, System, WorldExt, WriteStorage};
 use std::fmt::Display;
+use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::{
     runtime::Runtime,
@@ -61,6 +62,12 @@ impl Display for Event {
 }
 
 impl Event {
+    /// Returns the event symbol 
+    /// 
+    pub fn symbol(&self) -> &'static str {
+        self.0
+    }
+
     /// Returns the a clone of the inner thunk
     ///
     pub fn thunk(&self) -> Thunk {
@@ -85,16 +92,20 @@ impl Event {
     ///
     /// Caveats: If the event has a config set, it will configure the context, before setting it
     ///
-    pub fn fire(&mut self, mut thunk_context: ThunkContext) {
-        if let Some(Config(name, config)) = self.2 {
-            event!(Level::TRACE, "detected config {name} for event: {}", self.0);
-            config(&mut thunk_context);
-        }
-
+    pub fn fire(&mut self, thunk_context: ThunkContext) {
         self.3 = Some(thunk_context);
 
         // cancel any current task
         self.cancel();
+    }
+
+    /// If a config is set w/ this event, this will setup a thunk context 
+    /// from that config. Otherwise, No-OP.
+    pub fn setup(&self, thunk_context: &mut ThunkContext) {
+        if let Some(Config(name, config)) = self.2 {
+            event!(Level::TRACE, "detected config '{name}' for event: {} {}", self.symbol(), self.1.symbol());
+            config(thunk_context);
+        }
     }
 
     /// Cancel the existing join handle, mainly used for housekeeping.
@@ -268,6 +279,10 @@ impl<'a> System<'a> for EventRuntime {
             .join()
         {
             let event_name = event.to_string();
+
+            // Nit: there is probably a cleaner way to handle this
+            let event_ref = Arc::new(event.duplicate());
+            
             let Event(_, thunk, _, initial_context, task) = event;
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
@@ -426,6 +441,8 @@ impl<'a> System<'a> for EventRuntime {
 
                 // TODO: This might be a good place to refactor w/ v2 operation
                 let Thunk(thunk_name, thunk) = thunk;
+
+                event_ref.setup(&mut context);
 
                 if let Some((handle, cancel_token)) = thunk(&mut context) {
                     match cancel_tokens.insert(entity, CancelThunk::from(cancel_token)) {

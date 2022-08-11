@@ -9,60 +9,71 @@ use tracing::{event, Level};
 
 use crate::{
     plugins::{BlockContext, Event, EventRuntime, NetworkRuntime, Project, ThunkContext},
-    CatalogReader, CatalogWriter, EventBuilder, Operation, Runtime,
+    CatalogReader, CatalogWriter, EventSource, Operation, Runtime,
 };
 
 /// Exit instructions for the callers of Host
-/// 
-#[derive(Debug)]
+///
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum HostExitCode {
     OK,
     RestartRequested,
     Error(String),
 }
 
-/// Consolidates most common steps for starting a runtime
+/// Consolidates common procedures for hosting a runtime
 ///
-pub trait Host 
+pub trait Host
 where
-    Self: Extension
+    Self: Extension,
 {
-    /// Returns a new runtime, installing any required plugins
+    /// Returns a new runtime for this host
+    ///
+    /// Types implementing this trait should install any plugins
+    /// and add any configs, that will be needed to start engine
+    /// blocks defined in the project
     ///
     fn create_runtime(project: Project) -> Runtime;
 
-    /// Returns a new event builder, that can be used to manage events
+    /// Creates a new event source for the engine
     ///
-    fn create_event_builder(
-        &mut self, 
+    /// Implementing types receive the entire block context, and can
+    /// choose to interpret the block in any way they choose when returning
+    /// the event source.
+    ///
+    fn create_event_source(
+        &mut self,
         runtime: Runtime,
         block_name: impl AsRef<str>,
         block_context: &BlockContext,
-    ) -> EventBuilder;
+    ) -> EventSource;
 
-    /// Returns a new setup event builder, that can be used to manage setup events
+    /// Creates a setup event source if needed
     ///
-    fn create_setup_event_builder(
-        &mut self, 
+    fn create_setup_event_source(
+        &mut self,
         runtime: Runtime,
         block_name: impl AsRef<str>,
         block_context: &BlockContext,
-    ) -> Option<EventBuilder>;
+    ) -> Option<EventSource>;
 
     /// Returns some operation if additional setup is required before starting the event,
     /// otherwise No-OP.
     ///
+    /// The initial context passed here will contain the attributes and blocks
+    /// defined in the project.
+    ///
     fn prepare_engine(
-        &mut self, 
+        &mut self,
         engine: Entity,
         handle: Handle,
-        initial_context: ThunkContext,
-        event_builder: EventBuilder,
+        initial_context: &ThunkContext,
+        setup_event_source: Option<EventSource>,
     ) -> Option<Operation>;
 
     /// Returns true if the host should exit
-    /// 
-    fn should_exit(&mut self) -> Option<HostExitCode>; 
+    ///
+    fn should_exit(&mut self) -> Option<HostExitCode>;
 
     /// Starts a host runtime w/ a given project
     ///
@@ -77,8 +88,11 @@ where
         NetworkRuntime::configure_app_systems(&mut dispatcher);
         NetworkRuntime::configure_app_world(world);
 
-        dispatcher.add(HostSetup {}, "host_setup", &["event_runtime"]);
-        dispatcher.add(HostStartup {}, "host_startup", &["event_runtime"]);
+        Self::configure_app_systems(&mut dispatcher);
+        Self::configure_app_world(world);
+
+        dispatcher.add(HostSetup {}, "", &["event_runtime"]);
+        dispatcher.add(HostStartup {}, "", &["event_runtime"]);
 
         let mut dispatcher = dispatcher.build();
         dispatcher.setup(world);
@@ -94,35 +108,34 @@ where
             thunk_context.block = block_context.to_owned();
 
             let runtime = Self::create_runtime(project.clone());
-            let event_builder =
-                self.create_event_builder(runtime.clone(), block_name, block_context);
+            let engine_event_source =
+                self.create_event_source(runtime.clone(), block_name, block_context);
+
+            thunk_context
+                .as_mut()
+                .add_text_attr("event_symbol", engine_event_source.event.symbol());
 
             let engine = world
                 .create_entity()
                 .with(thunk_context.clone())
                 .with(runtime.clone())
-                .with(event_builder.event)
+                .with(engine_event_source.event)
                 .build();
+            
+            let setup_event_source = self.create_setup_event_source(runtime, block_name, block_context);
 
-            if let Some(setup_event_builder) =
-                self.create_setup_event_builder(runtime, block_name, block_context)
+            if let Some(setup_operation) =
+                self.prepare_engine(engine, handle.clone(), &thunk_context, setup_event_source)
             {
-                if let Some(operation) = self.prepare_engine(
-                    engine,
-                    handle.clone(),
-                    thunk_context.clone(),
-                    setup_event_builder,
-                ) {
-                    match world.write_component().insert(engine, operation) {
-                        Ok(_) => {
-                            event!(Level::DEBUG, "Inserted setup operation for {block_name}");
-                        }
-                        Err(err) => {
-                            event!(
-                                Level::ERROR,
-                                "Could not insert setup operation for {block_name}, {err}"
-                            );
-                        }
+                match world.write_component().insert(engine, setup_operation) {
+                    Ok(_) => {
+                        event!(Level::DEBUG, "Inserted setup operation for {block_name}");
+                    }
+                    Err(err) => {
+                        event!(
+                            Level::ERROR,
+                            "Could not insert setup operation for {block_name}, {err}"
+                        );
                     }
                 }
             } else {
@@ -153,7 +166,11 @@ where
     }
 }
 
-/// System that handles event setup and execution
+/// System that handles engine setup operations
+///
+/// If an engine requires an operation before operating, this system
+/// will monitor that operation, and start the engine after the
+/// operation completes.
 ///
 struct HostSetup;
 
@@ -183,6 +200,11 @@ impl<'a> System<'a> for HostSetup {
     }
 }
 
+/// System that starts engines
+///
+/// Checks to see if an engine has an outstanding operation, if not starts
+/// the engine if hasn't started already.
+///
 struct HostStartup;
 
 impl<'a> System<'a> for HostStartup {
@@ -208,5 +230,98 @@ impl<'a> System<'a> for HostStartup {
                 }
             }
         }
+    }
+}
+
+mod test {
+    use crate::{
+        plugins::{Println, Test},
+        Extension, Host, HostExitCode, Runtime,
+    };
+
+    struct TestHost(usize);
+
+    impl Extension for TestHost {}
+
+    impl Host for TestHost {
+        fn create_runtime(project: crate::plugins::Project) -> Runtime {
+            let mut runtime = Runtime::new(project);
+            runtime.install::<Test, Println>();
+            runtime
+        }
+
+        fn create_event_source(
+            &mut self,
+            runtime: crate::Runtime,
+            block_name: impl AsRef<str>,
+            _block_context: &crate::plugins::BlockContext,
+        ) -> crate::EventSource {
+            assert_eq!(block_name.as_ref(), "test_host");
+
+            if _block_context.get_block("test").is_some() {
+                let mut src = runtime.event_source::<Test, Println>();
+                // Tests that the context will be configured from the correct
+                // block in the project (test_host test)
+                src.set_config_from_project();
+                return src;
+            }
+
+            panic!("block context did not have a `test` block");
+        }
+
+        fn should_exit(&mut self) -> Option<crate::HostExitCode> {
+            self.0 -= 1;
+
+            if self.0 == 0 {
+                Some(HostExitCode::OK)
+            } else {
+                None
+            }
+        }
+
+        // TODO:
+        fn create_setup_event_source(
+            &mut self,
+            _runtime: crate::Runtime,
+            block_name: impl AsRef<str>,
+            _block_context: &crate::plugins::BlockContext,
+        ) -> Option<crate::EventSource> {
+            assert_eq!(block_name.as_ref(), "test_host");
+            None
+        }
+
+        fn prepare_engine(
+            &mut self,
+            _engine: specs::Entity,
+            _handle: tokio::runtime::Handle,
+            _initial_context: &crate::plugins::ThunkContext,
+            _event_builder: Option<crate::EventSource>,
+        ) -> Option<crate::Operation> {
+            None
+        }
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn test_host() {
+        use crate::Project;
+        let code = TestHost(10).start(
+            Project::load_content(
+                r#"
+            # Project Settings
+            ```
+            - add debug   .enable
+            ```
+
+            # Test Host Impl 
+            ``` test_host test
+            add name    .text bob
+            ```
+            "#,
+            )
+            .expect("valid .runmd"),
+        );
+
+        assert_eq!(code, HostExitCode::OK)
     }
 }

@@ -51,6 +51,9 @@ pub use thunks::Timer;
 pub use thunks::Println;
 pub use thunks::Dispatch;
 
+mod testing;
+pub use testing::Test;
+
 #[derive(Component, Default)]
 #[storage(DefaultVecStorage)]
 pub struct Archive(Option<Entity>);

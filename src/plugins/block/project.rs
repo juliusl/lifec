@@ -6,6 +6,7 @@ use atlier::system::Value;
 use imgui::Ui;
 use specs::storage::HashMapStorage;
 use specs::Component;
+use tracing::{event, Level};
 use std::collections::btree_map::{Iter, IterMut};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
@@ -36,8 +37,9 @@ impl Project {
     /// 
     pub fn configure(&self, tc: &mut ThunkContext) {
         if let Some(config_block) = self.find_block(&tc.block.block_name) {
-            let config = if let Some(plugin_symbol) = tc.as_ref().find_text("plugin_symbol") {
-                config_block.get_block(plugin_symbol).unwrap_or(config_block.as_ref().clone())
+            let config = if let Some(event_symbol) = tc.as_ref().find_text("event_symbol") {
+                event!(Level::TRACE, "Project is configuring from block {}, {event_symbol}", tc.block.block_name);
+                config_block.get_block(event_symbol).unwrap_or(config_block.as_ref().clone())
             } else {
                 config_block.as_ref().clone()
             };

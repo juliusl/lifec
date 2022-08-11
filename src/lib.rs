@@ -189,13 +189,13 @@ pub struct Runtime {
 
 /// Event builder returned by a runtime, that can be used to schedule events w/ a world
 /// 
-pub struct EventBuilder {
+pub struct EventSource {
     event: Event,
     create_fn: CreateFn,
     runtime: Arc<Runtime>, 
 }
 
-impl EventBuilder {
+impl EventSource {
     /// Sets the config for the event
     /// 
     pub fn set_config(&mut self, config: Config) {
@@ -218,7 +218,8 @@ impl EventBuilder {
     /// 
     pub fn set_config_from_project(&mut self) {
         self.event.set_config(Config("from_project", |mut tc| {
-            if let Some(project) = tc.clone().project.as_ref() {
+            let tc_clone = tc.clone();
+            if let Some(project) = tc_clone.project.as_ref() {
                 project.configure(&mut tc);
             }
         }));
@@ -261,14 +262,14 @@ impl Runtime {
         }
     }
 
-    /// Creates a new event builder, for an engine/plugin pair
+    /// Creates a new event source
     /// 
-    pub fn event_builder<'a, E, P>(&'a self) -> EventBuilder 
+    pub fn event_source<'a, E, P>(&'a self) -> EventSource 
     where
         E: Engine,
         P: Plugin + Send + Default
     {
-        EventBuilder {
+        EventSource {
             create_fn: E::create::<P>,
             event: E::event::<P>(),
             runtime: Arc::new(self.clone()),

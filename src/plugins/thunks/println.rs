@@ -1,3 +1,5 @@
+use tracing::{event, Level};
+
 use crate::plugins::Plugin;
 
 use super::ThunkContext;
@@ -16,8 +18,9 @@ impl Plugin<ThunkContext> for Println {
             async move {
                 tc.as_mut().apply("previous");
 
-                if tc.as_ref().is_enabled("debug").unwrap_or_default() {
-                    eprintln!("{:#?}", tc.as_ref());
+                if tc.project.as_ref().and_then(|p| p.as_ref().is_enabled("debug")).unwrap_or_default() {
+                    event!(Level::DEBUG, "Context -- \n{:#?}", tc.as_ref());
+                    event!(Level::DEBUG, "Project -- \n{:#?}", tc.project.as_ref());
                 }
 
                 Some(tc) 

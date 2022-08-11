@@ -10,6 +10,9 @@ use specs::WorldExt;
 use specs::WriteStorage;
 use crate::System;
 
+/// This engine instruments events w/ components
+/// for runtime tooling
+/// 
 #[derive(Clone, Default)]
 pub struct Call;
 
@@ -27,21 +30,17 @@ impl Engine for Call {
     }
 
     fn create_event(entity: Entity, world: &World) {
-        let mut tasks = world.write_component::<Task>();
-        let mut start_buttons = world.write_component::<StartButton>();
-        let mut progress_status_bars = world.write_component::<ProgressStatusBar>();
-
-        match tasks.insert(entity, Task::default()) {
+        match world.write_component().insert(entity, Task::default()) {
             Ok(_) => {}
             Err(_) => {}
         }
 
-        match start_buttons.insert(entity, StartButton::default()) {
+        match world.write_component().insert(entity, StartButton::default()) {
             Ok(_) => {}
             Err(_) => {}
         }
 
-        match progress_status_bars.insert(entity, ProgressStatusBar::default()) {
+        match world.write_component().insert(entity, ProgressStatusBar::default()) {
             Ok(_) => {}
             Err(_) => {}
         }
