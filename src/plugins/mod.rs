@@ -67,6 +67,19 @@ impl Archive {
 /// Async context returned if the plugin starts an async task
 pub type AsyncContext = (tokio::task::JoinHandle<ThunkContext>, tokio::sync::oneshot::Sender<()>);
 
+pub struct AsThunk<P>(pub P)
+where 
+    P: Plugin;
+
+impl<P> Into<Thunk> for AsThunk<P> 
+where
+    P: Plugin
+{
+    fn into(self) -> Thunk {
+        Thunk::from_plugin::<P>()
+    }
+}
+
 /// This trait is to facilitate extending working with the attribute graph
 pub trait Plugin<T = ThunkContext>
 where
@@ -77,6 +90,15 @@ where
         + Send
         + Sync,
 {
+    /// Returns self as a thunk 
+    /// 
+    fn as_thunk(self) ->  Thunk
+    where
+        Self: Sized + Plugin
+    {
+        AsThunk(self).into()
+    }
+
     /// Returns the symbol name representing this plugin
     fn symbol() -> &'static str;
 

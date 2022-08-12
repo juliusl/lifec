@@ -48,15 +48,6 @@ where
         block_context: &BlockContext,
     ) -> EventSource;
 
-    /// Creates a setup event source if needed
-    ///
-    fn create_setup_event_source(
-        &mut self,
-        runtime: Runtime,
-        block_name: impl AsRef<str>,
-        block_context: &BlockContext,
-    ) -> Option<EventSource>;
-
     /// Returns some operation if additional setup is required before starting the event,
     /// otherwise No-OP.
     ///
@@ -68,7 +59,6 @@ where
         engine: Entity,
         handle: Handle,
         initial_context: &ThunkContext,
-        setup_event_source: Option<EventSource>,
     ) -> Option<Operation>;
 
     /// Returns true if the host should exit
@@ -121,11 +111,9 @@ where
                 .with(runtime.clone())
                 .with(engine_event_source.event)
                 .build();
-            
-            let setup_event_source = self.create_setup_event_source(runtime, block_name, block_context);
 
             if let Some(setup_operation) =
-                self.prepare_engine(engine, handle.clone(), &thunk_context, setup_event_source)
+                self.prepare_engine(engine, handle.clone(), &thunk_context)
             {
                 match world.write_component().insert(engine, setup_operation) {
                     Ok(_) => {
@@ -178,8 +166,7 @@ impl<'a> System<'a> for HostSetup {
     type SystemData = (CatalogWriter<'a, Operation>, WriteStorage<'a, Event>);
 
     fn run(
-        &mut self,
-        (
+        &mut self, (
             CatalogWriter {
                 entities,
                 mut items,
@@ -234,12 +221,21 @@ impl<'a> System<'a> for HostStartup {
 }
 
 mod test {
+    use std::sync::Arc;
+
+    use tracing::{event, Level};
+
     use crate::{
-        plugins::{Println, Test},
-        Extension, Host, HostExitCode, Runtime,
+        plugins::{Plugin, Println, Test, ThunkContext},
+        Extension, Host, HostExitCode, Operation, Runtime, AttributeIndex,
     };
 
-    struct TestHost(usize);
+    /// Simple test host implementation, for additional coverage
+    /// 
+    struct TestHost(
+        /// iterations before exiting
+        usize
+    );
 
     impl Extension for TestHost {}
 
@@ -247,9 +243,15 @@ mod test {
         fn create_runtime(project: crate::plugins::Project) -> Runtime {
             let mut runtime = Runtime::new(project);
             runtime.install::<Test, Println>();
+            runtime.install::<Test, ChangeName>();
+            runtime.install::<Test, IsBob>();
+            runtime.install::<Test, IsNotBob>();
             runtime
         }
 
+        /// Tests that the expected block_context is passed here
+        /// Tests that the expected block exists
+        /// 
         fn create_event_source(
             &mut self,
             runtime: crate::Runtime,
@@ -259,7 +261,7 @@ mod test {
             assert_eq!(block_name.as_ref(), "test_host");
 
             if _block_context.get_block("test").is_some() {
-                let mut src = runtime.event_source::<Test, Println>();
+                let mut src = runtime.event_source::<Test, (IsBob, Println)>();
                 // Tests that the context will be configured from the correct
                 // block in the project (test_host test)
                 src.set_config_from_project();
@@ -269,6 +271,8 @@ mod test {
             panic!("block context did not have a `test` block");
         }
 
+        /// TODO
+        /// 
         fn should_exit(&mut self) -> Option<crate::HostExitCode> {
             self.0 -= 1;
 
@@ -279,25 +283,116 @@ mod test {
             }
         }
 
-        // TODO:
-        fn create_setup_event_source(
-            &mut self,
-            _runtime: crate::Runtime,
-            block_name: impl AsRef<str>,
-            _block_context: &crate::plugins::BlockContext,
-        ) -> Option<crate::EventSource> {
-            assert_eq!(block_name.as_ref(), "test_host");
-            None
-        }
-
+        /// Test basic example of generating a setup operation
+        /// 
         fn prepare_engine(
             &mut self,
             _engine: specs::Entity,
             _handle: tokio::runtime::Handle,
             _initial_context: &crate::plugins::ThunkContext,
-            _event_builder: Option<crate::EventSource>,
         ) -> Option<crate::Operation> {
+            if let Some(query) = _initial_context.block.find_query() {
+                event!(Level::TRACE, "found query {:#?}", query);
+                // Test generating a "setup" operation
+                
+                let item = Operation::item(_engine, _handle);
+                let thunk = query.thunk(
+                    item, 
+                    Some(((
+                        // Tests that the name is changed
+                        ChangeName(), 
+                        IsNotBob()
+                    ), 
+                    // Optional, debug println
+                    Println::default()).as_thunk())
+                );
+            
+                // Test passing a src to the thunk, so that the operation
+                // is initialized before being executed
+                //
+                // Note: in this context, entity id doesn't matter because an alt
+                // src will be used. The id matters if the initial src is being used
+                // This should hopefully be an implementation detail. 
+                let src = _initial_context.block
+                    .get_block("test")
+                    .expect("test block is defined");
+                
+                return Some(thunk(Arc::new(src)));
+            }
+
             None
+        }
+    }
+
+    #[derive(Default)]
+    struct ChangeName();
+
+    impl Plugin for ChangeName {
+        fn symbol() -> &'static str {
+            "change_name"
+        }
+
+        fn call_with_context(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
+            context.clone().task(|_| {
+                let mut tc = context.clone();
+                async move {
+                    event!(Level::DEBUG, "previous name {:?}", tc.find_text("name"));
+
+                    tc.as_mut().add_text_attr("name", "not-bob");
+                    event!(Level::DEBUG, "changing names");
+                    Some(tc)
+                }
+            })
+        }
+    }
+
+    #[derive(Default)]
+    struct IsBob();
+
+    impl Plugin for IsBob {
+        fn symbol() -> &'static str {
+            "is_bob"
+        }
+
+        fn call_with_context(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
+            context.clone().task(|_| {
+                let tc = context.clone();
+                async move {
+                    assert_eq!(
+                        tc.find_text("name"), 
+                        Some("bob".to_string())
+                    );
+
+                    event!(Level::TRACE, "checked if this is bob");
+                    
+                    None
+                }
+            })
+        }
+    }
+
+    #[derive(Default)]
+    struct IsNotBob();
+
+    impl Plugin for IsNotBob {
+        fn symbol() -> &'static str {
+            "is_not_bob"
+        }
+
+        fn call_with_context(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
+            context.clone().task(|_| {
+                let tc = context.clone();
+                async move {
+                    assert_eq!(
+                        tc.find_text("name"), 
+                        Some("not-bob".to_string())
+                    );
+
+                    event!(Level::TRACE, "checked if this is not-bob");
+                    
+                    None
+                }
+            })
         }
     }
 
@@ -307,7 +402,7 @@ mod test {
         use crate::Project;
         let code = TestHost(10).start(
             Project::load_content(
-                r#"
+            r#"
             # Project Settings
             ```
             - add debug   .enable
@@ -316,6 +411,8 @@ mod test {
             # Test Host Impl 
             ``` test_host test
             add name    .text bob
+            ``` query
+            define name find .search_text
             ```
             "#,
             )

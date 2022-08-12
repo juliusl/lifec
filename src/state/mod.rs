@@ -29,6 +29,31 @@ pub struct AttributeGraph {
     index: BTreeMap<String, Attribute>,
 }
 
+impl AttributeIndex for AttributeGraph {
+    fn entity_id(&self) -> u32 {
+        self.entity
+    }
+
+    fn find_value(&self, with_name: impl AsRef<str>) -> Option<Value> {
+        self.find_attr_value(with_name).and_then(|v| Some(v.to_owned()))
+    }
+
+    fn find_transient(&self, with_name: impl AsRef<str>, with_symbol: impl AsRef<str>) -> Option<&Attribute> {
+        let key = format!("{}::{}", with_name.as_ref(), with_symbol.as_ref());
+        self.find_attr(key)
+    }
+
+    fn add_attribute(&mut self, attr: Attribute) {
+        self.add_attribute(attr);
+    }
+
+    fn define(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) -> &mut Attribute {
+        self.define(name, symbol)
+    }
+
+    // TODO: Clean up redundant methods
+}
+
 impl From<Vec<u8>> for AttributeGraph {
     fn from(vec: Vec<u8>) -> Self {
         let mut graph = AttributeGraph::default();
@@ -2568,47 +2593,57 @@ pub enum AttributeGraphElements {
     /// text element parses all remaining text after .TEXT as a string
     #[token(".text", graph_lexer::from_text)]
     #[token(".TEXT", graph_lexer::from_text)]
+    #[token(".search_text", |_| Value::TextBuffer(String::default()))]
     Text(Value),
     /// bool element parses remaining as bool
     #[token(".enable", |_| Value::Bool(true))]
     #[token(".disable", |_| Value::Bool(false))]
+    #[token(".search_bool", |_| Value::Bool(false))]
     #[token(".bool", graph_lexer::from_bool)]
     #[token(".BOOL", graph_lexer::from_bool)]
     Bool(Value),
     /// int element parses remaining as i32
     #[token(".int", graph_lexer::from_int)]
     #[token(".INT", graph_lexer::from_int)]
+    #[token(".search_int", |_| Value::Int(0))]
     Int(Value),
     /// int pair element parses remaining as 2 comma-delimmited i32's
     #[token(".int2", graph_lexer::from_int_pair)]
     #[token(".INT_PAIR", graph_lexer::from_int_pair)]
+    #[token(".search_int2", |_| Value::IntPair(0, 0))]
     IntPair(Value),
     /// int range element parses remaining as 3 comma-delimitted i32's
     #[token(".int3", graph_lexer::from_int_range)]
+    #[token(".search_int3", |_| Value::IntRange(0, 0, 0))]
     #[token(".int_range", graph_lexer::from_int_range)]
     #[token(".INT_RANGE", graph_lexer::from_int_range)]
     IntRange(Value),
     /// float element parses remaining as f32
     #[token(".float", graph_lexer::from_float)]
     #[token(".FLOAT", graph_lexer::from_float)]
+    #[token(".search_float", |_| Value::Float(0.0))]
     Float(Value),
     /// float pair element parses reamining as 2 comma delimitted f32's
     #[token(".float2", graph_lexer::from_float_pair)]
     #[token(".FLOAT_PAIR", graph_lexer::from_float_pair)]
+    #[token(".search_float2", |_| Value::FloatPair(0.0, 0.0))]
     FloatPair(Value),
     /// float range element parses remaining as 3 comma delimitted f32's
     #[token(".float3", graph_lexer::from_float_range)]
     #[token(".FLOAT_RANGE", graph_lexer::from_float_range)]
+    #[token(".search_float3", |_| Value::FloatRange(0.0, 0.0, 0.0))]
     FloatRange(Value),
     /// binary vector element, currently parses the remaining as base64 encoded data
     #[token(".bin", graph_lexer::from_binary_vector_base64)]
     #[token(".base64", graph_lexer::from_binary_vector_base64)]
     #[token(".BINARY_VECTOR", graph_lexer::from_binary_vector_base64)]
+    #[token(".search_binary", |_| Value::BinaryVector(vec![]))]
     BinaryVector(Value),
     /// symbol value implies that the value is of symbolic quality, 
     /// and though no explicit validations are in place, the value of the symbol
     /// should be valid in many contexts that require an identifier
     #[token(".symbol", graph_lexer::from_symbol)]
+    #[token(".search_symbol", |_| Value::Symbol(String::default()))]
     SymbolValue(Value),
     /// empty element parses
     #[token(".empty")]

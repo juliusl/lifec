@@ -21,7 +21,7 @@ use super::Operation;
 /// When a parameter is evaluated, this query visits a destination type that implements `catalog::Item` and passes
 /// the found value.
 ///
-#[derive(Component, Default, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Component, Default, Clone, Hash, PartialEq, Eq)]
 #[storage(DefaultVecStorage)]
 pub struct Query<I>
 where
@@ -63,7 +63,28 @@ where
     /// 
     /// * `plugin_thunk` - If set, this thunk will be called after evaluating an index, and after the 
     /// item has been visited and converted to a thunk context. 
-    /// ( **Important** The plugin itself has a chance to update the context further before returning a task )
+    /// 
+    /// **Important** The plugin itself has a chance to update the context further before returning a task.
+    ///
+    /// # Very Important Design Caveat if implementing Host/Plugin
+    /// 
+    /// A) If this is being used w/ the `Host` trait and a setup operation
+    /// changes a stable attribute **AND**,
+    /// B) the host event source was configured to setup the event from the project,
+    /// **THEN** the host event source will not see those changes. 
+    /// 
+    /// This choice is made to preserve the definition of a stable attribute, and what that means to
+    /// the runtime. In this case if the desire is to propagate these type of changes, then
+    /// the plugin should design around a transient attribute.
+    /// 
+    /// We make a best effort to enforce this in this method by ensuring a block_name
+    /// is set before the new context is returned. However, the alternate src could have a different
+    /// block_name set, which means when the event is executed, the original block_name would have changed.
+    /// That being said, logically that would also mean that the alternate src is representing a different 
+    /// block, which would make that behavior valid. If this type of interaction is going to occur,
+    /// it's important that the item has a block name set before .into() is called. If the block_name
+    /// is already set, then we will skip this policy. 
+    /// 
     /// 
     pub fn thunk<Alt>(
         &'_ self,
@@ -78,6 +99,21 @@ where
             let mut item = item.clone();
             c.evaluate_with(&src, &mut item);
             let mut context = item.into();
+
+            // The block_name is used by the event runtime to configure an event 
+            // If the follow up to the completion of the operation we're returning here
+            // fires off an event w/ this context. It's important that we try to ensure
+            // the block_name is set, so that a config can be found and executed
+            // However, if the below plugin_thunk
+            if context.block.block_name.is_empty() {
+                if let Some(block_name) = src.find_text("block_name") {
+                    event!(Level::TRACE, "context did not have a block name, setting block name found in src");
+                    context.block.block_name = block_name;
+                } else {
+                    event!(Level::TRACE, "could not find a block name to use");
+                }
+            }
+
 
             let mut task = None;
             if let Some(Thunk(name, func)) = plugin_thunk.as_ref() {
@@ -104,7 +140,7 @@ where
     {
         for search in self.search_params.iter() {
             if let Some((name, _)) = search.transient() {
-                // TODO: Enforce type validation 
+                // TODO: Enforce type validation ?  
                 if let Some(value) = src.find_value(name) {
                     dest.visit(name, &value);
                 }

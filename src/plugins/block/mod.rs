@@ -6,7 +6,7 @@ pub use address::BlockAddress;
 mod project;
 pub use project::Project;
 
-use crate::AttributeGraph;
+use crate::{AttributeGraph, Query, AttributeIndex};
 use atlier::system::{Attribute, Value};
 use imgui::{ChildWindow, MenuItem, Ui};
 use specs::storage::DenseVecStorage;
@@ -24,7 +24,60 @@ pub struct BlockContext {
     max_block_id: u32,
 }
 
+pub type BlockQuery = Query<AttributeGraph>;
+
 impl BlockContext {
+    /// Finds a query from the current context
+    /// 
+    pub fn find_query(&self) -> Option<BlockQuery> {
+        if let Some(query_block) = self.get_block("query") {
+            let mut query = query_block.query(); 
+
+            for (name, value) in query_block.find_symbol_values("find") {
+                match value {
+                    Value::Bool(_) => {
+                        query = query.find_bool(name.trim_end_matches("::find"));
+                    },
+                    Value::TextBuffer(_) => {
+                        query = query.find_text(name.trim_end_matches("::find"));
+                    },
+                    Value::Int(_) => {
+                        query = query.find_int(name.trim_end_matches("::find"));
+                    },
+                    Value::IntPair(_, _) => {
+                        query = query.find_int_pair(name.trim_end_matches("::find"));
+                    },
+                    Value::IntRange(_, _, _) => {
+                        query = query.find_int_range(name.trim_end_matches("::find"));
+                    },
+                    Value::Float(_) => {
+                        query = query.find_float(name.trim_end_matches("::find"));
+                    },
+                    Value::FloatPair(_, _) => {
+                        query = query.find_float_pair(name.trim_end_matches("::find"));
+                    },
+                    Value::FloatRange(_, _, _) => {
+                        query = query.find_float_range(name.trim_end_matches("::find"));
+                    },
+                    Value::BinaryVector(_) => {
+                        query = query.find_binary(name.trim_end_matches("::find"));
+                    },
+                    Value::Symbol(_) => {
+                        query = query.find_symbol(name.trim_end_matches("::find"));
+                    },
+                    Value::Reference(_) => {
+                        // query = query.find_binary(name.trim_end_matches("::find"));
+                    },
+                    _ => {}
+                }
+            }
+
+            Some(query)
+        } else {
+            None 
+        }
+    }
+
     /// Converts self into vec of blocks
     pub fn to_blocks(&self) -> Vec<(String, AttributeGraph)> {
         let clone = self.clone();
