@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::{plugins::{ThunkContext, AsyncContext}, Item};
 use atlier::system::Value;
 use specs::{Component, DefaultVecStorage, Entity};
-use tokio::{sync::oneshot::Receiver, select, time::Instant};
+use tokio::{sync::oneshot::Receiver, select};
 use tracing::{event, Level};
 
 mod attribute_index;
@@ -54,25 +54,6 @@ pub mod protocol;
 pub struct Operation {
     pub context: ThunkContext,
     pub task: Option<AsyncContext>,
-}
-
-/// This type contains perf information for the operation
-/// 
-struct Perf {
-    start: Instant,
-    duration: Option<Duration>,
-}
-
-impl Default for Perf {
-    fn default() -> Self {
-        Self { start: Instant::now(), duration: None }
-    }
-}
-
-impl Drop for Perf {
-    fn drop(&mut self) {
-        event!(Level::TRACE, "duration: {:?}", self.duration)
-    }
 }
 
 impl Clone for Operation {
