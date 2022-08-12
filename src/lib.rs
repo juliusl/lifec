@@ -45,9 +45,7 @@ pub use state::Query;
 pub use state::AttributeIndex;
 pub use state::Operation;
 
-mod host;
-pub use host::Host;
-pub use host::HostExitCode;
+pub mod host;
 
 use crate::plugins::ProxyDispatcher;
 
@@ -187,11 +185,10 @@ pub struct Runtime {
     config: BTreeMap<String, ConfigFn>,
 }
 
-/// Event builder returned by a runtime, that can be used to schedule events w/ a world
+/// Event source returned by a runtime, that can be used to schedule events w/ a world
 /// 
 pub struct EventSource {
     event: Event,
-    create_fn: CreateFn,
     runtime: Arc<Runtime>, 
 }
 
@@ -225,25 +222,6 @@ impl EventSource {
         }));
     }
 
-    /// Creates the event w/ the world and returns the entity
-    /// 
-    pub fn create(&self, world: &World) -> Option<Entity> {
-        (self.create_fn)(world, |_|{})
-    }
-
-    /// Creates and schedules an event to start
-    /// 
-    pub fn schedule(&self, world: &World) -> Option<Entity> {
-        if let Some(created) = self.create(world) {
-            Runtime::start_event(created, world);
-
-            Some(created)
-        } else {
-            event!(Level::WARN, "did not schedule event {}", self.event);
-            None
-        }
-    }
-
     /// Returns the event's plugin thunk
     /// 
     pub fn thunk(&self) -> Thunk {
@@ -270,7 +248,6 @@ impl Runtime {
         P: Plugin + Send + Default
     {
         EventSource {
-            create_fn: E::create::<P>,
             event: E::event::<P>(),
             runtime: Arc::new(self.clone()),
         }
@@ -814,7 +791,9 @@ impl Runtime {
     }
 
     /// Starts the runtime and extension w/ a thunk_context and cancel_source
-    /// Can be used inside a plugin to customize a runtime.
+    /// 
+    /// Can be used inside a plugin to create a self-contained runtime.
+    /// 
     pub fn start_with<Ext, E>(
         extension: &mut Ext,
         block_symbol: String,

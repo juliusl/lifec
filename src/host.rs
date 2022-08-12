@@ -4,13 +4,23 @@ use atlier::system::Extension;
 use specs::{
     Builder, DispatcherBuilder, Entity, Join, ReadStorage, System, World, WorldExt, WriteStorage,
 };
-use tokio::runtime::Handle;
+use tokio::{runtime::Handle};
 use tracing::{event, Level};
 
 use crate::{
     plugins::{BlockContext, Event, EventRuntime, NetworkRuntime, Project, ThunkContext},
-    CatalogReader, CatalogWriter, EventSource, Operation, Runtime,
+    AttributeIndex, CatalogReader, CatalogWriter, EventSource, Operation, Runtime,
 };
+
+mod open;
+pub use open::open;
+
+mod dashboard;
+pub use dashboard::Dashboard;
+
+mod transport;
+pub use transport::Transport;
+pub use transport::TransportReceiver;
 
 /// Exit instructions for the callers of Host
 ///
@@ -46,6 +56,7 @@ where
         runtime: Runtime,
         block_name: impl AsRef<str>,
         block_context: &BlockContext,
+        dispatcher: &mut DispatcherBuilder,
     ) -> EventSource;
 
     /// Returns some operation if additional setup is required before starting the event,
@@ -70,6 +81,13 @@ where
     fn start(&mut self, project: Project) -> HostExitCode {
         let mut world = World::new();
         let world = &mut world;
+
+        // Usually the event_runtime would set this up, 
+        // But we do this early because we need to setup the dispatcher late,
+        // and we want the handle early
+        let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
+        world.insert(tokio_runtime);
+        
         let mut dispatcher = DispatcherBuilder::new();
 
         EventRuntime::configure_app_systems(&mut dispatcher);
@@ -81,11 +99,8 @@ where
         Self::configure_app_systems(&mut dispatcher);
         Self::configure_app_world(world);
 
-        dispatcher.add(HostSetup {}, "", &["event_runtime"]);
-        dispatcher.add(HostStartup {}, "", &["event_runtime"]);
-
-        let mut dispatcher = dispatcher.build();
-        dispatcher.setup(world);
+        dispatcher.add(HostSetup {}, "", &[]);
+        dispatcher.add(HostStartup {}, "", &[]);
 
         let handle = {
             let tokio_runtime = &world.read_resource::<tokio::runtime::Runtime>();
@@ -98,8 +113,12 @@ where
             thunk_context.block = block_context.to_owned();
 
             let runtime = Self::create_runtime(project.clone());
-            let engine_event_source =
-                self.create_event_source(runtime.clone(), block_name, block_context);
+            let engine_event_source = self.create_event_source(
+                runtime.clone(),
+                block_name,
+                block_context,
+                &mut dispatcher,
+            );
 
             thunk_context
                 .as_mut()
@@ -131,6 +150,9 @@ where
                 engines.push(engine);
             }
         }
+
+        let mut dispatcher = dispatcher.build();
+        dispatcher.setup(world);
         world.maintain();
 
         loop {
@@ -152,6 +174,25 @@ where
             }
         }
     }
+    
+    /// Install a host runtime w/ the given settings
+    /// 
+    /// Panics, if this is called more than once.
+    /// 
+    fn install_host_runtime<I, T>(
+        settings: (I, T), 
+        dispatcher: &mut DispatcherBuilder
+    )
+    where
+        I: AttributeIndex,
+        T: Transport + Send + Sync + 'static,
+    {
+        dispatcher.add(
+            HostRuntime::from(settings), 
+            "host_runtime", 
+            &[]
+        );
+    }
 }
 
 /// System that handles engine setup operations
@@ -166,7 +207,8 @@ impl<'a> System<'a> for HostSetup {
     type SystemData = (CatalogWriter<'a, Operation>, WriteStorage<'a, Event>);
 
     fn run(
-        &mut self, (
+        &mut self,
+        (
             CatalogWriter {
                 entities,
                 mut items,
@@ -220,21 +262,87 @@ impl<'a> System<'a> for HostStartup {
     }
 }
 
+/// System to receive dispatched objects at runtime,
+///
+/// These objects include,
+///     `AttributeGraph`
+///     `Operation`
+///     `ErrorContext`
+///
+struct HostRuntime<T>
+where
+    T: Transport,
+{
+    transport: T,
+    enable_graph_receiver: bool,
+    enable_operation_receiver: bool,
+    enable_error_context_receiver: bool,
+}
+
+impl<A, T> From<(A, T)> for HostRuntime<T>
+where
+    A: AttributeIndex,
+    T: Transport,
+{
+    fn from((index, transport): (A, T)) -> Self {
+        let enable_graph_receiver = index
+            .find_bool("enable_graph_receiver")
+            .unwrap_or_default();
+        let enable_operation_receiver = index
+            .find_bool("enable_operation_receiver")
+            .unwrap_or_default();
+        let enable_error_context_receiver = index
+            .find_bool("enable_error_context_receiver")
+            .unwrap_or_default();
+            
+        Self {
+            transport,
+            enable_graph_receiver,
+            enable_operation_receiver,
+            enable_error_context_receiver,
+        }
+    }
+}
+
+impl<'a, T> System<'a> for HostRuntime<T>
+where
+    T: Transport,
+{
+    type SystemData = TransportReceiver<'a>;
+
+    fn run(&mut self, mut receiver: Self::SystemData) {
+        if self.enable_graph_receiver {
+            receiver.receive_graph(&mut self.transport);
+        }
+
+        if self.enable_operation_receiver {
+            receiver.receive_operation(&mut self.transport);
+        }
+
+        if self.enable_error_context_receiver {
+            receiver.receive_error_context(&mut self.transport);
+        }
+    }
+}
+
 mod test {
     use std::sync::Arc;
 
+    use specs::DispatcherBuilder;
     use tracing::{event, Level};
 
     use crate::{
-        plugins::{Plugin, Println, Test, ThunkContext},
-        Extension, Host, HostExitCode, Operation, Runtime, AttributeIndex,
+        plugins::{Plugin, Println, Test, ThunkContext, Engine},
+        AttributeIndex, Extension, Operation, Runtime,
     };
 
+    use super::{Host, HostExitCode, Transport};
+
     /// Simple test host implementation, for additional coverage
-    /// 
+    ///
     struct TestHost(
         /// iterations before exiting
-        usize
+        usize,
     );
 
     impl Extension for TestHost {}
@@ -251,20 +359,31 @@ mod test {
 
         /// Tests that the expected block_context is passed here
         /// Tests that the expected block exists
-        /// 
+        ///
         fn create_event_source(
             &mut self,
             runtime: crate::Runtime,
             block_name: impl AsRef<str>,
             _block_context: &crate::plugins::BlockContext,
+            dispatcher: &mut DispatcherBuilder,
         ) -> crate::EventSource {
             assert_eq!(block_name.as_ref(), "test_host");
 
-            if _block_context.get_block("test").is_some() {
+            if let Some(test_graph) = _block_context.get_block("test") {
                 let mut src = runtime.event_source::<Test, (IsBob, Println)>();
                 // Tests that the context will be configured from the correct
                 // block in the project (test_host test)
                 src.set_config_from_project();
+
+                // Tests installing a host runtime
+                Self::install_host_runtime(
+                    (
+                        test_graph, 
+                        TestTransport{}
+                    ), 
+                    dispatcher
+                );
+
                 return src;
             }
 
@@ -272,8 +391,8 @@ mod test {
         }
 
         /// TODO
-        /// 
-        fn should_exit(&mut self) -> Option<crate::HostExitCode> {
+        ///
+        fn should_exit(&mut self) -> Option<HostExitCode> {
             self.0 -= 1;
 
             if self.0 == 0 {
@@ -284,7 +403,7 @@ mod test {
         }
 
         /// Test basic example of generating a setup operation
-        /// 
+        ///
         fn prepare_engine(
             &mut self,
             _engine: specs::Entity,
@@ -294,29 +413,35 @@ mod test {
             if let Some(query) = _initial_context.block.find_query() {
                 event!(Level::TRACE, "found query {:#?}", query);
                 // Test generating a "setup" operation
-                
+
                 let item = Operation::item(_engine, _handle);
                 let thunk = query.thunk(
-                    item, 
-                    Some(((
-                        // Tests that the name is changed
-                        ChangeName(), 
-                        IsNotBob()
-                    ), 
-                    // Optional, debug println
-                    Println::default()).as_thunk())
+                    item,
+                    Some(
+                        (
+                            (
+                                // Tests that the name is changed
+                                ChangeName(),
+                                IsNotBob(),
+                            ),
+                            // Optional, debug println
+                            Println::default(),
+                        )
+                            .as_thunk(),
+                    ),
                 );
-            
+
                 // Test passing a src to the thunk, so that the operation
                 // is initialized before being executed
                 //
                 // Note: in this context, entity id doesn't matter because an alt
                 // src will be used. The id matters if the initial src is being used
-                // This should hopefully be an implementation detail. 
-                let src = _initial_context.block
+                // This should hopefully be an implementation detail.
+                let src = _initial_context
+                    .block
                     .get_block("test")
                     .expect("test block is defined");
-                
+
                 return Some(thunk(Arc::new(src)));
             }
 
@@ -358,13 +483,10 @@ mod test {
             context.clone().task(|_| {
                 let tc = context.clone();
                 async move {
-                    assert_eq!(
-                        tc.find_text("name"), 
-                        Some("bob".to_string())
-                    );
+                    assert_eq!(tc.find_text("name"), Some("bob".to_string()));
 
                     event!(Level::TRACE, "checked if this is bob");
-                    
+
                     None
                 }
             })
@@ -383,16 +505,49 @@ mod test {
             context.clone().task(|_| {
                 let tc = context.clone();
                 async move {
-                    assert_eq!(
-                        tc.find_text("name"), 
-                        Some("not-bob".to_string())
-                    );
+                    assert_eq!(tc.find_text("name"), Some("not-bob".to_string()));
 
                     event!(Level::TRACE, "checked if this is not-bob");
-                    
+
                     None
                 }
             })
+        }
+    }
+
+    struct TestTransport;
+
+    impl Engine for TestTransport {
+        fn event_name() -> &'static str {
+            "test_transport"
+        }
+    }
+
+    impl Transport for TestTransport {
+        type Plugin = Println;
+
+        fn transport_graph(
+            &mut self,
+            _graph: crate::AttributeGraph,
+            _system_data: &mut super::TransportReceiver,
+        ) {
+            event!(Level::TRACE, "transport graph called")
+        }
+
+        fn transport_operation(
+            &mut self,
+            _operation: Operation,
+            _system_data: &mut super::TransportReceiver,
+        ) {
+            event!(Level::TRACE, "transport operation called")
+        }
+
+        fn transport_error_context(
+            &mut self,
+            _error_context: crate::plugins::ErrorContext,
+            _system_data: &mut super::TransportReceiver,
+        ) {
+            event!(Level::TRACE, "transport error context called")
         }
     }
 
@@ -402,7 +557,7 @@ mod test {
         use crate::Project;
         let code = TestHost(10).start(
             Project::load_content(
-            r#"
+                r#"
             # Project Settings
             ```
             - add debug   .enable
@@ -411,6 +566,11 @@ mod test {
             # Test Host Impl 
             ``` test_host test
             add name    .text bob
+
+            add enable_graph_receiver           .enable
+            add enable_operation_receiver       .enable
+            add enable_error_context_receiver   .enable
+
             ``` query
             define name find .search_text
             ```

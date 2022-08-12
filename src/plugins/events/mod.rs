@@ -20,6 +20,7 @@ use tracing::Level;
 
 use crate::AttributeGraph;
 use crate::Extension;
+use crate::Operation;
 
 use super::thunks::CancelThunk;
 use super::thunks::ErrorContext;
@@ -143,6 +144,7 @@ impl Extension for EventRuntime {
         world.register::<ErrorContext>();
         world.register::<Project>();
         world.register::<crate::Runtime>();
+        world.register::<Operation>();
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
@@ -199,6 +201,33 @@ impl SetupHandler<sync::mpsc::Receiver<AttributeGraph>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Sender<ErrorContext>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         let (tx, rx) = mpsc::channel::<ErrorContext>(10);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
+/// Setup for tokio-mulitple-producers single-consumer channel for status updates
+impl SetupHandler<sync::mpsc::Receiver<ErrorContext>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<ErrorContext>(10);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
+/// Setup for tokio-mulitple-producers single-consumer channel for status updates
+impl SetupHandler<sync::mpsc::Receiver<Operation>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<Operation>(10);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
+/// Setup for tokio-mulitple-producers single-consumer channel for status updates
+impl SetupHandler<sync::mpsc::Sender<Operation>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<Operation>(10);
         world.insert(tx);
         world.insert(rx);
     }

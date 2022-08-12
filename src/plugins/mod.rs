@@ -1,55 +1,56 @@
-use crate::*;
 use crate::editor::List;
 use crate::editor::Task;
+use crate::host::TransportReceiver;
+use crate::*;
+use specs::Builder;
+use specs::EntityBuilder;
 use tokio::select;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
-use specs::Builder;
-use specs::EntityBuilder;
 
 mod secure;
 pub use secure::Secure;
 
 mod block;
-pub use block::Project;
-pub use block::BlockContext;
 pub use block::BlockAddress;
+pub use block::BlockContext;
+pub use block::Project;
 
 mod network;
 pub use network::NetworkEvent;
-pub use network::NetworkTask;
-pub use network::Proxy;
-pub use network::ProxiedMessage;
 pub use network::NetworkRuntime;
+pub use network::NetworkTask;
+pub use network::ProxiedMessage;
+pub use network::Proxy;
 
 mod events;
+pub use events::Connection;
 pub use events::Event;
 pub use events::EventRuntime;
 pub use events::Listen;
-pub use events::Sequence;
-pub use events::Connection;
 pub use events::ProxyDispatcher;
+pub use events::Sequence;
 
 mod process;
-pub use process::Process;
-pub use process::Remote;
 pub use process::Expect;
 pub use process::Missing;
+pub use process::Process;
 pub use process::Redirect;
+pub use process::Remote;
 
 mod thunks;
-pub use thunks::ErrorContext;
-pub use thunks::Config;
 pub use thunks::CancelThunk;
+pub use thunks::Config;
+pub use thunks::Dispatch;
+pub use thunks::ErrorContext;
 pub use thunks::OpenDir;
 pub use thunks::OpenFile;
-pub use thunks::WriteFile;
+pub use thunks::Println;
 pub use thunks::StatusUpdate;
 pub use thunks::Thunk;
 pub use thunks::ThunkContext;
 pub use thunks::Timer;
-pub use thunks::Println;
-pub use thunks::Dispatch;
+pub use thunks::WriteFile;
 
 mod testing;
 pub use testing::Test;
@@ -65,15 +66,18 @@ impl Archive {
 }
 
 /// Async context returned if the plugin starts an async task
-pub type AsyncContext = (tokio::task::JoinHandle<ThunkContext>, tokio::sync::oneshot::Sender<()>);
+pub type AsyncContext = (
+    tokio::task::JoinHandle<ThunkContext>,
+    tokio::sync::oneshot::Sender<()>,
+);
 
 pub struct AsThunk<P>(pub P)
-where 
+where
     P: Plugin;
 
-impl<P> Into<Thunk> for AsThunk<P> 
+impl<P> Into<Thunk> for AsThunk<P>
 where
-    P: Plugin
+    P: Plugin,
 {
     fn into(self) -> Thunk {
         Thunk::from_plugin::<P>()
@@ -90,11 +94,11 @@ where
         + Send
         + Sync,
 {
-    /// Returns self as a thunk 
-    /// 
-    fn as_thunk(self) ->  Thunk
+    /// Returns self as a thunk
+    ///
+    fn as_thunk(self) -> Thunk
     where
-        Self: Sized + Plugin
+        Self: Sized + Plugin,
     {
         AsThunk(self).into()
     }
@@ -114,7 +118,7 @@ where
     fn caveats() -> &'static str {
         ""
     }
-    
+
     /// Parses entity from a .runmd file and add's T as a component from the parsed graph.
     /// Calls handle to handle any actions on the graph before T::from(graph)
     /// Calls init to complete building the entity.
@@ -180,7 +184,7 @@ pub trait Engine {
     /// Creates an instance of this engine
     fn create<P>(world: &World, config: fn(&mut ThunkContext)) -> Option<Entity>
     where
-        P: Plugin<ThunkContext> + Send + Default,
+        P: Plugin + Send + Default,
     {
         let entities = world.entities();
         let mut events = world.write_component::<Event>();
@@ -196,11 +200,15 @@ pub trait Engine {
                 initial_context.as_mut().set_parent_entity(entity);
 
                 if !P::caveats().is_empty() {
-                    initial_context.as_mut().add_text_attr("caveats", P::caveats());
+                    initial_context
+                        .as_mut()
+                        .add_text_attr("caveats", P::caveats());
                 }
 
                 if !P::description().is_empty() {
-                    initial_context.as_mut().add_text_attr("description", P::description());
+                    initial_context
+                        .as_mut()
+                        .add_text_attr("description", P::description());
                 }
 
                 match world
@@ -226,6 +234,63 @@ pub trait Engine {
                     "could not finish creating event {}, {}, src_desc: inserting event",
                     P::symbol(),
                     err
+                );
+                entities.delete(entity).ok();
+                None
+            }
+        }
+    }
+
+    /// Creates an engine event from a transport receiver
+    ///
+    fn create_from_transport_receiver<P>(
+        TransportReceiver {
+            entities,
+            contexts,
+            events,
+            ..
+        }: &mut TransportReceiver,
+    ) -> Option<Entity>
+    where
+        P: Plugin + Send + Default,
+    {
+        let entity = entities.create();
+
+        match events.insert(entity, Self::event::<P>()) {
+            Ok(_) => {
+                let mut initial_context = ThunkContext::default();
+                initial_context.as_mut().set_parent_entity(entity);
+
+                if !P::caveats().is_empty() {
+                    initial_context
+                        .as_mut()
+                        .add_text_attr("caveats", P::caveats());
+                }
+
+                if !P::description().is_empty() {
+                    initial_context
+                        .as_mut()
+                        .add_text_attr("description", P::description());
+                }
+
+                match contexts.insert(entity, initial_context) {
+                    Ok(_) => Some(entity),
+                    Err(err) => {
+                        event!(
+                            Level::ERROR,
+                            "could not finish creating event {}, {err}",
+                            P::symbol(),
+                        );
+                        entities.delete(entity).ok();
+                        None
+                    }
+                }
+            }
+            Err(err) => {
+                event!(
+                    Level::ERROR,
+                    "could not finish creating event {}, {err}",
+                    P::symbol(),
                 );
                 entities.delete(entity).ok();
                 None
@@ -262,12 +327,12 @@ pub trait Engine {
             if let Some(true) = engine_root.as_ref().is_enabled("repeat") {
                 sequence.set_cursor(first);
             }
-            
+
             if let Some(text) = engine_root.as_ref().find_text("repeat") {
                 event!(Level::DEBUG, "Looking for {}, to set cursor", text);
                 if let Some(entity) = engine_root.as_ref().find_int(text) {
                     let entity = world.entities().entity(entity as u32);
-                    sequence.set_cursor(entity);               
+                    sequence.set_cursor(entity);
                     event!(Level::DEBUG, "Cursor found");
                 } else {
                     event!(Level::DEBUG, "Cursor not found");
@@ -283,11 +348,12 @@ pub trait Engine {
                 .write_component::<Sequence>()
                 .insert(first, sequence.clone())
                 .ok();
-            
-            world.write_component::<Connection>()
+
+            world
+                .write_component::<Connection>()
                 .insert(first, Connection::default())
                 .ok();
-                
+
             world
                 .write_component::<List<Task>>()
                 .insert(first, sequence_list)
@@ -300,9 +366,9 @@ pub trait Engine {
     }
 
     /// standalone sets up a new specs environment with this extension
-    fn standalone<'a, 'b, E>() -> (World, DispatcherBuilder::<'a, 'b>) 
+    fn standalone<'a, 'b, E>() -> (World, DispatcherBuilder<'a, 'b>)
     where
-        E: Extension 
+        E: Extension,
     {
         let mut world = World::new();
         let mut dispatcher_builder = DispatcherBuilder::new();
@@ -322,10 +388,10 @@ type PluginTask = fn(&mut ThunkContext) -> Option<AsyncContext>;
 /// use lifec::editor::Call;
 /// use lifec::plugins::{OpenFile, WriteFile};
 /// use lifec::Runtime;
-/// 
+///
 /// let mut runtime = Runtime::default();
 /// runtime.install::<Call, (OpenFile, WriteFile)>();
-/// 
+///
 /// ```
 pub fn combine<A, B>() -> PluginTask
 where
@@ -335,7 +401,7 @@ where
     <(A, B) as Plugin>::call_with_context
 }
 
-impl<A, B> Plugin for (A, B) 
+impl<A, B> Plugin for (A, B)
 where
     A: Plugin + Default + Send,
     B: Plugin + Default + Send,
@@ -356,7 +422,7 @@ where
                 let (upper_cancel_b, cancel_source_b) = oneshot::channel::<()>();
 
                 if let Some(handle) = tc.handle() {
-                    let combined_task = handle.spawn(async move { 
+                    let combined_task = handle.spawn(async move {
                         let mut tc = tc.clone();
                         if let Some((handle, cancel)) = A::call_with_context(&mut tc) {
                             select! {
@@ -376,23 +442,22 @@ where
                             }
                         }
 
-                        let previous = tc.project
-                                .as_ref()
-                                .and_then(|p| p.transpile_blocks().ok())
-                                .unwrap_or_default()
-                                .trim()
-                                .to_string();
+                        let previous = tc
+                            .project
+                            .as_ref()
+                            .and_then(|p| p.transpile_blocks().ok())
+                            .unwrap_or_default()
+                            .trim()
+                            .to_string();
 
                         let mut next_tc = tc.clone();
                         if !previous.trim().is_empty() {
                             let block_name = tc.block.block_name.to_string();
-                            next_tc.as_mut().add_message(
-                                block_name,
-                                "previous",
-                                previous,
-                            );
+                            next_tc
+                                .as_mut()
+                                .add_message(block_name, "previous", previous);
                         }
-        
+
                         if let Some((handle, cancel)) = B::call_with_context(&mut next_tc) {
                             select! {
                                 next = handle => {
@@ -431,7 +496,6 @@ where
                     };
                 }
 
-             
                 None
             }
         })
