@@ -9,6 +9,9 @@ use crate::{plugins::{EventRuntime, ErrorContext, Engine},
 mod proxy;
 pub use proxy::ProxyTransport;
 
+mod test;
+pub use test::TestTransport;
+
 /// A transport is an abstraction over receiving objects that have 
 /// been dispatched from a thunk_context.
 /// 

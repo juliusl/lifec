@@ -362,16 +362,15 @@ impl<'a> System<'a> for HostRuntime {
 
 mod test {
     use std::sync::Arc;
-    use specs::{World, Entity, System, DispatcherBuilder};
-    use tokio::sync::mpsc::{Receiver};
+    use specs::{World, Entity, DispatcherBuilder};
     use tracing::{event, Level};
 
     use crate::{
-        plugins::{Plugin, Println, Test, ThunkContext, Engine, ErrorContext},
-        AttributeIndex, Extension, Operation, Runtime, AttributeGraph
+        plugins::{Plugin, Println, Test, ThunkContext},
+        AttributeIndex, Extension, Operation, Runtime, host::transport::TestTransport
     };
 
-    use super::{Host, HostExitCode, Transport, transport::ProxyTransport};
+    use super::{Host, HostExitCode};
 
     /// Simple test host implementation, for additional coverage
     ///
@@ -491,13 +490,25 @@ mod test {
                     .get_block("test")
                     .expect("test block is defined");
 
-                let (test_transport, proxy) = TestTransport::new();
+                let (mut test_transport, proxy) = TestTransport::new();
                 self.create_guest(
                     engine, 
                     world, 
                     src.clone(), 
                     proxy,
                 );
+
+                test_transport.add_graph_handler(|g| {
+                    event!(Level::TRACE, "transport graph called, {:#?}", g);
+                });
+
+                test_transport.add_operation_handler(|_| {
+                    event!(Level::TRACE, "transport operation called");
+                });
+
+                test_transport.add_error_handler(|_| {
+                    event!(Level::TRACE, "transport error context called");
+                });
 
                 dispatcher.add(test_transport, "", &[]);
 
@@ -582,91 +593,7 @@ mod test {
         }
     }
 
-    #[derive(Default)]
-    struct TestTransport {
-        rx_graphs: Option<Receiver<AttributeGraph>>,
-        rx_operations: Option<Receiver<Operation>>,
-        rx_error_contexts: Option<Receiver<ErrorContext>>,
-    }
 
-    impl TestTransport {
-        fn new() -> (Self, ProxyTransport) {
-            let mut test_transport = TestTransport::default();
-            let mut p = ProxyTransport::new();
-            test_transport.rx_graphs = Some(p.enable_graph_proxy(10));
-            test_transport.rx_operations = Some(p.enable_operation_proxy(10));
-            test_transport.rx_error_contexts = Some(p.enable_error_proxy(10));
-            (test_transport, p)
-        }
-    }
-
-    impl Engine for TestTransport {
-        fn event_symbol() -> &'static str {
-            "test_transport"
-        }
-    }
-
-    impl Transport for TestTransport {
-        fn transport_graph(
-            &mut self,
-            _graph: crate::AttributeGraph,
-        ) {
-            event!(Level::TRACE, "transport graph called, {:#?}", _graph);
-        }
-
-        fn transport_operation(
-            &mut self,
-            _operation: Operation,
-        ) {
-            event!(Level::TRACE, "transport operation called")
-        }
-
-        fn transport_error_context(
-            &mut self,
-            _error_context: crate::plugins::ErrorContext,
-        ) {
-            event!(Level::TRACE, "transport error context called")
-        }
-    }
-
-    impl<'a> System<'a> for TestTransport {
-        type SystemData = ();
-
-        fn run(&mut self, _: Self::SystemData) {
-            if let Some(grx) = self.rx_graphs.as_mut() {
-                match grx.try_recv() {
-                    Ok(g) => {
-                        self.transport_graph(g);
-                    },
-                    Err(_) => {
-                        
-                    },
-                }
-            }
-
-            if let Some(grx) = self.rx_operations.as_mut() {
-                match grx.try_recv() {
-                    Ok(g) => {
-                        self.transport_operation(g);
-                    },
-                    Err(_) => {
-                        
-                    },
-                }
-            }
-
-            if let Some(grx) = self.rx_error_contexts.as_mut() {
-                match grx.try_recv() {
-                    Ok(g) => {
-                        self.transport_error_context(g);
-                    },
-                    Err(_) => {
-                        
-                    },
-                }
-            }
-        }
-    }
 
     #[test]
     #[tracing_test::traced_test]
