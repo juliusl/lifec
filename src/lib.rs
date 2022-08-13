@@ -188,7 +188,7 @@ pub struct Runtime {
 /// Event source returned by a runtime, that can be used to schedule events w/ a world
 /// 
 pub struct EventSource {
-    event: Event,
+    event: Event, 
     runtime: Arc<Runtime>, 
 }
 
@@ -465,14 +465,14 @@ impl Runtime {
         created
     }
 
-    /// Creates a new engine,
-    /// an engine is defined by a sequence of events.
+    /// Creates a new engine, an engine is defined by a sequence of events.
+    /// 
     pub fn create_engine<E>(&self, world: &World, sequence_block_name: String) -> Option<Entity>
     where
         E: Engine,
     {
         if let Some(block) = self.project.find_block(&sequence_block_name) {
-            if let Some(mut engine_root) = block.get_block(E::event_name()) {
+            if let Some(mut engine_root) = block.get_block(E::event_symbol()) {
                 let mut sequence = Sequence::default();
                 for (block_address, block_name, value) in
                     engine_root.clone().iter_attributes().filter_map(|a| {
@@ -485,7 +485,7 @@ impl Runtime {
                     })
                 {
                     if let Some((_, block_symbol)) = block_address.split_once("::") {
-                        let engine_plugin_key = format!("{} {}", "call", block_symbol);
+                        let engine_plugin_key = format!("{} {}", E::event_symbol(), block_symbol);
                         if let Some(create_fn) = self.engine_plugin.get(&engine_plugin_key) {
                             if let Some(created) =
                                 self.create_plugin(world, block_address, value.clone(), *create_fn)
@@ -519,7 +519,7 @@ impl Runtime {
     where
         E: Engine,
     {
-        let engine_plugin_key = format!("{} {}", E::event_name(), symbol);
+        let engine_plugin_key = format!("{} {}", E::event_symbol(), symbol);
         self.engine_plugin
             .get(&engine_plugin_key)
             .and_then(|f| Some(*f))
@@ -809,7 +809,7 @@ impl Runtime {
         let mut connections = vec![];
         for (_, block) in project.iter_block() {
             if let Some(runtime_block) = block.get_block(&block_symbol) {
-                for (engine_address, value) in runtime_block.find_symbol_values(E::event_name()) {
+                for (engine_address, value) in runtime_block.find_symbol_values(E::event_symbol()) {
                     if let Some((engine_name, _)) = engine_address.split_once("::") {
                         call_names.push(engine_name.to_string());
 

@@ -5,7 +5,7 @@ use super::Engine;
 pub struct Test;
 
 impl Engine for Test {
-    fn event_name() -> &'static str {
+    fn event_symbol() -> &'static str {
         "test"
     }
 

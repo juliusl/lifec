@@ -10,7 +10,7 @@ use super::Call;
 pub struct Fix; 
 
 impl Engine for Fix {
-    fn event_name() -> &'static str {
+    fn event_symbol() -> &'static str {
         "fix"
     }
 

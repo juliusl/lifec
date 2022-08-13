@@ -17,7 +17,7 @@ use crate::System;
 pub struct Call;
 
 impl Engine for Call {
-    fn event_name() -> &'static str {
+    fn event_symbol() -> &'static str {
         "call"
     }
 

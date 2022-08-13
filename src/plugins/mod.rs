@@ -1,6 +1,5 @@
 use crate::editor::List;
 use crate::editor::Task;
-use crate::host::TransportReceiver;
 use crate::*;
 use specs::Builder;
 use specs::EntityBuilder;
@@ -143,7 +142,7 @@ where
 /// The engine trait is to enable an event struct to be created which handles the dynamics for an entity
 pub trait Engine {
     /// The name of the event this engine produces
-    fn event_name() -> &'static str;
+    fn event_symbol() -> &'static str;
 
     /// Setup graph
     fn setup(_: &mut AttributeGraph) {
@@ -241,69 +240,12 @@ pub trait Engine {
         }
     }
 
-    /// Creates an engine event from a transport receiver
-    ///
-    fn create_from_transport_receiver<P>(
-        TransportReceiver {
-            entities,
-            contexts,
-            events,
-            ..
-        }: &mut TransportReceiver,
-    ) -> Option<Entity>
-    where
-        P: Plugin + Send + Default,
-    {
-        let entity = entities.create();
-
-        match events.insert(entity, Self::event::<P>()) {
-            Ok(_) => {
-                let mut initial_context = ThunkContext::default();
-                initial_context.as_mut().set_parent_entity(entity);
-
-                if !P::caveats().is_empty() {
-                    initial_context
-                        .as_mut()
-                        .add_text_attr("caveats", P::caveats());
-                }
-
-                if !P::description().is_empty() {
-                    initial_context
-                        .as_mut()
-                        .add_text_attr("description", P::description());
-                }
-
-                match contexts.insert(entity, initial_context) {
-                    Ok(_) => Some(entity),
-                    Err(err) => {
-                        event!(
-                            Level::ERROR,
-                            "could not finish creating event {}, {err}",
-                            P::symbol(),
-                        );
-                        entities.delete(entity).ok();
-                        None
-                    }
-                }
-            }
-            Err(err) => {
-                event!(
-                    Level::ERROR,
-                    "could not finish creating event {}, {err}",
-                    P::symbol(),
-                );
-                entities.delete(entity).ok();
-                None
-            }
-        }
-    }
-
     /// Returns an event that runs the engine
     fn event<P>() -> Event
     where
         P: Plugin<ThunkContext> + Send + Default,
     {
-        Event::from_plugin::<P>(Self::event_name())
+        Event::from_plugin::<P>(Self::event_symbol())
     }
 
     /// Parses a .runmd plugin entity, and then sets up the entity's event component

@@ -1,15 +1,15 @@
-use std::time::Duration;
+use std::{time::Duration, collections::HashMap};
 
 use atlier::system::Extension;
 use specs::{
-    Builder, DispatcherBuilder, Entity, Join, ReadStorage, System, World, WorldExt, WriteStorage,
+    Builder, DispatcherBuilder, Entity, Join, ReadStorage, System, World, WorldExt, WriteStorage, Entities, Dispatcher,
 };
 use tokio::{runtime::Handle};
 use tracing::{event, Level};
 
 use crate::{
     plugins::{BlockContext, Event, EventRuntime, NetworkRuntime, Project, ThunkContext},
-    AttributeIndex, CatalogReader, CatalogWriter, EventSource, Operation, Runtime,
+    CatalogReader, CatalogWriter, EventSource, Operation, Runtime, AttributeIndex,
 };
 
 mod open;
@@ -21,6 +21,11 @@ pub use dashboard::Dashboard;
 mod transport;
 pub use transport::Transport;
 pub use transport::TransportReceiver;
+
+mod guest_runtime;
+pub use guest_runtime::GuestRuntime;
+
+use self::transport::ProxyTransport;
 
 /// Exit instructions for the callers of Host
 ///
@@ -37,7 +42,7 @@ pub trait Host
 where
     Self: Extension,
 {
-    /// Returns a new runtime for this host
+    /// Returns a new runtime for this host 
     ///
     /// Types implementing this trait should install any plugins
     /// and add any configs, that will be needed to start engine
@@ -45,7 +50,7 @@ where
     ///
     fn create_runtime(project: Project) -> Runtime;
 
-    /// Creates a new event source for the engine
+    /// Creates a new event source 
     ///
     /// Implementing types receive the entire block context, and can
     /// choose to interpret the block in any way they choose when returning
@@ -56,7 +61,6 @@ where
         runtime: Runtime,
         block_name: impl AsRef<str>,
         block_context: &BlockContext,
-        dispatcher: &mut DispatcherBuilder,
     ) -> EventSource;
 
     /// Returns some operation if additional setup is required before starting the event,
@@ -69,8 +73,38 @@ where
         &mut self,
         engine: Entity,
         handle: Handle,
+        world: &mut World,
+        dispatcher: &mut DispatcherBuilder,
         initial_context: &ThunkContext,
     ) -> Option<Operation>;
+
+    /// Add's a guest to the host
+    /// 
+    /// Called by the guest runtime when a guest runtime is 
+    /// created.
+    /// 
+    fn add_guest(
+        &mut self, 
+        host: Entity,
+        dispatcher: Dispatcher<'static, 'static>
+    );
+
+    /// Add's a guest to the host
+    /// 
+    /// Called by the guest runtime when a guest runtime is 
+    /// created.
+    /// 
+    fn take_guest(
+        &mut self, 
+        host: Entity
+    ) ->  Option<Dispatcher<'static, 'static>>;
+
+    // /// Visit guests of host
+    // /// 
+    // fn visit_guests(
+    //     &mut self, 
+    //     visitor: impl FnOnce(&mut Dispatcher<'static, 'static>)
+    // );
 
     /// Returns true if the host should exit
     ///
@@ -79,35 +113,14 @@ where
     /// Starts a host runtime w/ a given project
     ///
     fn start(&mut self, project: Project) -> HostExitCode {
-        let mut world = World::new();
-        let world = &mut world;
-
-        // Usually the event_runtime would set this up, 
-        // But we do this early because we need to setup the dispatcher late,
-        // and we want the handle early
-        let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
-        world.insert(tokio_runtime);
-        
-        let mut dispatcher = DispatcherBuilder::new();
-
-        EventRuntime::configure_app_systems(&mut dispatcher);
-        EventRuntime::configure_app_world(world);
-
-        NetworkRuntime::configure_app_systems(&mut dispatcher);
-        NetworkRuntime::configure_app_world(world);
-
-        Self::configure_app_systems(&mut dispatcher);
-        Self::configure_app_world(world);
-
-        dispatcher.add(HostSetup {}, "", &[]);
-        dispatcher.add(HostStartup {}, "", &[]);
+        let (mut world, mut dispatcher) = Self::new_world();
 
         let handle = {
             let tokio_runtime = &world.read_resource::<tokio::runtime::Runtime>();
             tokio_runtime.handle().clone()
         };
 
-        let mut engines = vec![];
+        let mut host_runtime = HostRuntime::default();
         for (block_name, block_context) in project.clone().iter_block() {
             let mut thunk_context = ThunkContext::default();
             thunk_context.block = block_context.to_owned();
@@ -117,12 +130,14 @@ where
                 runtime.clone(),
                 block_name,
                 block_context,
-                &mut dispatcher,
             );
 
             thunk_context
                 .as_mut()
-                .add_text_attr("event_symbol", engine_event_source.event.symbol());
+                .add_text_attr(
+                    "event_symbol", 
+                    engine_event_source.event.symbol()
+            );
 
             let engine = world
                 .create_entity()
@@ -132,8 +147,18 @@ where
                 .build();
 
             if let Some(setup_operation) =
-                self.prepare_engine(engine, handle.clone(), &thunk_context)
+                self.prepare_engine(
+                    engine, 
+                    handle.clone(), 
+                    &mut world,
+                    &mut dispatcher, 
+                    &thunk_context
+                )
             {
+                if let Some(guest) = self.take_guest(engine) {
+                    host_runtime.guests.insert(engine, guest);
+                }
+
                 match world.write_component().insert(engine, setup_operation) {
                     Ok(_) => {
                         event!(Level::DEBUG, "Inserted setup operation for {block_name}");
@@ -145,14 +170,17 @@ where
                         );
                     }
                 }
-            } else {
-                // If a setup operation isn't required, the engine will start immediately
-                engines.push(engine);
             }
         }
 
+        // Host runtime is definitely not send + sync
+        // therefore we add as thread local system
+        dispatcher.add_thread_local(
+            host_runtime
+        );
+
         let mut dispatcher = dispatcher.build();
-        dispatcher.setup(world);
+        dispatcher.setup(&mut world);
         world.maintain();
 
         loop {
@@ -160,7 +188,7 @@ where
             self.on_run(&world);
 
             world.maintain();
-            self.on_maintain(world);
+            self.on_maintain(&mut world);
 
             if let Some(exit_code) = self.should_exit() {
                 if let Some(runtime) = world.remove::<tokio::runtime::Runtime>() {
@@ -174,24 +202,66 @@ where
             }
         }
     }
-    
-    /// Install a host runtime w/ the given settings
+
+    /// Creates a new world and dispatcher builder 
     /// 
-    /// Panics, if this is called more than once.
+    fn new_world<'a, 'b>() -> (World, DispatcherBuilder<'a, 'b>) {
+        let mut world = World::new();
+
+        // Usually the event_runtime would set this up, 
+        // But we do this early because we need to setup the dispatcher late,
+        // and we want the handle early
+        let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
+        world.insert(tokio_runtime);
+        
+        let mut dispatcher = DispatcherBuilder::new();
+
+        EventRuntime::configure_app_systems(&mut dispatcher);
+        EventRuntime::configure_app_world(&mut world);
+
+        NetworkRuntime::configure_app_systems(&mut dispatcher);
+        NetworkRuntime::configure_app_world(&mut world);
+
+        Self::configure_app_systems(&mut dispatcher);
+        Self::configure_app_world(&mut world);
+
+        dispatcher.add(HostSetup {}, "", &[]);
+        dispatcher.add(HostStartup {}, "", &[]);
+
+        (world, dispatcher)
+    }
+
+    /// Creates a guest runtime component for a transport,
+    /// Registers the component w/ the host world and inserts the component into the world
     /// 
-    fn install_host_runtime<I, T>(
-        settings: (I, T), 
-        dispatcher: &mut DispatcherBuilder
-    )
+    fn create_guest<T>(&mut self, 
+        engine: Entity, 
+        world: &mut World, 
+        src: impl AttributeIndex, 
+        transport: T
+    ) 
     where
-        I: AttributeIndex,
-        T: Transport + Send + Sync + 'static,
+        Self: Sized,
+        T: Into<ProxyTransport>,
     {
-        dispatcher.add(
-            HostRuntime::from(settings), 
-            "host_runtime", 
-            &[]
-        );
+        world.register::<GuestRuntime>();
+
+        match world.write_component().insert(
+            engine, 
+            GuestRuntime::from(
+                (
+                    engine, 
+                    self, 
+                    src, 
+                    transport
+                )
+            )
+        ) {
+            Ok(_) => {
+                event!(Level::INFO, "host created guest for {}", engine.id());
+            },
+            Err(err) => event!(Level::ERROR, "could not insert guest runtime component, {err}"),
+        }
     }
 }
 
@@ -204,7 +274,10 @@ where
 struct HostSetup;
 
 impl<'a> System<'a> for HostSetup {
-    type SystemData = (CatalogWriter<'a, Operation>, WriteStorage<'a, Event>);
+    type SystemData = (
+        CatalogWriter<'a, Operation>, 
+        WriteStorage<'a, Event>
+    );
 
     fn run(
         &mut self,
@@ -262,87 +335,51 @@ impl<'a> System<'a> for HostStartup {
     }
 }
 
-/// System to receive dispatched objects at runtime,
-///
-/// These objects include,
-///     `AttributeGraph`
-///     `Operation`
-///     `ErrorContext`
-///
-struct HostRuntime<T>
-where
-    T: Transport,
-{
-    transport: T,
-    enable_graph_receiver: bool,
-    enable_operation_receiver: bool,
-    enable_error_context_receiver: bool,
+/// Manages a transport from a host to guest
+/// 
+#[derive(Default)]
+struct HostRuntime {
+    guests: HashMap<Entity, Dispatcher<'static, 'static>>
 }
 
-impl<A, T> From<(A, T)> for HostRuntime<T>
-where
-    A: AttributeIndex,
-    T: Transport,
-{
-    fn from((index, transport): (A, T)) -> Self {
-        let enable_graph_receiver = index
-            .find_bool("enable_graph_receiver")
-            .unwrap_or_default();
-        let enable_operation_receiver = index
-            .find_bool("enable_operation_receiver")
-            .unwrap_or_default();
-        let enable_error_context_receiver = index
-            .find_bool("enable_error_context_receiver")
-            .unwrap_or_default();
+impl<'a> System<'a> for HostRuntime {
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, GuestRuntime>
+    );
+
+    fn run(&mut self, (hosts, mut guests): Self::SystemData) {
+        for (host, guest) in (&hosts, &mut guests).join() {
             
-        Self {
-            transport,
-            enable_graph_receiver,
-            enable_operation_receiver,
-            enable_error_context_receiver,
-        }
-    }
-}
-
-impl<'a, T> System<'a> for HostRuntime<T>
-where
-    T: Transport,
-{
-    type SystemData = TransportReceiver<'a>;
-
-    fn run(&mut self, mut receiver: Self::SystemData) {
-        if self.enable_graph_receiver {
-            receiver.receive_graph(&mut self.transport);
-        }
-
-        if self.enable_operation_receiver {
-            receiver.receive_operation(&mut self.transport);
-        }
-
-        if self.enable_error_context_receiver {
-            receiver.receive_error_context(&mut self.transport);
+            if let Some(guest_dispatcher) = self.guests.get_mut(&host) {
+                guest.run(());
+                guest_dispatcher.dispatch(guest.world());
+                guest.world_mut().maintain();
+            }
         }
     }
 }
 
 mod test {
     use std::sync::Arc;
-
-    use specs::DispatcherBuilder;
+    use specs::{World, Entity, System, DispatcherBuilder};
+    use tokio::sync::mpsc::{Receiver};
     use tracing::{event, Level};
 
     use crate::{
-        plugins::{Plugin, Println, Test, ThunkContext, Engine},
-        AttributeIndex, Extension, Operation, Runtime,
+        plugins::{Plugin, Println, Test, ThunkContext, Engine, ErrorContext},
+        AttributeIndex, Extension, Operation, Runtime, AttributeGraph
     };
 
-    use super::{Host, HostExitCode, Transport};
+    use super::{Host, HostExitCode, Transport, transport::ProxyTransport};
 
     /// Simple test host implementation, for additional coverage
     ///
     struct TestHost(
         /// iterations before exiting
         usize,
+        /// test guest
+        Option<specs::Dispatcher<'static, 'static>>,
     );
 
     impl Extension for TestHost {}
@@ -357,6 +394,27 @@ mod test {
             runtime
         }
 
+        /// Tests that guest is added
+        /// 
+        fn add_guest(&mut self, _engine: Entity, _dispatcher: specs::Dispatcher<'static, 'static>) {
+            self.1 = Some(_dispatcher);
+        }
+
+        fn take_guest(
+                &mut self, 
+                _host: Entity
+            ) ->  Option<specs::Dispatcher<'static, 'static>> {
+            self.1.take()
+        }
+
+        // /// Tests that guests are visited
+        // /// 
+        // fn visit_guests(&mut self, visitor: impl FnOnce(&mut specs::Dispatcher<'static, 'static>)) {
+        //     if let Some(guest) = self.1.as_mut() {
+        //         visitor(guest);
+        //     }
+        // }
+
         /// Tests that the expected block_context is passed here
         /// Tests that the expected block exists
         ///
@@ -365,25 +423,14 @@ mod test {
             runtime: crate::Runtime,
             block_name: impl AsRef<str>,
             _block_context: &crate::plugins::BlockContext,
-            dispatcher: &mut DispatcherBuilder,
         ) -> crate::EventSource {
             assert_eq!(block_name.as_ref(), "test_host");
 
-            if let Some(test_graph) = _block_context.get_block("test") {
+            if let Some(_test_graph) = _block_context.get_block("test") {
                 let mut src = runtime.event_source::<Test, (IsBob, Println)>();
                 // Tests that the context will be configured from the correct
                 // block in the project (test_host test)
                 src.set_config_from_project();
-
-                // Tests installing a host runtime
-                Self::install_host_runtime(
-                    (
-                        test_graph, 
-                        TestTransport{}
-                    ), 
-                    dispatcher
-                );
-
                 return src;
             }
 
@@ -406,15 +453,17 @@ mod test {
         ///
         fn prepare_engine(
             &mut self,
-            _engine: specs::Entity,
+            engine: specs::Entity,
             _handle: tokio::runtime::Handle,
+            world: &mut World,
+            dispatcher: &mut DispatcherBuilder,
             _initial_context: &crate::plugins::ThunkContext,
         ) -> Option<crate::Operation> {
             if let Some(query) = _initial_context.block.find_query() {
                 event!(Level::TRACE, "found query {:#?}", query);
                 // Test generating a "setup" operation
 
-                let item = Operation::item(_engine, _handle);
+                let item = Operation::item(engine, _handle);
                 let thunk = query.thunk(
                     item,
                     Some(
@@ -441,6 +490,18 @@ mod test {
                     .block
                     .get_block("test")
                     .expect("test block is defined");
+
+                let (test_transport, proxy) = TestTransport::new();
+                self.create_guest(
+                    engine, 
+                    world, 
+                    src.clone(), 
+                    proxy,
+                );
+
+                dispatcher.add(test_transport, "", &[]);
+
+                // dispatcher.add(test_transport, "", &[]);
 
                 return Some(thunk(Arc::new(src)));
             }
@@ -487,6 +548,12 @@ mod test {
 
                     event!(Level::TRACE, "checked if this is bob");
 
+                    tc.dispatch(r#"
+                    ``` test println
+                    add test .text hi
+                    ```
+                    "#).await;
+
                     None
                 }
             })
@@ -515,29 +582,41 @@ mod test {
         }
     }
 
-    struct TestTransport;
+    #[derive(Default)]
+    struct TestTransport {
+        rx_graphs: Option<Receiver<AttributeGraph>>,
+        rx_operations: Option<Receiver<Operation>>,
+        rx_error_contexts: Option<Receiver<ErrorContext>>,
+    }
+
+    impl TestTransport {
+        fn new() -> (Self, ProxyTransport) {
+            let mut test_transport = TestTransport::default();
+            let mut p = ProxyTransport::new();
+            test_transport.rx_graphs = Some(p.enable_graph_proxy(10));
+            test_transport.rx_operations = Some(p.enable_operation_proxy(10));
+            test_transport.rx_error_contexts = Some(p.enable_error_proxy(10));
+            (test_transport, p)
+        }
+    }
 
     impl Engine for TestTransport {
-        fn event_name() -> &'static str {
+        fn event_symbol() -> &'static str {
             "test_transport"
         }
     }
 
     impl Transport for TestTransport {
-        type Plugin = Println;
-
         fn transport_graph(
             &mut self,
             _graph: crate::AttributeGraph,
-            _system_data: &mut super::TransportReceiver,
         ) {
-            event!(Level::TRACE, "transport graph called")
+            event!(Level::TRACE, "transport graph called, {:#?}", _graph);
         }
 
         fn transport_operation(
             &mut self,
             _operation: Operation,
-            _system_data: &mut super::TransportReceiver,
         ) {
             event!(Level::TRACE, "transport operation called")
         }
@@ -545,9 +624,47 @@ mod test {
         fn transport_error_context(
             &mut self,
             _error_context: crate::plugins::ErrorContext,
-            _system_data: &mut super::TransportReceiver,
         ) {
             event!(Level::TRACE, "transport error context called")
+        }
+    }
+
+    impl<'a> System<'a> for TestTransport {
+        type SystemData = ();
+
+        fn run(&mut self, _: Self::SystemData) {
+            if let Some(grx) = self.rx_graphs.as_mut() {
+                match grx.try_recv() {
+                    Ok(g) => {
+                        self.transport_graph(g);
+                    },
+                    Err(_) => {
+                        
+                    },
+                }
+            }
+
+            if let Some(grx) = self.rx_operations.as_mut() {
+                match grx.try_recv() {
+                    Ok(g) => {
+                        self.transport_operation(g);
+                    },
+                    Err(_) => {
+                        
+                    },
+                }
+            }
+
+            if let Some(grx) = self.rx_error_contexts.as_mut() {
+                match grx.try_recv() {
+                    Ok(g) => {
+                        self.transport_error_context(g);
+                    },
+                    Err(_) => {
+                        
+                    },
+                }
+            }
         }
     }
 
@@ -555,7 +672,7 @@ mod test {
     #[tracing_test::traced_test]
     fn test_host() {
         use crate::Project;
-        let code = TestHost(10).start(
+        let code = TestHost(100, None).start(
             Project::load_content(
                 r#"
             # Project Settings

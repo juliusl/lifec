@@ -18,6 +18,7 @@ use tokio::{
 use tracing::event;
 use tracing::Level;
 
+use crate::host::GuestRuntime;
 use crate::AttributeGraph;
 use crate::Extension;
 use crate::Operation;
@@ -63,8 +64,8 @@ impl Display for Event {
 }
 
 impl Event {
-    /// Returns the event symbol 
-    /// 
+    /// Returns the event symbol
+    ///
     pub fn symbol(&self) -> &'static str {
         self.0
     }
@@ -100,11 +101,16 @@ impl Event {
         self.cancel();
     }
 
-    /// If a config is set w/ this event, this will setup a thunk context 
+    /// If a config is set w/ this event, this will setup a thunk context
     /// from that config. Otherwise, No-OP.
     pub fn setup(&self, thunk_context: &mut ThunkContext) {
         if let Some(Config(name, config)) = self.2 {
-            event!(Level::TRACE, "detected config '{name}' for event: {} {}", self.symbol(), self.1.symbol());
+            event!(
+                Level::TRACE,
+                "detected config '{name}' for event: {} {}",
+                self.symbol(),
+                self.1.symbol()
+            );
             config(thunk_context);
         }
     }
@@ -257,6 +263,7 @@ impl<'a> System<'a> for EventRuntime {
         Read<'a, SecureClient, EventRuntime>,
         Read<'a, Sender<StatusUpdate>, EventRuntime>,
         Read<'a, Sender<AttributeGraph>, EventRuntime>,
+        Read<'a, Sender<Operation>, EventRuntime>,
         Read<'a, Sender<ErrorContext>, EventRuntime>,
         Read<'a, sync::broadcast::Sender<Entity>, EventRuntime>,
         Read<'a, Project>,
@@ -264,6 +271,7 @@ impl<'a> System<'a> for EventRuntime {
         ReadStorage<'a, Connection>,
         ReadStorage<'a, Project>,
         ReadStorage<'a, crate::Runtime>,
+        ReadStorage<'a, GuestRuntime>,
         WriteStorage<'a, Event>,
         WriteStorage<'a, ThunkContext>,
         WriteStorage<'a, Sequence>,
@@ -280,6 +288,7 @@ impl<'a> System<'a> for EventRuntime {
             https_client,
             status_update_channel,
             dispatcher,
+            operation_dispatcher,
             error_dispatcher,
             thunk_complete_channel,
             project,
@@ -287,6 +296,7 @@ impl<'a> System<'a> for EventRuntime {
             connections,
             projects,
             lifec_runtimes,
+            guest_runtimes,
             mut events,
             mut contexts,
             mut sequences,
@@ -298,11 +308,12 @@ impl<'a> System<'a> for EventRuntime {
     ) {
         let mut dispatch_queue = vec![];
 
-        for (entity, _connection, _project, _lifec_runtime, event) in (
+        for (entity, _connection, _project, _lifec_runtime, guest_runtime, event) in (
             &entities,
             connections.maybe(),
             projects.maybe(),
             lifec_runtimes.maybe(),
+            guest_runtimes.maybe(),
             &mut events,
         )
             .join()
@@ -311,7 +322,7 @@ impl<'a> System<'a> for EventRuntime {
 
             // Nit: there is probably a cleaner way to handle this
             let event_ref = Arc::new(event.duplicate());
-            
+
             let Event(_, thunk, _, initial_context, task) = event;
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
@@ -377,6 +388,10 @@ impl<'a> System<'a> for EventRuntime {
 
                                 runtime
                                     .block_on(async {
+                                        let error_dispatcher = guest_runtime
+                                            .and_then(|g| g.get_error_sender())
+                                            .unwrap_or(error_dispatcher.clone());
+
                                         error_dispatcher.send(error_context.clone()).await
                                     })
                                     .ok();
@@ -450,7 +465,11 @@ impl<'a> System<'a> for EventRuntime {
                 let mut context = initial_context
                     .enable_async(entity, runtime_handle)
                     .enable_https_client(https_client.clone())
-                    .enable_dispatcher(dispatcher.clone())
+                    .enable_dispatcher({
+                        guest_runtime
+                            .and_then(|g| g.get_graph_sender())
+                            .unwrap_or(dispatcher.clone())
+                    })
                     .enable_project({
                         if let Some(project) = _project {
                             // If the entity has a project component, prioritize using that
@@ -464,6 +483,11 @@ impl<'a> System<'a> for EventRuntime {
                             // Otherwise, use the common project set w/ the current world
                             project.reload_source()
                         }
+                    })
+                    .enable_operation_dispatcher({
+                        guest_runtime
+                            .and_then(|g| g.get_operation_sender())
+                            .unwrap_or(operation_dispatcher.clone())
                     })
                     .enable_status_updates(status_update_channel.clone())
                     .to_owned();
