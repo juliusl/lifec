@@ -16,18 +16,10 @@ pub struct TestTransport {
     on_graph: Option<fn(AttributeGraph)>,
     on_operation: Option<fn(Operation)>,
     on_error_context: Option<fn(ErrorContext)>,
+    proxy_transport: Option<ProxyTransport>,
 }
 
 impl TestTransport {
-    pub fn new() -> (Self, ProxyTransport) {
-        let mut test_transport = TestTransport::default();
-        let mut p = ProxyTransport::new();
-        test_transport.rx_graphs = Some(p.enable_graph_proxy(10));
-        test_transport.rx_operations = Some(p.enable_operation_proxy(10));
-        test_transport.rx_error_contexts = Some(p.enable_error_proxy(10));
-        (test_transport, p)
-    }
-
     pub fn add_graph_handler(&mut self, handler: fn(AttributeGraph)) {
         self.on_graph = Some(handler);
     }
@@ -72,6 +64,20 @@ impl Transport for TestTransport {
     ) {
         if let Some(h) = self.on_error_context {
             h(error_context);
+        }
+    }
+    
+    fn proxy(&mut self) -> ProxyTransport {
+        match self.proxy_transport.as_ref() {
+            Some(p) => p.clone(),
+            None => {
+                let mut p = ProxyTransport::new();
+                self.rx_graphs = Some(p.enable_graph_proxy(10));
+                self.rx_operations = Some(p.enable_operation_proxy(10));
+                self.rx_error_contexts = Some(p.enable_error_proxy(10));
+                self.proxy_transport = Some(p.clone());
+                p
+            },
         }
     }
 }

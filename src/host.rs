@@ -234,15 +234,14 @@ where
     /// Creates a guest runtime component for a transport,
     /// Registers the component w/ the host world and inserts the component into the world
     /// 
-    fn create_guest<T>(&mut self, 
+    fn create_guest(&mut self, 
         engine: Entity, 
         world: &mut World, 
         src: impl AttributeIndex, 
-        transport: T
+        transport: &mut impl Transport
     ) 
     where
         Self: Sized,
-        T: Into<ProxyTransport>,
     {
         world.register::<GuestRuntime>();
 
@@ -490,12 +489,12 @@ mod test {
                     .get_block("test")
                     .expect("test block is defined");
 
-                let (mut test_transport, proxy) = TestTransport::new();
+                let mut test_transport = TestTransport::default();
                 self.create_guest(
                     engine, 
                     world, 
                     src.clone(), 
-                    proxy,
+                    &mut test_transport,
                 );
 
                 test_transport.add_graph_handler(|g| {
@@ -511,8 +510,6 @@ mod test {
                 });
 
                 dispatcher.add(test_transport, "", &[]);
-
-                // dispatcher.add(test_transport, "", &[]);
 
                 return Some(thunk(Arc::new(src)));
             }

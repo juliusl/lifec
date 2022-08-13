@@ -37,6 +37,10 @@ pub trait Transport : Engine + Sized {
     /// Transports a received error context
     /// 
     fn transport_error_context(&mut self, error_context: ErrorContext);
+
+    /// Returns a proxy transport
+    /// 
+    fn proxy(&mut self) -> ProxyTransport;
 }
 
 /// System data type for systems enabling transporting runtime elements

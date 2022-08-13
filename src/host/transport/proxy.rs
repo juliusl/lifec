@@ -5,7 +5,7 @@ use crate::{AttributeGraph, Operation, plugins::{ErrorContext, Engine}};
 
 use super::Transport;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ProxyTransport {
     graphs: Option<Sender<AttributeGraph>>,
     operations: Option<Sender<Operation>>,
@@ -80,5 +80,9 @@ impl Transport for ProxyTransport {
                 },
             }
         }
+    }
+
+    fn proxy(&mut self) -> ProxyTransport {
+        self.clone()
     }
 }

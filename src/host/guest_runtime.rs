@@ -189,17 +189,21 @@ impl Transport for GuestRuntime
             }
         }
     }
+
+    fn proxy(&mut self) -> ProxyTransport {
+        self.transport.clone()
+    }
 }
 
 /// HAT! 
 /// 
-impl<H, A, T> From<(Entity, &mut H, A, T)> for GuestRuntime
+impl<H, A, T> From<(Entity, &mut H, A, &mut T)> for GuestRuntime
 where
     H: Host,
     A: AttributeIndex,
-    T: Into<ProxyTransport>
+    T: Transport
 {
-    fn from((engine, host, index, transport): (Entity, &mut H, A, T)) -> Self {
+    fn from((engine, host, index, transport): (Entity, &mut H, A, &mut T)) -> Self {
         let enable_graph_receiver = index
             .find_bool("enable_graph_receiver")
             .unwrap_or_default();
@@ -217,7 +221,7 @@ where
         host.add_guest(engine, dispatcher);
 
 
-        let transport = transport.into();
+        let transport = transport.proxy();
         Self {
             transport,
             enable_graph_receiver,
