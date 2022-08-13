@@ -1,11 +1,13 @@
 use specs::System;
 use tokio::sync::mpsc::Receiver;
-use tracing::{event, Level};
 
 use crate::{AttributeGraph, Operation, plugins::{ErrorContext, Engine}};
 
 use super::{ProxyTransport, Transport};
 
+/// Test transport implementation that can be configured to test 
+/// Host implementation 
+/// 
 #[derive(Default)]
 pub struct TestTransport {
     rx_graphs: Option<Receiver<AttributeGraph>>,
@@ -68,7 +70,6 @@ impl Transport for TestTransport {
         &mut self,
         error_context: crate::plugins::ErrorContext,
     ) {
-        event!(Level::TRACE, "transport error context called");
         if let Some(h) = self.on_error_context {
             h(error_context);
         }
