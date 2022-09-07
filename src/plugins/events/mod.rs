@@ -493,7 +493,7 @@ impl<'a> System<'a> for EventRuntime {
                     .to_owned();
 
                 // TODO: This might be a good place to refactor w/ v2 operation
-                let Thunk(thunk_name, thunk) = thunk;
+                let Thunk(thunk_name, thunk, ..) = thunk;
 
                 event_ref.setup(&mut context);
 

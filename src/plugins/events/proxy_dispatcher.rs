@@ -38,7 +38,6 @@ impl<'a> System<'a> for ProxyDispatcher {
                             if let (Some(block_name), Some(block_symbol)) = (graph.find_text("block_name"), graph.find_text("block_symbol")) {
                                 message = message.with_block(block_name, block_symbol, |c| {
                                     for attr in BlockContext::iter_block_attrs_mut(&mut graph) {
-                                        // TODO - this is copied from lib.rs, need to consolidate
                                         if !attr.is_stable() {
                                             if let Some((_, value)) = attr.transient() {
                                                 if let Value::Symbol(symbol) = attr.value() {

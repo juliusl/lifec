@@ -12,17 +12,18 @@ use std::{
     fs,
     hash::{Hash, Hasher},
     path::PathBuf,
-    str::from_utf8, borrow::Cow,
+    str::from_utf8, borrow::Cow
 };
 
 mod v2;
 pub use v2::AttributeIndex;
 pub use v2::Query;
 pub use v2::Operation;
+pub use v2::protocol::Protocol;
 
 /// Attribute graph is a component that indexes attributes for an entity
 /// It is designed to be a general purpose enough to be the common element of runtime state storage
-#[derive(Debug, Default, Component, Clone, Hash, Serialize, Deserialize, PartialEq, PartialOrd)]
+#[derive(Debug, Default, Component, Clone, Hash, Serialize, Deserialize, Eq, PartialEq, PartialOrd)]
 #[storage(HashMapStorage)]
 pub struct AttributeGraph {
     entity: u32,
@@ -1277,6 +1278,9 @@ impl AttributeGraph {
             }
             Value::Reference(init_value) => {
                 g.add_reference(name, init_value);
+            },
+            Value::Complex(_) => {
+                
             }
         })
     }

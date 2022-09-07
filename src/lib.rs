@@ -41,9 +41,11 @@ pub use state::AttributeGraph;
 pub use state::AttributeGraphEvents;
 pub use state::AttributeGraphElements;
 pub use state::AttributeGraphErrors;
+/// v2 apis 
 pub use state::Query;
 pub use state::AttributeIndex;
 pub use state::Operation;
+pub use state::Protocol;
 
 pub mod host;
 
@@ -183,13 +185,32 @@ pub struct Runtime {
     engine_plugin: BTreeMap<String, CreateFn>,
     /// Table for thunk configurations
     config: BTreeMap<String, ConfigFn>,
+    /// Table for event sources, added from install()
+    event_sources: BTreeMap<String, EventSource>,
 }
 
 /// Event source returned by a runtime, that can be used to schedule events w/ a world
 /// 
 pub struct EventSource {
+    /// The event struct component this source returns 
+    /// 
     event: Event, 
+    /// The runtime that created this event source 
+    /// 
     runtime: Arc<Runtime>, 
+    /// The setup operation 
+    /// 
+    setup: Option<Operation>,
+}
+
+impl Clone for EventSource {
+    fn clone(&self) -> Self {
+        Self { 
+            event: self.event.duplicate(), 
+            runtime: self.runtime.clone(),
+            setup: None,
+        }
+    }
 }
 
 impl EventSource {
@@ -222,6 +243,17 @@ impl EventSource {
         }));
     }
 
+    /// Creates a new entity w/ this event 
+    /// 
+    pub fn create_entity(&self, world: &World) -> Option<Entity> {
+        self.runtime.create_with_fn(
+            world, 
+            &self.event, 
+            |_|{}
+        )
+    }
+
+
     /// Returns the event's plugin thunk
     /// 
     pub fn thunk(&self) -> Thunk {
@@ -237,7 +269,18 @@ impl Runtime {
             project,
             engine_plugin: BTreeMap::default(),
             config: BTreeMap::default(),
+            event_sources: BTreeMap::default(),
         }
+    }
+
+    /// Find an installed event source by name
+    /// 
+    /// The format of the name is `{event_symbol} {plugin_symbol}`
+    /// 
+    pub fn find_event_source(&self, name: impl AsRef<str>) -> Option<EventSource> {
+        self.event_sources
+            .get(name.as_ref())
+            .map(EventSource::clone)
     }
 
     /// Creates a new event source
@@ -250,6 +293,7 @@ impl Runtime {
         EventSource {
             event: E::event::<P>(),
             runtime: Arc::new(self.clone()),
+            setup: None,
         }
     }
 
@@ -261,6 +305,13 @@ impl Runtime {
     {
         let event = E::event::<P>();
         self.engine_plugin.insert(event.to_string(), E::create::<P>);
+
+        // Register event sources
+        let event_source = self.event_source::<E, P>();
+        self.event_sources.insert(
+            event.to_string(), 
+            event_source
+        );
 
         event!(Level::INFO, "install event: {}", event.to_string());
     }
@@ -804,6 +855,7 @@ impl Runtime {
         E: Engine
     {
         let project = &extension.as_ref().project;
+        let (mut world, mut dispatcher_builder) = E::standalone::<Ext>();
 
         let mut call_names = vec![];
         let mut connections = vec![];
@@ -821,8 +873,6 @@ impl Runtime {
             }
         }
 
-        let (mut world, mut dispatcher_builder) = E::standalone::<Ext>();
-
         if tc.as_ref().is_enabled("proxy_dispatcher").unwrap_or_default() {
             dispatcher_builder.add(ProxyDispatcher::from(tc.clone()), "proxy_dispatcher", &[]);
         }
@@ -835,7 +885,7 @@ impl Runtime {
         for engine in call_names {
             if let Some(start) = extension
                 .as_ref()
-                .create_engine::<Call>(&world, engine.to_string())
+                .create_engine::<E>(&world, engine.to_string())
             {
                 engine_table.insert(engine, start);
             }
@@ -941,4 +991,12 @@ fn test_block_identifier() {
         block_identifier.next(),
         Some(BlockIdentifier::Name("jinja2".to_string())),
     )
+}
+
+#[test]
+fn test_runtime() {
+    let mut runtime = Runtime::default();
+    runtime.install::<Call, Println>();
+
+    assert!(runtime.find_event_source("call println").is_some());
 }

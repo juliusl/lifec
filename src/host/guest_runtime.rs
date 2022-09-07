@@ -1,33 +1,32 @@
-use std::ops::{Deref, DerefMut};
-
-use super::{Transport, Host, TransportReceiver, transport::ProxyTransport};
-use crate::{
-    plugins::{Engine, ErrorContext},
-    AttributeGraph, AttributeIndex, Operation,
+use std::{
+    collections::{HashMap, HashSet},
+    ops::{Deref, DerefMut},
 };
-use specs::{Component, DenseVecStorage, World, WorldExt, System, Entity};
-use tokio::sync::mpsc::{Sender, Receiver};
+
+use super::{transport::ProxyTransport, Host, Transport, TransportReceiver};
+use crate::{
+    plugins::{Engine, ErrorContext, Event, Project, Sequence, ThunkContext},
+    AttributeGraph, AttributeIndex, Operation, Runtime,
+};
+use atlier::system::Value;
+use specs::{shred::Resource, Component, DenseVecStorage, Entity, System, World, WorldExt};
+use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{event, Level};
 
 /// Guest runtime that can be use to receive objects from
 /// thunk contexts at runtime.
 ///
-/// These objects include,
-///     `AttributeGraph`
-///     `Operation`
-///     `ErrorContext`
-///
-/// The transport handles received objects (visitor pattern)
+/// If an entity has this component, the event runtime will configure
+/// the thunk context to use dispatchers from the guest runtime
 ///
 #[derive(Component)]
 #[storage(DenseVecStorage)]
-pub struct GuestRuntime
-{
+pub struct GuestRuntime {
     /// Proxy transport to the real transport
     ///
     transport: ProxyTransport,
     /// Guest world, isolates objects dispatched from plugins,
-    /// 
+    ///
     /// **Note** The dispatcher for this world is managed by the host.
     ///
     world: World,
@@ -42,8 +41,56 @@ pub struct GuestRuntime
     enable_error_context_receiver: bool,
 }
 
-impl GuestRuntime
-{
+impl GuestRuntime {
+    /// Creates a new guest runtime
+    /// 
+    /// # Arguments
+    /// * `engine` - This is the engine entity on the host 
+    /// * `host` - A reference to the host impl for setup 
+    /// * `index` - The attribute index source 
+    /// * `transport` - The transport the guest will communicate with 
+    pub fn new<H, A, T>(
+        engine: Entity,
+        host: &mut H, 
+        index: A, 
+        transport: &mut T, 
+    )  -> Self 
+    where
+        H: Host,
+        A: AttributeIndex,
+        T: Transport,
+    {
+        let enable_graph_receiver = index
+            .find_bool("enable_graph_receiver")
+            .unwrap_or_default();
+        let enable_operation_receiver = index
+            .find_bool("enable_operation_receiver")
+            .unwrap_or_default();
+        let enable_error_context_receiver = index
+            .find_bool("enable_error_context_receiver")
+            .unwrap_or_default();
+
+        let (mut world, dispatcher) = H::new_world();
+
+        // Install deps
+        let runtime = host.get_runtime(engine); 
+        world.insert(runtime.clone());
+        world.insert(runtime.project.clone());
+
+        let mut dispatcher = dispatcher.build();
+        dispatcher.setup(&mut world);
+        host.add_guest(engine, dispatcher);
+
+        let transport = transport.proxy();
+        Self {
+            transport,
+            enable_graph_receiver,
+            enable_operation_receiver,
+            enable_error_context_receiver,
+            world,
+        }
+    }
+
     /// Returns the guest's world
     ///
     pub fn world(&self) -> &World {
@@ -60,9 +107,7 @@ impl GuestRuntime
     ///
     pub fn get_graph_sender(&self) -> Option<Sender<AttributeGraph>> {
         if self.enable_graph_receiver {
-            let sender = self.world().read_resource::<Sender<AttributeGraph>>();
-            let sender = sender.deref();
-            Some(sender.clone())
+            self.sender()
         } else {
             None
         }
@@ -72,9 +117,7 @@ impl GuestRuntime
     ///
     pub fn get_operation_sender(&self) -> Option<Sender<Operation>> {
         if self.enable_graph_receiver {
-            let sender = self.world().read_resource::<Sender<Operation>>();
-            let sender = sender.deref();
-            Some(sender.clone())
+            self.sender()
         } else {
             None
         }
@@ -84,85 +127,175 @@ impl GuestRuntime
     ///
     pub fn get_error_sender(&self) -> Option<Sender<ErrorContext>> {
         if self.enable_graph_receiver {
-            let sender = self.world().read_resource::<Sender<ErrorContext>>();
-            let sender = sender.deref();
-            Some(sender.clone())
+            self.sender()
         } else {
             None
         }
     }
 
     /// Visits the guest world's graph receiver
-    /// 
-    pub fn visit_graph_receiver(
-        &mut self, 
-        visitor: impl FnOnce(&mut Receiver<AttributeGraph>)
-    ) {
+    ///
+    pub fn visit_graph_receiver(&mut self, visitor: impl FnOnce(&mut Receiver<AttributeGraph>)) {
         if self.enable_graph_receiver {
-            let mut rx = self.world().write_resource::<Receiver<AttributeGraph>>();
-            let rx = rx.deref_mut();
-            visitor(rx);
-        } 
+            self.visit(visitor);
+        }
     }
 
     /// Visits the guest world's operation receiver
-    /// 
-    pub fn visit_operation_receiver(&mut self, 
-        visitor: impl FnOnce(&mut Receiver<Operation>)
-    ) {
+    ///
+    pub fn visit_operation_receiver(&mut self, visitor: impl FnOnce(&mut Receiver<Operation>)) {
         if self.enable_operation_receiver {
-            let mut rx = self.world().write_resource::<Receiver<Operation>>();
-            let rx = rx.deref_mut();
-            visitor(rx);
-        } 
+            self.visit(visitor);
+        }
     }
 
-
     /// Visits the guest world's error context receiver
-    /// 
-    pub fn visit_error_context_receiver(&mut self, 
-        visitor: impl FnOnce(&mut Receiver<ErrorContext>)
+    ///
+    pub fn visit_error_context_receiver(
+        &mut self,
+        visitor: impl FnOnce(&mut Receiver<ErrorContext>),
     ) {
         if self.enable_error_context_receiver {
-            let mut rx = self.world().write_resource::<Receiver<ErrorContext>>();
-            let rx = rx.deref_mut();
-            visitor(rx);
-        } 
+            self.visit(visitor);
+        }
+    }
+
+    /// Parses an engine
+    /// 
+    /// The following resources must be added to the guest runtime, for this method 
+    /// to succeed,
+    /// 
+    /// * `Project` - defines which plugins to create 
+    /// * `Runtime` - contains configuration for installed plugins 
+    /// 
+    pub fn parse_engine<E>(&mut self)
+    where
+        E: Engine,
+    {
+        let mut call_names = vec![];
+        let mut connections = vec![];
+        for (_, block) in self.world().read_resource::<Project>().iter_block() {
+            for (_, runtime_block) in block.to_blocks() {
+                for (engine_address, value) in runtime_block.find_symbol_values(E::event_symbol()) {
+                    if let Some((engine_name, _)) = engine_address.split_once("::") {
+                        call_names.push(engine_name.to_string());
+
+                        if let Value::Symbol(connect_to) = value {
+                            connections.push((engine_name.to_string(), connect_to));
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut engine_table = HashMap::<String, Entity>::default();
+        for engine in call_names {
+            if let Some(start) = self
+                .world()
+                .read_resource::<Runtime>()
+                .create_engine::<E>(self.world(), engine.to_string())
+            {
+                engine_table.insert(engine, start);
+            }
+        }
+
+        let mut schedule = vec![];
+        let mut ignore = HashSet::<Entity>::default();
+        // Connect sequences
+        {
+            let mut sequences = self.world_mut().write_component::<Sequence>();
+            for (from, to) in connections {
+                if let Some(from) = engine_table.get(&from) {
+                    if let Some(to) = engine_table.get(&to) {
+                        if let Some(sequence) = (&mut sequences).get_mut(*from) {
+                            sequence.set_cursor(*to);
+                            ignore.insert(*to);
+
+                            if !ignore.contains(from) {
+                                schedule.push(*from);
+                                ignore.insert(*from);
+                                event!(
+                                    Level::INFO,
+                                    "schedule event:\n\t{} -> {}",
+                                    from.id(),
+                                    to.id()
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Schedule sequences 
+        {
+            let world = self.world_mut();
+            for e in schedule {
+                if let Some(event) = world.write_component::<Event>().get_mut(e) {
+                    if let Some(context) = world.read_component::<ThunkContext>().get(e) {
+                        event.fire(context.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    /// Returns the sender for T
+    ///
+    fn sender<T>(&self) -> Option<T>
+    where
+        T: Resource + Clone,
+    {
+        let sender = self.world().read_resource::<T>();
+        let sender = sender.deref();
+        Some(sender.clone())
+    }
+
+    /// Visits the receiver of T
+    ///
+    fn visit<T>(&mut self, visitor: impl FnOnce(&mut T))
+    where
+        T: Resource,
+    {
+        let mut rx = self.world().write_resource::<T>();
+        let rx = rx.deref_mut();
+        visitor(rx);
     }
 }
 
-impl<'a> System<'a> for GuestRuntime
-{
+impl<'a> System<'a> for GuestRuntime {
     type SystemData = ();
 
     fn run(&mut self, _: Self::SystemData) {
-        let GuestRuntime { 
-            transport, 
-            world, 
-            enable_graph_receiver, 
-            enable_operation_receiver, 
-            enable_error_context_receiver 
+        let GuestRuntime {
+            transport,
+            world,
+            enable_graph_receiver,
+            enable_operation_receiver,
+            enable_error_context_receiver,
         } = self;
 
         if *enable_graph_receiver {
-            world.system_data::<TransportReceiver>()
+            world
+                .system_data::<TransportReceiver>()
                 .receive_graph(transport);
         }
 
         if *enable_operation_receiver {
-            world.system_data::<TransportReceiver>()
+            world
+                .system_data::<TransportReceiver>()
                 .receive_operation(transport);
         }
 
         if *enable_error_context_receiver {
-            world.system_data::<TransportReceiver>()
+            world
+                .system_data::<TransportReceiver>()
                 .receive_error_context(transport);
         }
     }
 }
 
-impl Transport for GuestRuntime
-{
+impl Transport for GuestRuntime {
     fn transport_graph(&mut self, graph: AttributeGraph) {
         if let Some(tx) = self.get_graph_sender() {
             match tx.try_send(graph) {
@@ -195,48 +328,8 @@ impl Transport for GuestRuntime
     }
 }
 
-/// HAT! 
-/// 
-impl<H, A, T> From<(Entity, &mut H, A, &mut T)> for GuestRuntime
-where
-    H: Host,
-    A: AttributeIndex,
-    T: Transport
-{
-    fn from((engine, host, index, transport): (Entity, &mut H, A, &mut T)) -> Self {
-        let enable_graph_receiver = index
-            .find_bool("enable_graph_receiver")
-            .unwrap_or_default();
-        let enable_operation_receiver = index
-            .find_bool("enable_operation_receiver")
-            .unwrap_or_default();
-        let enable_error_context_receiver = index
-            .find_bool("enable_error_context_receiver")
-            .unwrap_or_default();
-        
-        let (mut world, dispatcher) =  H::new_world();
-
-        let mut dispatcher = dispatcher.build();
-        dispatcher.setup(&mut world);
-        host.add_guest(engine, dispatcher);
-
-
-        let transport = transport.proxy();
-        Self {
-            transport,
-            enable_graph_receiver,
-            enable_operation_receiver,
-            enable_error_context_receiver,
-            world,
-        }
-    }
-}
-
-impl Engine for GuestRuntime
-{
+impl Engine for GuestRuntime {
     fn event_symbol() -> &'static str {
-        // TODO: see const_format crate 
-        // visit_{transport_name}
         "guest"
     }
 }

@@ -139,6 +139,8 @@ pub trait Item {
             Value::Symbol(s) => self.visit_symbol(name, s),
             Value::Reference(r) => self.visit_reference(name, *r),
             Value::Empty => unimplemented!("empty value is not implemented"),
+            Value::Complex(_) => todo!(),
+            _ => {}
         }
     }
 }

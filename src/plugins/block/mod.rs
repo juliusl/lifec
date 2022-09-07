@@ -15,7 +15,7 @@ use std::fmt::Write;
 use std::{collections::BTreeSet, fmt::Error};
 
 /// BlockContext provides common methods for working with blocks
-#[derive(Debug, Component, Default, Clone, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Component, Default, Clone, Hash, Eq, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[storage(DenseVecStorage)]
 pub struct BlockContext {
     pub block_name: String,
@@ -364,6 +364,9 @@ impl BlockContext {
                     }
                     writeln!(src, "")?;
                 }
+            },
+            atlier::system::Value::Complex(_) => {
+                todo!()
             }
         }
 

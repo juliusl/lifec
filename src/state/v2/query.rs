@@ -6,8 +6,8 @@ use tracing::{event, Level};
 
 use crate::{
     catalog::Item,
-    plugins::{Thunk, ThunkContext},
-    AttributeIndex,
+    plugins::{Thunk, ThunkContext, Engine, ErrorContext},
+    AttributeIndex, host::{Transport, ProxyTransport},
 };
 
 use super::Operation;
@@ -23,7 +23,7 @@ use super::Operation;
 ///
 #[derive(Debug, Component, Default, Clone, Hash, PartialEq, Eq)]
 #[storage(DefaultVecStorage)]
-pub struct Query<I>
+pub struct Query<I = ThunkContext>
 where
     I: AttributeIndex + Clone + Default + Sync + Send + Any,
 {
@@ -33,7 +33,7 @@ where
     ///
     pub src: Arc<I>,
 
-    /// The entity_id is generally the id portion from a specs::Entity,
+    /// The entity id of the original src
     ///
     pub entity_id: u32,
 
@@ -43,6 +43,11 @@ where
     /// The initial value for transient values is the default value of the literal type.
     ///
     pub search_params: Vec<Attribute>,
+
+    /// Error context if an error context was received from
+    /// transport implementation
+    /// 
+    pub error_on_transport: Option<ErrorContext>
 }
 
 impl<I> Query<I>
@@ -114,14 +119,16 @@ where
                 }
             }
 
-
-            let mut task = None;
-            if let Some(Thunk(name, func)) = plugin_thunk.as_ref() {
-                event!(Level::DEBUG, "Calling thunk {name}, from query thunk");
-                task = (func)(&mut context);
+            if let Some(Thunk(name, func, setup_func)) = plugin_thunk.as_ref() { 
+                event!(Level::DEBUG, "Calling thunk {name}, from query thunk"); 
+                let mut operation = setup_func(&mut context);
+                if operation.task.is_none() {
+                    operation.task = (func)(&mut context);
+                }
+                operation
+            } else {
+                Operation { context, task: None }
             }
-
-            Operation { context, task }
         }
     }
 
@@ -281,7 +288,10 @@ where
     ///
     /// A value is cached by committing that value to the search parameter attribute
     ///
-    pub fn cache_with(&mut self, src: &Arc<I>) {
+    pub fn cache_with<Alt>(&mut self, src: &Arc<Alt>) 
+    where
+        Alt: AttributeIndex,
+    {
         for search in self.search_params.iter_mut() {
             if let Some((name, value)) = search.clone().transient() {
                 if let Some(caching) = src.find_value(name) {
@@ -294,5 +304,29 @@ where
                 }
             }
         }
+    }
+}
+
+impl Transport for Query {
+    fn transport_graph(&mut self, graph: crate::AttributeGraph) {
+        self.cache_with(&Arc::new(graph));
+    }
+
+    fn transport_operation(&mut self, operation: Operation) {
+       self.cache_with(&Arc::new(operation.context));
+    }
+
+    fn transport_error_context(&mut self, error_context: crate::plugins::ErrorContext) {
+        self.error_on_transport = Some(error_context);
+    }
+
+    fn proxy(&mut self) -> ProxyTransport {
+        unimplemented!("Proxy transport is not implemented for `Query`")
+    }
+}
+
+impl Engine for Query {
+    fn event_symbol() -> &'static str {
+        "query"
     }
 }

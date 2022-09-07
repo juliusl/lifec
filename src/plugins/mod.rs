@@ -103,7 +103,15 @@ where
     }
 
     /// Returns the symbol name representing this plugin
+    /// 
     fn symbol() -> &'static str;
+
+    /// If implemented, returns a setup operation that is required before running
+    /// this plugin w/ `context`
+    /// 
+    fn setup_operation(context: &mut ThunkContext) -> Operation {
+        Operation { context: context.clone(), task: None }
+    }
 
     /// implement call_with_context to allow for static extensions of attribute graph
     fn call_with_context(context: &mut T) -> Option<AsyncContext>;

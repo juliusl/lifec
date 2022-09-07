@@ -352,6 +352,8 @@ pub trait AttributeIndex {
             Value::IntRange(value, min, max) => g.add_int_range_attr(name, &[value, min, max]),
             Value::BinaryVector(init_value) => g.add_binary_attr(name, init_value),
             Value::Reference(_) => g.add_reference(name, value),
+            Value::Complex(_) => todo!(),
+            _ => {}
         })
     }
 
@@ -376,6 +378,6 @@ pub trait AttributeIndex {
     where
         Self: Sized + Clone + Default + Send + Sync + Any
     {
-        Query { src: Arc::new(self.clone()), entity_id: self.entity_id(), search_params }
+        Query { src: Arc::new(self.clone()), entity_id: self.entity_id(), search_params, error_on_transport: None }
     }
 }

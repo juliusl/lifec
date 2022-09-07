@@ -55,6 +55,8 @@ pub struct Thunk(
     pub &'static str,
     // thunk fn
     pub fn(&mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
+    /// setup thunk fn
+    pub fn(&mut ThunkContext) -> Operation,
 );
 
 /// Config for a thunk context
@@ -82,16 +84,16 @@ impl Thunk {
     /// Generates a thunk from a plugin impl
     pub fn from_plugin<P>() -> Self
     where
-        P: Plugin<ThunkContext>,
+        P: Plugin,
     {
-        Self(P::symbol(), P::call_with_context)
+        Self(P::symbol(), P::call_with_context, P::setup_operation)
     }
 
     /// deprecated?
     pub fn show(&self, context: &mut ThunkContext, ui: &Ui) {
         ui.set_next_item_width(130.0);
         if ui.button(context.label(self.0)) {
-            let Thunk(.., thunk) = self;
+            let Thunk(_, thunk, ..) = self;
             thunk(context);
         }
     }
