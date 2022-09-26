@@ -355,7 +355,7 @@ mod test {
     use tracing::{event, Level};
 
     use crate::{
-        plugins::{Plugin, Println, Test, ThunkContext},
+        plugins::{Plugin,  Test, ThunkContext},
         AttributeIndex, Extension, Runtime,
     };
 
@@ -377,7 +377,6 @@ mod test {
     impl Host for TestHost {
         fn create_runtime(&mut self, project: crate::plugins::Project) -> Runtime {
             let mut runtime = Runtime::new(project);
-            runtime.install::<Println>("test");
             runtime.install::<ChangeName>("test");
             runtime.install::<IsBob>("test");
             runtime.install::<IsNotBob>("test");
@@ -429,7 +428,7 @@ mod test {
                 async move {
                     event!(Level::DEBUG, "previous name {:?}", tc.find_text("name"));
 
-                    tc.as_mut().add_text_attr("name", "not-bob");
+                    tc.state().add_text_attr("name", "not-bob");
                     event!(Level::DEBUG, "changing names");
                     Some(tc)
                 }

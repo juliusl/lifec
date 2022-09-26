@@ -10,7 +10,7 @@ pub use specs::{Entities, Join, ReadStorage, WriteStorage};
 use tracing::{event, Level};
 pub use plugins::{
     AsyncContext, BlockContext, Config, Connection, Event, Install,
-    Plugin, Println, Process, Project, Sequence, ThunkContext, Timer, WriteFile, Thunk,
+    Plugin, Process, Project, Sequence, ThunkContext, Timer, WriteFile, Thunk,
 };
 use std::sync::Arc;
 

@@ -131,16 +131,14 @@ fn test_socket_proxies() {
         .create_entity()
         .with(a.clone())
         .build();
-    a.as_mut()
-        .set_parent_entity(entity_a);
+    //a.state() .set_parent_entity(entity_a);
 
     let mut b = ThunkContext::default();
     let entity_b = test_world
         .create_entity()
         .with(b.clone())
         .build();
-    b.as_mut()
-        .set_parent_entity(entity_b);
+    //b.state().set_parent_entity(entity_b);
     test_world.maintain();
 
     a = a.enable_async(entity_a, runtime.handle().clone());
@@ -301,7 +299,7 @@ impl<'a> System<'a> for ProxyRuntime {
         for (entity, context) in (&entities, &mut contexts).join() {
             
             // Enables a proxy for the socket, if a socket doesn't already exist, one is created
-            if !proxies.contains(entity) && context.as_ref().is_enabled("enable_proxy_socket").unwrap_or_default() {
+            if !proxies.contains(entity) && context.is_enabled("enable_proxy_socket") {
                 if context.socket_address().is_none() {
                     tokio_runtime.block_on(async {
                         context.enable_socket().await;
@@ -318,7 +316,7 @@ impl<'a> System<'a> for ProxyRuntime {
                     tokio_runtime.block_on(async {
                         let proxy_entity = entities.create();
                         let mut proxy_context = context.clone();
-                        proxy_context.as_mut().set_parent_entity(proxy_entity);
+                        //proxy_context.as_mut().set_parent_entity(proxy_entity);
                         proxy_context.enable_socket().await;
                         if let Some(mut proxy_address) = proxy_context.to_block_address() {
                             proxy_address.enable_proxy_mode();
@@ -365,14 +363,14 @@ fn test_proxy_runtime() {
     
     let test_entity_a = test_world.entities().create();
     let mut tc = ThunkContext::default();
-    tc.as_mut().add_bool_attr("enable_proxy_socket", true);
-    tc.as_mut().set_parent_entity(test_entity_a);
+    tc.state().add_bool_attr("enable_proxy_socket", true);
+    // tc.state().set_parent_entity(test_entity_a);
     test_world.write_component().insert(test_entity_a, tc.clone()).ok();
 
     let test_entity_b = test_world.entities().create();
     let mut tc = ThunkContext::default();
-    tc.as_mut().add_bool_attr("enable_proxy_socket", true);
-    tc.as_mut().set_parent_entity(test_entity_b);
+    tc.state().add_bool_attr("enable_proxy_socket", true);
+    // tc.as_mut().set_parent_entity(test_entity_b);
     test_world.write_component().insert(test_entity_b, tc.clone()).ok();
     
     test_world.maintain();

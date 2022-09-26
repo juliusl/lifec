@@ -32,6 +32,10 @@ impl AttributeIndex for AttributeGraph {
         self.entity
     }
 
+    fn hash_code(&self) -> u64 {
+        self.hash_code()
+    }
+
     fn find_value(&self, with_name: impl AsRef<str>) -> Option<Value> {
         self.find_attr_value(with_name).and_then(|v| Some(v.to_owned()))
     }

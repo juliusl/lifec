@@ -13,6 +13,8 @@ pub trait AttributeIndex {
     ///
     fn entity_id(&self) -> u32;
 
+    fn hash_code(&self) -> u64;
+
     /// Finds a value from the index, from an attribute with_name
     /// 
     /// This will always be the stable value from the attribute

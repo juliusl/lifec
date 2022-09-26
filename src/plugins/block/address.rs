@@ -11,6 +11,7 @@ use std::net::SocketAddr;
 use tracing::event;
 use tracing::Level;
 
+use crate::AttributeIndex;
 use crate::plugins::Proxy;
 use crate::plugins::ThunkContext;
 use crate::AttributeGraph;
@@ -117,10 +118,10 @@ impl BlockAddress {
 
         match world.read_component::<ThunkContext>().get(entity) {
             // The original hash code must match the hash code this address was created at
-            Some(ref tc) if tc.as_ref().hash_code() == self.hash_code => {
+            Some(ref tc) if tc.state().hash_code() == self.hash_code => {
                 let proxy_entity = world.entities().create();
                 let mut hosting = tc.to_owned().clone();
-                hosting.as_mut().set_parent_entity(proxy_entity);
+               // hosting.as_mut().set_parent_entity(proxy_entity);
 
                 if let Some(_) = hosting.enable_socket().await {
                     if let Some(mut proxy_address) = hosting.to_block_address() {
@@ -696,7 +697,7 @@ fn test_proxy_mode() {
     runtime.block_on(async {
         let mut main = ThunkContext::default();
         let main_entity = test_world.create_entity().build();
-        main.as_mut().set_parent_entity(main_entity);
+       // main.as_mut().set_parent_entity(main_entity);
         if let Some(_) = main.enable_socket().await {
         } else {
             assert!(false, "Could not create main socket");

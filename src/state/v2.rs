@@ -268,7 +268,7 @@ mod tests {
             .with_int_range("test_int_range", &[3, 1, 4])
             .with_symbol("test_symbol", "cool_symbol")
             .to_owned();
-        let src = ThunkContext::from(src);
+        let src = ThunkContext::default();
         
         let query = src.query::<Process>();
         todo!()
@@ -404,12 +404,12 @@ mod tests {
                 let mut tc = context.clone();
                 async move {
                     let mut a = 0;
-                    for attr in tc.as_ref().iter_attributes() {
-                        println!("announcing {}, {}", attr.name(), attr.value());
-                        a += 1;
-                    }
+                    // for attr in tc.state().iter_attributes() {
+                    //     println!("announcing {}, {}", attr.name(), attr.value());
+                    //     a += 1;
+                    // }
 
-                    tc.as_mut().with_int("announced", a);
+                    tc.state().with_int("announced", a);
 
                     Some(tc)
                 }
@@ -431,7 +431,7 @@ mod tests {
                 .with_int_range("test_int_range", &self.test_int_range)
                 .with_symbol("test_symbol", self.test_symbol)
                 .to_owned();
-            let mut tc = ThunkContext::from(src);
+            let mut tc = ThunkContext::default();
             if let (Some(handle), Some(entity)) = (self.handle, self.entity) {
                 tc = tc.enable_async(entity, handle);
             }

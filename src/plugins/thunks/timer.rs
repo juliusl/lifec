@@ -26,12 +26,12 @@ impl Plugin for Timer {
             let mut tc = thunk_context.clone();
             async move {
                 let mut duration = 0.0;
-                if let Some(d) = tc.as_ref().find_int("duration") {
+                if let Some(d) = tc.find_int("duration") {
                     tc.update_status_only("duration found").await;
                     duration += d as f32;
                 }
 
-                if let Some(d_ms) = tc.as_ref().find_float("duration_ms") {
+                if let Some(d_ms) = tc.find_float("duration_ms") {
                     tc.update_status_only("duration_ms found").await;
                     duration += d_ms / 1000.0;
                 }
@@ -43,14 +43,13 @@ impl Plugin for Timer {
                     let progress = elapsed.as_secs_f32() / duration;
                     if progress < 1.0 {
                         
-                        if tc.as_ref().is_enabled("quiet").unwrap_or_default() {
+                        if tc.is_enabled("quiet") {
                             tc.update_progress("", progress).await;
                         } else {
                             tc.update_progress(format!("elapsed {} ms", elapsed.as_millis()), progress).await;
                         }
                     } else {
-                        tc.as_mut()
-                            .add_text_attr("elapsed", format!("{:?}", elapsed));
+                        tc.add_text_attr("elapsed", format!("{:?}", elapsed));
                         break;
                     }
 

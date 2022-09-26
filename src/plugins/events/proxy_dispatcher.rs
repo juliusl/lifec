@@ -29,11 +29,11 @@ impl<'a> System<'a> for ProxyDispatcher {
 
     fn run(&mut self, (entities, contexts, mut proxies): Self::SystemData) {
         for (entity, context) in (&entities, &contexts).join() {
-            if context.as_ref().is_enabled("proxy").unwrap_or_default() && !proxies.contains(entity) {
+            if context.is_enabled("proxy") && !proxies.contains(entity) {
                 match proxies.insert(entity, Proxy::default()) {
                     Ok(_) => {
                         if let Some(dispatcher) = self.0.dispatcher() {
-                            let mut graph = context.as_ref().clone(); 
+                            //let mut graph = context.state().clone(); 
                             let mut message = Project::default();
 
                             // if let (Some(block_name), Some(block_symbol)) = (graph.find_text("block_name"), graph.find_text("block_symbol")) {

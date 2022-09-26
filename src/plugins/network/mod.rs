@@ -138,7 +138,7 @@ impl<'a> System<'a> for NetworkRuntime {
                                     // it need's to process next.
                                     let mut upstream_context = upstream_context.clone();
                                     upstream_context
-                                        .as_mut()
+                                        .state()
                                         .define("proxy", "received")
                                         .edit_as(Value::Int(sent as i32));
                                     upstream_event.fire(upstream_context);

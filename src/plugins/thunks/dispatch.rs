@@ -18,7 +18,7 @@ impl Plugin for Dispatch {
         context.clone().task(|_| {
             let tc = context.clone();
             async move {
-                if let Some(message) = tc.as_ref().find_text("content") {
+                if let Some(message) = tc.find_text("content") {
                     tc.dispatch(message).await;
                 }
 

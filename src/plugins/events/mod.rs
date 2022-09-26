@@ -406,7 +406,7 @@ impl<'a> System<'a> for EventRuntime {
                                     event!(Level::ERROR, "Error detected, and `stop_on_error` is enabled, stopping at {}", entity.id());
                                     let mut clone = thunk_context.clone();
 
-                                    clone.as_mut().with_text(
+                                    clone.state().with_text(
                                         "thunk_symbol",
                                         format!("Stopped -> {}", thunk.0),
                                     );
@@ -515,7 +515,7 @@ impl<'a> System<'a> for EventRuntime {
 
                             let mut started = context.clone();
                             started
-                                .as_mut()
+                                .state()
                                 .with_text("thunk_symbol", format!("Running -> {}", thunk_name));
 
                             // Initializes and starts the task by spawning it on the runtime
@@ -524,7 +524,7 @@ impl<'a> System<'a> for EventRuntime {
                                     .update_status_only(format!(
                                         "# event received: {}, {}",
                                         &event_name,
-                                        initial_context.as_ref().hash_code()
+                                        initial_context.state().hash_code()
                                     ))
                                     .await;
 
@@ -537,7 +537,7 @@ impl<'a> System<'a> for EventRuntime {
                                             ))
                                             .await;
                                         updated_context
-                                            .as_mut()
+                                            .state()
                                             .add_text_attr("thunk_symbol", thunk_name);
                                         updated_context
                                     }
@@ -572,7 +572,7 @@ impl<'a> System<'a> for EventRuntime {
         // dispatch all queued messages
         while let Some((mut next, last)) = dispatch_queue.pop() {
             if let (Some(event), Some(context)) = (events.get_mut(next), contexts.get_mut(next)) {
-                let last_id = last.as_ref().entity();
+                let last_id = last.state().entity_id();
                 // let previous = last
                 //     .project
                 //     .and_then(|p| p.transpile_blocks().ok())
