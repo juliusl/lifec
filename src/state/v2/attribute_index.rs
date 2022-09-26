@@ -2,8 +2,6 @@ use std::{sync::Arc, any::Any, collections::BTreeSet};
 
 use atlier::system::{Attribute, Value};
 
-use crate::Query;
-
 /// V2 - Revising interface w/ attributes
 ///
 /// Trait to support multiple attribute indexing implementations and stores
@@ -13,6 +11,8 @@ pub trait AttributeIndex {
     ///
     fn entity_id(&self) -> u32;
 
+    /// Returns the hash code of the current state
+    /// 
     fn hash_code(&self) -> u64;
 
     /// Finds a value from the index, from an attribute with_name
@@ -20,24 +20,41 @@ pub trait AttributeIndex {
     /// This will always be the stable value from the attribute
     ///
     fn find_value(&self, with_name: impl AsRef<str>) -> Option<Value>;
-
-    /// Finds a transient attribute defined in the index
-    ///
-    fn find_transient(&self, with_name: impl AsRef<str>, with_symbol: impl AsRef<str>) -> Option<&Attribute>;
+    
+    /// Returns all values found with_name
+    /// 
+    fn find_values(&self, with_name: impl AsRef<str>) -> Vec<Value>;
 
     /// Adds an attribute to the index
     ///
     fn add_attribute(&mut self, attr: Attribute);
 
-    /// Defines and adds a transient attribute to the index
+
+    /// Finds all text values with name, 
     /// 
-    /// Typically an attribute is stable, when it is just a name and value. A transient attribute contains 
-    /// an additional name/value, seperate from the stable name/value and represents a non-stable value.
+    fn find_text_values(&self, with_name: impl AsRef<str>) -> Vec<String> {
+        self.find_values(with_name).iter().filter_map(|v| {
+            match v {
+                Value::TextBuffer(text) => {
+                    Some(text.to_string())
+                },
+                _ => None,
+            }
+        }).collect()
+    }
+
+    /// Finds all symbol values with name, 
     /// 
-    /// By using a transient value in cases when a state transition may not occur, this limits 
-    /// the scope of state changes to very specific use cases.
-    ///
-    fn define(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) -> &mut Attribute;
+    fn find_symbol_values(&self, with_name: impl AsRef<str>) -> Vec<String> {
+        self.find_values(with_name).iter().filter_map(|v| {
+            match v {
+                Value::Symbol(symbol) => {
+                    Some(symbol.to_string())
+                },
+                _ => None,
+            }
+        }).collect()
+    }
 
     /// Finds a text value from an attribute
     ///

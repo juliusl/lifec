@@ -58,14 +58,14 @@ impl<'a> System<'a> for ProxyDispatcher {
                             //     });
                             // }
 
-                            match dispatcher.try_send(message.as_ref().clone()) {
-                                Ok(_) => {
-                                    event!(Level::DEBUG, "proxied {:?}", entity);
-                                },
-                                Err(err) => {
-                                    event!(Level::ERROR, "error proxying {err}");
-                                },
-                            }
+                            // match dispatcher.try_send(message.as_ref().clone()) {
+                            //     Ok(_) => {
+                            //         event!(Level::DEBUG, "proxied {:?}", entity);
+                            //     },
+                            //     Err(err) => {
+                            //         event!(Level::ERROR, "error proxying {err}");
+                            //     },
+                            // }
                         }
                     },
                     Err(err) => {

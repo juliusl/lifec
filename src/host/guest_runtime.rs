@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{transport::ProxyTransport, Host, Transport, TransportReceiver};
+
 use crate::{
     plugins::{ErrorContext, Event, Project, Sequence, ThunkContext},
     AttributeGraph, AttributeIndex, Operation, Runtime,
@@ -24,7 +24,7 @@ use tracing::{event, Level};
 pub struct GuestRuntime {
     /// Proxy transport to the real transport
     ///
-    transport: ProxyTransport,
+   //  transport: ProxyTransport,
     /// Guest world, isolates objects dispatched from plugins,
     ///
     /// **Note** The dispatcher for this world is managed by the host.
@@ -49,47 +49,47 @@ impl GuestRuntime {
     /// * `host` - A reference to the host impl for setup 
     /// * `index` - The attribute index source 
     /// * `transport` - The transport the guest will communicate with 
-    pub fn new<H, A, T>(
-        engine: Entity,
-        host: &mut H, 
-        index: A, 
-        transport: &mut T, 
-    )  -> Self 
-    where
-        H: Host,
-        A: AttributeIndex,
-        T: Transport,
-    {
-        let enable_graph_receiver = index
-            .find_bool("enable_graph_receiver")
-            .unwrap_or_default();
-        let enable_operation_receiver = index
-            .find_bool("enable_operation_receiver")
-            .unwrap_or_default();
-        let enable_error_context_receiver = index
-            .find_bool("enable_error_context_receiver")
-            .unwrap_or_default();
+    // pub fn new<H, A, T>(
+    //     engine: Entity,
+    //     host: &mut H, 
+    //     index: A, 
+    //     transport: &mut T, 
+    // )  -> Self 
+    // where
+    //     H: Host,
+    //     A: AttributeIndex,
+    //     T: Transport,
+    // {
+    //     let enable_graph_receiver = index
+    //         .find_bool("enable_graph_receiver")
+    //         .unwrap_or_default();
+    //     let enable_operation_receiver = index
+    //         .find_bool("enable_operation_receiver")
+    //         .unwrap_or_default();
+    //     let enable_error_context_receiver = index
+    //         .find_bool("enable_error_context_receiver")
+    //         .unwrap_or_default();
 
-        let (mut world, dispatcher) = H::new_world();
+    //     let (mut world, dispatcher) = H::new_world();
 
-        // Install deps
-        let runtime = host.get_runtime(engine); 
-        world.insert(runtime.clone());
-        // world.insert(runtime.project.clone());
+    //     // Install deps
+    //     let runtime = host.get_runtime(engine); 
+    //     world.insert(runtime.clone());
+    //     // world.insert(runtime.project.clone());
 
-        let mut dispatcher = dispatcher.build();
-        dispatcher.setup(&mut world);
-        host.add_guest(engine, dispatcher);
+    //     let mut dispatcher = dispatcher.build();
+    //     dispatcher.setup(&mut world);
+    //     host.add_guest(engine, dispatcher);
 
-        let transport = transport.proxy();
-        Self {
-            transport,
-            enable_graph_receiver,
-            enable_operation_receiver,
-            enable_error_context_receiver,
-            world,
-        }
-    }
+    //     let transport = transport.proxy();
+    //     Self {
+    //         transport,
+    //         enable_graph_receiver,
+    //         enable_operation_receiver,
+    //         enable_error_context_receiver,
+    //         world,
+    //     }
+    // }
 
     /// Returns the guest's world
     ///
@@ -183,67 +183,67 @@ impl GuestRuntime {
     }
 }
 
-impl<'a> System<'a> for GuestRuntime {
-    type SystemData = ();
+// impl<'a> System<'a> for GuestRuntime {
+//     type SystemData = ();
 
-    fn run(&mut self, _: Self::SystemData) {
-        let GuestRuntime {
-            transport,
-            world,
-            enable_graph_receiver,
-            enable_operation_receiver,
-            enable_error_context_receiver,
-        } = self;
+//     fn run(&mut self, _: Self::SystemData) {
+//         let GuestRuntime {
+//             transport,
+//             world,
+//             enable_graph_receiver,
+//             enable_operation_receiver,
+//             enable_error_context_receiver,
+//         } = self;
 
-        if *enable_graph_receiver {
-            world
-                .system_data::<TransportReceiver>()
-                .receive_graph(transport);
-        }
+//         if *enable_graph_receiver {
+//             world
+//                 .system_data::<TransportReceiver>()
+//                 .receive_graph(transport);
+//         }
 
-        if *enable_operation_receiver {
-            world
-                .system_data::<TransportReceiver>()
-                .receive_operation(transport);
-        }
+//         if *enable_operation_receiver {
+//             world
+//                 .system_data::<TransportReceiver>()
+//                 .receive_operation(transport);
+//         }
 
-        if *enable_error_context_receiver {
-            world
-                .system_data::<TransportReceiver>()
-                .receive_error_context(transport);
-        }
-    }
-}
+//         if *enable_error_context_receiver {
+//             world
+//                 .system_data::<TransportReceiver>()
+//                 .receive_error_context(transport);
+//         }
+//     }
+// }
 
-impl Transport for GuestRuntime {
-    fn transport_graph(&mut self, graph: AttributeGraph) {
-        if let Some(tx) = self.get_graph_sender() {
-            match tx.try_send(graph) {
-                Ok(_) => event!(Level::TRACE, "guest runtime transported graph"),
-                Err(err) => event!(Level::ERROR, "could not send graph, {err}"),
-            }
-        }
-    }
+// impl Transport for GuestRuntime {
+//     fn transport_graph(&mut self, graph: AttributeGraph) {
+//         if let Some(tx) = self.get_graph_sender() {
+//             match tx.try_send(graph) {
+//                 Ok(_) => event!(Level::TRACE, "guest runtime transported graph"),
+//                 Err(err) => event!(Level::ERROR, "could not send graph, {err}"),
+//             }
+//         }
+//     }
 
-    fn transport_operation(&mut self, operation: Operation) {
-        if let Some(tx) = self.get_operation_sender() {
-            match tx.try_send(operation) {
-                Ok(_) => event!(Level::TRACE, "guest runtime transported operation"),
-                Err(err) => event!(Level::ERROR, "could not send operation, {err}"),
-            }
-        }
-    }
+//     fn transport_operation(&mut self, operation: Operation) {
+//         if let Some(tx) = self.get_operation_sender() {
+//             match tx.try_send(operation) {
+//                 Ok(_) => event!(Level::TRACE, "guest runtime transported operation"),
+//                 Err(err) => event!(Level::ERROR, "could not send operation, {err}"),
+//             }
+//         }
+//     }
 
-    fn transport_error_context(&mut self, error_context: ErrorContext) {
-        if let Some(tx) = self.get_error_sender() {
-            match tx.try_send(error_context) {
-                Ok(_) => event!(Level::TRACE, "guest runtime transported error_context"),
-                Err(err) => event!(Level::ERROR, "could not send error_context, {err}"),
-            }
-        }
-    }
+//     fn transport_error_context(&mut self, error_context: ErrorContext) {
+//         if let Some(tx) = self.get_error_sender() {
+//             match tx.try_send(error_context) {
+//                 Ok(_) => event!(Level::TRACE, "guest runtime transported error_context"),
+//                 Err(err) => event!(Level::ERROR, "could not send error_context, {err}"),
+//             }
+//         }
+//     }
 
-    fn proxy(&mut self) -> ProxyTransport {
-        self.transport.clone()
-    }
-}
+//     fn proxy(&mut self) -> ProxyTransport {
+//         self.transport.clone()
+//     }
+// }

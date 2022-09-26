@@ -176,8 +176,8 @@ impl BlockAddress {
     /// Returns a new block address for an attribute graph, uses the current entity set in the attribute graph
     /// as the entity for this address
     ///
-    pub fn new(graph: impl AsRef<AttributeGraph>) -> BlockAddress {
-        let hash_code = graph.as_ref().hash_code();
+    pub fn new(graph: &impl AttributeIndex) -> BlockAddress {
+        let hash_code = graph.hash_code();
 
         let mut new_address = BlockAddress {
             hash_code,
@@ -189,7 +189,7 @@ impl BlockAddress {
             ip_block_e: 0,
             ip_block_f: 0,
         };
-        new_address.set_entity_block([graph.as_ref().entity(), 0]);
+        new_address.set_entity_block([graph.entity_id(), 0]);
         new_address
     }
 
@@ -580,7 +580,7 @@ impl BlockAddress {
 
 #[test]
 fn test_block_address() {
-    let graph = AttributeGraph::from(100);
+    let graph = AttributeGraph::default();
     let mut addr = BlockAddress::new(&graph);
     let ip_v4 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 50871);
     let ip_v6 = SocketAddr::new(
@@ -634,8 +634,8 @@ fn test_block_connection() {
         42313,
     );
 
-    let a = AttributeGraph::from(100);
-    let b = AttributeGraph::from(1421);
+    let a = AttributeGraph::default();
+    let b = AttributeGraph::default();
     let addr_a = BlockAddress::new(&a);
     let addr_b = BlockAddress::new(&b);
 

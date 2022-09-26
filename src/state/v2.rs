@@ -9,9 +9,6 @@ use tracing::{event, Level};
 mod attribute_index;
 pub use attribute_index::AttributeIndex;
 
-mod query;
-pub use query::Query;
-
 /// An operation encapsulates an async task and it's context
 /// Where the result of the task is the next version of the context.
 /// 
@@ -183,58 +180,6 @@ impl Operation {
     }
 }
 
-impl Into<ThunkContext> for Operation {
-    fn into(self) -> ThunkContext {
-        self.context.clone()
-    }
-}
-
-impl Item for Operation {
-    fn visit_bool(&mut self, _name: impl AsRef<str>, _value: bool) {
-        self.context.add_bool_attr(_name, _value);
-    }
-
-    fn visit_int(&mut self, _name: impl AsRef<str>, _value: i32) {
-        self.context.add_int_attr(_name, _value);
-    }
-
-    fn visit_int_pair(&mut self, _name: impl AsRef<str>, _value: [i32; 2]) {
-        self.context.add_int_pair_attr(_name, &_value);
-    }
-
-    fn visit_int_range(&mut self, _name: impl AsRef<str>, _value: [i32; 3]) {
-        self.context.add_int_range_attr(_name, &_value);
-    }
-
-    fn visit_float(&mut self, _name: impl AsRef<str>, _value: f32) {
-        self.context.add_float_attr(_name, _value);
-    }
-
-    fn visit_float_pair(&mut self, _name: impl AsRef<str>, _value: [f32; 2]) {
-        self.context.add_float_pair_attr(_name, &_value);
-    }
-
-    fn visit_float_range(&mut self, _name: impl AsRef<str>, _value: [f32; 3]) {
-        self.context.add_float_range_attr(_name, &_value);
-    }
-
-    fn visit_binary_vec(&mut self, _name: impl AsRef<str>, _value: impl Into<Vec<u8>>) {
-        self.context.add_binary_attr(_name, _value);
-    }
-
-    fn visit_symbol(&mut self, _name: impl AsRef<str>, _value: impl AsRef<str>) {
-        self.context.add_symbol(_name, _value);
-    }
-
-    fn visit_text(&mut self, _name: impl AsRef<str>, _value: impl AsRef<str>) {
-        self.context.add_text_attr(_name, _value);
-    }
-
-    fn visit_reference(&mut self, _name: impl AsRef<str>, _value: u64) {        
-        self.context.add_reference(_name, Value::Reference(_value));
-    }
-}
-
 mod tests {
     use specs::Entity;
     use tokio::runtime::Handle;
@@ -256,7 +201,7 @@ mod tests {
         use std::sync::Arc;
 
         // Test simple case where the src is just a thunk context
-        let src = AttributeGraph::from(0)
+        let src = AttributeGraph::default()
             .with_text("name", "bob")
             .with_int("age", 99)
             .with_bool("is_alias", true)
@@ -419,7 +364,7 @@ mod tests {
 
     impl Into<ThunkContext> for Person {
         fn into(self) -> ThunkContext {
-            let src = AttributeGraph::from(0)
+            let src = AttributeGraph::default()
                 .with_text("name", self.name)
                 .with_int("age", self.age as i32)
                 .with_bool("is_alias", self.is_alias)

@@ -2,7 +2,7 @@ use std::{net::SocketAddr, sync::Arc, future::Future};
 
 use crate::{plugins::BlockAddress, AttributeGraph, BlockContext, Operation, Project, AttributeIndex};
 use atlier::system::Value;
-use reality::BlockObject;
+use reality::{BlockObject, BlockIndex};
 use specs::{Component, DenseVecStorage, Entity};
 use tokio::{
     io::{self, AsyncBufReadExt, BufReader},
@@ -38,7 +38,7 @@ use super::{SecureClient, StatusUpdate, CancelSource, CancelToken, ErrorContext}
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
     /// Underlying block context for this thunk,
-    pub block: BlockContext,
+    block: BlockContext,
     /// Current project
     pub project: Option<Project>,
     /// Entity that owns this context
@@ -49,8 +49,8 @@ pub struct ThunkContext {
     status_updates: Option<Sender<StatusUpdate>>,
     /// Client for sending secure http requests
     client: Option<SecureClient>,
-    /// Dispatcher for attribute graphs
-    dispatcher: Option<Sender<AttributeGraph>>,
+    /// Dispatcher for runmd
+    dispatcher: Option<Sender<String>>,
     /// Dispatcher for attribute graphs
     operation_dispatcher: Option<Sender<Operation>>,
     /// Channel to send bytes to a listening char_device
@@ -93,8 +93,10 @@ impl ThunkContext {
         self
     }
 
+    /// Returns the current state of this thunk context,
+    /// 
     pub fn state(&self) -> impl AttributeIndex {
-        AttributeGraph::default()
+       AttributeGraph::default()
     }
 
     pub fn is_enabled(&self, property: impl AsRef<str>) -> bool {
@@ -179,7 +181,7 @@ impl ThunkContext {
     /// Plugins using this context will be able to dispatch attribute graphs to the underlying
     /// runtime.
     ///
-    pub fn enable_dispatcher(&mut self, dispatcher: Sender<AttributeGraph>) -> &mut ThunkContext {
+    pub fn enable_dispatcher(&mut self, dispatcher: Sender<String>) -> &mut ThunkContext {
         self.dispatcher = Some(dispatcher);
         self
     }
@@ -228,6 +230,7 @@ impl ThunkContext {
     ) -> Option<io::Lines<BufReader<tokio::net::TcpStream>>> {
         if let Some(_) = self.dispatcher {
             let address = self
+                .state()
                 .find_text("address")
                 .unwrap_or("127.0.0.1:0".to_string());
 
@@ -264,6 +267,7 @@ impl ThunkContext {
     ///
     pub async fn enable_socket(&mut self) -> Option<Arc<UdpSocket>> {
         let address = self
+            .state()
             .find_text("address")
             .unwrap_or("127.0.0.1:0".to_string());
 
@@ -273,8 +277,8 @@ impl ThunkContext {
                     event!(Level::DEBUG, "created socket at {address}");
 
                     // Add the socket address as a transient value
-                    self.define("socket", "address")
-                        .edit_as(Value::TextBuffer(address));
+                    // self.define("socket", "address")
+                    //     .edit_as(Value::TextBuffer(address));
                     self.udp_socket = Some(Arc::new(socket));
                 }
 
@@ -339,19 +343,13 @@ impl ThunkContext {
     ///
     pub async fn dispatch(&self, runmd: impl AsRef<str>) {
         if let Some(dispatcher) = &self.dispatcher {
-            let graph = AttributeGraph::from(0);
-            match graph.batch(runmd) {
-                Ok(msg) => {
-                    dispatcher.send(msg).await.ok();
-                }
-                Err(_) => todo!(),
-            }
+            dispatcher.send(runmd.as_ref().to_string()).await.ok();
         }
     }
 
     /// Returns the underlying dispatch transmitter
     ///
-    pub fn dispatcher(&self) -> Option<sync::mpsc::Sender<AttributeGraph>> {
+    pub fn dispatcher(&self) -> Option<sync::mpsc::Sender<String>> {
         self.dispatcher.clone()
     }
 
@@ -415,10 +413,10 @@ impl ThunkContext {
     pub async fn update_status_only(&self, status: impl AsRef<str>) {
         self.update_progress(&status, 0.0).await;
 
-        if let Some(true) = self.find_bool("debug") {
-            let block_name = &self.block.name.as_ref().unwrap();
-            let status = status.as_ref();
-            event!(Level::DEBUG, "{block_name}\t{status}");
+        if let Some(true) = self.state().find_bool("debug") {
+            // let block_name = &self.block.name.as_ref().unwrap();
+            // let status = status.as_ref();
+            // event!(Level::DEBUG, "{block_name}\t{status}");
         }
     }
 
@@ -484,32 +482,6 @@ impl ThunkContext {
         // if !self.block.update_block("error", &record) {
         //     self.block.add_block("error", record);
         // }
-        todo!()
-    }
-}
-
-impl AttributeIndex for ThunkContext {
-    fn entity_id(&self) -> u32 {
-        todo!()
-    }
-
-    fn find_value(&self, with_name: impl AsRef<str>) -> Option<Value> {
-        todo!()
-    }
-
-    fn find_transient(&self, with_name: impl AsRef<str>, with_symbol: impl AsRef<str>) -> Option<&atlier::system::Attribute> {
-        todo!()
-    }
-
-    fn add_attribute(&mut self, attr: atlier::system::Attribute) {
-        todo!()
-    }
-
-    fn define(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) -> &mut atlier::system::Attribute {
-        todo!()
-    }
-
-    fn hash_code(&self) -> u64 {
         todo!()
     }
 }

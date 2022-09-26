@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use reality::{BlockObject, BlockProperties};
 use specs::{Component, DenseVecStorage};
 
-use crate::plugins::{ThunkContext, Plugin};
+use crate::{plugins::{ThunkContext, Plugin}, AttributeIndex};
 
 /// Component for installing scripts,
 /// 
@@ -19,28 +19,19 @@ impl Plugin for Install {
     }
 
     fn description() -> &'static str {
-        "Installs a file from the src_dir to work_dir"
+        "Installs a file to the work_dir"
     }
 
     fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
         context.clone().query::<Install>().task(|_|{
             let tc = context.clone();
             async {
-                let properties = tc.clone().block.properties.expect("there should be properties");
-                let file_name = properties
-                    .property("install").expect("a file name")
-                    .symbol().expect("a symbol value");
+                let file_name = tc.state().find_symbol("install").expect("file name is required for install plugin");
+                let src_dir = tc.state().find_symbol("src_dir").expect("src_dir required for install plugin");
+                let work_dir = tc.state().find_symbol("work_dir").expect("work_dir required for install plugin");
 
-                let src_dir = properties
-                    .property("src_dir").expect("a src directory")
-                    .symbol().expect("a symbol value");
-
-                let work_dir = properties
-                    .property("work_dir").expect("a work_dir")
-                    .symbol().expect("a symbol value");
-
-                let src = PathBuf::from(src_dir).join(file_name);
-                let dst = PathBuf::from(work_dir).join(file_name);
+                let src = PathBuf::from(src_dir).join(&file_name);
+                let dst = PathBuf::from(work_dir).join(&file_name);
                 
                 match tokio::fs::copy(src, dst).await {
                     Ok(_) => {

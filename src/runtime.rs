@@ -6,17 +6,17 @@ use tracing::event;
 use tracing::Level;
 
 use crate::{
-    Event, EventSource, Plugin, Project, 
+    Event, Plugin, Project, 
 };
+
+mod event_source;
+pub use event_source::EventSource;
 
 /// Runtime provides access to the underlying project, and function tables for creating components
 ///
 #[derive(Component, Default, Clone)]
 #[storage(DefaultVecStorage)]
 pub struct Runtime {
-    /// Project loaded w/ this runtime, typically from a .runmd file
-    /// The project file usually contains different configurations for event scheduling
-    project: Project,
     /// Table of functions for creating new event components
     plugins: BTreeMap<String, EventSource>,
     /// Set of custom attributes to use, added from install()
@@ -49,41 +49,21 @@ impl SpecialAttribute for Runtime {
 }
 
 impl Runtime {
-    /// Returns a runtime from a project, with no plugins installed
-    ///
-    pub fn new(project: Project) -> Self {
-        Self {
-            project,
-            plugins: BTreeMap::default(),
-            custom_attributes: BTreeMap::default(),
-        }
-    }
-
-    /// Creates a new event source
-    ///
-    pub fn event_source<'a, P>(&'a self, event_name: &'static str) -> EventSource
-    where
-        P: Plugin + Send + Default,
-    {
-        EventSource {
-            event: Event::from_plugin::<P>(event_name),
-            runtime: Arc::new(self.clone()),
-            setup: None,
-        }
-    }
-
-    /// Install an engine into the runtime. An engine provides functions for creating new component instances.
+    /// Installs a plugin on this runtime,
+    /// 
     pub fn install<P>(&mut self, event_name: &'static str)
     where
         P: Plugin + Send + Default,
     {
         // Register event sources
-        let event_source = self.event_source::<P>(event_name);
-        self.plugins.insert(format!("{}::{}", event_name, P::symbol()), event_source);
+        self.plugins.insert(
+            format!("{}::{}", event_name, P::symbol()),  
+            EventSource::new::<P>(self.clone(), event_name)
+        );
     }
 
-    /// Installs a plugin and custom attribute to the runtime,
-    ///
+    /// Installs a plugin on this runtime and also adds the plugin as a custom attribute,
+    /// 
     pub fn install_with_custom<P>(&mut self, event_name: &'static str)
     where
         P: Plugin + BlockObject + Send + Default,

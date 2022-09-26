@@ -81,46 +81,44 @@ where
     }
 }
 
-/// This trait is to facilitate extending working with the attribute graph
+/// Implement this trait to extend the events that the runtime can create
+/// 
 pub trait Plugin {
     /// Returns the symbol name representing this plugin
     /// 
     fn symbol() -> &'static str;
 
+    /// Implement to execute logic over this thunk context w/ the runtime event system,
+    /// 
+    fn call(context: &ThunkContext) -> Option<AsyncContext>;
+
     /// Returns a short string description for this plugin
+    /// 
     fn description() -> &'static str {
         ""
     }
 
     /// Returns any caveats for this plugin
+    /// 
     fn caveats() -> &'static str {
         ""
     }
 
-    /// Returns self as a thunk
-    ///
-    fn as_thunk(self) -> Thunk
-    where
-        Self: Sized + Plugin,
-    {
-        AsThunk(self).into()
+    /// Optionally, implement to customize the attribute parser
+    /// 
+    fn customize(_parser: &mut AttributeParser) {
     }
 
-    /// If implemented, returns a setup operation that is required before running
-    /// this plugin w/ `context`
+    /// Optionally, implement to execute a setup operation before the event is called
     /// 
     fn setup_operation(context: &mut ThunkContext) -> Operation {
         Operation { context: context.clone(), task: None }
     }
 
-    /// implement call_with_context to allow for static extensions of attribute graph
-    fn call(context: &ThunkContext) -> Option<AsyncContext>;
-
-    /// Implement to customize the attribute parser
+    /// Returns this plugin as a custom attribute, 
     /// 
-    fn customize(_parser: &mut AttributeParser) {
-    }
-
+    /// This allows the runmd parser to use this plugin as an attribute type,
+    /// 
     fn as_custom_attr() -> CustomAttribute {
         reality::CustomAttribute::new_with(Self::symbol(), |parser, content| {
             if let Some(world) = parser.world() {

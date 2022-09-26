@@ -137,10 +137,10 @@ impl<'a> System<'a> for NetworkRuntime {
                                     // the plugin can interpret the transient value to figure out what type of message
                                     // it need's to process next.
                                     let mut upstream_context = upstream_context.clone();
-                                    upstream_context
-                                        .state()
-                                        .define("proxy", "received")
-                                        .edit_as(Value::Int(sent as i32));
+                                    // upstream_context
+                                    //     .state()
+                                    //     .define("proxy", "received")
+                                    //     .edit_as(Value::Int(sent as i32));
                                     upstream_event.fire(upstream_context);
                                 }
                             }

@@ -471,26 +471,26 @@ impl<'a> System<'a> for EventRuntime {
                 let mut context = initial_context
                     .enable_async(entity, runtime_handle)
                     .enable_https_client(https_client.clone())
-                    .enable_dispatcher({
-                        guest_runtime
-                            .and_then(|g| g.get_graph_sender())
-                            .unwrap_or(dispatcher.clone())
-                    })
-                    .enable_project({
-                        if let Some(project) = _project {
-                            // If the entity has a project component, prioritize using that
-                            project.clone()
-                        } else if let Some(runtime) = _lifec_runtime {
-                            // Otherwise if the entity has a runtime component, use the project
-                            // from the runtime. A runtime usually is configured w/ a project on start-up
-                            // so this is less explicit then directly setting the project component
-                            // runtime.project.clone()
-                            todo!()
-                        } else {
-                            // Otherwise, use the common project set w/ the current world
-                            project.reload_source()
-                        }
-                    })
+                    // .enable_dispatcher({
+                    //     guest_runtime
+                    //         .and_then(|g| g.get_graph_sender())
+                    //         .unwrap_or(dispatcher.clone())
+                    // })
+                    // .enable_project({
+                    //     if let Some(project) = _project {
+                    //         // If the entity has a project component, prioritize using that
+                    //         project.clone()
+                    //     } else if let Some(runtime) = _lifec_runtime {
+                    //         // Otherwise if the entity has a runtime component, use the project
+                    //         // from the runtime. A runtime usually is configured w/ a project on start-up
+                    //         // so this is less explicit then directly setting the project component
+                    //         // runtime.project.clone()
+                    //         todo!()
+                    //     } else {
+                    //         // Otherwise, use the common project set w/ the current world
+                    //         project.reload_source()
+                    //     }
+                    // })
                     .enable_operation_dispatcher({
                         guest_runtime
                             .and_then(|g| g.get_operation_sender())
