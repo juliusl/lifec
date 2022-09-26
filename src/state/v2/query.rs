@@ -6,7 +6,7 @@ use tracing::{event, Level};
 
 use crate::{
     catalog::Item,
-    plugins::{Thunk, ThunkContext, Engine, ErrorContext},
+    plugins::{Thunk, ThunkContext, ErrorContext},
     AttributeIndex, host::{Transport, ProxyTransport},
 };
 
@@ -110,14 +110,14 @@ where
             // fires off an event w/ this context. It's important that we try to ensure
             // the block_name is set, so that a config can be found and executed
             // However, if the below plugin_thunk
-            if context.block.block_name.is_empty() {
-                if let Some(block_name) = src.find_text("block_name") {
-                    event!(Level::TRACE, "context did not have a block name, setting block name found in src");
-                    context.block.block_name = block_name;
-                } else {
-                    event!(Level::TRACE, "could not find a block name to use");
-                }
-            }
+            // if context.block.block_name.is_empty() {
+            //     if let Some(block_name) = src.find_text("block_name") {
+            //         event!(Level::TRACE, "context did not have a block name, setting block name found in src");
+            //         context.block.block_name = block_name;
+            //     } else {
+            //         event!(Level::TRACE, "could not find a block name to use");
+            //     }
+            // }
 
             if let Some(Thunk(name, func, setup_func)) = plugin_thunk.as_ref() { 
                 event!(Level::DEBUG, "Calling thunk {name}, from query thunk"); 
@@ -322,11 +322,5 @@ impl Transport for Query {
 
     fn proxy(&mut self) -> ProxyTransport {
         unimplemented!("Proxy transport is not implemented for `Query`")
-    }
-}
-
-impl Engine for Query {
-    fn event_symbol() -> &'static str {
-        "query"
     }
 }

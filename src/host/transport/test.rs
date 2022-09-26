@@ -1,7 +1,7 @@
 use specs::System;
 use tokio::sync::mpsc::Receiver;
 
-use crate::{AttributeGraph, Operation, plugins::{ErrorContext, Engine}};
+use crate::{AttributeGraph, Operation, plugins::{ErrorContext}};
 
 use super::{ProxyTransport, Transport};
 
@@ -30,12 +30,6 @@ impl TestTransport {
 
     pub fn add_error_handler(&mut self, handler: fn(ErrorContext)) {
         self.on_error_context = Some(handler);
-    }
-}
-
-impl Engine for TestTransport {
-    fn event_symbol() -> &'static str {
-        "test_transport"
     }
 }
 

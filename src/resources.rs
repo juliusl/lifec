@@ -2,7 +2,7 @@ use rust_embed::RustEmbed;
 use tracing::{event, Level};
 use std::path::PathBuf;
 
-use crate::plugins::ThunkContext;
+use crate::{plugins::ThunkContext, AttributeIndex};
 
 /// Handles unpacking resources for a `RustEmbed` source
 pub struct Resources(

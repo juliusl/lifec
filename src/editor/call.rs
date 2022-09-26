@@ -1,4 +1,5 @@
 use super::{ProgressStatusBar, StartButton, Task};
+use crate::AttributeIndex;
 use crate::plugins::*;
 use specs::Builder;
 use specs::Entities;

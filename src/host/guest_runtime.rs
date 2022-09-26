@@ -5,7 +5,7 @@ use std::{
 
 use super::{transport::ProxyTransport, Host, Transport, TransportReceiver};
 use crate::{
-    plugins::{Engine, ErrorContext, Event, Project, Sequence, ThunkContext},
+    plugins::{ErrorContext, Event, Project, Sequence, ThunkContext},
     AttributeGraph, AttributeIndex, Operation, Runtime,
 };
 use atlier::system::Value;
@@ -75,7 +75,7 @@ impl GuestRuntime {
         // Install deps
         let runtime = host.get_runtime(engine); 
         world.insert(runtime.clone());
-        world.insert(runtime.project.clone());
+        // world.insert(runtime.project.clone());
 
         let mut dispatcher = dispatcher.build();
         dispatcher.setup(&mut world);
@@ -157,86 +157,6 @@ impl GuestRuntime {
     ) {
         if self.enable_error_context_receiver {
             self.visit(visitor);
-        }
-    }
-
-    /// Parses an engine
-    /// 
-    /// The following resources must be added to the guest runtime, for this method 
-    /// to succeed,
-    /// 
-    /// * `Project` - defines which plugins to create 
-    /// * `Runtime` - contains configuration for installed plugins 
-    /// 
-    pub fn parse_engine<E>(&mut self)
-    where
-        E: Engine,
-    {
-        let mut call_names = vec![];
-        let mut connections = vec![];
-        for (_, block) in self.world().read_resource::<Project>().iter_block() {
-            for (_, runtime_block) in block.to_blocks() {
-                for (engine_address, value) in runtime_block.find_symbol_values(E::event_symbol()) {
-                    if let Some((engine_name, _)) = engine_address.split_once("::") {
-                        call_names.push(engine_name.to_string());
-
-                        if let Value::Symbol(connect_to) = value {
-                            connections.push((engine_name.to_string(), connect_to));
-                        }
-                    }
-                }
-            }
-        }
-
-        let mut engine_table = HashMap::<String, Entity>::default();
-        for engine in call_names {
-            if let Some(start) = self
-                .world()
-                .read_resource::<Runtime>()
-                .create_engine::<E>(self.world(), engine.to_string())
-            {
-                engine_table.insert(engine, start);
-            }
-        }
-
-        let mut schedule = vec![];
-        let mut ignore = HashSet::<Entity>::default();
-        // Connect sequences
-        {
-            let mut sequences = self.world_mut().write_component::<Sequence>();
-            for (from, to) in connections {
-                if let Some(from) = engine_table.get(&from) {
-                    if let Some(to) = engine_table.get(&to) {
-                        if let Some(sequence) = (&mut sequences).get_mut(*from) {
-                            sequence.set_cursor(*to);
-                            ignore.insert(*to);
-
-                            if !ignore.contains(from) {
-                                schedule.push(*from);
-                                ignore.insert(*from);
-                                event!(
-                                    Level::INFO,
-                                    "schedule event:\n\t{} -> {}",
-                                    from.id(),
-                                    to.id()
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Schedule sequences 
-        {
-            let world = self.world_mut();
-            for e in schedule {
-                if let Some(event) = world.write_component::<Event>().get_mut(e) {
-                    if let Some(context) = world.read_component::<ThunkContext>().get(e) {
-                        event.fire(context.clone());
-                    }
-                }
-            }
         }
     }
 
@@ -325,11 +245,5 @@ impl Transport for GuestRuntime {
 
     fn proxy(&mut self) -> ProxyTransport {
         self.transport.clone()
-    }
-}
-
-impl Engine for GuestRuntime {
-    fn event_symbol() -> &'static str {
-        "guest"
     }
 }

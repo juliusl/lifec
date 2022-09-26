@@ -1,11 +1,11 @@
-use crate::plugins::Plugin;
+use crate::{plugins::Plugin, AttributeIndex};
 
 use super::ThunkContext;
 
 #[derive(Default)]
 pub struct Dispatch;
 
-impl Plugin<ThunkContext> for Dispatch {
+impl Plugin for Dispatch {
     fn symbol() -> &'static str {
         "dispatch"
     }
@@ -14,7 +14,7 @@ impl Plugin<ThunkContext> for Dispatch {
         "Dispatches the text attribute `content`"
     }
 
-    fn call_with_context(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
+    fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
         context.clone().task(|_| {
             let tc = context.clone();
             async move {

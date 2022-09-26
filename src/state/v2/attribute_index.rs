@@ -1,4 +1,4 @@
-use std::{sync::Arc, any::Any};
+use std::{sync::Arc, any::Any, collections::BTreeSet};
 
 use atlier::system::{Attribute, Value};
 
@@ -329,6 +329,19 @@ pub trait AttributeIndex {
         ));
     }
 
+    /// Adds a complex attribute 
+    /// 
+    /// A complex attribute is a set of identifiers. In the context of a reality block, 
+    /// the identifiers are property map keys for a stable attribute that has a property map.
+    /// 
+    fn add_complex(&mut self, name: impl AsRef<str>, init_value: impl Into<BTreeSet<String>>) {
+        self.add_attribute(Attribute::new( 
+            self.entity_id(), 
+            name.as_ref().to_string(), 
+            Value::Complex(init_value.into()) 
+        ));
+    }
+
     /// Updates the index
     ///
     fn update(&mut self, func: impl FnOnce(&mut Self)) -> &mut Self {
@@ -355,29 +368,5 @@ pub trait AttributeIndex {
             Value::Complex(_) => todo!(),
             _ => {}
         })
-    }
-
-    /// Creates a new empty query, for evaluating state from an index
-    /// 
-    /// **Note** Once a query is created, the same query can be reused w/ other index sources. This allows 
-    /// the search parameters to be declared once, and reused w/ other sources.
-    /// 
-    fn query(&self) -> Query<Self> 
-    where
-        Self: Sized + Clone + Default + Send + Sync + Any
-    {
-        self.query_with(vec![])
-    }
-
-    /// Creates a new query, for evaluating state from the index w/ search_params
-    /// 
-    /// **Note** Once a query is created, the same query can be reused w/ other index sources. This allows 
-    /// the search parameters to be declared once, and reused w/ other sources.
-    /// 
-    fn query_with(&self, search_params: Vec<Attribute>) -> Query<Self> 
-    where
-        Self: Sized + Clone + Default + Send + Sync + Any
-    {
-        Query { src: Arc::new(self.clone()), entity_id: self.entity_id(), search_params, error_on_transport: None }
     }
 }

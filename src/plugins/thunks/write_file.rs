@@ -10,7 +10,7 @@ use super::{CancelToken, ThunkContext};
 #[storage(DenseVecStorage)]
 pub struct WriteFile;
 
-impl Plugin<ThunkContext> for WriteFile {
+impl Plugin for WriteFile {
     fn symbol() -> &'static str {
         "write_file"
     }
@@ -19,8 +19,8 @@ impl Plugin<ThunkContext> for WriteFile {
         "Writes a file_block to the path specified by file_dst."
     }
 
-    fn call_with_context(
-        context: &mut ThunkContext,
+    fn call(
+        context: &ThunkContext,
     ) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
         context.clone().task(|_| {
             let mut tc = context.clone();

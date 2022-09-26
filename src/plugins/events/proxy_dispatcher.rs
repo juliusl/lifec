@@ -1,6 +1,7 @@
 use atlier::system::Value;
 use specs::{System, ReadStorage, Entities, WriteStorage, Join};
 use tracing::{event, Level};
+use crate::AttributeIndex;
 use crate::plugins::network::Proxy;
 use crate::plugins::{ThunkContext, Project, BlockContext};
 
@@ -35,27 +36,27 @@ impl<'a> System<'a> for ProxyDispatcher {
                             let mut graph = context.as_ref().clone(); 
                             let mut message = Project::default();
 
-                            if let (Some(block_name), Some(block_symbol)) = (graph.find_text("block_name"), graph.find_text("block_symbol")) {
-                                message = message.with_block(block_name, block_symbol, |c| {
-                                    for attr in BlockContext::iter_block_attrs_mut(&mut graph) {
-                                        if !attr.is_stable() {
-                                            if let Some((_, value)) = attr.transient() {
-                                                if let Value::Symbol(symbol) = attr.value() {
-                                                    let symbol = symbol.trim_end_matches("::");
-                                                    let name = attr.name().trim_end_matches(&format!("::{symbol}"));
+                            // if let (Some(block_name), Some(block_symbol)) = (graph.find_text("block_name"), graph.find_text("block_symbol")) {
+                            //     message = message.with_block(block_name, block_symbol, |c| {
+                            //         for attr in BlockContext::iter_block_attrs_mut(&mut graph) {
+                            //             if !attr.is_stable() {
+                            //                 if let Some((_, value)) = attr.transient() {
+                            //                     if let Value::Symbol(symbol) = attr.value() {
+                            //                         let symbol = symbol.trim_end_matches("::");
+                            //                         let name = attr.name().trim_end_matches(&format!("::{symbol}"));
                         
-                                                    c.as_mut()
-                                                        .define(name, symbol)
-                                                        .edit_as(value.clone());
-                                                }
-                                            }
-                                        } else {
-                                            let (name, value) = (attr.name(), attr.value());
-                                            c.with(name, value.clone());
-                                        }
-                                    }
-                                });
-                            }
+                            //                         c.as_mut()
+                            //                             .define(name, symbol)
+                            //                             .edit_as(value.clone());
+                            //                     }
+                            //                 }
+                            //             } else {
+                            //                 let (name, value) = (attr.name(), attr.value());
+                            //                 c.with(name, value.clone());
+                            //             }
+                            //         }
+                            //     });
+                            // }
 
                             match dispatcher.try_send(message.as_ref().clone()) {
                                 Ok(_) => {

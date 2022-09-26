@@ -6,6 +6,8 @@ use specs::{DenseVecStorage, Entities, ReadStorage, System};
 use tokio::task::JoinHandle;
 use tracing::{event, Level};
 
+use crate::AttributeIndex;
+
 use super::{BlockAddress, CancelThunk, ErrorContext, Event, EventRuntime, ThunkContext};
 
 mod proxy;
@@ -124,12 +126,12 @@ impl<'a> System<'a> for NetworkRuntime {
                                 if let (Some(upstream_event), Some(upstream_context)) =
                                     (events.get_mut(upstream), contexts.get(upstream))
                                 {
-                                    event!(
-                                        Level::TRACE,
-                                        "proxied message\n{sent} bytes\n{} -> {upstream_id}\n{}",
-                                        entity.id(),
-                                        upstream_context.block.block_name
-                                    );
+                                    // event!(
+                                    //     Level::TRACE,
+                                    //     "proxied message\n{sent} bytes\n{} -> {upstream_id}\n{}",
+                                    //     entity.id(),
+                                    //     upstream_context.block.block_name
+                                    // );
 
                                     // By going through the proxy instead of receiving the message directly,
                                     // the plugin can interpret the transient value to figure out what type of message

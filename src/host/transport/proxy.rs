@@ -1,7 +1,7 @@
 use tokio::sync::{mpsc::{Sender, Receiver, channel}};
 use tracing::{event, Level};
 
-use crate::{AttributeGraph, Operation, plugins::{ErrorContext, Engine}};
+use crate::{AttributeGraph, Operation, plugins::ErrorContext};
 
 use super::Transport;
 
@@ -33,12 +33,6 @@ impl ProxyTransport {
         let (tx, rx) = channel(capacity);
         self.error_contexts = Some(tx);
         rx
-    }
-}
-
-impl Engine for ProxyTransport {
-    fn event_symbol() -> &'static str {
-        "proxy"
     }
 }
 

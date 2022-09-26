@@ -30,29 +30,32 @@ impl ErrorContext {
     /// Returns true if the processing for this entity should stop
     /// 
     pub fn stop_on_error(&self) -> bool {
-        self.0.get_block("error")
-            .and_then(|b| b.as_ref().is_enabled("stop_on_error"))
-            .unwrap_or_default()
+        // self.0.get_block("error")
+        //     .and_then(|b| b.as_ref().is_enabled("stop_on_error"))
+        //     .unwrap_or_default(
+        todo!()
     }
 
     /// Looks for an error block symbol, and returns all text attributes
     /// 
     pub fn errors(&self) -> Vec<(String, String)> {
-        self.0.get_block("error").unwrap_or_default().iter_attributes().filter_map(|a| {
-            if a.name().starts_with("block_") {
-                return None;
-            }
+        // self.0.get_block("error").unwrap_or_default().iter_attributes().filter_map(|a| {
+        //     if a.name().starts_with("block_") {
+        //         return None;
+        //     }
 
-            let name = a.name();
-            match a.value() {
-                atlier::system::Value::TextBuffer(error) => {
-                    Some((name.to_string(), error.to_string()))
-                },
-                _ => {
-                    None 
-                }
-            }
-        }).collect()
+        //     let name = a.name();
+        //     match a.value() {
+        //         atlier::system::Value::TextBuffer(error) => {
+        //             Some((name.to_string(), error.to_string()))
+        //         },
+        //         _ => {
+        //             None 
+        //         }
+        //     }
+        // }).collect()
+
+        todo!()
     }
 
 
@@ -67,9 +70,9 @@ impl ErrorContext {
     pub fn set_previous_attempt(&mut self, previous: AttributeGraph) {
         event!(Level::INFO, "previous {:#?}", previous);
 
-        self.0.add_block("previous_attempt", |c| {
-            c.copy(&previous);
-        });
+        // self.0.add_block("previous_attempt", |c| {
+        //     c.copy(&previous);
+        // });
     }
 
     /// Returns the stopped event 
@@ -87,6 +90,8 @@ impl ErrorContext {
     /// Returns data from the previous attempt to fix the error context
     /// 
     pub fn previous_attempt(&self) -> Option<AttributeGraph> {
-        self.0.get_block("previous_attempt")
+        // self.0.get_block("previous_attempt")
+
+        todo!()
     }
 }

@@ -10,7 +10,7 @@ use super::CancelToken;
 #[storage(DenseVecStorage)]
 pub struct Timer;
 
-impl Plugin<ThunkContext> for Timer {
+impl Plugin for Timer {
     fn symbol() -> &'static str {
         "timer"
     }
@@ -19,8 +19,8 @@ impl Plugin<ThunkContext> for Timer {
         "Create a timer w/ a duration of seconds."
     }
 
-    fn call_with_context(
-        thunk_context: &mut ThunkContext,
+    fn call(
+        thunk_context: &ThunkContext,
     ) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
         thunk_context.clone().task(|mut cancel_source| {
             let mut tc = thunk_context.clone();

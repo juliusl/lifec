@@ -12,8 +12,6 @@ pub use attribute_index::AttributeIndex;
 mod query;
 pub use query::Query;
 
-pub mod protocol;
-
 /// An operation encapsulates an async task and it's context
 /// Where the result of the task is the next version of the context.
 /// 
@@ -241,7 +239,7 @@ mod tests {
     use specs::Entity;
     use tokio::runtime::Handle;
 
-    use crate::{catalog::Item, plugins::{ThunkContext, Plugin}, AttributeGraph};
+    use crate::{catalog::Item, plugins::{ThunkContext, Plugin, Process}, AttributeGraph, AttributeIndex};
 
     /// This test demonstrates how to use the v2 api's 
     /// 
@@ -272,109 +270,110 @@ mod tests {
             .to_owned();
         let src = ThunkContext::from(src);
         
-        let query = src.query();
-        let query = query
-            .find_text("name")
-            .find_int("age")
-            .find_bool("is_alias")
-            .find_binary("test_bin")
-            .find_float_range("test_float_range")
-            .find_float_pair("test_float_pair")
-            .find_float("test_float")
-            .find_int_pair("test_int_pair")
-            .find_int_range("test_int_range")
-            .find_symbol("test_symbol");
+        let query = src.query::<Process>();
+        todo!()
+        // let query = query
+        //     .find_text("name")
+        //     .find_int("age")
+        //     .find_bool("is_alias")
+        //     .find_binary("test_bin")
+        //     .find_float_range("test_float_range")
+        //     .find_float_pair("test_float_pair")
+        //     .find_float("test_float")
+        //     .find_int_pair("test_int_pair")
+        //     .find_int_range("test_int_range")
+        //     .find_symbol("test_symbol");
     
-        let mut person = Person::default();
-        query.evaluate(&mut person);
+        // let mut person = Person::default();
+        // query.evaluate(&mut person);
 
-        assert_eq!(person.name, "bob");
-        assert_eq!(person.age, 99);
-        assert_eq!(person.is_alias, true);
-        assert_eq!(person.test_bin, vec![b'h', b'e', b'l', b'l', b'o']);
-        assert_eq!(person.test_float_range, [3.1, 1.4, 4.5]);
-        assert_eq!(person.test_float_pair, [3.1, 1.4]);
-        assert_eq!(person.test_float, 3.1);
-        assert_eq!(person.test_int_pair, [3, 1]);
-        assert_eq!(person.test_int_range, [3, 1, 4]);
-        assert_eq!(person.test_symbol, "cool_symbol");
-        eprintln!("{:#?}", person);
+        // assert_eq!(person.name, "bob");
+        // assert_eq!(person.age, 99);
+        // assert_eq!(person.is_alias, true);
+        // assert_eq!(person.test_bin, vec![b'h', b'e', b'l', b'l', b'o']);
+        // assert_eq!(person.test_float_range, [3.1, 1.4, 4.5]);
+        // assert_eq!(person.test_float_pair, [3.1, 1.4]);
+        // assert_eq!(person.test_float, 3.1);
+        // assert_eq!(person.test_int_pair, [3, 1]);
+        // assert_eq!(person.test_int_range, [3, 1, 4]);
+        // assert_eq!(person.test_symbol, "cool_symbol");
+        // eprintln!("{:#?}", person);
         
-        let cached = &mut query.cache();
+        // let cached = &mut query.cache();
 
-        let mut person_from_cached = Person::default();
-        cached.cached(&mut person_from_cached);
+        // let mut person_from_cached = Person::default();
+        // cached.cached(&mut person_from_cached);
 
-        let person = person_from_cached;
-        assert_eq!(person.name, "bob");
-        assert_eq!(person.age, 99);
-        assert_eq!(person.is_alias, true);
-        assert_eq!(person.test_bin, vec![b'h', b'e', b'l', b'l', b'o']);
-        assert_eq!(person.test_float_range, [3.1, 1.4, 4.5]);
-        assert_eq!(person.test_float_pair, [3.1, 1.4]);
-        assert_eq!(person.test_float, 3.1);
-        assert_eq!(person.test_int_pair, [3, 1]);
-        assert_eq!(person.test_int_range, [3, 1, 4]);
-        assert_eq!(person.test_symbol, "cool_symbol");
-        eprintln!("{:#?}", person);
+        // let person = person_from_cached;
+        // assert_eq!(person.name, "bob");
+        // assert_eq!(person.age, 99);
+        // assert_eq!(person.is_alias, true);
+        // assert_eq!(person.test_bin, vec![b'h', b'e', b'l', b'l', b'o']);
+        // assert_eq!(person.test_float_range, [3.1, 1.4, 4.5]);
+        // assert_eq!(person.test_float_pair, [3.1, 1.4]);
+        // assert_eq!(person.test_float, 3.1);
+        // assert_eq!(person.test_int_pair, [3, 1]);
+        // assert_eq!(person.test_int_range, [3, 1, 4]);
+        // assert_eq!(person.test_symbol, "cool_symbol");
+        // eprintln!("{:#?}", person);
 
-        // Test thunk version of the query
-        let person = Person::default();
-        let thunk_query = query.thunk(person, Some(Thunk::from_plugin::<Announce>()));
-        let src = Arc::new(src);
+        // // Test thunk version of the query
+        // let person = Person::default();
+        // let thunk_query = query.thunk(person, Some(Thunk::from_plugin::<Announce>()));
+        // let src = Arc::new(src);
 
-        let operation = thunk_query(src.clone());
-        let context = operation.context;
-        assert!(context.find_bool("is_alias").unwrap_or_default());
-        assert_eq!(context.find_float_range("test_float_range"), Some((3.1, 1.4, 4.5)));
-        assert!(operation.task.is_none());
+        // let operation = thunk_query(src.clone());
+        // let context = operation.context;
+        // assert!(context.find_bool("is_alias").unwrap_or_default());
+        // assert_eq!(context.find_float_range("test_float_range"), Some((3.1, 1.4, 4.5)));
+        // assert!(operation.task.is_none());
 
-        let world = World::new();
-        let entity = world.entities().create();
-        let runtime = tokio::runtime::Runtime::new().unwrap();
+        // let world = World::new();
+        // let entity = world.entities().create();
+        // let runtime = tokio::runtime::Runtime::new().unwrap();
 
-        // Test async enabled person
-        let mut person = Person::default();
-        person.handle = Some(runtime.handle().clone());
-        person.entity = Some(entity);
-        let thunk_query = query.thunk(person, Some(Thunk::from_plugin::<Announce>()));
+        // // Test async enabled person
+        // let mut person = Person::default();
+        // person.handle = Some(runtime.handle().clone());
+        // person.entity = Some(entity);
+        // let thunk_query = query.thunk(person, Some(Thunk::from_plugin::<Announce>()));
 
-        let mut operation = thunk_query(src.clone());
-        let context = &operation.context;
-        assert!(context.find_bool("is_alias").unwrap_or_default());
-        assert_eq!(context.find_float_range("test_float_range"), Some((3.1, 1.4, 4.5)));
+        // let mut operation = thunk_query(src.clone());
+        // let context = &operation.context;
+        // assert!(context.find_bool("is_alias").unwrap_or_default());
+        // assert_eq!(context.find_float_range("test_float_range"), Some((3.1, 1.4, 4.5)));
 
-        let context = operation.wait().expect("completes");
-        assert!(context.find_bool("is_alias").unwrap_or_default());
-        assert_eq!(context.find_float_range("test_float_range"), Some((3.1, 1.4, 4.5)));
-        assert_eq!(context.find_int("announced"), Some(10));
+        // let context = operation.wait().expect("completes");
+        // assert!(context.find_bool("is_alias").unwrap_or_default());
+        // assert_eq!(context.find_float_range("test_float_range"), Some((3.1, 1.4, 4.5)));
+        // assert_eq!(context.find_int("announced"), Some(10));
 
-        // Test async enabled operation as the item 
-        let entity = world.entities().create();
-        let operation = crate::state::v2::Operation::item(entity, runtime.handle().clone());
-        let thunk_query = query.thunk(operation, Some(Thunk::from_plugin::<Announce>()));
-        let operation = thunk_query(src.clone());
-        let context = &operation.context;
+        // // Test async enabled operation as the item 
+        // let entity = world.entities().create();
+        // let operation = crate::state::v2::Operation::item(entity, runtime.handle().clone());
+        // let thunk_query = query.thunk(operation, Some(Thunk::from_plugin::<Announce>()));
+        // let operation = thunk_query(src.clone());
+        // let context = &operation.context;
 
-        assert!(context.find_bool("is_alias").unwrap_or_default());
-        assert_eq!(context.find_float_range("test_float_range"), Some((3.1, 1.4, 4.5)));
+        // assert!(context.find_bool("is_alias").unwrap_or_default());
+        // assert_eq!(context.find_float_range("test_float_range"), Some((3.1, 1.4, 4.5)));
 
-        // Test using operation.context as src index
-        let mut person_from_tc = Person::default();
-        query.evaluate_with(&Arc::new(context.clone()), &mut person_from_tc);
+        // // Test using operation.context as src index
+        // let mut person_from_tc = Person::default();
+        // query.evaluate_with(&Arc::new(context.clone()), &mut person_from_tc);
 
-        let person = person_from_tc;
-        assert_eq!(person.name, "bob");
-        assert_eq!(person.age, 99);
-        assert_eq!(person.is_alias, true);
-        assert_eq!(person.test_bin, vec![b'h', b'e', b'l', b'l', b'o']);
-        assert_eq!(person.test_float_range, [3.1, 1.4, 4.5]);
-        assert_eq!(person.test_float_pair, [3.1, 1.4]);
-        assert_eq!(person.test_float, 3.1);
-        assert_eq!(person.test_int_pair, [3, 1]);
-        assert_eq!(person.test_int_range, [3, 1, 4]);
-        assert_eq!(person.test_symbol, "cool_symbol");
-        eprintln!("{:#?}", person);
+        // let person = person_from_tc;
+        // assert_eq!(person.name, "bob");
+        // assert_eq!(person.age, 99);
+        // assert_eq!(person.is_alias, true);
+        // assert_eq!(person.test_bin, vec![b'h', b'e', b'l', b'l', b'o']);
+        // assert_eq!(person.test_float_range, [3.1, 1.4, 4.5]);
+        // assert_eq!(person.test_float_pair, [3.1, 1.4]);
+        // assert_eq!(person.test_float, 3.1);
+        // assert_eq!(person.test_int_pair, [3, 1]);
+        // assert_eq!(person.test_int_range, [3, 1, 4]);
+        // assert_eq!(person.test_symbol, "cool_symbol");
+        // eprintln!("{:#?}", person);
     }
 
     #[derive(Debug, Default, Clone)]
@@ -400,7 +399,7 @@ mod tests {
             "annonuce"
         }
 
-        fn call_with_context(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
+        fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
             context.clone().task(|_| {
                 let mut tc = context.clone();
                 async move {

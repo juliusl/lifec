@@ -38,8 +38,8 @@ use crate::AttributeGraph;
 #[derive(Debug, Component, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[storage(DenseVecStorage)]
 pub struct BlockAddress {
-    /// The hash code is the hash_code of the runmd block that initated this address to be created
-    ///
+    /// The hash_code of the runmd block that initated this address
+    /// 
     hash_code: u64,
     /// An entity id is typically a u32 int (provided by specs)
     /// The format of the entity block is
@@ -91,70 +91,14 @@ impl Into<[u8; 64]> for BlockAddress {
         let ip_block_d = cast::<u64, [u8; 8]>(self.ip_block_d);
         let ip_block_e = cast::<u64, [u8; 8]>(self.ip_block_e);
         let ip_block_f = cast::<u64, [u8; 8]>(self.ip_block_f);
-        node[0] = hash_code[0];
-        node[1] = hash_code[1];
-        node[2] = hash_code[2];
-        node[3] = hash_code[3];
-        node[4] = hash_code[4];
-        node[5] = hash_code[5];
-        node[6] = hash_code[6];
-        node[7] = hash_code[7];
-        node[8] = entity_block[0];
-        node[9] = entity_block[1];
-        node[10] = entity_block[2];
-        node[11] = entity_block[3];
-        node[12] = entity_block[4];
-        node[13] = entity_block[5];
-        node[14] = entity_block[6];
-        node[15] = entity_block[7];
-        node[16] = ip_block_a[0];
-        node[17] = ip_block_a[1];
-        node[18] = ip_block_a[2];
-        node[19] = ip_block_a[3];
-        node[20] = ip_block_a[4];
-        node[21] = ip_block_a[5];
-        node[22] = ip_block_a[6];
-        node[23] = ip_block_a[7];
-        node[24] = ip_block_b[0];
-        node[25] = ip_block_b[1];
-        node[26] = ip_block_b[2];
-        node[27] = ip_block_b[3];
-        node[28] = ip_block_b[4];
-        node[29] = ip_block_b[5];
-        node[30] = ip_block_b[6];
-        node[31] = ip_block_b[7];
-        node[32] = ip_block_c[0];
-        node[33] = ip_block_c[1];
-        node[34] = ip_block_c[2];
-        node[35] = ip_block_c[3];
-        node[36] = ip_block_c[4];
-        node[37] = ip_block_c[5];
-        node[38] = ip_block_c[6];
-        node[39] = ip_block_c[7];
-        node[40] = ip_block_d[0];
-        node[41] = ip_block_d[1];
-        node[42] = ip_block_d[2];
-        node[43] = ip_block_d[3];
-        node[44] = ip_block_d[4];
-        node[45] = ip_block_d[5];
-        node[46] = ip_block_d[6];
-        node[47] = ip_block_d[7];
-        node[48] = ip_block_e[0];
-        node[49] = ip_block_e[1];
-        node[50] = ip_block_e[2];
-        node[51] = ip_block_e[3];
-        node[52] = ip_block_e[4];
-        node[53] = ip_block_e[5];
-        node[54] = ip_block_e[6];
-        node[55] = ip_block_e[7];
-        node[56] = ip_block_f[0];
-        node[57] = ip_block_f[1];
-        node[58] = ip_block_f[2];
-        node[59] = ip_block_f[3];
-        node[60] = ip_block_f[4];
-        node[61] = ip_block_f[5];
-        node[62] = ip_block_f[6];
-        node[63] = ip_block_f[7];
+        node[0..8].copy_from_slice(&hash_code);
+        node[8..16].copy_from_slice(&entity_block);
+        node[16..24].copy_from_slice(&ip_block_a);
+        node[24..32].copy_from_slice(&ip_block_b);
+        node[32..40].copy_from_slice(&ip_block_c);
+        node[40..48].copy_from_slice(&ip_block_d);
+        node[48..56].copy_from_slice(&ip_block_e);
+        node[56..].copy_from_slice(&ip_block_f);
         node
     }
 }
@@ -217,15 +161,12 @@ impl BlockAddress {
                             }
                         }
                     }
-                
                 }
-            
             }
             _ => {
 
             }
         }
-
         None
     }
 }

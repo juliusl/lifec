@@ -5,7 +5,7 @@ use std::cmp::min;
 use std::fmt::Write;
 
 use crate::plugins::{EventRuntime, StatusUpdate};
-use crate::AttributeGraph;
+use crate::{AttributeGraph, AttributeIndex};
 
 #[derive(Component, Clone, Default)]
 #[storage(HashMapStorage)]

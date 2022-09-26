@@ -6,6 +6,7 @@ use specs::storage::DenseVecStorage;
 use tokio::net::UdpSocket;
 use tracing::{event, Level};
 
+use crate::AttributeIndex;
 use crate::plugins::{ThunkContext, BlockAddress, EventRuntime};
 
 use super::NetworkEvent;

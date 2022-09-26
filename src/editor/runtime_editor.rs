@@ -74,20 +74,6 @@ impl RuntimeEditor {
         }
     }
 
-    /// Scans the project creating all engines found in the file
-    pub fn create_engine_parts(&self, app_world: &World) -> Vec<Entity> {
-        let mut engines = vec![];
-        for (block_name, block) in self.project().iter_block() {
-            if let Some(_) = block.get_block("call") {
-                engines.push(block_name);
-            }
-        }
-
-        let engines = engines.iter().map(|e| e.to_string());
-        self.runtime()
-            .create_engine_group::<Call>(app_world, engines.collect())
-    }
-
     /// Creates the engine from a dropped_dir path
     pub fn create_default(&self, app_world: &World) -> Option<Entity> {
         self.runtime()
@@ -111,15 +97,15 @@ impl Default for RuntimeEditor {
             task_window_size: [580.0, 700.0],
         };
         default.runtime.install::<Call, Timer>();
-        default.runtime.install::<Call, Remote>();
+        // default.runtime.install::<Call, Remote>();
         default.runtime.install::<Call, Process>();
-        default.runtime.install::<Call, OpenDir>();
-        default.runtime.install::<Call, OpenFile>();
+        // default.runtime.install::<Call, OpenDir>();
+        // default.runtime.install::<Call, OpenFile>();
         default.runtime.install::<Call, WriteFile>();
-        default.runtime.install::<Call, Runtime>();
+       // default.runtime.install::<Call, Runtime>();
         default.runtime.install::<Call, Println>();
         default.runtime.install::<Call, Expect>();
-        default.runtime.install::<Fix, Missing>();
+       //  default.runtime.install::<Fix, Missing>();
         default.runtime.install::<Call, Redirect>();
         default
     }
@@ -181,20 +167,20 @@ impl Extension for RuntimeEditor {
     ) {
         match event {
             WindowEvent::DroppedFile(dropped_file_path) => {
-                if dropped_file_path.is_dir() {
-                    let path = dropped_file_path.join(".runmd");
-                    if path.exists() {
-                        if let Some(_) = self.load_project(path.to_str().unwrap_or_default()) {
-                            self.create_default(world);
-                        }
-                    }
-                } else if "runmd" == dropped_file_path.extension().unwrap_or_default() {
-                    if let Some(_) =
-                        self.load_project(dropped_file_path.to_str().unwrap_or_default())
-                    {
-                        self.create_engine_parts(world);
-                    }
-                }
+                // if dropped_file_path.is_dir() {
+                //     let path = dropped_file_path.join(".runmd");
+                //     if path.exists() {
+                //         if let Some(_) = self.load_project(path.to_str().unwrap_or_default()) {
+                //             self.create_default(world);
+                //         }
+                //     }
+                // } else if "runmd" == dropped_file_path.extension().unwrap_or_default() {
+                //     if let Some(_) =
+                //         self.load_project(dropped_file_path.to_str().unwrap_or_default())
+                //     {
+                //         self.create_engine_parts(world);
+                //     }
+                // }
             }
             WindowEvent::CloseRequested => {
                 let mut cancel_source = world.write_component::<CancelThunk>();
@@ -363,117 +349,117 @@ impl Extension for RuntimeEditor {
 
 impl RuntimeEditor {
     pub fn edit_event_menu(&mut self, app_world: &specs::World, ui: &Ui) {
-        self.runtime.create_event_menu_item(
-            app_world,
-            &Call::event::<Timer>(),
-            |c| {
-                let title = unique_title("new_timer");
-                c.block.block_name = title.to_string();
-                c.as_mut()
-                    .with_text("node_title", title)
-                    .with_text("thunk_symbol", Timer::symbol())
-                    .with_bool("default_open", true)
-                    .with_int("duration", 0);
-            },
-            Timer::description(),
-            ui,
-        );
+        // self.runtime.create_event_menu_item(
+        //     app_world,
+        //     &Call::event::<Timer>(),
+        //     |c| {
+        //         let title = unique_title("new_timer");
+        //         c.block.block_name = title.to_string();
+        //         c.as_mut()
+        //             .with_text("node_title", title)
+        //             .with_text("thunk_symbol", Timer::symbol())
+        //             .with_bool("default_open", true)
+        //             .with_int("duration", 0);
+        //     },
+        //     Timer::description(),
+        //     ui,
+        // );
 
-        self.runtime.create_event_menu_item(
-            app_world,
-            &Call::event::<Process>(),
-            |c| {
-                let title = unique_title("new_process");
-                c.block.block_name = title.to_string();
-                c.as_mut()
-                    .with_text("node_title", title)
-                    .with_text("thunk_symbol", Process::symbol())
-                    .with_bool("default_open", true)
-                    .with_text("command", "");
-            },
-            Process::description(),
-            ui,
-        );
+        // self.runtime.create_event_menu_item(
+        //     app_world,
+        //     &Call::event::<Process>(),
+        //     |c| {
+        //         let title = unique_title("new_process");
+        //         c.block.block_name = title.to_string();
+        //         c.as_mut()
+        //             .with_text("node_title", title)
+        //             .with_text("thunk_symbol", Process::symbol())
+        //             .with_bool("default_open", true)
+        //             .with_text("command", "");
+        //     },
+        //     Process::description(),
+        //     ui,
+        // );
 
-        self.runtime.create_event_menu_item(
-            app_world,
-            &Call::event::<Remote>(),
-            |c| {
-                let title = unique_title("new_remote");
-                c.block.block_name = title.to_string();
-                c.as_mut()
-                    .with_text("node_title", title)
-                    .with_text("thunk_symbol", Remote::symbol())
-                    .with_bool("default_open", true)
-                    .with_text("command", "");
-            },
-            Remote::description(),
-            ui,
-        );
+        // self.runtime.create_event_menu_item(
+        //     app_world,
+        //     &Call::event::<Remote>(),
+        //     |c| {
+        //         let title = unique_title("new_remote");
+        //         c.block.block_name = title.to_string();
+        //         c.as_mut()
+        //             .with_text("node_title", title)
+        //             .with_text("thunk_symbol", Remote::symbol())
+        //             .with_bool("default_open", true)
+        //             .with_text("command", "");
+        //     },
+        //     Remote::description(),
+        //     ui,
+        // );
 
-        self.runtime.create_event_menu_item(
-            app_world,
-            &Call::event::<OpenFile>(),
-            |c| {
-                let title = unique_title("new_open_file");
-                c.block.block_name = title.to_string();
-                c.as_mut()
-                    .with_text("node_title", title)
-                    .with_text("thunk_symbol", OpenFile::symbol())
-                    .with_bool("default_open", true)
-                    .with_text("file_src", "");
-            },
-            OpenFile::description(),
-            ui,
-        );
+        // self.runtime.create_event_menu_item(
+        //     app_world,
+        //     &Call::event::<OpenFile>(),
+        //     |c| {
+        //         let title = unique_title("new_open_file");
+        //         c.block.block_name = title.to_string();
+        //         c.as_mut()
+        //             .with_text("node_title", title)
+        //             .with_text("thunk_symbol", OpenFile::symbol())
+        //             .with_bool("default_open", true)
+        //             .with_text("file_src", "");
+        //     },
+        //     OpenFile::description(),
+        //     ui,
+        // );
 
-        self.runtime.create_event_menu_item(
-            app_world,
-            &Call::event::<OpenDir>(),
-            |c| {
-                let title = unique_title("new_open_dir");
-                c.block.block_name = title.to_string();
-                c.as_mut()
-                    .with_text("node_title", title)
-                    .with_text("thunk_symbol", OpenDir::symbol())
-                    .with_bool("default_open", true)
-                    .with_text("file_dir", "");
-            },
-            OpenDir::description(),
-            ui,
-        );
+        // self.runtime.create_event_menu_item(
+        //     app_world,
+        //     &Call::event::<OpenDir>(),
+        //     |c| {
+        //         let title = unique_title("new_open_dir");
+        //         c.block.block_name = title.to_string();
+        //         c.as_mut()
+        //             .with_text("node_title", title)
+        //             .with_text("thunk_symbol", OpenDir::symbol())
+        //             .with_bool("default_open", true)
+        //             .with_text("file_dir", "");
+        //     },
+        //     OpenDir::description(),
+        //     ui,
+        // );
 
-        self.runtime.create_event_menu_item(
-            app_world,
-            &Call::event::<WriteFile>(),
-            |c| {
-                let title = unique_title("new_write_file");
-                c.block.block_name = title.to_string();
-                c.as_mut()
-                    .with_text("node_title", title)
-                    .with_text("thunk_symbol", WriteFile::symbol())
-                    .with_bool("default_open", true)
-                    .add_text_attr("file_dst", "");
-            },
-            WriteFile::description(),
-            ui,
-        );
+        // self.runtime.create_event_menu_item(
+        //     app_world,
+        //     &Call::event::<WriteFile>(),
+        //     |c| {
+        //         let title = unique_title("new_write_file");
+        //         c.block.block_name = title.to_string();
+        //         c.as_mut()
+        //             .with_text("node_title", title)
+        //             .with_text("thunk_symbol", WriteFile::symbol())
+        //             .with_bool("default_open", true)
+        //             .add_text_attr("file_dst", "");
+        //     },
+        //     WriteFile::description(),
+        //     ui,
+        // );
 
-        self.runtime.create_event_menu_item(
-            app_world,
-            &Call::event::<Println>(),
-            |c| {
-                let title = unique_title("new_println");
-                c.block.block_name = title.to_string();
-                c.as_mut()
-                    .with_text("node_title", title)
-                    .with_text("thunk_symbol", Println::symbol())
-                    .with_bool("default_open", true)
-                    .add_text_attr("file_dst", "");
-            },
-            Println::description(),
-            ui,
-        );
+        // self.runtime.create_event_menu_item(
+        //     app_world,
+        //     &Call::event::<Println>(),
+        //     |c| {
+        //         let title = unique_title("new_println");
+        //         c.block.block_name = title.to_string();
+        //         c.as_mut()
+        //             .with_text("node_title", title)
+        //             .with_text("thunk_symbol", Println::symbol())
+        //             .with_bool("default_open", true)
+        //             .add_text_attr("file_dst", "");
+        //     },
+        //     Println::description(),
+        //     ui,
+        // );
     }
 
     pub fn task_window(&mut self, app_world: &specs::World, task_list: &mut List<Task>, ui: &Ui) {
@@ -489,8 +475,8 @@ impl RuntimeEditor {
                 ui.menu_bar(|| {
                     ui.menu("Menu", || {
                         let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
-                        self.project_mut().edit_project_menu(ui);
-                        ui.separator();
+                        // self.project_mut().edit_project_menu(ui);
+                        // ui.separator();
 
                         self.edit_event_menu(app_world, ui);
                         ui.separator();

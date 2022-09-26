@@ -8,7 +8,6 @@ use std::fmt::Display;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::{
-    runtime::Runtime,
     sync::{
         self,
         mpsc::{self, Sender},
@@ -18,6 +17,8 @@ use tokio::{
 use tracing::event;
 use tracing::Level;
 
+use crate::AttributeIndex;
+use crate::Runtime;
 use crate::host::GuestRuntime;
 use crate::AttributeGraph;
 use crate::Extension;
@@ -37,21 +38,26 @@ use specs::storage::VecStorage;
 mod proxy_dispatcher;
 pub use proxy_dispatcher::ProxyDispatcher;
 
-mod listen;
-pub use listen::Listen;
-
 mod sequence;
-pub use sequence::Connection;
 pub use sequence::Sequence;
 
+mod connection;
+pub use connection::Connection;
+
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
+/// 
 #[derive(Component)]
 #[storage(VecStorage)]
 pub struct Event(
+    /// Name of this event
     &'static str,
+    /// Thunk that is being executed
     Thunk,
+    /// Config for the thunk context before being executed
     Option<Config>,
+    /// Initial context that starts this event
     Option<ThunkContext>,
+    /// This is the task that 
     Option<JoinHandle<ThunkContext>>,
 );
 
@@ -125,6 +131,7 @@ impl Event {
     }
 
     /// returns true if task is running
+    /// 
     pub fn is_running(&self) -> bool {
         self.4
             .as_ref()
@@ -133,6 +140,7 @@ impl Event {
     }
 
     /// Creates a duplicate of this event
+    /// 
     pub fn duplicate(&self) -> Self {
         Self(self.0, self.1.clone(), self.2.clone(), None, None)
     }
@@ -159,9 +167,9 @@ impl Extension for EventRuntime {
 }
 
 /// Setup for tokio runtime, (Not to be confused with crate::Runtime)
-impl SetupHandler<Runtime> for EventRuntime {
+impl SetupHandler<tokio::runtime::Runtime> for EventRuntime {
     fn setup(world: &mut specs::World) {
-        world.insert(Runtime::new().unwrap());
+        world.insert(tokio::runtime::Runtime::new().unwrap());
 
         // TODO: setup shutdown hook
     }
@@ -240,15 +248,13 @@ impl SetupHandler<sync::mpsc::Sender<Operation>> for EventRuntime {
 }
 
 /// Setup for a built-in runtime for the world
-///
-/// TODO: Trying to move more things to this runtime-space
-///
 impl SetupHandler<super::Runtime> for EventRuntime {
     fn setup(world: &mut World) {
         world.insert(super::Runtime::default());
     }
 }
 
+/// Setup for a shared https client 
 impl SetupHandler<SecureClient> for EventRuntime {
     fn setup(world: &mut World) {
         let https = HttpsConnector::new();
@@ -259,7 +265,7 @@ impl SetupHandler<SecureClient> for EventRuntime {
 
 impl<'a> System<'a> for EventRuntime {
     type SystemData = (
-        Read<'a, Runtime, EventRuntime>,
+        Read<'a, tokio::runtime::Runtime, EventRuntime>,
         Read<'a, SecureClient, EventRuntime>,
         Read<'a, Sender<StatusUpdate>, EventRuntime>,
         Read<'a, Sender<AttributeGraph>, EventRuntime>,
@@ -270,7 +276,7 @@ impl<'a> System<'a> for EventRuntime {
         Entities<'a>,
         ReadStorage<'a, Connection>,
         ReadStorage<'a, Project>,
-        ReadStorage<'a, crate::Runtime>,
+        ReadStorage<'a, Runtime>,
         ReadStorage<'a, GuestRuntime>,
         WriteStorage<'a, Event>,
         WriteStorage<'a, ThunkContext>,
@@ -451,14 +457,14 @@ impl<'a> System<'a> for EventRuntime {
             // An event starts by passing an initial_context to the event
             // the runtime takes this context and configures it before calling the thunk
             } else if let Some(initial_context) = initial_context.take() {
-                event!(
-                    Level::DEBUG,
-                    "start event:\n\t{}\n\t{}\n\t{}\n\t{}",
-                    entity.id(),
-                    initial_context.block.block_name,
-                    &event_name,
-                    initial_context.as_ref().hash_code()
-                );
+                // event!(
+                //     Level::DEBUG,
+                //     "start event:\n\t{}\n\t{}\n\t{}\n\t{}",
+                //     entity.id(),
+                //     initial_context.block.name.unwrap(),
+                //     &event_name,
+                //     initial_context.as_ref().hash_code()
+                // );
                 let thunk = thunk.clone();
                 let runtime_handle = runtime.handle().clone();
 
@@ -478,7 +484,8 @@ impl<'a> System<'a> for EventRuntime {
                             // Otherwise if the entity has a runtime component, use the project
                             // from the runtime. A runtime usually is configured w/ a project on start-up
                             // so this is less explicit then directly setting the project component
-                            runtime.project.clone()
+                            // runtime.project.clone()
+                            todo!()
                         } else {
                             // Otherwise, use the common project set w/ the current world
                             project.reload_source()
@@ -564,49 +571,31 @@ impl<'a> System<'a> for EventRuntime {
 
         // dispatch all queued messages
         while let Some((mut next, last)) = dispatch_queue.pop() {
-            // TODO: This is tricky, probably will re-write
-            if let Some(true) = connections.get(next).and_then(|c| Some(c.fork_enabled())) {
-                let forked_event = events.get(next).and_then(|e| Some(e.duplicate()));
-                let forked_context = contexts.get(next).and_then(|c| Some(c.clone()));
-
-                if let (Some(event), Some(context)) = (forked_event, forked_context) {
-                    let fork = entities.create();
-                    let fork_id = fork.id();
-                    let log = format!("Forking, {fork_id}, {event}");
-                    if events.insert(fork, event).is_ok() {
-                        if contexts.insert(fork, context).is_ok() {
-                            event!(Level::TRACE, "{}", log);
-                            next = fork;
-                        }
-                    }
-                }
-            }
-
             if let (Some(event), Some(context)) = (events.get_mut(next), contexts.get_mut(next)) {
                 let last_id = last.as_ref().entity();
-                let previous = last
-                    .project
-                    .and_then(|p| p.transpile_blocks().ok())
-                    .unwrap_or_default()
-                    .trim()
-                    .to_string();
+                // let previous = last
+                //     .project
+                //     .and_then(|p| p.transpile_blocks().ok())
+                //     .unwrap_or_default()
+                //     .trim()
+                //     .to_string();
 
-                if !previous.trim().is_empty() {
-                    context
-                        .as_mut()
-                        .add_message(event.to_string(), "previous", previous);
-                }
+                // if !previous.trim().is_empty() {
+                //     context
+                //         .as_mut()
+                //         .add_message(event.to_string(), "previous", previous);
+                // }
 
                 event.fire(context.clone());
-                event!(
-                    tracing::Level::DEBUG,
-                    "dispatch event:\n\t{} -> {}\n\t{}\n\t{}\n\t{}",
-                    last_id,
-                    next.id(),
-                    context.block.block_name,
-                    event,
-                    context.as_ref().hash_code()
-                );
+                // event!(
+                //     tracing::Level::DEBUG,
+                //     "dispatch event:\n\t{} -> {}\n\t{}\n\t{}\n\t{}",
+                //     last_id,
+                //     next.id(),
+                //     context.block.name.unwrap(),
+                //     event,
+                //     context.as_ref().hash_code()
+                // );
             } else {
                 event!(Level::WARN, "Next event does not exist");
             }

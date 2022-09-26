@@ -1,80 +1,30 @@
 use std::fmt::Display;
 
+use reality::{AttributeParser, Interpreter, SpecialAttribute};
 use specs::storage::DefaultVecStorage;
-use specs::{Component, Entity};
+use specs::{Component, Entity, World, WorldExt};
 
-/// The event runtime uses this component to determine if it should execute additional events after an event completes
+use super::Connection;
+
+/// Struct for a collection of event entities,
+/// 
+/// The event runtime uses this component to determine if it should 
+/// execute additional events after an event completes
 #[derive(Component, Debug, Default, Clone)]
 #[storage(DefaultVecStorage)]
 pub struct Sequence(
     /// sequence, a list of entities w/ events that are called in sequence
-    Vec<Entity>, 
+    Vec<Entity>,
     /// cursor, if set, this entity will be called after the sequence completes
-    Option<Entity>
-);
-
-/// This component configures the Sequence cursor to point at the sequence it is connected to
-#[derive(Component, Debug, Default, Clone)]
-#[storage(DefaultVecStorage)]
-pub struct Connection(
-    /// entities that are connected
-    Sequence,
-    /// This entity is a third-party of the connection, which owns this component.
-    /// This is to make garbage collecting these connections easier.
     Option<Entity>,
-    /// Fork, means that this connection is not exclusive bewteen two entities
-    bool,
 );
-
-impl Display for Connection {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let (Some(from), Some(to)) = self.connection() {
-            let from = from.id();
-            let to = to.id();
-            write!(f, "{from} -> {to} ")?;
-        }
-
-        if let Some(owner) = self.owner() {
-            let owner = owner.id();
-            write!(f, "owner: {owner} ")?;
-        }
-
-        // let fork = self.2;
-        // writeln!(f, " fork: {fork}")
-
-        Ok(())
-    }
-}
-
-impl Connection {
-    pub fn set_owner(&mut self, owner: Entity) {
-        self.1 = Some(owner);
-    }
-
-    pub fn enable_fork(&mut self) {
-        self.2 = true;
-    }
-
-    pub fn fork_enabled(&self) -> bool {
-        self.2
-    }
-
-    pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
-        let Self(sequence, ..) = self; 
-        (sequence.last(), sequence.cursor())
-    }
-
-    pub fn owner(&self) -> Option<Entity> {
-        self.1
-    }
-}
 
 impl Display for Sequence {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.0.is_empty() {
-            write!(f, "End of sequence, cursor: {:?}",  self.1)?;
+            write!(f, "End of sequence, cursor: {:?}", self.1)?;
         } else {
-            let mut clone = self.0.clone(); 
+            let mut clone = self.0.clone();
             clone.reverse();
             for entity in clone.iter().take(1) {
                 write!(f, "next: {:?} ", entity)?;
@@ -87,8 +37,8 @@ impl Display for Sequence {
 }
 
 impl From<Vec<Entity>> for Sequence {
-    /// Note: Reverses the order, assuming vec was built with .push(), this is 
-    /// because underneath the hood we'll pop off of this vector 
+    /// Note: Reverses the order, assuming vec was built with .push(), this is
+    /// because underneath the hood we'll pop off of this vector
     fn from(mut vec: Vec<Entity>) -> Self {
         vec.reverse();
 
@@ -100,7 +50,7 @@ impl Sequence {
     /// Returns true if there are no events in the sequence.
     pub fn is_empty(&self) -> bool {
         let Self(events, ..) = self;
-        
+
         events.is_empty()
     }
 
@@ -120,13 +70,13 @@ impl Sequence {
 
     /// Returns the next entity in this sequence.
     pub fn next(&mut self) -> Option<Entity> {
-        let Self(events, ..) = self; 
+        let Self(events, ..) = self;
 
         events.pop()
     }
 
     /// Returns a copy of the next entity in this sequence,
-    /// w/o altering the sequence 
+    /// w/o altering the sequence
     pub fn peek(&self) -> Option<Entity> {
         self.clone().0.pop()
     }
@@ -146,7 +96,7 @@ impl Sequence {
         let to = other.peek();
 
         let mut link = Sequence::default();
-        
+
         if let Some(from) = from {
             link.add(from);
         }
@@ -155,7 +105,7 @@ impl Sequence {
             link.set_cursor(to);
         }
 
-        Connection(link, None, false)
+        Connection::from(link)
     }
 
     /// Resets thre cursor
@@ -171,7 +121,7 @@ impl Sequence {
         self.1
     }
 
-    /// Sets the entity to dispatch at the end of the sequence, 
+    /// Sets the entity to dispatch at the end of the sequence,
     /// if pointing to an entity in this sequence, setting the cursor will create a loop.
     pub fn set_cursor(&mut self, cursor: Entity) {
         self.1 = Some(cursor);
@@ -186,11 +136,11 @@ impl Sequence {
             fork.add(next);
             Some(fork)
         } else {
-            None 
+            None
         }
     }
 
-    /// iterate through entities 
+    /// iterate through entities
     pub fn iter_entities(&self) -> impl Iterator<Item = Entity> {
         let mut clone = self.0.clone();
         clone.reverse();

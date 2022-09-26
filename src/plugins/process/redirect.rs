@@ -2,12 +2,12 @@ use std::path::PathBuf;
 
 use tracing::{event, Level};
 
-use crate::plugins::{ThunkContext, Plugin};
+use crate::{plugins::{ThunkContext, Plugin}, AttributeIndex};
 
 #[derive(Default)]
 pub struct Redirect; 
 
-impl Plugin<ThunkContext> for Redirect {
+impl Plugin for Redirect {
     fn symbol() -> &'static str {
         "redirect"
     }
@@ -16,7 +16,7 @@ impl Plugin<ThunkContext> for Redirect {
         "Redirect stdout to the path specified by `redirect_stdout`, and redirect stderr to the path specified by `redirect_stderr`"
     }
 
-    fn call_with_context(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
+    fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
         context.clone().task(|_| {
             let mut tc = context.clone(); 
             async move {

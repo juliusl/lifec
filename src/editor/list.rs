@@ -80,7 +80,7 @@ where
                 ui.text(format!(
                     "{} {} - {}:",
                     thunk_symbol,
-                    context.block.block_name,
+                    context.block.name.unwrap(),
                     context.as_ref().hash_code()
                 ));
 

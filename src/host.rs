@@ -11,9 +11,6 @@ use crate::{
     AttributeIndex, CatalogReader, CatalogWriter, EventSource, Operation, Runtime, AttributeGraph,
 };
 
-mod open;
-pub use open::open;
-
 mod dashboard;
 pub use dashboard::Dashboard;
 
@@ -93,31 +90,6 @@ where
     ///
     fn should_exit(&mut self) -> Option<HostExitCode>;
 
-    /// Interprets the block context, 
-    /// 
-    /// The `block_name` is interpreted as the `event_symbol`,
-    /// each `block_symbol` is interpreted as an `plugin_symbol`. 
-    /// The default implementation will use this pair to find an `EventSource` from
-    /// the runtime. If the event source exists, then it will be pushed onto the sources
-    /// vector, w/ the attributes interpreted from the block.  
-    ///
-    fn parse_block_context(
-        &mut self,
-        runtime: Runtime,
-        block_name: impl AsRef<str>,
-        block_context: &BlockContext,
-    ) -> Vec<(EventSource, AttributeGraph)> {
-        let event_symbol = block_name.as_ref();
-        let mut sources = vec![];
-        for (plugin_symbol, config) in block_context.to_blocks() {
-            if let Some(event_source) = 
-                runtime.find_event_source(format!("{event_symbol} {plugin_symbol}")) {
-                sources.push((event_source, config));
-            }
-        }
-        sources
-    }
-
     /// Returns some operation if additional setup is required before starting the event,
     /// otherwise No-OP.
     ///
@@ -165,12 +137,12 @@ where
             thunk_context.block = block_context.to_owned();
 
             let runtime = self.create_runtime(project.clone());
-            let engine_event_source =
-                self.parse_block_context(
-                    runtime.clone(), 
-                    block_name, 
-                    block_context
-                );
+            // let engine_event_source =
+            //     self.parse_block_context(
+            //         runtime.clone(), 
+            //         block_name, 
+            //         block_context
+            //     );
 
             let engine = world
                 .create_entity()
@@ -240,6 +212,7 @@ where
     /// Creates a new world and dispatcher builder
     ///
     fn new_world<'a, 'b>() -> (World, DispatcherBuilder<'a, 'b>) {
+        // TODO: Get this from reality 
         let mut world = World::new();
         world.register::<GuestRuntime>();
 
@@ -377,14 +350,13 @@ impl<'a> System<'a> for HostRuntime {
 }
 
 mod test {
-    use specs::{DispatcherBuilder, Entity, World, WorldExt};
-    use std::{sync::Arc, collections::HashMap};
+    use specs::Entity;
+    use std::collections::HashMap;
     use tracing::{event, Level};
 
     use crate::{
-        host::transport::TestTransport,
         plugins::{Plugin, Println, Test, ThunkContext},
-        AttributeIndex, Extension, Operation, Runtime,
+        AttributeIndex, Extension, Runtime,
     };
 
     use super::{Host, HostExitCode};
@@ -405,10 +377,10 @@ mod test {
     impl Host for TestHost {
         fn create_runtime(&mut self, project: crate::plugins::Project) -> Runtime {
             let mut runtime = Runtime::new(project);
-            runtime.install::<Test, Println>();
-            runtime.install::<Test, ChangeName>();
-            runtime.install::<Test, IsBob>();
-            runtime.install::<Test, IsNotBob>();
+            runtime.install::<Println>("test");
+            runtime.install::<ChangeName>("test");
+            runtime.install::<IsBob>("test");
+            runtime.install::<IsNotBob>("test");
             runtime
         }
 
@@ -451,7 +423,7 @@ mod test {
             "change_name"
         }
 
-        fn call_with_context(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
+        fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
             context.clone().task(|_| {
                 let mut tc = context.clone();
                 async move {
@@ -473,7 +445,7 @@ mod test {
             "is_bob"
         }
 
-        fn call_with_context(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
+        fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
             context.clone().task(|_| {
                 let tc = context.clone();
                 async move {
@@ -504,7 +476,7 @@ mod test {
             "is_not_bob"
         }
 
-        fn call_with_context(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
+        fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
             context.clone().task(|_| {
                 let tc = context.clone();
                 async move {

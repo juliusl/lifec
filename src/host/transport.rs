@@ -1,7 +1,7 @@
 use specs::prelude::*;
 use tokio::sync::mpsc::Receiver;
 
-use crate::{plugins::{EventRuntime, ErrorContext, Engine}, 
+use crate::{plugins::{EventRuntime, ErrorContext}, 
     AttributeGraph, 
     Operation, 
 };
@@ -25,7 +25,7 @@ pub use test::TestTransport;
 /// variety of storage and network stack implementations. 
 /// 
 /// 
-pub trait Transport : Engine + Sized {
+pub trait Transport : Sized {
     /// Transports a received graph 
     /// 
     fn transport_graph(&mut self, graph: AttributeGraph);

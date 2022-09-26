@@ -4,19 +4,19 @@ use std::sync::Arc;
 
 use crate::AttributeGraph;
 use crate::Operation;
-use crate::RuntimeDispatcher;
 use crate::state::AttributeIndex;
 use atlier::system::Value;
 use hyper::client::HttpConnector;
 use imgui::Ui;
 use specs::Component;
 use specs::{storage::DenseVecStorage, Entity};
+use reality::BlockObject;
 
-mod open_file;
-pub use open_file::OpenFile;
+// mod open_file;
+// pub use open_file::OpenFile;
 
-mod open_dir;
-pub use open_dir::OpenDir;
+// mod open_dir;
+// pub use open_dir::OpenDir;
 
 mod write_file;
 use tokio::io;
@@ -51,10 +51,10 @@ use tokio::{runtime::Handle, sync::mpsc::Sender, sync::oneshot::channel, task::J
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
 pub struct Thunk(
-    // thunk label
+    // Symbol that represents this thunk
     pub &'static str,
     // thunk fn
-    pub fn(&mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
+    pub fn(&ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
     /// setup thunk fn
     pub fn(&mut ThunkContext) -> Operation,
 );
@@ -86,7 +86,7 @@ impl Thunk {
     where
         P: Plugin,
     {
-        Self(P::symbol(), P::call_with_context, P::setup_operation)
+        Self(P::symbol(), P::call, P::setup_operation)
     }
 
     /// deprecated?
@@ -147,12 +147,11 @@ impl From<CancelToken> for CancelThunk {
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
-    /// Underlying block context for this thunk
+    /// Underlying block context for this thunk,
     pub block: BlockContext,
     /// Current project
     pub project: Option<Project>,
-    /// Async fields
-    /// Entity that is identifying the thunk
+    /// Entity that owns this context
     pub entity: Option<Entity>,
     /// Tokio runtime handle, to spawn additional tasks 
     pub handle: Option<Handle>,
@@ -175,6 +174,7 @@ pub struct ThunkContext {
     ///     1) wait for a connection to be made,
     ///     2) wait for the connection to close, 
     ///     3) and cannot be stored in the context,
+    /// 
     udp_socket: Option<Arc<UdpSocket>>,
 }
 
@@ -202,6 +202,29 @@ impl AttributeIndex for ThunkContext {
 
 /// This block has all the async related features
 impl ThunkContext {
+    /// Returns self with a query added to the block context,
+    /// 
+    /// Before a thunk is executed, each query must be successful.
+    /// 
+    pub fn query<T>(self) -> Self 
+    where
+        T: BlockObject + Default
+    {
+        self.query_with(&T::default())
+    }
+
+    /// Returns self with a query added to the block context,
+    /// 
+    /// Before a thunk is executed, each query must be successful.
+    /// 
+    pub fn query_with<T>(mut self, object: &T) -> Self 
+    where
+        T: BlockObject
+    {
+        self.block.add_query(object);
+        self
+    }
+
     /// Returns true if the source has been cancelled.
     /// Note: In most cases you could just use tokio::select! macro with the source,
     /// but there are control flows where getting a boolean is more ergonomic.
@@ -523,7 +546,7 @@ impl ThunkContext {
         self.update_progress(&status, 0.0).await;
 
         if self.as_ref().is_enabled("debug").unwrap_or_default() {
-            let block_name = &self.block.block_name;
+            let block_name = &self.block.name.as_ref().unwrap();
             let status = status.as_ref();
             event!(Level::DEBUG, "{block_name}\t{status}"); 
         }
@@ -538,19 +561,20 @@ impl ThunkContext {
     /// not execute any of the next events in the sequence
     ///  
     pub fn get_errors(&self) -> Option<ErrorContext> {
-        self.block.get_block("error").and_then(|b| { 
-            let mut b = b;
+        // self.block.get_block("error").and_then(|b| { 
+        //     let mut b = b;
             
-            if self.as_ref().is_enabled("stop_on_error").unwrap_or_default() {
-                b.add_bool_attr("stop_on_error", true);
+        //     if self.as_ref().is_enabled("stop_on_error").unwrap_or_default() {
+        //         b.add_bool_attr("stop_on_error", true);
 
-                if let Some(stopped) = self.entity {
-                    return Some(ErrorContext::new(BlockContext::from(b), Some(stopped)))
-                }
-            }
+        //         if let Some(stopped) = self.entity {
+        //             return Some(ErrorContext::new(BlockContext::from(b), Some(stopped)))
+        //         }
+        //     }
 
-            Some(ErrorContext::new(BlockContext::from(b), None)) 
-        })
+        //     Some(ErrorContext::new(BlockContext::from(b), None)) 
+        // })
+        todo!()
     }
 }
 
@@ -586,9 +610,10 @@ impl ThunkContext {
 impl ThunkContext {
     /// Updates error block
     pub fn error(&mut self, record: impl Fn(&mut AttributeGraph)) {
-        if !self.block.update_block("error", &record) {
-            self.block.add_block("error", record);
-        }
+        // if !self.block.update_block("error", &record) {
+        //     self.block.add_block("error", record);
+        // }
+        todo!()
     }
 
     /// Formats a label that is unique to this state
@@ -604,7 +629,7 @@ impl ThunkContext {
 impl From<AttributeGraph> for ThunkContext {
     fn from(g: AttributeGraph) -> Self {
         Self {
-            block: BlockContext::from(g),
+            block: BlockContext::default(),
             project: None,
             entity: None,
             handle: None,
@@ -620,12 +645,14 @@ impl From<AttributeGraph> for ThunkContext {
 
 impl AsRef<AttributeGraph> for ThunkContext {
     fn as_ref(&self) -> &AttributeGraph {
-        self.block.as_ref()
+        // self.block.as_ref()
+        todo!()
     }
 }
 
 impl AsMut<AttributeGraph> for ThunkContext {
     fn as_mut(&mut self) -> &mut AttributeGraph {
-        self.block.as_mut()
+        // self.block.as_mut()
+        todo!()
     }
 }

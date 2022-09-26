@@ -7,12 +7,12 @@ use super::ThunkContext;
 #[derive(Default)]
 pub struct Println;
 
-impl Plugin<ThunkContext> for Println {
+impl Plugin for Println {
     fn symbol() -> &'static str {
         "println"
     }
 
-    fn call_with_context(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
+    fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
         context.clone().task(|_| {
             let mut tc = context.clone();
             async move {

@@ -5,21 +5,21 @@ use super::{Dashboard, Host};
 
 /// Opens the host's extension UI, Optionally, enable diagnostic dashboard
 /// 
-pub fn open(title: impl AsRef<str>, host: impl Host + 'static, enable_dashboard: bool) {
-    if !enable_dashboard {
-        crate::open::open(
-            title.as_ref(), 
-            Empty{}, 
-            host
-        );
-    } else {
-        crate::open::open(
-            title.as_ref(), 
-            Dashboard{}, 
-            host
-        );
-    }
-}
+// pub fn open(title: impl AsRef<str>, host: impl Host + 'static, enable_dashboard: bool) {
+//     if !enable_dashboard {
+//         crate::open::open(
+//             title.as_ref(), 
+//             Empty{}, 
+//             host
+//         );
+//     } else {
+//         crate::open::open(
+//             title.as_ref(), 
+//             Dashboard{}, 
+//             host
+//         );
+//     }
+// }
 
 struct Empty{}
 

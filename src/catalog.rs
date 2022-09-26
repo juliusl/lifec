@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use specs::prelude::*;
 use atlier::system::Value;
 use tracing::{event, Level};
@@ -123,6 +125,10 @@ pub trait Item {
         event!(Level::WARN, "visit_reference not implemented")
     }
 
+    fn visit_complex(&mut self, _name: impl AsRef<str>, _value: impl Into<BTreeSet<String>>) {
+        event!(Level::WARN, "visit_complex not implemented")
+    }
+
     /// Visits self w/ a name and value and calls the corresponding visit method
     /// 
     fn visit(&mut self, name: impl AsRef<str>, value: &Value) {
@@ -138,9 +144,8 @@ pub trait Item {
             Value::BinaryVector(v) => self.visit_binary_vec(name, v.to_vec()),
             Value::Symbol(s) => self.visit_symbol(name, s),
             Value::Reference(r) => self.visit_reference(name, *r),
+            Value::Complex(complex) => self.visit_complex(name, complex.clone()),
             Value::Empty => unimplemented!("empty value is not implemented"),
-            Value::Complex(_) => todo!(),
-            _ => {}
         }
     }
 }
