@@ -1,7 +1,7 @@
 use specs::{World, DispatcherBuilder, WorldExt};
 use tracing::{event, Level};
 
-use crate::{Extension, Runtime, plugins::{Event, ThunkContext}};
+use crate::{Extension, Runtime, plugins::ThunkContext};
 
 /// start creates an engine from the runtime, and begins the world in a loop
 pub fn start<E, S>(mut extension: E, call_sequence: Vec<S>)

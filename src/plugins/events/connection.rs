@@ -8,12 +8,40 @@ use super::Sequence;
 #[derive(Component, Debug, Default, Clone)]
 #[storage(DefaultVecStorage)]
 pub struct Connection(
-    /// entities that are connected
+    /// Entities that are connected
     Sequence,
-    /// This entity is a third-party of the connection, which owns this component.
-    /// This is to make garbage collecting these connections easier.
+    /// This entity is a third-party of the connection the consumes this connection state,
+    /// 
+    /// This is to make garbage collection consumers easier
     Option<Entity>,
 );
+
+impl Connection {
+    /// Sets the owner of this connection, 
+    /// 
+    pub fn set_owner(&mut self, owner: Entity) {
+        self.1 = Some(owner);
+    }
+
+    /// Returns a tuple view of this connection,
+    /// 
+    pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
+        let Self(sequence, ..) = self; 
+        (sequence.last(), sequence.cursor())
+    }
+
+    /// Returns true if this connection is active,
+    /// 
+    pub fn is_connected(&self) -> bool {
+        !self.0.is_empty()
+    }
+
+    /// Returns the "owner" of this connection,
+    /// 
+    pub fn owner(&self) -> Option<Entity> {
+        self.1
+    }
+}
 
 impl From<Sequence> for Connection {
     fn from(s: Sequence) -> Self {
@@ -38,21 +66,6 @@ impl Display for Connection {
         // writeln!(f, " fork: {fork}")
 
         Ok(())
-    }
-}
-
-impl Connection {
-    pub fn set_owner(&mut self, owner: Entity) {
-        self.1 = Some(owner);
-    }
-
-    pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
-        let Self(sequence, ..) = self; 
-        (sequence.last(), sequence.cursor())
-    }
-
-    pub fn owner(&self) -> Option<Entity> {
-        self.1
     }
 }
 

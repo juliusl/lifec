@@ -1,14 +1,12 @@
 use std::{
-    collections::{HashMap, HashSet},
     ops::{Deref, DerefMut},
 };
 
 
 use crate::{
-    plugins::{ErrorContext, Event, Project, Sequence, ThunkContext},
-    AttributeGraph, AttributeIndex, Operation, Runtime,
+    plugins::ErrorContext,
+    AttributeGraph, AttributeIndex, Operation,
 };
-use atlier::system::Value;
 use specs::{shred::Resource, Component, DenseVecStorage, Entity, System, World, WorldExt};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{event, Level};

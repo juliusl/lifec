@@ -1,7 +1,7 @@
 pub use atlier::system::{combine, combine_default};
 pub use atlier::system::{App, Extension, Value};
 pub use plugins::{
-    AsyncContext, BlockContext, Config, Connection, Event, Install, Plugin, Process, Project,
+    AsyncContext, BlockContext, Config, Connection, Install, Plugin, Process, Project,
     Sequence, Thunk, ThunkContext, Timer, WriteFile,
 };
 pub use specs::{
@@ -11,6 +11,7 @@ pub use specs::{
 
 use reality::{AttributeParser, CustomAttribute};
 use tracing::{event, Level};
+use std::sync::Arc;
 
 mod resources;
 pub use resources::Resources;
@@ -50,3 +51,7 @@ pub type CreateFn = fn(&World, SetupFn, ConfigFn) -> Option<Entity>;
 mod runtime;
 pub use runtime::EventSource;
 pub use runtime::Runtime;
+
+mod engine;
+pub use engine::Engine;
+pub use engine::Event;

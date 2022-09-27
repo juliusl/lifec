@@ -20,7 +20,6 @@ pub use network::ProxiedMessage;
 pub use network::Proxy;
 
 mod events;
-pub use events::Event;
 pub use events::Sequence;
 pub use events::Connection;
 pub use events::EventRuntime;
