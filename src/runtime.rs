@@ -60,6 +60,10 @@ impl Runtime {
 
     /// Installs a plugin on this runtime and also adds the plugin as a custom attribute,
     /// 
+    /// If the plugin is using the parser feature, an entity and event component
+    /// is created when the runmd block is compiled. Otherwise the event source
+    /// is required.
+    /// 
     pub fn install_with_custom<P>(&mut self, event_name: &'static str)
     where
         P: Plugin + BlockObject + Send + Default,
