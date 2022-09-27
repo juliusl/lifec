@@ -34,8 +34,8 @@ pub use process::Process;
 mod install;
 pub use install::Install;
 
-mod write_file;
-pub use write_file::WriteFile;
+mod println;
+pub use println::Println;
 
 mod timer;
 pub use timer::Timer;
@@ -100,7 +100,7 @@ pub trait Plugin {
     /// 
     /// Only used if this type is being used as a CustomAttribute.
     /// 
-    fn customize(_parser: &mut AttributeParser) {
+    fn compile(_parser: &mut AttributeParser) {
     }
 
     /// Optionally, implement to execute a setup operation before the event is called
@@ -133,7 +133,7 @@ pub trait Plugin {
                 parser.define_child(child.clone(), Self::symbol(), Value::Symbol(content));
                 parser.define("sequence", Value::Int(child.id() as i32));
             
-                Self::customize(parser);
+                Self::compile(parser);
             }
         })
     }

@@ -1,30 +1,42 @@
-// use tracing::{event, Level};
+use reality::{BlockObject, BlockProperties};
+use crate::{plugins::Plugin, AttributeIndex};
 
-// use crate::plugins::Plugin;
+use super::ThunkContext;
 
-// use super::ThunkContext;
+/// Prints a message to stdout
+/// 
+#[derive(Default)]
+pub struct Println;
 
-// #[derive(Default)]
-// pub struct Println;
+impl Plugin for Println {
+    fn symbol() -> &'static str {
+        "println"
+    }
 
-// impl Plugin for Println {
-//     fn symbol() -> &'static str {
-//         "println"
-//     }
+    fn description() -> &'static str {
+        "Prints a message to stdout, ex. .println <message>"
+    }
 
-//     fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
-//         context.clone().task(|_| {
-//             let mut tc = context.clone();
-//             async move {
-//                 tc.as_mut().apply("previous");
+    fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
+        context.clone().task(|_| {
+            let tc = context.clone();
+            async move {
+                if let Some(message) = tc.state().find_symbol("println") {
+                    println!("{}", message);
+                }
+                None 
+            }
+        })
+    }
+}
 
-//                 if tc.project.as_ref().and_then(|p| p.as_ref().is_enabled("debug")).unwrap_or_default() {
-//                     event!(Level::DEBUG, "Context -- \n{:#?}", tc.as_ref());
-//                     event!(Level::DEBUG, "Project -- \n{:#?}", tc.project.as_ref());
-//                 }
+impl BlockObject for Println {
+    fn query(&self) -> reality::BlockProperties {
+        BlockProperties::default()
+            .require("println")
+    }
 
-//                 Some(tc) 
-//             }
-//         })
-//     }
-// }
+    fn parser(&self) -> Option<reality::CustomAttribute> {
+        Some(Println::as_custom_attr())
+    }
+}

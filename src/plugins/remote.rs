@@ -1,3 +1,6 @@
+
+// TODO: Incorporate this as a custom attribute added by .process 
+
 // use crate::AttributeIndex;
 // use crate::plugins::thunks::CancelToken;
 // use crate::plugins::{Plugin, ThunkContext};
@@ -17,7 +20,7 @@
 // #[storage(DenseVecStorage)]
 // pub struct Remote;
 
-// impl Plugin<ThunkContext> for Remote {
+// impl Plugin for Remote {
 //     fn symbol() -> &'static str {
 //         "remote"
 //     }

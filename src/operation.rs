@@ -5,9 +5,6 @@ use specs::{Component, DefaultVecStorage, Entity};
 use tokio::{sync::oneshot::Receiver, select};
 use tracing::{event, Level};
 
-mod attribute_index;
-pub use attribute_index::AttributeIndex;
-
 /// An operation encapsulates an async task and it's context
 /// Where the result of the task is the next version of the context.
 /// 

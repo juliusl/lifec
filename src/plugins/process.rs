@@ -23,7 +23,7 @@ impl Plugin for Process {
         "Executes a new command w/ an OS process."
     }
 
-    fn customize(parser: &mut reality::AttributeParser) {
+    fn compile(parser: &mut reality::AttributeParser) {
         // Enable .env to declare environment variables
         parser.add_custom(CustomAttribute::new_with("env", |p, value| {
             let var_name = p.symbol().expect("Requires a var name").to_string();

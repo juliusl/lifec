@@ -9,7 +9,7 @@ use tracing::event;
 use tracing::Level;
 
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
-///
+/// 
 #[derive(Component)]
 #[storage(DenseVecStorage)]
 pub struct Event(
@@ -135,8 +135,8 @@ impl SpecialAttribute for Event {
     /// ```
     ///
     fn parse(parser: &mut reality::AttributeParser, content: impl AsRef<str>) {
-        if let Some(ident) = Self::parse_ident(content) {
-            parser.define("event", Value::Symbol(ident));
+        if let Some(ident) = Self::parse_idents(content).first() {
+            parser.define("event", Value::Symbol(ident.to_string()));
         }
     }
 }

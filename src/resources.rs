@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use crate::{plugins::ThunkContext, AttributeIndex};
 
 /// Handles unpacking resources for a `RustEmbed` source
+/// 
 pub struct Resources(
     /// folder prefix
     pub &'static str
