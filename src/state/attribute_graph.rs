@@ -31,6 +31,7 @@ impl AttributeGraph {
     }
 
     /// Returns the current hash_code of the graph
+    /// 
     pub fn hash_code(&self) -> u64 {
         let mut hasher = DefaultHasher::default();
 
@@ -39,15 +40,34 @@ impl AttributeGraph {
         hasher.finish()
     }
 
-    /// Returns some bool if there is a matching name attribute with bool value.
+    /// Returns some bool if there is a matching name attribute with bool value
+    /// 
     pub fn is_enabled(&self, with_name: impl AsRef<str>) -> bool {
         self.find_bool(with_name).unwrap_or_default()
+    }
+
+    /// Returns a new graph scoped at the child entity,
+    /// 
+    /// If the child is not a part of this graph, nothing is returned
+    /// 
+    pub fn scope(&self, child: Entity) -> Option<AttributeGraph> {
+        if let Some(_) = self.index.child_properties(child.id()) {
+            let mut clone = self.clone();
+            clone.child = Some(child);
+            Some(clone)
+        } else {
+            None
+        }
     }
 }
 
 impl AttributeIndex for AttributeGraph {
     fn entity_id(&self) -> u32 {
-        self.index.root().id()
+        if let Some(child) = self.child {
+            child.id()
+        } else {
+            self.index.root().id()
+        }
     }
 
     fn hash_code(&self) -> u64 {
@@ -145,7 +165,7 @@ impl AttributeIndex for AttributeGraph {
     fn add_attribute(&mut self, attr: Attribute) {
         let root = self.index.root().name().to_string();
 
-        let properties = if self.entity_id() != attr.id() {
+        let properties = if self.index.root().id() != attr.id() {
             self.index
                 .child_properties_mut(attr.id)
                 .expect("Trying to add an attribute that is out of context of the current index")
@@ -154,6 +174,8 @@ impl AttributeIndex for AttributeGraph {
         };
 
         if attr.is_stable() {
+            // If added through this with/add functions, then the attribute should 
+            // always be stable
             properties.add(attr.name, attr.value.clone());
         } else if let Some((name, value)) = attr.transient {
             let name = name.trim_start_matches(&root);

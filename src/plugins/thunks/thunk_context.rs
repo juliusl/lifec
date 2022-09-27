@@ -2,7 +2,7 @@ use std::{net::SocketAddr, sync::Arc, future::Future};
 
 use crate::{ AttributeGraph, Operation, AttributeIndex, plugins::network::BlockAddress};
 
-use specs::{Component, DenseVecStorage, Entity, WorldExt};
+use specs::{Component, DenseVecStorage, Entity};
 use tokio::{
     io::{self, AsyncBufReadExt, BufReader},
     net::{TcpListener, UdpSocket},
@@ -36,7 +36,7 @@ use super::{SecureClient, StatusUpdate, CancelSource, CancelToken, ErrorContext}
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
-    /// Underlying block context for this thunk,
+    /// Underlying state for this thunk,
     graph: AttributeGraph,
     /// Entity that owns this context
     entity: Option<Entity>,
@@ -242,6 +242,7 @@ impl ThunkContext {
     /// Sends a character to a the char_device if it exists
     ///
     /// Caveat: If `enable_output`/`enable_async` haven't been called this is a no-op
+    /// 
     pub async fn send_char(&self, c: u8) {
         if let Some(entity) = self.entity {
             event!(Level::TRACE, "sending message to {}", entity.id());
@@ -305,6 +306,7 @@ impl ThunkContext {
     ///
     /// Caveat: async must be enabled for this api to work, otherwise it will result in a
     /// no-op
+    /// 
     pub fn task<F>(
         &self,
         task: impl FnOnce(CancelSource) -> F,
@@ -412,7 +414,7 @@ impl ThunkContext {
     /// If the socket is enabled for this context, returns the block address
     ///
     pub fn to_block_address(&self) -> Option<BlockAddress> {
-        if let Some(socket_addr) = self.socket_address() {
+        if let Some(_socket_addr) = self.socket_address() {
             // let address = BlockAddress::new(self);
             // Some(address.with_socket_addr(socket_addr))
             todo!()
@@ -426,7 +428,7 @@ impl ThunkContext {
 ///
 impl ThunkContext {
     /// Updates error block
-    pub fn error(&mut self, record: impl Fn(&mut AttributeGraph)) {
+    pub fn error(&mut self, _record: impl Fn(&mut AttributeGraph)) {
         // if !self.block.update_block("error", &record) {
         //     self.block.add_block("error", record);
         // }
