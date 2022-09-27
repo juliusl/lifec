@@ -13,6 +13,7 @@ use tokio::sync::{
 use tracing::event;
 use tracing::Level;
 
+use crate::AttributeGraph;
 use crate::engine::Connection;
 use crate::engine::Sequence;
 use crate::host::GuestRuntime;
@@ -162,6 +163,7 @@ impl<'a> System<'a> for EventRuntime {
         ReadStorage<'a, Connection>,
         ReadStorage<'a, Runtime>,
         ReadStorage<'a, GuestRuntime>,
+        ReadStorage<'a, AttributeGraph>,
         WriteStorage<'a, Event>,
         WriteStorage<'a, ThunkContext>,
         WriteStorage<'a, Sequence>,
@@ -185,6 +187,7 @@ impl<'a> System<'a> for EventRuntime {
             connections,
             lifec_runtimes,
             guest_runtimes,
+            attribute_graphs,
             mut events,
             mut contexts,
             mut sequences,
@@ -196,10 +199,11 @@ impl<'a> System<'a> for EventRuntime {
     ) {
         let mut dispatch_queue = vec![];
 
-        for (entity, _connection, _lifec_runtime, guest_runtime, event) in (
+        for (entity, _connection, _lifec_runtime, attribute_graph, guest_runtime, event) in (
             &entities,
             connections.maybe(),
             lifec_runtimes.maybe(),
+            attribute_graphs.maybe(),
             guest_runtimes.maybe(),
             &mut events,
         )
@@ -215,6 +219,9 @@ impl<'a> System<'a> for EventRuntime {
                 if current_task.is_finished() {
                     if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() })
                     {
+                        // Commit the current state to previous,
+                        let thunk_context = thunk_context.commit();
+
                         // If the context enabled it's address, add the block address to world storage
                         if thunk_context.socket_address().is_some()
                             && !block_addresses.contains(entity)
@@ -364,6 +371,10 @@ impl<'a> System<'a> for EventRuntime {
                     })
                     .enable_status_updates(status_update_channel.clone())
                     .to_owned();
+                
+                if let Some(graph) = attribute_graph {
+                    context = context.with_state(graph.clone());
+                }
 
                 // TODO: This might be a good place to refactor w/ v2 operation
                 let Thunk(thunk_name, thunk, ..) = thunk;

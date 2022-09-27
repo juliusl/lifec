@@ -49,6 +49,10 @@ pub use engine::Event;
 
 mod host;
 pub use host::GuestRuntime;
+pub use host::Host;
+
+mod project;
+pub use project::Project;
 
 /// This function is provided by types that implement the Engine trait
 pub type SetupFn = fn(&World) -> Entity;

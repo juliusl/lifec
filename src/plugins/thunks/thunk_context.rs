@@ -36,6 +36,8 @@ use super::{SecureClient, StatusUpdate, CancelSource, CancelToken, ErrorContext}
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
+    /// Previous graph used w/ this context
+    previous_graph: Option<AttributeGraph>,
     /// Underlying state for this thunk,
     graph: AttributeGraph,
     /// Entity that owns this context
@@ -77,6 +79,29 @@ impl ThunkContext {
     /// 
     pub fn state_mut(&mut self) -> &mut impl AttributeIndex {
         &mut self.graph
+    }
+
+    /// Returns an immutable reference to the previous state,
+    /// 
+    pub fn previous(&self) -> Option<&impl AttributeIndex> {
+        self.previous_graph.as_ref()
+    }
+
+    /// Returns a new context with state, 
+    /// 
+    pub fn with_state(&self, state: impl Into<AttributeGraph>) -> Self {
+        let mut context = self.clone();
+        context.graph = state.into();
+        context
+    }
+
+    /// Returns a new context with the current state committed to the 
+    /// previous field, 
+    /// 
+    pub fn commit(&self) -> Self {
+        let mut clone = self.clone();
+        clone.previous_graph = Some(clone.graph.clone());
+        clone
     }
 
     /// Returns true if the property is some boolean
@@ -392,7 +417,7 @@ impl ThunkContext {
 
         //     Some(ErrorContext::new(BlockContext::from(b), None))
         // })
-        todo!()
+        None
     }
 }
 

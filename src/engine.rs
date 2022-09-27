@@ -49,7 +49,7 @@ pub use connection::Connection;
 ///
 #[derive(Default, Debug, Component)]
 #[storage(VecStorage)]
-pub struct Engine {}
+pub struct Engine();
 
 impl SpecialAttribute for Engine {
     fn ident() -> &'static str {
@@ -69,13 +69,14 @@ impl Interpreter for Engine {
         world.register::<Connection>();
     }
 
+    /// Handles interpreting blocks and setting up sequences
+    /// 
     fn interpret(&self, world: &World, block: &Block) {
         if block.name().is_empty() && block.symbol().is_empty() {
             return;
         }
-
-        let mut engines: Vec<(specs::Entity, Sequence)> = vec![];
-
+        
+        // let mut engines: Vec<(specs::Entity, Sequence)> = vec![];
         for index in block
             .index()
             .iter()
@@ -97,28 +98,28 @@ impl Interpreter for Engine {
 
                     // TODO: Can assert that the .runtime attribute worked
                 }
-                let parent = world.entities().entity(index.root().id());
+                // let parent = world.entities().entity(index.root().id());
 
-                // Connect the engines
-                if let Some((last, mut previous_sequence)) = engines.pop() {
-                    let connection = previous_sequence.connect(&sequence);
-                    world.write_component().insert(last, connection).ok();
+                // // Connect the engines
+                // if let Some((last, mut previous_sequence)) = engines.pop() {
+                //     let connection = previous_sequence.connect(&sequence);
+                //     world.write_component().insert(last, connection).ok();
 
-                    previous_sequence.set_cursor(parent);
-                    world.write_component().insert(last, previous_sequence).ok();
-                }
+                //     previous_sequence.set_cursor(parent);
+                //     world.write_component().insert(last, previous_sequence).ok();
+                // }
 
-                engines.push((parent, sequence));
+                // engines.push((parent, sequence));
             }
         }
 
-        if let Some((last, previous_sequence)) = engines.pop() {
-            world.write_component().insert(last, previous_sequence).ok();
-            world
-                .write_component()
-                .insert(last, Connection::default())
-                .ok();
-        }
+        // if let Some((last, previous_sequence)) = engines.pop() {
+        //     world.write_component().insert(last, previous_sequence).ok();
+        //     world
+        //         .write_component()
+        //         .insert(last, Connection::default())
+        //         .ok();
+        // }
     }
 }
 

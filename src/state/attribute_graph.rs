@@ -59,6 +59,14 @@ impl AttributeGraph {
             None
         }
     }
+
+    /// Returns an unscoped graph,
+    /// 
+    pub fn unscope(&self) -> AttributeGraph {
+        let mut clone = self.clone();
+        clone.child = None;
+        clone
+    }
 }
 
 impl AttributeIndex for AttributeGraph {

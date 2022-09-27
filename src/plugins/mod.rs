@@ -1,4 +1,3 @@
-
 use crate::*;
 use tokio::select;
 use tokio::sync::oneshot;
@@ -14,7 +13,6 @@ pub use network::BlockAddress;
 mod events;
 pub use events::EventRuntime;
 pub use events::ProxyDispatcher;
-
 
 mod thunks;
 pub use thunks::CancelThunk;
