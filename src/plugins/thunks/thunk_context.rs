@@ -2,7 +2,6 @@ use std::{net::SocketAddr, sync::Arc, future::Future};
 
 use crate::{ AttributeGraph, Operation, AttributeIndex, plugins::network::BlockAddress};
 
-use reality::Interpreter;
 use specs::{Component, DenseVecStorage, Entity, WorldExt};
 use tokio::{
     io::{self, AsyncBufReadExt, BufReader},

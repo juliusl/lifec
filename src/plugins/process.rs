@@ -1,5 +1,5 @@
 use atlier::system::Value;
-use reality::{BlockObject, BlockProperties, CustomAttribute};
+use crate::{AttributeParser, BlockObject, BlockProperties, CustomAttribute};
 use specs::{Component, DenseVecStorage};
 use tokio::{select, task::JoinHandle};
 
@@ -23,7 +23,7 @@ impl Plugin for Process {
         "Executes a new command w/ an OS process."
     }
 
-    fn compile(parser: &mut reality::AttributeParser) {
+    fn compile(parser: &mut AttributeParser) {
         // Enable .env to declare environment variables
         parser.add_custom(CustomAttribute::new_with("env", |p, value| {
             let var_name = p.symbol().expect("Requires a var name").to_string();
@@ -92,14 +92,14 @@ impl Plugin for Process {
 }
 
 impl BlockObject for Process {
-    fn query(&self) -> reality::BlockProperties {
+    fn query(&self) -> BlockProperties {
         BlockProperties::new("runtime")
             .require("process")
             .optional("work_dir")
             .optional("env")
     }
 
-    fn parser(&self) -> Option<reality::CustomAttribute> {
+    fn parser(&self) -> Option<CustomAttribute> {
         Some(Process::as_custom_attr())
     }
 }

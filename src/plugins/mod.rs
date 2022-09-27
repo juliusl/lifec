@@ -2,7 +2,6 @@
 use crate::*;
 use tokio::select;
 use tokio::sync::oneshot;
-use tokio::task::JoinHandle;
 
 mod network;
 pub use network::NetworkEvent;
@@ -114,7 +113,7 @@ pub trait Plugin {
     /// This allows the runmd parser to use this plugin as an attribute type,
     /// 
     fn as_custom_attr() -> CustomAttribute {
-        reality::CustomAttribute::new_with(Self::symbol(), |parser, content| {
+        CustomAttribute::new_with(Self::symbol(), |parser, content| {
             if let Some(world) = parser.world() {
                 let child = world.entities().create();
 

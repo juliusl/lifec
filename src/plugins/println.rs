@@ -1,10 +1,8 @@
-use reality::{BlockObject, BlockProperties};
-use crate::{plugins::Plugin, AttributeIndex};
-
+use crate::{plugins::Plugin, AttributeIndex, BlockObject, BlockProperties, CustomAttribute};
 use super::ThunkContext;
 
 /// Prints a message to stdout
-/// 
+///
 #[derive(Default)]
 pub struct Println;
 
@@ -24,19 +22,18 @@ impl Plugin for Println {
                 if let Some(message) = tc.state().find_symbol("println") {
                     println!("{}", message);
                 }
-                None 
+                None
             }
         })
     }
 }
 
 impl BlockObject for Println {
-    fn query(&self) -> reality::BlockProperties {
-        BlockProperties::default()
-            .require("println")
+    fn query(&self) -> BlockProperties {
+        BlockProperties::default().require("println")
     }
 
-    fn parser(&self) -> Option<reality::CustomAttribute> {
+    fn parser(&self) -> Option<CustomAttribute> {
         Some(Println::as_custom_attr())
     }
 }

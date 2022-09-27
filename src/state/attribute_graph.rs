@@ -1,5 +1,4 @@
 use atlier::system::{Attribute, Value};
-use reality::{BlockIndex, BlockProperty};
 use specs::{storage::HashMapStorage, Component, Entity};
 use std::{
     collections::hash_map::DefaultHasher,
@@ -7,7 +6,7 @@ use std::{
 };
 use tracing::{event, Level};
 
-use crate::AttributeIndex;
+use crate::{BlockIndex, BlockProperty, AttributeIndex};
 
 /// Wrapper struct over a block index,
 /// 
@@ -58,9 +57,9 @@ impl AttributeIndex for AttributeGraph {
     fn find_value(&self, with_name: impl AsRef<str>) -> Option<Value> {
         let search = |property: Option<BlockProperty>| match property {
             Some(property) => match property {
-                reality::BlockProperty::Single(value) => Some(value),
-                reality::BlockProperty::List(values) => values.first().cloned(),
-                reality::BlockProperty::Required => {
+                BlockProperty::Single(value) => Some(value),
+                BlockProperty::List(values) => values.first().cloned(),
+                BlockProperty::Required => {
                     event!(
                         Level::ERROR,
                         "Required property has not been set, {}",
@@ -68,7 +67,7 @@ impl AttributeIndex for AttributeGraph {
                     );
                     None
                 }
-                reality::BlockProperty::Optional => {
+                BlockProperty::Optional => {
                     event!(
                         Level::WARN,
                         "Optional property has not been set, {}",
@@ -76,7 +75,7 @@ impl AttributeIndex for AttributeGraph {
                     );
                     None
                 }
-                reality::BlockProperty::Empty => None,
+                BlockProperty::Empty => None,
             },
             None => {
                 event!(
@@ -101,9 +100,9 @@ impl AttributeIndex for AttributeGraph {
     fn find_values(&self, with_name: impl AsRef<str>) -> Vec<Value> {
         let search = |property: Option<BlockProperty>| match property {
             Some(property) => match property {
-                reality::BlockProperty::Single(value) => vec![value],
-                reality::BlockProperty::List(values) => values.clone(),
-                reality::BlockProperty::Required => {
+                BlockProperty::Single(value) => vec![value],
+                BlockProperty::List(values) => values.clone(),
+                BlockProperty::Required => {
                     event!(
                         Level::ERROR,
                         "Required property has not been set, {}",
@@ -111,7 +110,7 @@ impl AttributeIndex for AttributeGraph {
                     );
                     vec![]
                 }
-                reality::BlockProperty::Optional => {
+                BlockProperty::Optional => {
                     event!(
                         Level::WARN,
                         "Optional property has not been set, {}",
@@ -119,7 +118,7 @@ impl AttributeIndex for AttributeGraph {
                     );
                     vec![]
                 }
-                reality::BlockProperty::Empty => {
+                BlockProperty::Empty => {
                     vec![]
                 }
             },

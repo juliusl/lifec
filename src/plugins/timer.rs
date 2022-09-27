@@ -1,8 +1,8 @@
 use std::time::Instant;
 
+use crate::{BlockObject, BlockProperties};
 use crate::plugins::*;
 use logos::{Lexer, Logos};
-use reality::{BlockObject, BlockProperties};
 use specs::storage::DenseVecStorage;
 use tokio::task::JoinHandle;
 
@@ -70,7 +70,7 @@ impl Plugin for Timer {
 }
 
 impl BlockObject for Timer {
-    fn query(&self) -> reality::BlockProperties {
+    fn query(&self) -> BlockProperties {
         BlockProperties::default().require("timer")
     }
 

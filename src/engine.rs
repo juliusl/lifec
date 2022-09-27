@@ -1,4 +1,4 @@
-use reality::{BlockProperty, Interpreter, SpecialAttribute};
+use crate::{BlockProperty, Interpreter, SpecialAttribute, AttributeParser, Block};
 use specs::{Component, VecStorage, World, WorldExt};
 
 mod event;
@@ -56,7 +56,7 @@ impl SpecialAttribute for Engine {
         "engine"
     }
 
-    fn parse(parser: &mut reality::AttributeParser, _todo: impl AsRef<str>) {
+    fn parse(parser: &mut AttributeParser, _todo: impl AsRef<str>) {
         // Install the event special attribute
         parser.with_custom::<Event>();
     }
@@ -69,7 +69,7 @@ impl Interpreter for Engine {
         world.register::<Connection>();
     }
 
-    fn interpret(&self, world: &World, block: &reality::Block) {
+    fn interpret(&self, world: &World, block: &Block) {
         if block.name().is_empty() && block.symbol().is_empty() {
             return;
         }
@@ -125,12 +125,8 @@ impl Interpreter for Engine {
 #[test]
 fn test_engine() {
     // TODO: Write assertions
-    use crate::Process;
-    use crate::Runtime;
-    use crate::Timer;
+    use crate::*;
     use specs::WorldExt;
-    use reality::BlockProperties;
-    use reality::BlockIndex;
 
     let mut runtime = Runtime::default();
     runtime.install_with_custom::<Process>("call");
@@ -141,7 +137,7 @@ fn test_engine() {
     world.register::<Event>();
     world.insert(runtime);
 
-    let parser = reality::Parser::new_with(world)
+    let parser = Parser::new_with(world)
         .with_special_attr::<Runtime>()
         .with_special_attr::<Engine>();
 
@@ -177,7 +173,7 @@ fn test_engine() {
     {
         // TODO: Write assertions
         let block = world
-            .read_component::<reality::Block>()
+            .read_component::<Block>()
             .get(process)
             .unwrap()
             .clone();
@@ -188,7 +184,7 @@ fn test_engine() {
         let step_one = world.entities().entity(2);
         {
             let block = world
-                .read_component::<reality::Block>()
+                .read_component::<Block>()
                 .get(step_one)
                 .unwrap()
                 .clone();
@@ -227,7 +223,7 @@ fn test_engine() {
         let step_two = world.entities().entity(6);
         {
             let block = world
-                .read_component::<reality::Block>()
+                .read_component::<Block>()
                 .get(step_two)
                 .unwrap()
                 .clone();

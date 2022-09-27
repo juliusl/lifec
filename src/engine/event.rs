@@ -1,8 +1,7 @@
 use std::fmt::Display;
 
-use crate::{Config, Plugin, Thunk, ThunkContext};
+use crate::{Config, Plugin, Thunk, ThunkContext, SpecialAttribute, AttributeParser};
 use atlier::system::Value;
-use reality::SpecialAttribute;
 use specs::{Component, DenseVecStorage};
 use tokio::task::JoinHandle;
 use tracing::event;
@@ -134,7 +133,7 @@ impl SpecialAttribute for Event {
     /// + .event start      <This will end up looking for a block `start test`>
     /// ```
     ///
-    fn parse(parser: &mut reality::AttributeParser, content: impl AsRef<str>) {
+    fn parse(parser: &mut AttributeParser, content: impl AsRef<str>) {
         if let Some(ident) = Self::parse_idents(content).first() {
             parser.define("event", Value::Symbol(ident.to_string()));
         }

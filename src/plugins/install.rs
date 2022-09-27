@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use reality::{BlockObject, BlockProperties};
+use crate::{CustomAttribute, BlockObject, BlockProperties};
 use specs::{Component, DenseVecStorage};
 
 use crate::{plugins::{ThunkContext, Plugin}, AttributeIndex};
@@ -47,14 +47,14 @@ impl Plugin for Install {
 }
 
 impl BlockObject for Install {
-    fn query(&self) -> reality::BlockProperties {
+    fn query(&self) -> BlockProperties {
         BlockProperties::default()
             .require("install")
             .require("work_dir")
             .require("src_dir")
     }
 
-    fn parser(&self) -> Option<reality::CustomAttribute> {
+    fn parser(&self) -> Option<CustomAttribute> {
         Some(Install::as_custom_attr())
     }
 }

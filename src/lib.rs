@@ -6,7 +6,18 @@ pub use specs::{
     Entities, Entity, HashMapStorage, Join, ReadStorage, System, World, WorldExt, WriteStorage,
 };
 
-use reality::{AttributeParser, CustomAttribute};
+pub use reality::{
+    BlockProperties, 
+    Block, 
+    BlockProperty, 
+    BlockObject,
+    BlockIndex,
+    Parser,
+    AttributeParser, 
+    CustomAttribute,
+    SpecialAttribute,
+    Interpreter,
+};
 use tracing::{event, Level};
 
 mod resources;

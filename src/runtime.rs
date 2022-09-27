@@ -1,11 +1,9 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use reality::{AttributeParser, BlockObject, CustomAttribute, SpecialAttribute};
+use crate::{AttributeParser, BlockObject, CustomAttribute, SpecialAttribute, Plugin};
 use specs::{Component, DefaultVecStorage, WorldExt};
 use tracing::event;
 use tracing::Level;
-
-use crate::Plugin;
 
 mod event_source;
 pub use event_source::EventSource;
@@ -80,8 +78,7 @@ impl Runtime {
 #[test]
 #[tracing_test::traced_test]
 fn test_runtime() {
-    use crate::Process;
-    use crate::Install;
+    use crate::*;
     
     let mut runtime = Runtime::default();
     runtime.install_with_custom::<Process>("call");
@@ -91,7 +88,7 @@ fn test_runtime() {
     world.register::<Runtime>();
     world.insert(runtime);
 
-    let parser = reality::Parser::new_with(world).with_special_attr::<Runtime>();
+    let parser = Parser::new_with(world).with_special_attr::<Runtime>();
 
     let parser = parser.parse(
         r#"
@@ -113,7 +110,7 @@ fn test_runtime() {
     {
         // TODO: Write assertions
         let block = world
-            .read_component::<reality::Block>()
+            .read_component::<Block>()
             .get(process)
             .unwrap()
             .clone();
@@ -126,12 +123,12 @@ fn test_runtime() {
         eprintln!(
             "{:#?}",
             world
-                .read_component::<reality::BlockProperties>()
+                .read_component::<BlockProperties>()
                 .get(process)
         );
         eprintln!(
             "{:#?}",
-            world.read_component::<reality::BlockIndex>().get(process)
+            world.read_component::<BlockIndex>().get(process)
         );
     }
 
@@ -140,7 +137,7 @@ fn test_runtime() {
         eprintln!(
             "{:#?}",
             world
-                .read_component::<reality::BlockProperties>()
+                .read_component::<BlockProperties>()
                 .get(process)
         );
     }
