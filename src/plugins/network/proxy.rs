@@ -363,13 +363,13 @@ fn test_proxy_runtime() {
     
     let test_entity_a = test_world.entities().create();
     let mut tc = ThunkContext::default();
-    tc.state().add_bool_attr("enable_proxy_socket", true);
+    tc.state_mut().add_bool_attr("enable_proxy_socket", true);
     // tc.state().set_parent_entity(test_entity_a);
     test_world.write_component().insert(test_entity_a, tc.clone()).ok();
 
     let test_entity_b = test_world.entities().create();
     let mut tc = ThunkContext::default();
-    tc.state().add_bool_attr("enable_proxy_socket", true);
+    tc.state_mut().add_bool_attr("enable_proxy_socket", true);
     // tc.as_mut().set_parent_entity(test_entity_b);
     test_world.write_component().insert(test_entity_b, tc.clone()).ok();
     

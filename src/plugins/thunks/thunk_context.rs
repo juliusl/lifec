@@ -69,8 +69,14 @@ pub struct ThunkContext {
 impl ThunkContext {
     /// Returns the current state of this thunk context,
     /// 
-    pub fn state(&self) -> impl AttributeIndex {
-       AttributeGraph::default()
+    pub fn state(&self) -> &impl AttributeIndex {
+       &self.graph
+    }
+
+    /// Returns a mutable reference to the underlying state,
+    /// 
+    pub fn state_mut(&mut self) -> &mut impl AttributeIndex {
+        &mut self.graph
     }
 
     /// Returns true if the property is some boolean

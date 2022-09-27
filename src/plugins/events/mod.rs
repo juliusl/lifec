@@ -285,9 +285,9 @@ impl<'a> System<'a> for EventRuntime {
 
                                 if error_context.stop_on_error() {
                                     event!(Level::ERROR, "Error detected, and `stop_on_error` is enabled, stopping at {}", entity.id());
-                                    let clone = thunk_context.clone();
+                                    let mut clone = thunk_context.clone();
 
-                                    clone.state().with_text(
+                                    clone.state_mut().with_text(
                                         "thunk_symbol",
                                         format!("Stopped -> {}", thunk.0),
                                     );
@@ -379,9 +379,9 @@ impl<'a> System<'a> for EventRuntime {
                                 cancel.send(()).ok();
                             }
 
-                            let started = context.clone();
+                            let mut started = context.clone();
                             started
-                                .state()
+                                .state_mut()
                                 .with_text("thunk_symbol", format!("Running -> {}", thunk_name));
 
                             // Initializes and starts the task by spawning it on the runtime
@@ -395,7 +395,7 @@ impl<'a> System<'a> for EventRuntime {
                                     .await;
 
                                 match handle.await {
-                                    Ok(updated_context) => {
+                                    Ok(mut updated_context) => {
                                         context
                                             .update_status_only(format!(
                                                 "# completed: {}",
@@ -403,7 +403,7 @@ impl<'a> System<'a> for EventRuntime {
                                             ))
                                             .await;
                                         updated_context
-                                            .state()
+                                            .state_mut()
                                             .add_text_attr("thunk_symbol", thunk_name);
                                         updated_context
                                     }
