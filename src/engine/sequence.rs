@@ -1,8 +1,7 @@
 use std::fmt::Display;
 
-use reality::{AttributeParser, Interpreter, SpecialAttribute};
 use specs::storage::DefaultVecStorage;
-use specs::{Component, Entity, World, WorldExt};
+use specs::{Component, Entity};
 
 use super::Connection;
 

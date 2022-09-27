@@ -1,10 +1,10 @@
-use std::path::PathBuf;
 
 use crate::plugins::*;
 use specs::storage::DenseVecStorage;
 use specs::Component;
 
-use super::{CancelToken, ThunkContext};
+use super::ThunkContext;
+use super::thunks::CancelToken;    
 
 #[derive(Component, Default)]
 #[storage(DenseVecStorage)]
@@ -23,7 +23,7 @@ impl Plugin for WriteFile {
         context: &ThunkContext,
     ) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
         context.clone().task(|_| {
-            let mut tc = context.clone();
+            let tc = context.clone();
             async move {
                 // tc.as_mut().apply("previous");
                 // for mut file_block in tc.as_ref().find_blocks("file") {

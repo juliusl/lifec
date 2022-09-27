@@ -4,7 +4,11 @@ use specs::{Component, VecStorage, World, WorldExt};
 mod event;
 pub use event::Event;
 
-use crate::{Connection, Sequence};
+mod sequence;
+pub use sequence::Sequence;
+
+mod connection;
+pub use connection::Connection;
 
 /// An engine is a sequence of events, this component manages
 /// sequences of events
@@ -123,15 +127,18 @@ fn test_engine() {
     // TODO: Write assertions
     use crate::Process;
     use crate::Runtime;
+    use crate::Timer;
     use specs::WorldExt;
     use reality::BlockProperties;
     use reality::BlockIndex;
 
     let mut runtime = Runtime::default();
     runtime.install_with_custom::<Process>("call");
+    runtime.install_with_custom::<Timer>("call");
 
     let mut world = specs::World::new();
     world.register::<Runtime>();
+    world.register::<Event>();
     world.insert(runtime);
 
     let parser = reality::Parser::new_with(world)
@@ -158,6 +165,7 @@ fn test_engine() {
     ``` step_two test
     + .runtime
     : .process called step two
+    : .timer 50 s
     : .process called step two again
     : .process called step two again again
     ``` 
@@ -208,6 +216,11 @@ fn test_engine() {
                 let index = world.read_component::<BlockIndex>();
                 let index = index.get(e);
                 eprintln!("{:#?}", index);
+
+
+                let event = world.read_component::<Event>();
+                let event = event.get(e).expect("should have been added");
+                eprintln!("{event}");
             }
         }
 

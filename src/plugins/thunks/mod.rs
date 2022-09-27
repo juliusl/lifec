@@ -4,26 +4,8 @@ use hyper::client::HttpConnector;
 use specs::Component;
 use specs::{storage::DenseVecStorage, Entity};
 
-// mod open_file;
-// pub use open_file::OpenFile;
-
-// mod open_dir;
-// pub use open_dir::OpenDir;
-
-mod write_file;
-pub use write_file::WriteFile;
-
-mod timer;
-pub use timer::Timer;
-
-// mod println;
-// pub use println::Println;
-
 mod error;
 pub use error::ErrorContext;
-
-mod dispatch;
-pub use dispatch::Dispatch;
 
 mod thunk_context;
 pub use thunk_context::ThunkContext;
@@ -69,7 +51,7 @@ impl Thunk {
     /// Generates a thunk from a plugin impl
     pub fn from_plugin<P>() -> Self
     where
-        P: Plugin,
+        P: Plugin + ?Sized,
     {
         Self(P::symbol(), P::call, P::setup_operation)
     }

@@ -1,9 +1,7 @@
-use atlier::system::Value;
 use specs::{System, ReadStorage, Entities, WriteStorage, Join};
 use tracing::{event, Level};
-use crate::AttributeIndex;
 use crate::plugins::network::Proxy;
-use crate::plugins::{ThunkContext, Project, BlockContext};
+use crate::plugins::{ThunkContext};
 
 /// Proxy dispatcher is a system for use in the standalone runtime context,
 /// 
@@ -34,7 +32,6 @@ impl<'a> System<'a> for ProxyDispatcher {
                     Ok(_) => {
                         if let Some(dispatcher) = self.0.dispatcher() {
                             //let mut graph = context.state().clone(); 
-                            let mut message = Project::default();
 
                             // if let (Some(block_name), Some(block_symbol)) = (graph.find_text("block_name"), graph.find_text("block_symbol")) {
                             //     message = message.with_block(block_name, block_symbol, |c| {

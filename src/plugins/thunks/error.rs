@@ -3,7 +3,6 @@ use specs::storage::HashMapStorage;
 use tracing::{event, Level};
 
 use crate::AttributeGraph;
-use crate::plugins::BlockContext;
 
 /// Component for handling errors
 /// 
@@ -13,7 +12,7 @@ use crate::plugins::BlockContext;
 #[storage(HashMapStorage)]
 pub struct ErrorContext(
     /// error block
-    BlockContext, 
+    AttributeGraph, 
     /// stopped entity 
     Option<Entity>,
     /// fix entity 
@@ -23,8 +22,8 @@ pub struct ErrorContext(
 impl ErrorContext {
     /// Creates a new error context 
     /// 
-    pub fn new(error_block: BlockContext, stopped: Option<Entity>) -> Self {
-        Self(error_block, stopped, None)
+    pub fn new(graph: AttributeGraph, stopped: Option<Entity>) -> Self {
+        Self(graph, stopped, None)
     }
 
     /// Returns true if the processing for this entity should stop

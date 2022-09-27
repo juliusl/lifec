@@ -4,48 +4,41 @@ use tokio::select;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
-mod secure;
-pub use secure::Secure;
-
-mod block;
-pub use block::BlockAddress;
-pub use block::BlockContext;
-pub use block::Project;
-
 mod network;
 pub use network::NetworkEvent;
 pub use network::NetworkRuntime;
 pub use network::NetworkTask;
 pub use network::ProxiedMessage;
 pub use network::Proxy;
+pub use network::BlockAddress;
 
 mod events;
-pub use events::Sequence;
-pub use events::Connection;
 pub use events::EventRuntime;
 pub use events::ProxyDispatcher;
 
-mod process;
-// pub use process::Expect;
-// pub use process::Missing;
-// pub use process::Remote;
-pub use process::Process;
-pub use process::Redirect;
-pub use process::Install;
 
 mod thunks;
 pub use thunks::CancelThunk;
 pub use thunks::Config;
-pub use thunks::Dispatch;
 pub use thunks::ErrorContext;
 pub use thunks::StatusUpdate;
 pub use thunks::Thunk;
 pub use thunks::ThunkContext;
-pub use thunks::Timer;
-pub use thunks::WriteFile;
 
 mod testing;
 pub use testing::Test;
+
+mod process;
+pub use process::Process;
+
+mod install;
+pub use install::Install;
+
+mod write_file;
+pub use write_file::WriteFile;
+
+mod timer;
+pub use timer::Timer;
 
 /// Struct to archive an entity
 /// 
@@ -103,7 +96,9 @@ pub trait Plugin {
         ""
     }
 
-    /// Optionally, implement to customize the attribute parser
+    /// Optionally, implement to customize the attribute parser,
+    /// 
+    /// Only used if this type is being used as a CustomAttribute.
     /// 
     fn customize(_parser: &mut AttributeParser) {
     }
@@ -123,8 +118,19 @@ pub trait Plugin {
             if let Some(world) = parser.world() {
                 let child = world.entities().create();
 
-                parser.define_child(child, Self::symbol(), Value::Symbol(content));
+                // This is used after .runtime
+                // If the consumer writes an ident afterwards, than that will
+                // be used as the event name
+                let mut event_name = "call";
+                if let Value::Symbol(e) = parser.value() {
+                    event_name = e;
+                }
+                world.write_component().insert(
+                    child, 
+                    Event::from_plugin::<Self>(event_name)
+                ).ok();
 
+                parser.define_child(child.clone(), Self::symbol(), Value::Symbol(content));
                 parser.define("sequence", Value::Int(child.id() as i32));
             
                 Self::customize(parser);

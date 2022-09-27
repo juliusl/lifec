@@ -6,22 +6,21 @@ use specs::World;
 use specs::{shred::SetupHandler, Entities, Join, Read, System, WorldExt, WriteStorage};
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use tokio::{
-    sync::{
-        self,
-        mpsc::{self, Sender},
-    },
+use tokio::sync::{
+    self,
+    mpsc::{self, Sender},
 };
 use tracing::event;
 use tracing::Level;
 
+use crate::engine::Connection;
+use crate::engine::Sequence;
+use crate::host::GuestRuntime;
 use crate::AttributeIndex;
 use crate::Event;
-use crate::Runtime;
-use crate::host::GuestRuntime;
-use crate::AttributeGraph;
 use crate::Extension;
 use crate::Operation;
+use crate::Runtime;
 
 use super::thunks::CancelThunk;
 use super::thunks::ErrorContext;
@@ -29,16 +28,10 @@ use super::thunks::SecureClient;
 use super::thunks::StatusUpdate;
 use super::Archive;
 use super::BlockAddress;
-use super::Project;
 use super::{Thunk, ThunkContext};
 mod proxy_dispatcher;
 pub use proxy_dispatcher::ProxyDispatcher;
 
-mod sequence;
-pub use sequence::Sequence;
-
-mod connection;
-pub use connection::Connection;
 
 /// Event runtime drives the tokio::Runtime and schedules/monitors/orchestrates task entities
 #[derive(Default)]
@@ -50,7 +43,6 @@ impl Extension for EventRuntime {
         world.register::<ThunkContext>();
         world.register::<CancelThunk>();
         world.register::<ErrorContext>();
-        world.register::<Project>();
         world.register::<crate::Runtime>();
         world.register::<Operation>();
     }
@@ -88,18 +80,18 @@ impl SetupHandler<sync::broadcast::Sender<Entity>> for EventRuntime {
 }
 
 /// Setup for tokio-mulitple-producers single-consumer channel for status updates
-impl SetupHandler<sync::mpsc::Sender<AttributeGraph>> for EventRuntime {
+impl SetupHandler<sync::mpsc::Sender<String>> for EventRuntime {
     fn setup(world: &mut specs::World) {
-        let (tx, rx) = mpsc::channel::<AttributeGraph>(10);
+        let (tx, rx) = mpsc::channel::<String>(10);
         world.insert(tx);
         world.insert(rx);
     }
 }
 
 /// Setup for tokio-mulitple-producers single-consumer channel for status updates
-impl SetupHandler<sync::mpsc::Receiver<AttributeGraph>> for EventRuntime {
+impl SetupHandler<sync::mpsc::Receiver<String>> for EventRuntime {
     fn setup(world: &mut specs::World) {
-        let (tx, rx) = mpsc::channel::<AttributeGraph>(10);
+        let (tx, rx) = mpsc::channel::<String>(10);
         world.insert(tx);
         world.insert(rx);
     }
@@ -148,7 +140,7 @@ impl SetupHandler<super::Runtime> for EventRuntime {
     }
 }
 
-/// Setup for a shared https client 
+/// Setup for a shared https client
 impl SetupHandler<SecureClient> for EventRuntime {
     fn setup(world: &mut World) {
         let https = HttpsConnector::new();
@@ -162,14 +154,12 @@ impl<'a> System<'a> for EventRuntime {
         Read<'a, tokio::runtime::Runtime, EventRuntime>,
         Read<'a, SecureClient, EventRuntime>,
         Read<'a, Sender<StatusUpdate>, EventRuntime>,
-        Read<'a, Sender<AttributeGraph>, EventRuntime>,
+        Read<'a, Sender<String>, EventRuntime>,
         Read<'a, Sender<Operation>, EventRuntime>,
         Read<'a, Sender<ErrorContext>, EventRuntime>,
         Read<'a, sync::broadcast::Sender<Entity>, EventRuntime>,
-        Read<'a, Project>,
         Entities<'a>,
         ReadStorage<'a, Connection>,
-        ReadStorage<'a, Project>,
         ReadStorage<'a, Runtime>,
         ReadStorage<'a, GuestRuntime>,
         WriteStorage<'a, Event>,
@@ -191,10 +181,8 @@ impl<'a> System<'a> for EventRuntime {
             operation_dispatcher,
             error_dispatcher,
             thunk_complete_channel,
-            project,
             entities,
             connections,
-            projects,
             lifec_runtimes,
             guest_runtimes,
             mut events,
@@ -208,10 +196,9 @@ impl<'a> System<'a> for EventRuntime {
     ) {
         let mut dispatch_queue = vec![];
 
-        for (entity, _connection, _project, _lifec_runtime, guest_runtime, event) in (
+        for (entity, _connection, _lifec_runtime, guest_runtime, event) in (
             &entities,
             connections.maybe(),
-            projects.maybe(),
             lifec_runtimes.maybe(),
             guest_runtimes.maybe(),
             &mut events,
@@ -298,7 +285,7 @@ impl<'a> System<'a> for EventRuntime {
 
                                 if error_context.stop_on_error() {
                                     event!(Level::ERROR, "Error detected, and `stop_on_error` is enabled, stopping at {}", entity.id());
-                                    let mut clone = thunk_context.clone();
+                                    let clone = thunk_context.clone();
 
                                     clone.state().with_text(
                                         "thunk_symbol",
@@ -365,26 +352,11 @@ impl<'a> System<'a> for EventRuntime {
                 let mut context = initial_context
                     .enable_async(entity, runtime_handle)
                     .enable_https_client(https_client.clone())
-                    // .enable_dispatcher({
-                    //     guest_runtime
-                    //         .and_then(|g| g.get_graph_sender())
-                    //         .unwrap_or(dispatcher.clone())
-                    // })
-                    // .enable_project({
-                    //     if let Some(project) = _project {
-                    //         // If the entity has a project component, prioritize using that
-                    //         project.clone()
-                    //     } else if let Some(runtime) = _lifec_runtime {
-                    //         // Otherwise if the entity has a runtime component, use the project
-                    //         // from the runtime. A runtime usually is configured w/ a project on start-up
-                    //         // so this is less explicit then directly setting the project component
-                    //         // runtime.project.clone()
-                    //         todo!()
-                    //     } else {
-                    //         // Otherwise, use the common project set w/ the current world
-                    //         project.reload_source()
-                    //     }
-                    // })
+                    .enable_dispatcher({
+                        guest_runtime
+                            .and_then(|g| g.get_graph_sender())
+                            .unwrap_or(dispatcher.clone())
+                    })
                     .enable_operation_dispatcher({
                         guest_runtime
                             .and_then(|g| g.get_operation_sender())
@@ -407,7 +379,7 @@ impl<'a> System<'a> for EventRuntime {
                                 cancel.send(()).ok();
                             }
 
-                            let mut started = context.clone();
+                            let started = context.clone();
                             started
                                 .state()
                                 .with_text("thunk_symbol", format!("Running -> {}", thunk_name));
@@ -423,7 +395,7 @@ impl<'a> System<'a> for EventRuntime {
                                     .await;
 
                                 match handle.await {
-                                    Ok(mut updated_context) => {
+                                    Ok(updated_context) => {
                                         context
                                             .update_status_only(format!(
                                                 "# completed: {}",
@@ -464,32 +436,23 @@ impl<'a> System<'a> for EventRuntime {
         }
 
         // dispatch all queued messages
-        while let Some((mut next, last)) = dispatch_queue.pop() {
-            if let (Some(event), Some(context)) = (events.get_mut(next), contexts.get_mut(next)) {
+        while let Some((next, last)) = dispatch_queue.pop() {
+            if let (Some(event), Some(context)) = (events.get_mut(next), contexts.get(next)) {
                 let last_id = last.state().entity_id();
-                // let previous = last
-                //     .project
-                //     .and_then(|p| p.transpile_blocks().ok())
-                //     .unwrap_or_default()
-                //     .trim()
-                //     .to_string();
-
-                // if !previous.trim().is_empty() {
-                //     context
-                //         .as_mut()
-                //         .add_message(event.to_string(), "previous", previous);
-                // }
 
                 event.fire(context.clone());
-                // event!(
-                //     tracing::Level::DEBUG,
-                //     "dispatch event:\n\t{} -> {}\n\t{}\n\t{}\n\t{}",
-                //     last_id,
-                //     next.id(),
-                //     context.block.name.unwrap(),
-                //     event,
-                //     context.as_ref().hash_code()
-                // );
+                event!(
+                    tracing::Level::DEBUG,
+                    "dispatch event:\n\t{} -> {}\n\t{}\n\t{}\n\t{}",
+                    last_id,
+                    next.id(),
+                    context
+                        .state()
+                        .find_symbol("event_title")
+                        .unwrap_or("unnamed".to_string()),
+                    event,
+                    context.state().hash_code()
+                );
             } else {
                 event!(Level::WARN, "Next event does not exist");
             }

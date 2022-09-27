@@ -1,4 +1,4 @@
-use std::{sync::Arc, any::Any, collections::BTreeSet};
+use std::collections::BTreeSet;
 
 use atlier::system::{Attribute, Value};
 
@@ -28,7 +28,6 @@ pub trait AttributeIndex {
     /// Adds an attribute to the index
     ///
     fn add_attribute(&mut self, attr: Attribute);
-
 
     /// Finds all text values with name, 
     /// 
@@ -384,8 +383,7 @@ pub trait AttributeIndex {
             Value::IntRange(value, min, max) => g.add_int_range_attr(name, &[value, min, max]),
             Value::BinaryVector(init_value) => g.add_binary_attr(name, init_value),
             Value::Reference(_) => g.add_reference(name, value),
-            Value::Complex(_) => todo!(),
-            _ => {}
+            Value::Complex(init_value) => g.add_complex(name, init_value),
         })
     }
 }

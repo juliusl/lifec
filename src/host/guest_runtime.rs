@@ -1,15 +1,12 @@
 use std::{
     ops::{Deref, DerefMut},
 };
-
-
 use crate::{
     plugins::ErrorContext,
-    AttributeGraph, AttributeIndex, Operation,
+    AttributeGraph, Operation,
 };
-use specs::{shred::Resource, Component, DenseVecStorage, Entity, System, World, WorldExt};
+use specs::{shred::Resource, Component, DenseVecStorage, World, WorldExt};
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{event, Level};
 
 /// Guest runtime that can be use to receive objects from
 /// thunk contexts at runtime.
@@ -22,7 +19,7 @@ use tracing::{event, Level};
 pub struct GuestRuntime {
     /// Proxy transport to the real transport
     ///
-   //  transport: ProxyTransport,
+    ///  transport: ProxyTransport,
     /// Guest world, isolates objects dispatched from plugins,
     ///
     /// **Note** The dispatcher for this world is managed by the host.
@@ -103,7 +100,7 @@ impl GuestRuntime {
 
     /// Returns a graph sender from the guest's world
     ///
-    pub fn get_graph_sender(&self) -> Option<Sender<AttributeGraph>> {
+    pub fn get_graph_sender(&self) -> Option<Sender<String>> {
         if self.enable_graph_receiver {
             self.sender()
         } else {

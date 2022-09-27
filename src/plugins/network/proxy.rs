@@ -7,9 +7,9 @@ use tokio::net::UdpSocket;
 use tracing::{event, Level};
 
 use crate::AttributeIndex;
-use crate::plugins::{ThunkContext, BlockAddress, EventRuntime};
+use crate::plugins::{ThunkContext,  EventRuntime};
 
-use super::NetworkEvent;
+use super::{NetworkEvent, BlockAddress};
 
 /// Component for running proxy network systems
 /// 

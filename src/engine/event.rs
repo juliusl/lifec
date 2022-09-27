@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{Thunk, Plugin, Config, ThunkContext};
+use crate::{Config, Plugin, Thunk, ThunkContext};
 use atlier::system::Value;
 use reality::SpecialAttribute;
 use specs::{Component, DenseVecStorage};
@@ -9,27 +9,27 @@ use tracing::event;
 use tracing::Level;
 
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
-/// 
+///
 #[derive(Component)]
 #[storage(DenseVecStorage)]
 pub struct Event(
     /// Name of this event
-    pub &'static str,
+    pub String,
     /// Thunk that is being executed
     pub Thunk,
     /// Config for the thunk context before being executed
     pub Option<Config>,
     /// Initial context that starts this event
     pub Option<ThunkContext>,
-    /// This is the task that 
+    /// This is the task that
     pub Option<JoinHandle<ThunkContext>>,
 );
 
 impl Event {
     /// Returns the event symbol
     ///
-    pub fn symbol(&self) -> &'static str {
-        self.0
+    pub fn symbol(&self) -> &String {
+        &self.0
     }
 
     /// Returns the a clone of the inner thunk
@@ -40,11 +40,17 @@ impl Event {
 
     /// Creates an event component, with a task created with on_event
     /// a handle to the tokio runtime is passed to this function to customize the task spawning
-    pub fn from_plugin<P>(event_name: &'static str) -> Self
+    pub fn from_plugin<P>(event_name: impl AsRef<str>) -> Self
     where
-        P: Plugin + Default + Send,
+        P: Plugin + ?Sized,
     {
-        Self(event_name, Thunk::from_plugin::<P>(), None, None, None)
+        Self(
+            event_name.as_ref().to_string(),
+            Thunk::from_plugin::<P>(),
+            None,
+            None,
+            None,
+        )
     }
 
     /// Sets the config to use w/ this event
@@ -86,7 +92,7 @@ impl Event {
     }
 
     /// returns true if task is running
-    /// 
+    ///
     pub fn is_running(&self) -> bool {
         self.4
             .as_ref()
@@ -95,9 +101,15 @@ impl Event {
     }
 
     /// Creates a duplicate of this event
-    /// 
+    ///
     pub fn duplicate(&self) -> Self {
-        Self(self.0, self.1.clone(), self.2.clone(), None, None)
+        Self(
+            self.0.to_string(),
+            self.1.clone(),
+            self.2.clone(),
+            None,
+            None,
+        )
     }
 }
 
@@ -115,13 +127,13 @@ impl SpecialAttribute for Event {
     }
 
     /// # Example Usage
-    /// ```runmd 
+    /// ```runmd
     /// ``` test
     /// + .engine
     /// + .event install    <This will end up looking for a block `install test`>
-    /// + .event start      <This will end up looking for a block `start test`> 
+    /// + .event start      <This will end up looking for a block `start test`>
     /// ```
-    /// 
+    ///
     fn parse(parser: &mut reality::AttributeParser, content: impl AsRef<str>) {
         if let Some(ident) = Self::parse_ident(content) {
             parser.define("event", Value::Symbol(ident));

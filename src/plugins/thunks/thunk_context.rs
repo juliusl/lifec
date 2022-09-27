@@ -1,9 +1,9 @@
 use std::{net::SocketAddr, sync::Arc, future::Future};
 
-use crate::{plugins::BlockAddress, AttributeGraph, BlockContext, Operation, Project, AttributeIndex};
-use atlier::system::Value;
-use reality::{BlockObject, BlockIndex};
-use specs::{Component, DenseVecStorage, Entity};
+use crate::{ AttributeGraph, Operation, AttributeIndex, plugins::network::BlockAddress};
+
+use reality::Interpreter;
+use specs::{Component, DenseVecStorage, Entity, WorldExt};
 use tokio::{
     io::{self, AsyncBufReadExt, BufReader},
     net::{TcpListener, UdpSocket},
@@ -38,20 +38,18 @@ use super::{SecureClient, StatusUpdate, CancelSource, CancelToken, ErrorContext}
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
     /// Underlying block context for this thunk,
-    block: BlockContext,
-    /// Current project
-    pub project: Option<Project>,
+    graph: AttributeGraph,
     /// Entity that owns this context
-    pub entity: Option<Entity>,
+    entity: Option<Entity>,
     /// Tokio runtime handle, to spawn additional tasks
-    pub handle: Option<Handle>,
+    handle: Option<Handle>,
     /// Sender for status updates for the thunk
     status_updates: Option<Sender<StatusUpdate>>,
     /// Client for sending secure http requests
     client: Option<SecureClient>,
     /// Dispatcher for runmd
     dispatcher: Option<Sender<String>>,
-    /// Dispatcher for attribute graphs
+    /// Dispatcher for operations
     operation_dispatcher: Option<Sender<Operation>>,
     /// Channel to send bytes to a listening char_device
     char_device: Option<Sender<(u32, u8)>>,
@@ -70,37 +68,16 @@ pub struct ThunkContext {
 
 /// This block has all the async related features
 impl ThunkContext {
-    /// Returns self with a query added to the block context,
-    ///
-    /// Before a thunk is executed, each query must be successful.
-    ///
-    pub fn query<T>(self) -> Self
-    where
-        T: BlockObject + Default,
-    {
-        self.query_with(&T::default())
-    }
-
-    /// Returns self with a query added to the block context,
-    ///
-    /// Before a thunk is executed, each query must be successful.
-    ///
-    pub fn query_with<T>(mut self, object: &T) -> Self
-    where
-        T: BlockObject,
-    {
-        self.block.add_query(object);
-        self
-    }
-
     /// Returns the current state of this thunk context,
     /// 
     pub fn state(&self) -> impl AttributeIndex {
        AttributeGraph::default()
     }
 
+    /// Returns true if the property is some boolean
+    /// 
     pub fn is_enabled(&self, property: impl AsRef<str>) -> bool {
-        todo!()
+        self.graph.find_bool(property).unwrap_or_default()
     }
 
     /// Returns true if the source has been cancelled.
@@ -140,40 +117,6 @@ impl ThunkContext {
     pub fn enable_https_client(&mut self, client: SecureClient) -> &mut ThunkContext {
         self.client = Some(client);
         self
-    }
-
-    /// Returns a context w/ a project
-    ///
-    /// Setting the project allows this context to configure itself
-    /// from the blocks defined in the project.
-    ///
-    /// **Caveat** When this is called from the event runtime, the following order will
-    /// be used to determine which project is chosen,
-    /// - Entity has a `Project` component
-    /// - Entity has a `Runtime` component
-    /// - World's project resource
-    ///
-    /// ## The `previous` graph event message
-    ///
-    /// When the event runtime executes a sequence, the event runtime will transpile
-    /// the project, and send it as a graph message under the moniker `previous`. When
-    /// a plugin executes, it can apply this state to it's current graph in order to use the results.
-    ///
-    /// i.e. `tc.as_mut().apply("previous")`
-    ///
-    /// This method of passing state forward is an explicit gesture. And has high-overhead because the project must be
-    /// transpiled in order to send state forward.
-    ///
-    /// If multiple plugins need to share state, it is more performant to create a composite plugin using combine::<A, B>
-    /// A composite plugin will share the same thunk context between each plugin, which bypasses the need to transpile the project.
-    /// However, a composite plugin **must** take into account how each plugin will interpret attributes during execution. This is usually
-    /// not really an issue, as long as stable attributes are used and declared consistently.
-    ///
-    pub fn enable_project(&mut self, project: Project) -> &mut ThunkContext {
-        self.project = Some(project);
-        self
-
-        // TODO: Check block name
     }
 
     /// Returns a context w/ a dispatcher

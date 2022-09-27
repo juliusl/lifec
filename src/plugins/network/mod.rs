@@ -1,19 +1,21 @@
 use std::net::SocketAddr;
 
-use atlier::system::{Extension, Value};
+use atlier::system::Extension;
 use specs::{Component, Join, Read, WorldExt, WriteStorage};
 use specs::{DenseVecStorage, Entities, ReadStorage, System};
 use tokio::task::JoinHandle;
 use tracing::{event, Level};
 
-use crate::AttributeIndex;
-
-use super::{BlockAddress, CancelThunk, ErrorContext, Event, EventRuntime, ThunkContext};
+use super::{CancelThunk, ErrorContext, Event, EventRuntime, ThunkContext};
 
 mod proxy;
 pub use proxy::ProxiedMessage;
 pub use proxy::Proxy;
 pub use proxy::ProxyRuntime;
+
+mod address;
+pub use address::BlockAddress;
+
 
 /// Network runtime is similar to the event runtime, but instead fires events
 /// when a network task has completed

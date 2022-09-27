@@ -1,13 +1,11 @@
-use std::{collections::BTreeMap, ops::Deref, sync::Arc};
+use std::{collections::BTreeMap, ops::Deref};
 
 use reality::{AttributeParser, BlockObject, CustomAttribute, SpecialAttribute};
 use specs::{Component, DefaultVecStorage, WorldExt};
 use tracing::event;
 use tracing::Level;
 
-use crate::{
-    Event, Plugin, Project, 
-};
+use crate::Plugin;
 
 mod event_source;
 pub use event_source::EventSource;

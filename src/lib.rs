@@ -1,8 +1,8 @@
 pub use atlier::system::{combine, combine_default};
 pub use atlier::system::{App, Extension, Value};
 pub use plugins::{
-    AsyncContext, BlockContext, Config, Connection, Install, Plugin, Process, Project,
-    Sequence, Thunk, ThunkContext, Timer, WriteFile,
+    AsyncContext, Config, Install, Plugin, Process,
+    Thunk, ThunkContext, Timer, WriteFile,
 };
 pub use specs::{
     storage::BTreeStorage, Component, DefaultVecStorage, DenseVecStorage, DispatcherBuilder,
@@ -11,7 +11,6 @@ pub use specs::{
 
 use reality::{AttributeParser, CustomAttribute};
 use tracing::{event, Level};
-use std::sync::Arc;
 
 mod resources;
 pub use resources::Resources;
@@ -24,11 +23,6 @@ pub use start::start;
 
 // pub mod editor;
 pub mod plugins;
-
-mod catalog;
-pub use catalog::CatalogReader;
-pub use catalog::CatalogWriter;
-pub use catalog::Item;
 
 mod state;
 pub use state::AttributeGraph;

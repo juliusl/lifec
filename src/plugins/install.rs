@@ -23,7 +23,7 @@ impl Plugin for Install {
     }
 
     fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
-        context.clone().query::<Install>().task(|_|{
+        context.clone().task(|_|{
             let tc = context.clone();
             async {
                 let file_name = tc.state().find_symbol("install").expect("file name is required for install plugin");
