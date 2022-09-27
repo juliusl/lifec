@@ -28,13 +28,22 @@ impl Host {
         &mut self.world
     }
 
-    /// Opens a file, compiles, and returns a host,
+    /// Opens the .runmd file in the current directory,
     /// 
-    pub async fn open<P>(path: impl AsRef<PathBuf>) -> Result<Self, impl Error> 
+    pub async fn runmd<P>() -> Result<Self, impl Error> 
     where
         P: Project
     {
-        match tokio::fs::read_to_string(path.as_ref()).await {
+        Self::open::<P>(".runmd").await
+    }
+
+    /// Opens a file, compiles, and returns a host,
+    /// 
+    pub async fn open<P>(path: impl Into<PathBuf>) -> Result<Self, impl Error> 
+    where
+        P: Project
+    {
+        match tokio::fs::read_to_string(path.into()).await {
             Ok(runmd) => {
                 Ok(Host::load_content::<P>(runmd))
             },
