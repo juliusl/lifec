@@ -71,6 +71,13 @@ impl Interpreter for Engine {
         world.register::<Event>();
         world.register::<Sequence>();
         world.register::<Connection>();
+
+        let (exit, listener) = Exit::new();
+        world.insert(Some(exit));
+        world.insert(Some(listener));
+
+        world.fetch_mut::<Option<Exit>>().take();
+        world.fetch_mut::<Option<ExitListener>>().take();
     }
 
     /// Handles interpreting blocks and setting up sequences
