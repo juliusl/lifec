@@ -49,7 +49,13 @@ impl Plugin for Process {
                     .expect("missing process property");
                 
                 event!(Level::TRACE, "Creating command for {command}");
+
+                let mut args = command.split(" ");
+
+                let command = args.next().expect("needs a program");
                 let mut command_task = tokio::process::Command::new(command);
+                command_task.args(args);
+
                 command_task.kill_on_drop(true);
 
                 // Set up any env variables
