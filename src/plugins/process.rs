@@ -84,6 +84,8 @@ impl Plugin for Process {
                                 // Self::resolve_output(&mut tc, command, start_time, output);
                             }
                             Err(err) => {
+                                let path = std::env::current_dir().expect("should be able to get current dir");
+                                event!(Level::TRACE, "The current directory is {}", path.display());
                                 tc.update_progress(format!("# error {}", err), 0.0).await;
                             }
                         }
