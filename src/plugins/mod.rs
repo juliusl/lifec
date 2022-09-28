@@ -180,7 +180,7 @@ where
                 if let Some(handle) = tc.handle() {
                     let combined_task = handle.spawn(async move {
                         let mut tc = tc.clone();
-                        if let Some((handle, cancel)) = A::call(&mut tc) {
+                        if let Some((handle, cancel)) = A::call(&tc) {
                             select! {
                                 next = handle => {
                                     match next {
@@ -198,23 +198,9 @@ where
                             }
                         }
 
-                        // let previous = tc
-                        //     .project
-                        //     .as_ref()
-                        //     .and_then(|p| p.transpile_blocks().ok())
-                        //     .unwrap_or_default()
-                        //     .trim()
-                        //     .to_string();
+                        let mut next_tc = tc.commit();
 
-                        let mut next_tc = tc.clone();
-                        // if !previous.trim().is_empty() {
-                        //     let block_name = tc.block.name.unwrap().to_string();
-                        //     next_tc
-                        //         .as_mut()
-                        //         .add_message(block_name, "previous", previous);
-                        // }
-
-                        if let Some((handle, cancel)) = B::call(&mut next_tc) {
+                        if let Some((handle, cancel)) = B::call(&next_tc) {
                             select! {
                                 next = handle => {
                                     match next {

@@ -53,6 +53,7 @@ pub use host::Host;
 
 mod project;
 pub use project::Project;
+pub use project::default_runtime;
 
 /// This function is provided by types that implement the Engine trait
 pub type SetupFn = fn(&World) -> Entity;
