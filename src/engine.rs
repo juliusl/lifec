@@ -105,6 +105,7 @@ impl Interpreter for Engine {
 
                 // TODO index engines
             }
+            return;
         }
 
         // let mut engines: Vec<(specs::Entity, Sequence)> = vec![];
