@@ -23,12 +23,6 @@ use tracing::{event, Level};
 mod resources;
 pub use resources::Resources;
 
-mod open;
-// pub use open::open;
-
-mod start;
-pub use start::start;
-
 // pub mod editor;
 pub mod plugins;
 
