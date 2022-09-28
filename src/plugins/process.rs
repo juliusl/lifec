@@ -27,8 +27,11 @@ impl Plugin for Process {
         // Enable .env to declare environment variables
         parser.add_custom(CustomAttribute::new_with("env", |p, value| {
             let var_name = p.symbol().expect("Requires a var name").to_string();
-            p.define("env", Value::Symbol(var_name.to_string()));
-            p.define(var_name, Value::Symbol(value));
+
+            let last = p.last_child_entity().expect("should have added an entity for the process");
+
+            p.define_child(last, "env", Value::Symbol(var_name.to_string()));
+            p.define_child(last, var_name, Value::Symbol(value));
         }));
     }
 

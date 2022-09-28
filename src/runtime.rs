@@ -90,11 +90,12 @@ fn test_runtime() {
     use crate::*;
     
     let mut runtime = Runtime::default();
-    runtime.install_with_custom::<Process>("call");
-    runtime.install_with_custom::<Install>("call");
+    runtime.install_with_custom::<Process>("");
+    runtime.install_with_custom::<Install>("");
 
     let mut world = specs::World::new();
     world.register::<Runtime>();
+    world.register::<Event>();
     world.insert(runtime);
 
     let parser = Parser::new_with(world).with_special_attr::<Runtime>();
