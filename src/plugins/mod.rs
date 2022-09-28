@@ -114,7 +114,6 @@ pub trait Plugin {
         CustomAttribute::new_with(Self::symbol(), |parser, content| {
             if let Some(world) = parser.world() {
                 let child = world.entities().create();
-                parser.define("sequence", Value::Int(child.id() as i32));
 
                 // This is used after .runtime
                 // If the consumer writes an ident afterwards, than that will
@@ -128,6 +127,7 @@ pub trait Plugin {
                     Event::from_plugin::<Self>(event_name)
                 ).ok();
 
+                parser.define("sequence", Value::Int(child.id() as i32));
                 parser.define_child(child.clone(), Self::symbol(), Value::Symbol(content));
                 Self::compile(parser);
             }
