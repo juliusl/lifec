@@ -453,10 +453,7 @@ impl ThunkContext {
 ///
 impl ThunkContext {
     /// Updates error block
-    pub fn error(&mut self, _record: impl Fn(&mut AttributeGraph)) {
-        // if !self.block.update_block("error", &record) {
-        //     self.block.add_block("error", record);
-        // }
-        todo!()
+    pub fn error(&mut self, record: impl Fn(&mut AttributeGraph)) {
+        record(&mut self.graph);
     }
 }
