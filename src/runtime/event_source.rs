@@ -17,7 +17,7 @@ pub struct EventSource {
 impl EventSource {
     /// Returns a new event source
     /// 
-    pub fn new<P>(runtime: Runtime, event_name: &'static str) -> Self 
+    pub fn new<P>(runtime: Runtime, event_name: impl AsRef<str>) -> Self 
     where 
         P: Plugin + Default + Send
     {

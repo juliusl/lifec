@@ -90,7 +90,7 @@ impl Interpreter for Engine {
             {
                 let mut sequence = Sequence::default();
 
-                for plugin in plugins.iter() {
+                for plugin in plugins.iter().map(|p| *p) {
                     let plugin = world.entities().entity(*plugin as u32);
                     sequence.add(plugin);
                     // TODO: Can assert that the .runtime attribute worked
