@@ -117,7 +117,7 @@ impl Host {
     /// 
     /// TODO: make this async
     /// 
-    pub fn should_exit(self) -> bool {
+    pub fn should_exit(&self) -> bool {
         let mut exit_listener = self.world.write_resource::<Option<ExitListener>>();
         
         if let Some(exit_listener) = exit_listener.deref_mut() {
