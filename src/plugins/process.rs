@@ -39,7 +39,7 @@ impl Plugin for Process {
             async move {
                 let command = tc
                     .state()
-                    .find_text("process")
+                    .find_symbol("process")
                     .expect("missing process property");
 
                 let mut command_task = tokio::process::Command::new(command);
