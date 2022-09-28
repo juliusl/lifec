@@ -26,6 +26,7 @@ pub trait Project {
         let mut world = specs::World::new();
         world.register::<Runtime>();
         world.register::<Event>();
+        world.register::<AttributeGraph>();
         world.insert(Self::runtime());
         world
     }
