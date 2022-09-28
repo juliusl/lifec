@@ -35,7 +35,7 @@ impl Host {
     /// # Systems Included:
     /// * event_runtime - System that manages running engines.  
     ///
-    pub fn dispatcher_builder(&self) -> DispatcherBuilder {
+    pub fn dispatcher_builder<'a, 'b>() -> DispatcherBuilder<'a, 'b> {
         let dispatcher_builder = DispatcherBuilder::new();
 
         dispatcher_builder.with(EventRuntime::default(), "event_runtime", &[])
