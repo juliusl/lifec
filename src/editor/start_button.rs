@@ -18,25 +18,6 @@ pub struct StartButton(
     pub Option<Entity>
 );
 
-impl App for StartButton {
-    fn name() -> &'static str {
-        "start_button"
-    }
-
-    fn edit_ui(&mut self, ui: &imgui::Ui) {
-        if let Self(pressed, .., label, Some(entity)) = self {
-            if ui.button(format!("{} {}", label, entity.id())) {
-                *pressed = Some(true);
-             }
-        }
-    }
-
-    fn display_ui(&self, ui: &imgui::Ui) {
-        ui.same_line();
-        ui.text(&self.1);
-    }
-}
-
 impl Extension for StartButton {
     fn configure_app_world(world: &mut World) {
         world.register::<StartButton>();
@@ -58,8 +39,15 @@ impl Extension for StartButton {
         if let Self(.., Some(entity)) = self {
             let mut components = app_world.write_component::<Self>();
             if let Some(start_button) = components.get_mut(*entity) {
-                start_button.edit_ui(ui);
+                if let Self(pressed, .., label, Some(entity)) = self {
+                    if ui.button(format!("{} {}", label, entity.id())) {
+                        *pressed = Some(true);
+                     }
+                }
                 start_button.display_ui(ui);
+
+                ui.same_line();
+                ui.text(&self.1);
             }
         }
     }

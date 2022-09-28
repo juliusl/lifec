@@ -1,11 +1,13 @@
-mod guest_runtime;
-use std::{error::Error, path::PathBuf};
-
-pub use guest_runtime::GuestRuntime;
+use std::{error::Error, path::PathBuf, str::from_utf8};
 use specs::{DispatcherBuilder, World};
+use hyper_tls::HttpsConnector;
 use tracing::{event, Level};
+use hyper::{Client, Uri};
 
 use crate::{plugins::EventRuntime, Project};
+
+mod guest_runtime;
+pub use guest_runtime::GuestRuntime;
 
 /// Struct for starting engines compiled from a
 /// project type,
@@ -15,18 +17,6 @@ pub struct Host {
 }
 
 impl Host {
-    /// Returns a immutable reference to the world,
-    ///
-    pub fn world(&self) -> &World {
-        &self.world
-    }
-
-    /// Returns a mutable reference to the world,
-    ///
-    pub fn world_mut(&mut self) -> &mut World {
-        &mut self.world
-    }
-
     /// Returns a new dispatcher builder with core
     /// systems included.
     ///
@@ -39,6 +29,18 @@ impl Host {
         let dispatcher_builder = DispatcherBuilder::new();
 
         dispatcher_builder.with(EventRuntime::default(), "event_runtime", &[])
+    }
+
+    /// Returns a immutable reference to the world,
+    ///
+    pub fn world(&self) -> &World {
+        &self.world
+    }
+
+    /// Returns a mutable reference to the world,
+    ///
+    pub fn world_mut(&mut self) -> &mut World {
+        &mut self.world
     }
 
     /// Opens the .runmd file in the current directory,
@@ -65,8 +67,42 @@ impl Host {
         }
     }
 
-    /// Opens a file, compiles, and returns a host
-    ///
+    /// Opens a uri via GET, compiles the body, and returns a host,
+    /// 
+    pub async fn get<P>(uri: impl AsRef<str>) -> Result<Self, impl Error> 
+    where
+        P: Project,
+    {
+        let https = HttpsConnector::new();
+        let client = Client::builder().build::<_, hyper::Body>(https);
+
+        match  uri.as_ref().parse::<Uri>() {
+            Ok(uri) => match client.get(uri).await {
+                Ok(mut response) => {
+                    match hyper::body::to_bytes(response.body_mut()).await {
+                        Ok(bytes) => {
+                            let bytes = bytes.to_vec();
+                            let content = from_utf8(&bytes).expect("should be able to read into a string");
+                            Ok(Self::load_content::<P>(&content))
+                        },
+                        Err(err) => {
+                            panic!("Could not read bytes {err}")
+                        },
+                    }
+                },
+                Err(err) => {
+                    event!(Level::ERROR, "Could not get content {err}");
+                    Err(err)
+                },
+            },
+            Err(err) => {
+                panic!("Could not parse uri, {}, {err}", uri.as_ref());
+            },
+        }
+    }
+
+    /// Compiles runmd content into a Host, 
+    /// 
     pub fn load_content<P>(content: impl AsRef<str>) -> Self
     where
         P: Project,

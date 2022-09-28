@@ -21,51 +21,12 @@ pub struct ProgressStatusBar(
     pub String
 );
 
-impl Into<AttributeGraph> for ProgressStatusBar {
-    fn into(self) -> AttributeGraph {
-        let Self(progress, status, log_display, log_history) = self;
-
-        AttributeGraph::from(0)
-            .with_float("progress", progress)
-            .with_text("status", status)
-            .with_binary("log_display", log_display)
-            .with_binary("history.log", log_history)
-            .to_owned()
-    }
-}
-
-impl From<AttributeGraph> for ProgressStatusBar {
-    fn from(graph: AttributeGraph) -> Self {
-        Self(
-            {
-                graph.find_float("progress")
-                    .unwrap_or_default()
-            }, 
-            {
-                graph.find_text("status")
-                    .unwrap_or_default()
-            }, 
-            {
-                graph.find_binary("log_display")
-                    .and_then(|b| String::from_utf8(b).ok())
-                    .unwrap_or_default()
-            }, 
-            {
-                graph.find_binary("history.log")
-                    .and_then(|b| String::from_utf8(b).ok())
-                    .unwrap_or_default()
-            })
-    }
-}
-
-impl App for ProgressStatusBar {
-    fn name() -> &'static str {
-        "progress_status_bar"
+impl Extension for ProgressStatusBar {
+    fn configure_app_world(world: &mut specs::World) {
+        world.register::<ProgressStatusBar>();
     }
 
-    fn edit_ui(&mut self, _: &imgui::Ui) {}
-
-    fn display_ui(&self, ui: &imgui::Ui) {
+    fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {
         let ProgressStatusBar(progress, status, log_display, log_full) = self;
 
         if *progress > 0.0 {
@@ -114,25 +75,6 @@ impl App for ProgressStatusBar {
                 ui.open_popup(&log_full);
             }
         }
-    }
-}
-
-impl Extension for ProgressStatusBar {
-    fn configure_app_world(world: &mut specs::World) {
-        world.register::<ProgressStatusBar>();
-    }
-
-    fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
-        dispatcher.add(
-            EventRuntime::default(),
-            "progress_status_bar/event_runtime",
-            &[],
-        );
-    }
-
-    fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {
-        self.display_ui(ui);
-        self.edit_ui(ui);
     }
 
     fn on_run(&'_ mut self, app_world: &specs::World) {
