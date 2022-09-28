@@ -57,7 +57,7 @@ impl Plugin for Process {
                 }
 
                 // Set current directory if work_dir is set
-                if let Some(work_dir) = tc.state().find_symbol("work_dir") {
+                if let Some(work_dir) = tc.state().find_symbol("current_dir") {
                     command_task.current_dir(work_dir);
                 }
 
@@ -95,7 +95,7 @@ impl BlockObject for Process {
     fn query(&self) -> BlockProperties {
         BlockProperties::new("runtime")
             .require("process")
-            .optional("work_dir")
+            .optional("current_dir")
             .optional("env")
     }
 

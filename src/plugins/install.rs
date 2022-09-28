@@ -30,6 +30,8 @@ impl Plugin for Install {
                 let src_dir = tc.state().find_symbol("src_dir").expect("src_dir required for install plugin");
                 let work_dir = tc.state().find_symbol("work_dir").expect("work_dir required for install plugin");
 
+                tokio::fs::create_dir_all(&work_dir).await.expect("should be able to create work directory");
+
                 let src = PathBuf::from(src_dir).join(&file_name);
                 let dst = PathBuf::from(work_dir).join(&file_name);
                 
