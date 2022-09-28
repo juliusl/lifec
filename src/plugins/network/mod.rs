@@ -118,12 +118,12 @@ impl<'a> System<'a> for NetworkRuntime {
         &mut self,
         (entities, tokio_runtime, contexts, mut network_tasks, mut events): Self::SystemData,
     ) {
-        for (entity, task) in (&entities, &mut network_tasks).join() {
+        for (_entity, task) in (&entities, &mut network_tasks).join() {
             if task.is_ready() {
                 tokio_runtime.block_on(async {
                     if let Some(next) = task.handle().await {
                         match next {
-                            NetworkEvent::Proxied(upstream_id, sent) => {
+                            NetworkEvent::Proxied(upstream_id, _sent) => {
                                 let upstream = entities.entity(upstream_id);
                                 if let (Some(upstream_event), Some(upstream_context)) =
                                     (events.get_mut(upstream), contexts.get(upstream))
@@ -138,7 +138,7 @@ impl<'a> System<'a> for NetworkRuntime {
                                     // By going through the proxy instead of receiving the message directly,
                                     // the plugin can interpret the transient value to figure out what type of message
                                     // it need's to process next.
-                                    let mut upstream_context = upstream_context.clone();
+                                    let upstream_context = upstream_context.clone();
                                     // upstream_context
                                     //     .state()
                                     //     .define("proxy", "received")

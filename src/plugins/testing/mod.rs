@@ -1,4 +1,4 @@
-use specs::{Builder, Component, DefaultVecStorage, WorldExt};
+use specs::{Component, DefaultVecStorage};
 
 pub struct Test;
 

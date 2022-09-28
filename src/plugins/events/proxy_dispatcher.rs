@@ -30,7 +30,7 @@ impl<'a> System<'a> for ProxyDispatcher {
             if context.is_enabled("proxy") && !proxies.contains(entity) {
                 match proxies.insert(entity, Proxy::default()) {
                     Ok(_) => {
-                        if let Some(dispatcher) = self.0.dispatcher() {
+                        if let Some(_dispatcher) = self.0.dispatcher() {
                             //let mut graph = context.state().clone(); 
 
                             // if let (Some(block_name), Some(block_symbol)) = (graph.find_text("block_name"), graph.find_text("block_symbol")) {

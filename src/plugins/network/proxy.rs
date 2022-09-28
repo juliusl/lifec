@@ -6,7 +6,6 @@ use specs::storage::DenseVecStorage;
 use tokio::net::UdpSocket;
 use tracing::{event, Level};
 
-use crate::AttributeIndex;
 use crate::plugins::{ThunkContext,  EventRuntime};
 
 use super::{NetworkEvent, BlockAddress};
@@ -347,6 +346,8 @@ fn test_proxy_runtime() {
     use specs::DispatcherBuilder;
     use atlier::system::Extension;
     use crate::plugins::network::NetworkRuntime;
+    use crate::AttributeIndex;
+    
     let mut test_world = World::new();
     let test_world = &mut test_world;
     let mut test_dispatcher = DispatcherBuilder::new();
