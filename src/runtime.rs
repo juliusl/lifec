@@ -51,10 +51,15 @@ impl Runtime {
     where
         P: Plugin + Send + Default,
     {
+        let mut event_name = event_name.to_string();
+        if event_name.is_empty() {
+            event_name = "call".to_string();
+        }
+        
         // Register event sources
         self.plugins.insert(
-            format!("{}::{}", event_name, P::symbol()),  
-            EventSource::new::<P>(self.clone(), event_name)
+            format!("{}::{}", &event_name, P::symbol()),  
+            EventSource::new::<P>(self.clone(), &event_name)
         );
     }
 

@@ -7,6 +7,7 @@ use crate::{plugins::Println, AttributeGraph, Engine, Event, Install, Process, R
 ///
 pub trait Project {
     /// TODO: Currently Engine is stateless, but leaving this here as an extension point
+    /// 
     fn configure_engine(engine: &mut Engine);
 
     /// Interpret a compiled block, this will run after the Engine
