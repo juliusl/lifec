@@ -38,7 +38,10 @@ pub trait Project {
     /// Override with care as this adds critical components for the event runtime,
     ///
     fn compile(runmd: impl AsRef<str>) -> World {
-        let parser = Parser::new_with(Self::world()).parse(runmd);
+        let parser = Parser::new_with(Self::world())
+            .with_special_attr::<Runtime>()
+            .parse(runmd);
+        
         let mut world = parser.commit();
 
         let engine = &mut Engine();
