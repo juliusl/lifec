@@ -28,7 +28,6 @@ An engine is declared within a control block. For example,
 + .runtime
 : .stop_on_error
 : .process apt-get install jq, curl
-
 <```>
 ```
 
@@ -65,4 +64,10 @@ TODO
 
 ## Advanced Plugin Development
 TODO
+
+## Dependencies
+
+- `atlier` - Framework library that provides frame value types and an extensible presentation framework. It can be used to provide visual tooling on top of the `specs ECS` World. 
+
+- `reality` - `runmd` parsing library that compiles `runmd` into Block structs. It blends some of its core types opaquely into plugin development, mainly any implementation extending how a Host will parse `runmd`.
 
