@@ -127,7 +127,7 @@ impl Interpreter for Engine {
                     // TODO: Can assert that the .runtime attribute worked
                 }
 
-                if let Some(parent) = sequence.peek() {
+                if let Some(parent) = sequence.next() {
                     world
                         .write_component()
                         .insert(parent, sequence)

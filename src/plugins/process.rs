@@ -52,7 +52,7 @@ impl Plugin for Process {
 
                 let mut args = command.split(" ");
 
-                let command = args.next().expect("needs a program");
+                let command = args.next().expect("should have at least one argument that is the program");
                 let mut command_task = tokio::process::Command::new(command);
                 command_task.args(args);
 
