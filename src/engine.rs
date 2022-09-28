@@ -63,6 +63,7 @@ impl SpecialAttribute for Engine {
     fn parse(parser: &mut AttributeParser, _todo: impl AsRef<str>) {
         // Install the event special attribute
         parser.with_custom::<Event>();
+        parser.with_custom::<Exit>();
     }
 }
 
