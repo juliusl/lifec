@@ -3,6 +3,7 @@ use hyper_tls::HttpsConnector;
 use specs::Entity;
 use specs::ReadStorage;
 use specs::World;
+use specs::Write;
 use specs::{shred::SetupHandler, Entities, Join, Read, System, WorldExt, WriteStorage};
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -14,6 +15,7 @@ use tracing::event;
 use tracing::Level;
 
 use crate::AttributeGraph;
+use crate::Exit;
 use crate::engine::Connection;
 use crate::engine::Sequence;
 use crate::host::GuestRuntime;
@@ -152,6 +154,7 @@ impl SetupHandler<SecureClient> for EventRuntime {
 
 impl<'a> System<'a> for EventRuntime {
     type SystemData = (
+        Write<'a, Option<Exit>>,
         Read<'a, tokio::runtime::Runtime, EventRuntime>,
         Read<'a, SecureClient, EventRuntime>,
         Read<'a, Sender<StatusUpdate>, EventRuntime>,
@@ -176,6 +179,7 @@ impl<'a> System<'a> for EventRuntime {
     fn run(
         &mut self,
         (
+            mut exit,
             runtime,
             https_client,
             status_update_channel,
@@ -330,6 +334,11 @@ impl<'a> System<'a> for EventRuntime {
                                         if let Some(cursor) = sequence.cursor() {
                                             event!(Level::DEBUG, "found cursor {}", cursor.id());
                                             dispatch_queue.push((cursor, thunk_context));
+                                        } else {
+                                            if let Some(exit) = exit.take() {
+                                                runtime.block_on(async { exit.exit().await });
+                                                event!(Level::INFO, "Event runtime is signaling for exit");
+                                            }
                                         }
                                     }
                                 }

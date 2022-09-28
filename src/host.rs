@@ -1,10 +1,11 @@
-use std::{error::Error, path::PathBuf, str::from_utf8};
-use specs::{DispatcherBuilder, World};
+use std::{error::Error, path::PathBuf, str::from_utf8, ops::DerefMut};
+use specs::{DispatcherBuilder, World, WorldExt};
 use hyper_tls::HttpsConnector;
+use tokio::sync::oneshot::error::TryRecvError;
 use tracing::{event, Level};
 use hyper::{Client, Uri};
 
-use crate::{plugins::EventRuntime, Project};
+use crate::{plugins::EventRuntime, Project, ExitListener};
 
 mod guest_runtime;
 pub use guest_runtime::GuestRuntime;
@@ -109,6 +110,26 @@ impl Host {
     {
         Self {
             world: P::compile(content),
+        }
+    }
+
+    /// Returns true if should exit
+    /// 
+    /// TODO: make this async
+    /// 
+    pub fn should_exit(self) -> bool {
+        let mut exit_listener = self.world.write_resource::<Option<ExitListener>>();
+        
+        if let Some(exit_listener) = exit_listener.deref_mut() {
+            match exit_listener.0.try_recv() {
+                Ok(_) => true,
+                Err(err) => match err {
+                    TryRecvError::Empty => false,
+                    TryRecvError::Closed => true,
+                },
+            }
+        } else {
+            false
         }
     }
 }

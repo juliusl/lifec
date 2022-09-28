@@ -36,6 +36,7 @@ use super::{SecureClient, StatusUpdate, CancelSource, CancelToken, ErrorContext}
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
+    error_graph: Option<AttributeGraph>,
     /// Previous graph used w/ this context
     previous_graph: Option<AttributeGraph>,
     /// Underlying state for this thunk,
@@ -383,16 +384,9 @@ impl ThunkContext {
 
     /// Updates status of thunk execution
     ///
-    /// TODO: The ergonomics of this api and the one above need some improvement,
-    ///  
     pub async fn update_status_only(&self, status: impl AsRef<str>) {
         self.update_progress(&status, 0.0).await;
-
-        if let Some(true) = self.state().find_bool("debug") {
-            // let block_name = &self.block.name.as_ref().unwrap();
-            // let status = status.as_ref();
-            // event!(Level::DEBUG, "{block_name}\t{status}");
-        }
+        event!(Level::TRACE, "{}", status.as_ref())
     }
 
     /// Returns the error context this context has an error block
@@ -404,20 +398,13 @@ impl ThunkContext {
     /// not execute any of the next events in the sequence
     ///  
     pub fn get_errors(&self) -> Option<ErrorContext> {
-        // self.block.get_block("error").and_then(|b| {
-        //     let mut b = b;
-
-        //     if self.as_ref().is_enabled("stop_on_error").unwrap_or_default() {
-        //         b.add_bool_attr("stop_on_error", true);
-
-        //         if let Some(stopped) = self.entity {
-        //             return Some(ErrorContext::new(BlockContext::from(b), Some(stopped)))
-        //         }
-        //     }
-
-        //     Some(ErrorContext::new(BlockContext::from(b), None))
-        // })
-        None
+        self.error_graph.as_ref().and_then(|e| {
+            if self.is_enabled("stop_on_error") {
+                Some(ErrorContext::new(e.clone(), self.entity.clone()))
+            } else {
+                Some(ErrorContext::new(e.clone(), None))
+            }
+        })
     }
 }
 
@@ -454,6 +441,8 @@ impl ThunkContext {
 impl ThunkContext {
     /// Updates error block
     pub fn error(&mut self, record: impl Fn(&mut AttributeGraph)) {
-        record(&mut self.graph);
+        let mut error_graph = self.graph.clone();
+        record(&mut error_graph);
+        self.error_graph = Some(error_graph);
     }
 }

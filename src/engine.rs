@@ -1,5 +1,4 @@
 use crate::{AttributeParser, Block, BlockProperty, Interpreter, SpecialAttribute};
-use atlier::system::Value;
 use specs::{Component, VecStorage, World, WorldExt};
 
 mod event;
@@ -10,6 +9,10 @@ pub use sequence::Sequence;
 
 mod connection;
 pub use connection::Connection;
+
+mod exit;
+pub use exit::Exit;
+pub use self::exit::ExitListener;
 
 /// An engine is a sequence of events, this component manages
 /// sequences of events
@@ -73,8 +76,27 @@ impl Interpreter for Engine {
     /// Handles interpreting blocks and setting up sequences
     ///
     fn interpret(&self, world: &World, block: &Block) {
-        if block.name().is_empty() && block.symbol().is_empty() {
+        if block.is_root_block() {
             return;
+        }
+
+        if block.is_control_block() {
+            for index in block.index().iter().filter(|i| i.root().name() == "engine") {
+                if index
+                    .find_property("exit_on_completion")
+                    .and_then(|e| Some(e.is_enabled()))
+                    .unwrap_or_default()
+                {
+                    let (exit, listener) = Exit::new();
+                    let mut exit_resource = world.write_resource::<Option<Exit>>();
+                    *exit_resource = Some(exit);
+
+                    let mut exit_resource = world.write_resource::<Option<ExitListener>>();
+                    *exit_resource = Some(listener);
+                }
+
+                // TODO index engines
+            }
         }
 
         // let mut engines: Vec<(specs::Entity, Sequence)> = vec![];
