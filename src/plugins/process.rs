@@ -8,6 +8,9 @@ use crate::{
     AttributeIndex,
 };
 
+use tracing::event;
+use tracing::Level;
+
 /// The process component executes a command and records the output
 /// 
 #[derive(Debug, Clone, Default, Component)]
@@ -44,7 +47,8 @@ impl Plugin for Process {
                     .state()
                     .find_symbol("process")
                     .expect("missing process property");
-
+                
+                event!(Level::TRACE, "Creating command for {command}");
                 let mut command_task = tokio::process::Command::new(command);
                 command_task.kill_on_drop(true);
 
@@ -56,6 +60,7 @@ impl Plugin for Process {
                     .iter()
                     .filter_map(|e| tc.state().find_symbol(e).and_then(|s| Some((e, s))))
                 {
+                    event!(Level::TRACE, "Setting env var {env_name}");
                     command_task.env(env_name, env_val);
                 }
 
