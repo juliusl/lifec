@@ -365,27 +365,28 @@ impl ThunkContext {
 
     /// Sends an update for the status and progress
     ///
-    pub async fn update_progress(&self, status: impl AsRef<str>, progress: f32) {
-        if let ThunkContext {
-            status_updates: Some(status_updates),
-            entity: Some(entity),
-            ..
-        } = self
-        {
-            match status_updates
-                .send((*entity, progress, status.as_ref().to_string()))
-                .await
-            {
-                Ok(_) => {}
-                Err(_) => {}
-            }
-        }
+    pub async fn update_progress(&self, _status: impl AsRef<str>, progress: f32) {
+        // if let ThunkContext {
+        //     status_updates: Some(status_updates),
+        //     entity: Some(entity),
+        //     ..
+        // } = self
+        // {
+        //     match status_updates
+        //         .send((*entity, progress, status.as_ref().to_string()))
+        //         .await
+        //     {
+        //         Ok(_) => {}
+        //         Err(_) => {}
+        //     }
+        // }
+        event!(Level::TRACE, "progress {}", progress);
     }
 
     /// Updates status of thunk execution
     ///
     pub async fn update_status_only(&self, status: impl AsRef<str>) {
-        self.update_progress(&status, 0.0).await;
+        // TODO self.update_progress(&status, 0.0).await;
         event!(Level::TRACE, "{}", status.as_ref())
     }
 
