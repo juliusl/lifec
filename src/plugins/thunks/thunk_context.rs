@@ -365,7 +365,7 @@ impl ThunkContext {
 
     /// Sends an update for the status and progress
     ///
-    pub async fn update_progress(&self, _status: impl AsRef<str>, progress: f32) {
+    pub async fn update_progress(&self, status: impl AsRef<str>, progress: f32) {
         // if let ThunkContext {
         //     status_updates: Some(status_updates),
         //     entity: Some(entity),
@@ -380,7 +380,7 @@ impl ThunkContext {
         //         Err(_) => {}
         //     }
         // }
-        event!(Level::TRACE, "progress {}", progress);
+        event!(Level::TRACE, "progress {}, {}", progress, status.as_ref());
     }
 
     /// Updates status of thunk execution
