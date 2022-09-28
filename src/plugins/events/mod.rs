@@ -457,21 +457,21 @@ impl<'a> System<'a> for EventRuntime {
 
         // dispatch all queued messages
         while let Some((next, last)) = dispatch_queue.pop() {
-            if let (Some(event), Some(context)) = (events.get_mut(next), contexts.get(next)) {
+            if let Some(event) = events.get_mut(next) {
                 let last_id = last.state().entity_id();
 
-                event.fire(context.clone());
+                event.fire(last.clone());
                 event!(
                     tracing::Level::DEBUG,
                     "dispatch event:\n\t{} -> {}\n\t{}\n\t{}\n\t{}",
                     last_id,
                     next.id(),
-                    context
+                    last
                         .state()
                         .find_symbol("event_title")
                         .unwrap_or("unnamed".to_string()),
                     event,
-                    context.state().hash_code()
+                    last.state().hash_code()
                 );
             } else {
                 event!(Level::WARN, "Next event does not exist");
