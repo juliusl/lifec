@@ -18,7 +18,7 @@ fn main() {
     ```
     
     ``` test containerd
-    :  src_dir  .symbol .
+    :  src_dir  .symbol ./
     :  work_dir .symbol .work/acr
 
     + .runtime

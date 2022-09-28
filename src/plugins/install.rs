@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use crate::{CustomAttribute, BlockObject, BlockProperties};
 use specs::{Component, DenseVecStorage};
-
 use crate::{plugins::{ThunkContext, Plugin}, AttributeIndex};
 
 /// Component for installing scripts,

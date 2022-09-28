@@ -354,14 +354,13 @@ impl<'a> System<'a> for EventRuntime {
             // An event starts by passing an initial_context to the event
             // the runtime takes this context and configures it before calling the thunk
             } else if let Some(initial_context) = initial_context.take() {
-                // event!(
-                //     Level::DEBUG,
-                //     "start event:\n\t{}\n\t{}\n\t{}\n\t{}",
-                //     entity.id(),
-                //     initial_context.block.name.unwrap(),
-                //     &event_name,
-                //     initial_context.as_ref().hash_code()
-                // );
+                event!(
+                    Level::DEBUG,
+                    "start event:\n\t{}\n\t{}\n\t{}",
+                    entity.id(),
+                    &event_name,
+                    initial_context.state().hash_code()
+                );
                 let thunk = thunk.clone();
                 let runtime_handle = runtime.handle().clone();
 
@@ -463,13 +462,9 @@ impl<'a> System<'a> for EventRuntime {
                 event.fire(last.clone());
                 event!(
                     tracing::Level::DEBUG,
-                    "dispatch event:\n\t{} -> {}\n\t{}\n\t{}\n\t{}",
+                    "dispatch event:\n\t{} -> {}\n\t{}\n\t{}",
                     last_id,
                     next.id(),
-                    last
-                        .state()
-                        .find_symbol("event_title")
-                        .unwrap_or("unnamed".to_string()),
                     event,
                     last.state().hash_code()
                 );

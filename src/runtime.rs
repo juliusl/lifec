@@ -103,7 +103,9 @@ fn test_runtime() {
     let parser = parser.parse(
         r#"
     ``` test plugin
-    : description .symbol This is a test plugin
+    : description   .symbol This is a test plugin
+    : src_dir       .symbol ./
+    : work_dir      .symbol .work
 
     + .runtime
     : .process cargo update 
@@ -143,6 +145,16 @@ fn test_runtime() {
     }
 
     let process = world.entities().entity(3);
+    {
+        eprintln!(
+            "{:#?}",
+            world
+                .read_component::<BlockProperties>()
+                .get(process)
+        );
+    }
+
+    let process = world.entities().entity(4);
     {
         eprintln!(
             "{:#?}",

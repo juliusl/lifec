@@ -29,10 +29,7 @@ impl ErrorContext {
     /// Returns true if the processing for this entity should stop
     /// 
     pub fn stop_on_error(&self) -> bool {
-        // self.0.get_block("error")
-        //     .and_then(|b| b.as_ref().is_enabled("stop_on_error"))
-        //     .unwrap_or_default(
-        todo!()
+        self.stopped().is_some()
     }
 
     /// Looks for an error block symbol, and returns all text attributes

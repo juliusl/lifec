@@ -29,6 +29,10 @@ pub trait AttributeIndex {
     ///
     fn add_attribute(&mut self, attr: Attribute);
 
+    /// Return all indexed values,
+    /// 
+    fn values(&self) -> Vec<(String, Vec<Value>)>;
+
     /// Finds all text values with name, 
     /// 
     fn find_text_values(&self, with_name: impl AsRef<str>) -> Vec<String> {

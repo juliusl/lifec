@@ -1,4 +1,5 @@
 use atlier::system::{Attribute, Value};
+use reality::BlockProperties;
 use specs::{storage::HashMapStorage, Component, Entity};
 use std::{
     collections::hash_map::DefaultHasher,
@@ -67,6 +68,19 @@ impl AttributeGraph {
         clone.child = None;
         clone
     }
+
+    /// Resolves the properties to use within the current scope,
+    /// 
+    fn resolve_properties(&self) -> &BlockProperties {
+        if let Some(child) = self
+            .child
+            .and_then(|child| self.index.child_properties(child.id()))
+        {
+            child
+        } else {
+            self.index.properties()
+        }
+    }
 }
 
 impl AttributeIndex for AttributeGraph {
@@ -76,6 +90,31 @@ impl AttributeIndex for AttributeGraph {
         } else {
             self.index.root().id()
         }
+    }
+
+    fn values(&self) -> Vec<(String, Vec<Value>)> {
+        let mut values = vec![];
+        for (name, property) in self.resolve_properties().iter_properties() {
+            let mut property_values = vec![];
+
+            match property {
+                BlockProperty::Single(val) => {
+                    property_values.push(val.clone());
+                },
+                BlockProperty::List(vals) => {
+                    let mut vals = vals.iter().cloned().collect();
+                    let vals = &mut vals;
+                    property_values.append(vals);
+                },
+                _ => {
+                    continue;
+                }
+            }
+
+            values.push((name.to_string(), property_values));
+        }
+
+        values
     }
 
     fn hash_code(&self) -> u64 {
@@ -115,13 +154,13 @@ impl AttributeIndex for AttributeGraph {
             }
         };
 
-        if let Some(child) = self
-            .child
-            .and_then(|child| self.index.child_properties(child.id()))
-        {
-            search(child.property(with_name.as_ref()).cloned())
-        } else {
-            search(self.index.find_property(with_name.as_ref()))
+        let properties = self.resolve_properties();
+        match search(properties.property(with_name.as_ref()).cloned()) {
+            Some(val) => Some(val),
+            None =>  {
+                event!(Level::TRACE, "Searching for `{}` from control values", with_name.as_ref());
+                self.index.control_values().get(with_name.as_ref()).cloned()
+            },
         }
     }
 
@@ -160,14 +199,16 @@ impl AttributeIndex for AttributeGraph {
             }
         };
 
-        if let Some(child) = self
-            .child
-            .and_then(|child| self.index.child_properties(child.id()))
-        {
-            search(child.property(with_name.as_ref()).cloned())
-        } else {
-            search(self.index.find_property(with_name.as_ref()))
+        let properties = self.resolve_properties();
+        let mut output = search(properties.property(with_name.as_ref()).cloned());
+
+        if output.is_empty() {
+            event!(Level::TRACE, "Searching for `{}` from control values", with_name.as_ref());
+            if let Some(val) = self.index.control_values().get(with_name.as_ref()) {
+                output.push(val.clone());
+            }
         }
+        output
     }
 
     fn add_attribute(&mut self, attr: Attribute) {
