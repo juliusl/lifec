@@ -1,4 +1,5 @@
-use crate::{BlockProperty, Interpreter, SpecialAttribute, AttributeParser, Block};
+use crate::{AttributeParser, Block, BlockProperty, Interpreter, SpecialAttribute};
+use atlier::system::Value;
 use specs::{Component, VecStorage, World, WorldExt};
 
 mod event;
@@ -70,45 +71,46 @@ impl Interpreter for Engine {
     }
 
     /// Handles interpreting blocks and setting up sequences
-    /// 
+    ///
     fn interpret(&self, world: &World, block: &Block) {
         if block.name().is_empty() && block.symbol().is_empty() {
             return;
         }
-        
+
         // let mut engines: Vec<(specs::Entity, Sequence)> = vec![];
         for index in block
             .index()
             .iter()
             .filter(|i| i.root().name() == "runtime")
         {
-            if let Some(BlockProperty::List(plugins)) = index.properties().property("sequence").and_then(|b| match b {
-                BlockProperty::Single(s) => Some(BlockProperty::List(vec![s.clone()])),
-                BlockProperty::List(_) => Some(b.clone()),
-                _ => None,
-            }) {
+            if let Some(plugins) = index
+                .properties()
+                .property("sequence")
+                .and_then(BlockProperty::int_vec)
+            {
                 let mut sequence = Sequence::default();
 
-                for plugin in plugins.iter().filter_map(|p| match p {
-                    atlier::system::Value::Int(id) => Some(id),
-                    _ => None,
-                }) {
+                for plugin in plugins.iter() {
                     let plugin = world.entities().entity(*plugin as u32);
                     sequence.add(plugin);
-
                     // TODO: Can assert that the .runtime attribute worked
                 }
-                // let parent = world.entities().entity(index.root().id());
 
+                if let Some(parent) = sequence.peek() {
+                    world
+                        .write_component()
+                        .insert(parent, sequence)
+                        .expect("Should be able to insert");
+                }
+
+                // TODO - This needs to happen elsewhere
                 // // Connect the engines
                 // if let Some((last, mut previous_sequence)) = engines.pop() {
                 //     let connection = previous_sequence.connect(&sequence);
                 //     world.write_component().insert(last, connection).ok();
-
                 //     previous_sequence.set_cursor(parent);
                 //     world.write_component().insert(last, previous_sequence).ok();
                 // }
-
                 // engines.push((parent, sequence));
             }
         }
@@ -197,23 +199,21 @@ fn test_engine() {
             Engine::default().initialize(&mut world);
             Engine::default().interpret(&world, &block);
             world.maintain();
-          
+
             let sequence = world
                 .read_component::<Sequence>()
                 .get(step_one)
                 .unwrap()
                 .clone();
-    
+
             for e in sequence.iter_entities() {
                 let properties = world.read_component::<BlockProperties>();
                 let properties = properties.get(e);
                 eprintln!("{:#?}", properties);
 
-
                 let index = world.read_component::<BlockIndex>();
                 let index = index.get(e);
                 eprintln!("{:#?}", index);
-
 
                 let event = world.read_component::<Event>();
                 let event = event.get(e).expect("should have been added");
@@ -236,13 +236,13 @@ fn test_engine() {
             Engine::default().initialize(&mut world);
             Engine::default().interpret(&world, &block);
             world.maintain();
-            
+
             let sequence = world
                 .read_component::<Sequence>()
                 .get(step_two)
                 .unwrap()
                 .clone();
-    
+
             for e in sequence.iter_entities() {
                 let properties = world.read_component::<BlockProperties>();
                 let properties = properties.get(e);

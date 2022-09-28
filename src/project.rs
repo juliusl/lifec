@@ -25,8 +25,8 @@ pub trait Project {
     ///
     fn world() -> World {
         let mut world = specs::World::new();
-        world.register::<Runtime>();
         world.register::<Event>();
+        world.register::<Runtime>();
         world.register::<AttributeGraph>();
         world.insert(Self::runtime());
         world
@@ -42,6 +42,7 @@ pub trait Project {
     fn compile(runmd: impl AsRef<str>) -> World {
         let parser = Parser::new_with(Self::world())
             .with_special_attr::<Runtime>()
+            .with_special_attr::<Engine>()
             .parse(runmd);
         
         let mut world = parser.commit();
