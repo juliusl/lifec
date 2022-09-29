@@ -66,8 +66,10 @@ TODO
 TODO
 
 ## Dependencies
+- `specs` - ECS library, manages handling storage at runtime as well as dispatching systems to operate on this data.
 
-- `atlier` - Framework library that provides frame value types and an extensible presentation framework. It can be used to provide visual tooling on top of the `specs ECS` World. 
+- `atlier` - Framework library that provides frame value types and an extensible presentation framework. It can be used to provide visual tooling on top of the `specs ECS` World.
 
 - `reality` - `runmd` parsing library that compiles `runmd` into Block structs. It blends some of its core types opaquely into plugin development, mainly any implementation extending how a Host will parse `runmd`.
+
 
