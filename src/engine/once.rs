@@ -28,7 +28,7 @@ impl Interpreter for Once {
         world.register::<Once>();
     }
 
-    fn interpret(&self, world: &specs::World, block: &reality::Block) {
+    fn interpret(&self, _world: &specs::World, block: &reality::Block) {
         if !block.is_control_block() && !block.is_root_block() {
             todo!()
         }

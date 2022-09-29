@@ -1,0 +1,52 @@
+# Example of an engine setup 
+
+
+``` test_block1
++ .engine
+: .event test
+: .event test azure
+: .fork test_block2, azure
+```
+
+ ``` test test_block1
++ .runtime
+: .println test_block1
+ ```
+
+``` test_block2
++ .engine
+: .event test
+: .repeat 5
+```
+
+ ``` test test_block2
++ .runtime
+: .println test_block2
+```
+
+``` azure
++ .engine 
+: .event test
+: .next containerd
+```
+
+``` test azure
++ .runtime
+: .println testing
+```
+
+``` containerd
++ .engine
+: .event test
+: .exit
+```
+    
+``` test containerd
+:  src_dir  .symbol ./
+:  work_dir .symbol .work/acr
+
++ .runtime
+: .process  sh lib/sh/login-acr.sh
+:  REGISTRY_NAME .env obddemo
+: .install  access_token
+ ```

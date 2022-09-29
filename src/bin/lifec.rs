@@ -1,161 +1,131 @@
-use std::{collections::HashMap, ops::Deref};
+use std::{error::Error, path::PathBuf};
 
-use lifec::{
-    Block, Engine, Entity, Event, Host, Join, LifecycleOptions, Project, ReadStorage, Sequence,
-    ThunkContext, WorldExt, BlockIndex,
-};
-
-use specs::Read;
+use clap::{Args, Parser, Subcommand};
+use lifec::{Host, InspectExtensions, Project};
+use tracing::{event, Level};
 use tracing_subscriber::EnvFilter;
 
 /// Simple program for parsing runmd into a World
 ///
-fn main() {
+#[tokio::main]
+async fn main() {
     tracing_subscriber::fmt::Subscriber::builder()
         .with_env_filter(EnvFilter::from_default_env())
         .compact()
         .init();
 
-    let mut host = Host::load_content::<Lifec>(
-        r#"
-    ``` test_block1
-    + .engine
-    : .event test
-    : .event test azure
-    : .fork test_block2, azure
-    ```
+    let cli = Lifec::parse();
 
-    ``` test test_block1
-    + .runtime
-    : .println test_block1
-    ```
+    // Read the local .runmd file
+    let host = cli.create_host().await;
+    match host {
+        Some(mut host) => match cli {
+            Lifec {
+                command: Some(Commands::PrintLifecycleGraph),
+                ..
+            } => {
+                host.print_lifecycle_graph();
+            }
+            Lifec {
+                command: Some(Commands::PrintEngineEventGraph),
+                ..
+            } => {
+                host.print_engine_event_graph();
+            }
+            Lifec {
+                command: Some(Commands::Start(Start { id: Some(id), .. })), 
+                ..
+            } => {
+                host.start(id);
+            }
+            _ => {
 
-    ``` test_block2
-    + .engine
-    : .event test
-    : .repeat 5
-    ```
-
-    ``` test test_block2
-    + .runtime
-    : .println test_block2
-    ```
-
-    ``` azure
-    + .engine 
-    : .event test
-    : .next containerd
-    ```
-
-    ``` test azure
-    + .runtime
-    : .println testing
-    ```
-
-    ``` containerd
-    + .engine
-    : .event test
-    : .exit
-    ```
-    
-    ``` test containerd
-    :  src_dir  .symbol ./
-    :  work_dir .symbol .work/acr
-
-    + .runtime
-    : .process  sh lib/sh/login-acr.sh
-    :  REGISTRY_NAME .env obddemo
-
-    : .install  access_token
-    ```
-    "#,
-    );
-
-    // Print lifecycle options
-    //
-    host.world_mut().exec(
-        |(options, blocks): (Read<HashMap<Entity, LifecycleOptions>>, ReadStorage<Block>)| {
-            for (e, option) in options.iter() {
-                if let Some(block) = blocks.get(*e) {
-                    let mut block_name = block.name().to_string();
-                    if block_name.is_empty() {
-                        block_name = "```".to_string();
-                    }
-                    println!(
-                        "Engine control block: {} {} @ {:?}",
-                        block_name,
-                        block.symbol(),
-                        e
-                    );
-                    println!("  {:?}", option);
-                    println!("");
-                }
             }
         },
-    );
-
-    host.world_mut().exec(
-        |(blocks, engines, sequences): (
-            ReadStorage<Block>,
-            ReadStorage<Engine>,
-            ReadStorage<Sequence>,
-        )| {
-            for (block, _, sequence) in (&blocks, &engines, &sequences).join() {
-                let mut block_name = block.name().to_string();
-                if block_name.is_empty() {
-                    block_name = "```".to_string();
-                }
-                println!("Engine events: {} {}", block_name, block.symbol());
-                for e in sequence.iter_entities() {
-                    let runtime_block = blocks.get(e).expect("should exist");
-                    println!("```{} {}", runtime_block.name(), runtime_block.symbol());
-                    for index in runtime_block.index().iter().filter(|i| i.root().name() == "runtime") {
-                        for (e, props) in index.iter_children() {
-                            println!("\tplugin event - {e}");
-                            for (name, prop) in props.iter_properties(){
-                                println!("\t{name}{:?}", prop);
-                            }
-                            println!();
-                        }
-                    }
-                }
-                println!("");
-            }
-        },
-    );
-
-    // host.world_mut().exec(
-    //     |blocks: Read<HashMap<String, Entity>>| {
-    //         eprintln!("{:#?}", blocks.deref()); 
-    //     },
-    // );
-
-    // let mut dispatcher = {
-    //     let dispatcher = Host::dispatcher_builder();
-    //     dispatcher.build()
-    // };
-    // dispatcher.setup(host.world_mut());
-
-    // // TODO - Turn this into an api
-
-    // // -- Ex
-    // /*
-    //     host.start_engine("containerd').await;
-
-    // */
-    // let event = host.world().entities().entity(3);
-    // if let Some(event) = host.world().write_component::<Event>().get_mut(event) {
-    //     event.fire(ThunkContext::default());
-    // }
-    // host.world_mut().maintain();
-
-    // // TODO, typically you would use an event loop here,
-    // while !host.should_exit() {
-    //     dispatcher.dispatch(host.world());
-    // }
+        None => {
+            eprintln!("Could not load host, run with `RUST_LOG=lifec=debug` for more information");
+        }
+    }
 }
 
-struct Lifec;
+#[derive(Debug, Parser)]
+#[clap(name = "lifec")]
+#[clap(about = "Utilities for binary for inspecting World prepared by lifec")]
+struct Lifec {
+    /// Path to runmd file, (defaults to .runmd in the current directory if not used)
+    #[clap(short, long)]
+    runmd_path: Option<String>,
+    /// Url to get runmd from, must use `https`
+    #[clap(long)]
+    url: Option<String>,
+    #[clap(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Prints the lifecycle graph,
+    PrintLifecycleGraph,
+    /// Prints the engine event graph,
+    PrintEngineEventGraph,
+    /// Starts an event,
+    Start(Start),
+}
+
+#[derive(Debug, Args)]
+struct Start {
+    /// Entity id of the event to start,
+    ///
+    /// The entity id can be retrieved from the print-engine-event-graph command
+    ///
+    #[clap(long)]
+    id: Option<u32>,
+    /// Name of engine control block to search for to start,
+    /// 
+    #[clap(long)]
+    engine_name: Option<String>, 
+}
+
+impl Lifec {
+    /// Creates a new lifec host,
+    /// 
+    pub async fn create_host(&self) -> Option<Host> {
+        if let Some(url) = &self.url {
+            match Host::get::<Lifec>(url).await {
+                Ok(host) => {
+                    return Some(host);
+                },
+                Err(err) => {
+                    event!(Level::ERROR, "Could not get runmd from url {url}, {err}");
+                    return None;
+                },
+            }
+        }
+
+        if let Some(runmd_path) = &self.runmd_path {
+            let mut runmd_path = PathBuf::from(runmd_path);
+            if !runmd_path.ends_with(".runmd") || runmd_path.is_dir() {
+                runmd_path = runmd_path.join(".runmd");
+            }
+
+            match Host::open::<Lifec>(runmd_path).await {
+                Ok(host) => Some(host),
+                Err(err) => {
+                    event!(Level::ERROR, "Could not load runmd from path {err}");
+                    None
+                },
+            }
+        } else {
+            match Host::runmd::<Lifec>().await {
+                Ok(host) => Some(host),
+                Err(err) => {
+                    event!(Level::ERROR, "Could not load `.runmd` from current directory {err}");
+                    None
+                },
+            }
+        }
+    }
+}
 
 impl Project for Lifec {
     fn configure_engine(_engine: &mut lifec::Engine) {

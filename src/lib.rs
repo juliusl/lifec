@@ -46,8 +46,8 @@ pub use engine::LifecycleOptions;
 pub use engine::Sequence;
 
 mod host;
-pub use host::GuestRuntime;
 pub use host::Host;
+pub use host::InspectExtensions;
 
 mod project;
 pub use project::Project;

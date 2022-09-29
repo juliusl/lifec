@@ -1,14 +1,14 @@
-use std::{error::Error, path::PathBuf, str::from_utf8};
-use specs::{DispatcherBuilder, World, WorldExt};
+use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
+use specs::{DispatcherBuilder, World, WorldExt};
+use std::{error::Error, path::PathBuf, str::from_utf8};
 use tokio::sync::oneshot::error::TryRecvError;
 use tracing::{event, Level};
-use hyper::{Client, Uri};
 
-use crate::{plugins::EventRuntime, Project, ExitListener};
+use crate::{plugins::EventRuntime, ExitListener, Project, Event, ThunkContext};
 
-mod guest_runtime;
-pub use guest_runtime::GuestRuntime;
+mod inspect;
+pub use inspect::InspectExtensions;
 
 /// Struct for starting engines compiled from a
 /// project type,
@@ -69,41 +69,40 @@ impl Host {
     }
 
     /// Opens a uri via GET, compiles the body, and returns a host,
-    /// 
-    pub async fn get<P>(uri: impl AsRef<str>) -> Result<Self, impl Error> 
+    ///
+    pub async fn get<P>(uri: impl AsRef<str>) -> Result<Self, impl Error>
     where
         P: Project,
     {
         let https = HttpsConnector::new();
         let client = Client::builder().build::<_, hyper::Body>(https);
 
-        match  uri.as_ref().parse::<Uri>() {
+        match uri.as_ref().parse::<Uri>() {
             Ok(uri) => match client.get(uri).await {
-                Ok(mut response) => {
-                    match hyper::body::to_bytes(response.body_mut()).await {
-                        Ok(bytes) => {
-                            let bytes = bytes.to_vec();
-                            let content = from_utf8(&bytes).expect("should be able to read into a string");
-                            Ok(Self::load_content::<P>(&content))
-                        },
-                        Err(err) => {
-                            panic!("Could not read bytes {err}")
-                        },
+                Ok(mut response) => match hyper::body::to_bytes(response.body_mut()).await {
+                    Ok(bytes) => {
+                        let bytes = bytes.to_vec();
+                        let content =
+                            from_utf8(&bytes).expect("should be able to read into a string");
+                        Ok(Self::load_content::<P>(&content))
+                    }
+                    Err(err) => {
+                        panic!("Could not read bytes {err}")
                     }
                 },
                 Err(err) => {
                     event!(Level::ERROR, "Could not get content {err}");
                     Err(err)
-                },
+                }
             },
             Err(err) => {
                 panic!("Could not parse uri, {}, {err}", uri.as_ref());
-            },
+            }
         }
     }
 
-    /// Compiles runmd content into a Host, 
-    /// 
+    /// Compiles runmd content into a Host,
+    ///
     pub fn load_content<P>(content: impl AsRef<str>) -> Self
     where
         P: Project,
@@ -114,7 +113,7 @@ impl Host {
     }
 
     /// Returns true if should exit,
-    /// 
+    ///
     pub fn should_exit(&self) -> bool {
         let mut exit_listener = self.world.write_resource::<ExitListener>();
         match exit_listener.1.try_recv() {
@@ -123,6 +122,27 @@ impl Host {
                 TryRecvError::Empty => false,
                 TryRecvError::Closed => true,
             },
+        }
+    }
+
+    /// Starts an event entity,
+    /// 
+    pub fn start(&mut self, event_entity: u32) {
+        let mut dispatcher = {
+            let dispatcher = Host::dispatcher_builder();
+            dispatcher.build()
+        };
+        dispatcher.setup(self.world_mut());
+
+        let event = self.world().entities().entity(event_entity);
+        if let Some(event) = self.world().write_component::<Event>().get_mut(event) {
+            event.fire(ThunkContext::default());
+        }
+        self.world_mut().maintain();
+
+        // TODO - Exit is currently in development
+        while !self.should_exit() {
+            dispatcher.dispatch(self.world());
         }
     }
 }

@@ -18,7 +18,6 @@ use crate::AttributeGraph;
 use crate::Exit;
 use crate::engine::Connection;
 use crate::engine::Sequence;
-use crate::host::GuestRuntime;
 use crate::AttributeIndex;
 use crate::Event;
 use crate::Extension;
@@ -165,7 +164,6 @@ impl<'a> System<'a> for EventRuntime {
         Entities<'a>,
         ReadStorage<'a, Connection>,
         ReadStorage<'a, Runtime>,
-        ReadStorage<'a, GuestRuntime>,
         ReadStorage<'a, AttributeGraph>,
         WriteStorage<'a, Event>,
         WriteStorage<'a, ThunkContext>,
@@ -190,7 +188,6 @@ impl<'a> System<'a> for EventRuntime {
             entities,
             connections,
             lifec_runtimes,
-            guest_runtimes,
             attribute_graphs,
             mut events,
             mut contexts,
@@ -203,12 +200,11 @@ impl<'a> System<'a> for EventRuntime {
     ) {
         let mut dispatch_queue = vec![];
 
-        for (entity, _connection, _lifec_runtime, attribute_graph, guest_runtime, event) in (
+        for (entity, _connection, _lifec_runtime, attribute_graph, event) in (
             &entities,
             connections.maybe(),
             lifec_runtimes.maybe(),
             attribute_graphs.maybe(),
-            guest_runtimes.maybe(),
             &mut events,
         )
             .join()
@@ -286,10 +282,7 @@ impl<'a> System<'a> for EventRuntime {
 
                                 runtime
                                     .block_on(async {
-                                        let error_dispatcher = guest_runtime
-                                            .and_then(|g| g.get_error_sender())
-                                            .unwrap_or(error_dispatcher.clone());
-
+                                        let error_dispatcher = error_dispatcher.clone();
                                         error_dispatcher.send(error_context.clone()).await
                                     })
                                     .ok();
@@ -368,14 +361,10 @@ impl<'a> System<'a> for EventRuntime {
                     .enable_async(entity, runtime_handle)
                     .enable_https_client(https_client.clone())
                     .enable_dispatcher({
-                        guest_runtime
-                            .and_then(|g| g.get_graph_sender())
-                            .unwrap_or(dispatcher.clone())
+                        dispatcher.clone()
                     })
                     .enable_operation_dispatcher({
-                        guest_runtime
-                            .and_then(|g| g.get_operation_sender())
-                            .unwrap_or(operation_dispatcher.clone())
+                        operation_dispatcher.clone()
                     })
                     .enable_status_updates(status_update_channel.clone())
                     .to_owned();
