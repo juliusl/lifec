@@ -15,8 +15,6 @@ async fn main() {
         .init();
 
     let cli = Lifec::parse();
-
-    // Read the local .runmd file
     let host = cli.create_host().await;
     match host {
         Some(mut host) => match cli {
@@ -46,6 +44,8 @@ async fn main() {
     }
 }
 
+/// Struct for cli state,
+/// 
 #[derive(Debug, Parser)]
 #[clap(name = "lifec")]
 #[clap(about = "Utilities for binary for inspecting World prepared by lifec")]
@@ -60,6 +60,8 @@ struct Lifec {
     command: Option<Commands>,
 }
 
+/// Enumeration of commands,
+/// 
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Prints the lifecycle graph,
@@ -70,6 +72,8 @@ enum Commands {
     Start(Start),
 }
 
+/// Struct for `start` command arguments
+/// 
 #[derive(Debug, Args)]
 struct Start {
     /// Entity id of the event to start,
@@ -79,13 +83,17 @@ struct Start {
     #[clap(long)]
     id: Option<u32>,
     /// Name of engine control block to search for to start,
-    ///
+    /// 
+    /// This will start the first event in the engine sequence,
+    /// 
     #[clap(long)]
     engine_name: Option<String>,
 }
 
 impl Lifec {
     /// Creates a new lifec host,
+    /// 
+    /// Will parse runmd from either a url, local file path, or current directory
     ///
     pub async fn create_host(&self) -> Option<Host> {
         match self {
