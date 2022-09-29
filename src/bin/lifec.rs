@@ -47,7 +47,7 @@ async fn main() {
 /// 
 #[derive(Debug, Parser)]
 #[clap(name = "lifec")]
-#[clap(about = "Utilities for binary for inspecting World prepared by lifec")]
+#[clap(about = "Utilities for working with World created by lifec")]
 struct Lifec {
     /// Path to runmd file, (defaults to .runmd in the current directory if not used)
     #[clap(short, long)]
