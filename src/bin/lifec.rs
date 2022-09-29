@@ -33,14 +33,12 @@ async fn main() {
                 host.print_engine_event_graph();
             }
             Lifec {
-                command: Some(Commands::Start(Start { id: Some(id), .. })), 
+                command: Some(Commands::Start(Start { id: Some(id), .. })),
                 ..
             } => {
                 host.start(id);
             }
-            _ => {
-
-            }
+            _ => {}
         },
         None => {
             eprintln!("Could not load host, run with `RUST_LOG=lifec=debug` for more information");
@@ -81,24 +79,24 @@ struct Start {
     #[clap(long)]
     id: Option<u32>,
     /// Name of engine control block to search for to start,
-    /// 
+    ///
     #[clap(long)]
-    engine_name: Option<String>, 
+    engine_name: Option<String>,
 }
 
 impl Lifec {
     /// Creates a new lifec host,
-    /// 
+    ///
     pub async fn create_host(&self) -> Option<Host> {
         if let Some(url) = &self.url {
             match Host::get::<Lifec>(url).await {
                 Ok(host) => {
                     return Some(host);
-                },
+                }
                 Err(err) => {
                     event!(Level::ERROR, "Could not get runmd from url {url}, {err}");
                     return None;
-                },
+                }
             }
         }
 
@@ -113,15 +111,18 @@ impl Lifec {
                 Err(err) => {
                     event!(Level::ERROR, "Could not load runmd from path {err}");
                     None
-                },
+                }
             }
         } else {
             match Host::runmd::<Lifec>().await {
                 Ok(host) => Some(host),
                 Err(err) => {
-                    event!(Level::ERROR, "Could not load `.runmd` from current directory {err}");
+                    event!(
+                        Level::ERROR,
+                        "Could not load `.runmd` from current directory {err}"
+                    );
                     None
-                },
+                }
             }
         }
     }
