@@ -42,6 +42,7 @@ pub use engine::Engine;
 pub use engine::Event;
 pub use engine::Exit;
 pub use engine::ExitListener;
+pub use engine::LifecycleOptions;
 
 mod host;
 pub use host::GuestRuntime;

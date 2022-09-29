@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use crate::{AttributeParser, Block, BlockProperty, Interpreter, SpecialAttribute};
-use specs::{Component, VecStorage, World, WorldExt};
+use specs::{Component, VecStorage, World, WorldExt, Entity};
 
 mod event;
 pub use event::Event;
@@ -11,8 +13,24 @@ mod connection;
 pub use connection::Connection;
 
 mod exit;
-pub use exit::Exit;
 pub use self::exit::ExitListener;
+pub use exit::Exit;
+
+mod repeat;
+pub use repeat::Repeat;
+
+mod next;
+pub use next::Next;
+
+mod fork;
+pub use fork::Fork;
+
+mod once;
+pub use once::Once;
+
+mod lifecycle;
+pub use lifecycle::LifecycleResolver;
+pub use lifecycle::LifecycleOptions;
 
 /// An engine is a sequence of events, this component manages
 /// sequences of events
@@ -51,9 +69,19 @@ pub use self::exit::ExitListener;
 /// ```
 /// ```
 ///
-#[derive(Default, Debug, Component)]
+#[derive(Clone, Default, Debug, Component)]
 #[storage(VecStorage)]
-pub struct Engine();
+pub struct Engine;
+
+impl Engine {
+    /// Finds the entity for a block,
+    /// 
+    pub fn find_block(world: &World, expression: impl AsRef<str>) -> Option<Entity> {
+        let block_list = world.read_resource::<HashMap<String, Entity>>();
+        
+        block_list.get(expression.as_ref()).cloned()
+    }
+}
 
 impl SpecialAttribute for Engine {
     fn ident() -> &'static str {
@@ -61,9 +89,14 @@ impl SpecialAttribute for Engine {
     }
 
     fn parse(parser: &mut AttributeParser, _todo: impl AsRef<str>) {
-        // Install the event special attribute
+        // Event types
         parser.with_custom::<Event>();
+        parser.with_custom::<Once>();
+        // Lifecycle options
         parser.with_custom::<Exit>();
+        parser.with_custom::<Next>();
+        parser.with_custom::<Fork>();
+        parser.with_custom::<Repeat>();
     }
 }
 
@@ -72,13 +105,6 @@ impl Interpreter for Engine {
         world.register::<Event>();
         world.register::<Sequence>();
         world.register::<Connection>();
-
-        let (exit, listener) = Exit::new();
-        world.insert(Some(exit));
-        world.insert(Some(listener));
-
-        world.fetch_mut::<Option<Exit>>().take();
-        world.fetch_mut::<Option<ExitListener>>().take();
     }
 
     /// Handles interpreting blocks and setting up sequences
@@ -89,26 +115,14 @@ impl Interpreter for Engine {
         }
 
         if block.is_control_block() {
-            for index in block.index().iter().filter(|i| i.root().name() == "engine") {
-                if index
-                    .find_property("exit_on_completion")
-                    .and_then(|e| Some(e.is_enabled()))
-                    .unwrap_or_default()
-                {
-                    let (exit, listener) = Exit::new();
-                    let mut exit_resource = world.write_resource::<Option<Exit>>();
-                    *exit_resource = Some(exit);
-
-                    let mut exit_resource = world.write_resource::<Option<ExitListener>>();
-                    *exit_resource = Some(listener);
-                }
-
-                // TODO index engines
-            }
+            let block_entity = world.entities().entity(block.entity());
+            world
+                .write_component()
+                .insert(block_entity, self.clone())
+                .expect("should be able to insert engine component");
             return;
         }
 
-        // let mut engines: Vec<(specs::Entity, Sequence)> = vec![];
         for index in block
             .index()
             .iter()
@@ -124,7 +138,6 @@ impl Interpreter for Engine {
                 for plugin in plugins.iter().map(|p| *p) {
                     let plugin = world.entities().entity(*plugin as u32);
                     sequence.add(plugin);
-                    // TODO: Can assert that the .runtime attribute worked
                 }
 
                 if let Some(parent) = sequence.next() {
@@ -133,26 +146,8 @@ impl Interpreter for Engine {
                         .insert(parent, sequence)
                         .expect("Should be able to insert");
                 }
-
-                // TODO - This needs to happen elsewhere
-                // // Connect the engines
-                // if let Some((last, mut previous_sequence)) = engines.pop() {
-                //     let connection = previous_sequence.connect(&sequence);
-                //     world.write_component().insert(last, connection).ok();
-                //     previous_sequence.set_cursor(parent);
-                //     world.write_component().insert(last, previous_sequence).ok();
-                // }
-                // engines.push((parent, sequence));
             }
         }
-
-        // if let Some((last, previous_sequence)) = engines.pop() {
-        //     world.write_component().insert(last, previous_sequence).ok();
-        //     world
-        //         .write_component()
-        //         .insert(last, Connection::default())
-        //         .ok();
-        // }
     }
 }
 

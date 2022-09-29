@@ -125,17 +125,19 @@ impl SpecialAttribute for Event {
         "event"
     }
 
-    /// # Example Usage
-    /// ```runmd
-    /// ``` test
-    /// + .engine
-    /// + .event install    <This will end up looking for a block `install test`>
-    /// + .event start      <This will end up looking for a block `start test`>
-    /// ```
-    ///
     fn parse(parser: &mut AttributeParser, content: impl AsRef<str>) {
-        if let Some(ident) = Self::parse_idents(content).first() {
-            parser.define("event", Value::Symbol(ident.to_string()));
+        let idents = Event::parse_idents(content.as_ref());
+
+        match (idents.get(0), idents.get(1)) {
+            (Some(name), Some(symbol)) => {
+                parser.define("event", Value::Symbol(format!("{name} {symbol}")));
+            },
+            (Some(symbol), None) => {
+                parser.define("event", Value::Symbol(symbol.to_string()));
+            },
+            _ => {
+                event!(Level::ERROR, "Invalid format idents state");
+            }
         }
     }
 }

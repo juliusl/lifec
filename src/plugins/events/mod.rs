@@ -336,8 +336,8 @@ impl<'a> System<'a> for EventRuntime {
                                             dispatch_queue.push((cursor, thunk_context));
                                         } else {
                                             if let Some(exit) = exit.take() {
-                                                runtime.block_on(async { exit.exit().await });
-                                                event!(Level::INFO, "Event runtime is signaling for exit");
+                                                // runtime.block_on(async { exit.exit().await });
+                                                // event!(Level::INFO, "Event runtime is signaling for exit");
                                             }
                                         }
                                     }

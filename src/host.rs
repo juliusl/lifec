@@ -1,4 +1,4 @@
-use std::{error::Error, path::PathBuf, str::from_utf8, ops::DerefMut};
+use std::{error::Error, path::PathBuf, str::from_utf8};
 use specs::{DispatcherBuilder, World, WorldExt};
 use hyper_tls::HttpsConnector;
 use tokio::sync::oneshot::error::TryRecvError;
@@ -24,7 +24,7 @@ impl Host {
     /// When adding additional systems, the below systems can be used as dependencies
     ///
     /// # Systems Included:
-    /// * event_runtime - System that manages running engines.  
+    /// * event_runtime - System that manages running engines.
     ///
     pub fn dispatcher_builder<'a, 'b>() -> DispatcherBuilder<'a, 'b> {
         let dispatcher_builder = DispatcherBuilder::new();
@@ -113,23 +113,16 @@ impl Host {
         }
     }
 
-    /// Returns true if should exit
-    /// 
-    /// TODO: make this async
+    /// Returns true if should exit,
     /// 
     pub fn should_exit(&self) -> bool {
-        let mut exit_listener = self.world.write_resource::<Option<ExitListener>>();
-        
-        if let Some(exit_listener) = exit_listener.deref_mut() {
-            match exit_listener.0.try_recv() {
-                Ok(_) => true,
-                Err(err) => match err {
-                    TryRecvError::Empty => false,
-                    TryRecvError::Closed => true,
-                },
-            }
-        } else {
-            false
+        let mut exit_listener = self.world.write_resource::<ExitListener>();
+        match exit_listener.1.try_recv() {
+            Ok(_) => true,
+            Err(err) => match err {
+                TryRecvError::Empty => false,
+                TryRecvError::Closed => true,
+            },
         }
     }
 }

@@ -1,5 +1,8 @@
-use lifec::{Project, Event, ThunkContext, Host, WorldExt};
+use std::collections::HashMap;
 
+use lifec::{Project, Event, ThunkContext, Host, WorldExt, Entity, LifecycleOptions, ReadStorage, Block};
+
+use specs::Read;
 use tracing_subscriber::EnvFilter;
 
 /// Simple program for parsing runmd into a World
@@ -11,6 +14,40 @@ fn main() {
         .init();
 
     let mut host = Host::load_content::<Lifec>(r#"
+    ``` test_block1
+    + .engine
+    : .event test
+    : .event test azure
+    : .fork test_block2, azure
+    ```
+
+    ``` test test_block1
+    + .runtime
+    : .println test_block1
+    ```
+
+    ``` test_block2
+    + .engine
+    : .event test
+    : .repeat 5
+    ```
+
+    ``` test test_block2
+    + .runtime
+    : .println test_block2
+    ```
+
+    ``` azure
+    + .engine 
+    : .event test
+    : .next containerd
+    ```
+
+    ``` test azure
+    + .runtime
+    : .println testing
+    ```
+
     ``` containerd
     + .engine
     : .event test
@@ -29,22 +66,45 @@ fn main() {
     ```
     "#);
 
-    let mut dispatcher = {
-        let dispatcher = Host::dispatcher_builder();
-        dispatcher.build()
-    };
-    dispatcher.setup(host.world_mut());
-    
-    // TODO - Turn this into an api
-    let event = host.world().entities().entity(3);
-    if let Some(event) = host.world().write_component::<Event>().get_mut(event) {
-        event.fire(ThunkContext::default());
-    }
-    host.world_mut().maintain();
+    // Print lifecycle options
+    //
+    host.world_mut().exec(|(options, blocks): (Read<HashMap<Entity, LifecycleOptions>>, ReadStorage<Block>)| {
+       for (e, option) in options.iter() {
+            if let Some(block) = blocks.get(*e) {
+                let mut block_name = block.name().to_string();
+                if block_name.is_empty() {
+                    block_name = "```".to_string();
+                }
+                println!("Engine control block: {} {} @ {:?}", block_name, block.symbol(), e);
+                println!("  {:?}", option);
+                println!("");
+            }
+       }
+    });
 
-    while !host.should_exit() {
-        dispatcher.dispatch(host.world());
-    }
+    // let mut dispatcher = {
+    //     let dispatcher = Host::dispatcher_builder();
+    //     dispatcher.build()
+    // };
+    // dispatcher.setup(host.world_mut());
+    
+    // // TODO - Turn this into an api
+
+    // // -- Ex 
+    // /*
+    //     host.start_engine("containerd').await;
+    
+    // */
+    // let event = host.world().entities().entity(3);
+    // if let Some(event) = host.world().write_component::<Event>().get_mut(event) {
+    //     event.fire(ThunkContext::default());
+    // }
+    // host.world_mut().maintain();
+
+    // // TODO, typically you would use an event loop here, 
+    // while !host.should_exit() {
+    //     dispatcher.dispatch(host.world());
+    // }
 }
 
 struct Lifec;

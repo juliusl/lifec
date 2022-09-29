@@ -1,7 +1,9 @@
 use reality::{Block, BlockIndex, Interpreter, Parser};
 use specs::{Join, World, WorldExt};
+use tracing::event;
+use tracing::Level;
 
-use crate::{plugins::Println, AttributeGraph, Engine, Event, Install, Process, Runtime, Timer};
+use crate::{plugins::Println, AttributeGraph, Engine, Event, Install, Process, Runtime, Timer, engine::{Fork, Next, Repeat, LifecycleResolver}, Exit};
 
 /// Trait to facilitate
 ///
@@ -25,6 +27,7 @@ pub trait Project {
     ///
     fn world() -> World {
         let mut world = specs::World::new();
+        world.register::<Engine>();
         world.register::<Event>();
         world.register::<Runtime>();
         world.register::<AttributeGraph>();
@@ -47,10 +50,23 @@ pub trait Project {
         
         let mut world = parser.commit();
 
-        let engine = &mut Engine();
+        let engine = &mut Engine::default();
 
         Self::configure_engine(engine);
         engine.initialize(&mut world);
+
+        // Engine lifecycle options
+        let fork = Fork::default();
+        fork.initialize(&mut world);
+
+        let next = Next::default();
+        next.initialize(&mut world);
+
+        let repeat = Repeat::default();
+        repeat.initialize(&mut world);
+
+        let exit = Exit::default();
+        exit.initialize(&mut world);
 
         // Setup graphs for all plugin entities
         for (entity, block_index) in
@@ -68,7 +84,18 @@ pub trait Project {
 
         for block in world.read_component::<Block>().join() {
             engine.interpret(&world, block);
+            repeat.interpret(&world, block);
+            fork.interpret(&world, block);
+            next.interpret(&world, block);
+            exit.interpret(&world, block);
             Self::interpret(&world, block);
+            event!(Level::TRACE, "Interpreted block {} {}", block.name(), block.symbol());
+        }
+
+        {
+            let lifecycle_resolver = world.system_data::<LifecycleResolver>();
+            let settings = lifecycle_resolver.resolve_lifecycle();
+            world.insert(settings);
         }
 
         world
