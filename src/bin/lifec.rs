@@ -88,40 +88,48 @@ impl Lifec {
     /// Creates a new lifec host,
     ///
     pub async fn create_host(&self) -> Option<Host> {
-        if let Some(url) = &self.url {
-            match Host::get::<Lifec>(url).await {
-                Ok(host) => {
-                    return Some(host);
-                }
-                Err(err) => {
-                    event!(Level::ERROR, "Could not get runmd from url {url}, {err}");
-                    return None;
-                }
-            }
-        }
-
-        if let Some(runmd_path) = &self.runmd_path {
-            let mut runmd_path = PathBuf::from(runmd_path);
-            if !runmd_path.ends_with(".runmd") || runmd_path.is_dir() {
-                runmd_path = runmd_path.join(".runmd");
-            }
-
-            match Host::open::<Lifec>(runmd_path).await {
-                Ok(host) => Some(host),
-                Err(err) => {
-                    event!(Level::ERROR, "Could not load runmd from path {err}");
-                    None
+        match self {
+            Self {
+                url: Some(url),
+                ..
+            } => {
+                match Host::get::<Lifec>(url).await {
+                    Ok(host) => {
+                        return Some(host);
+                    }
+                    Err(err) => {
+                        event!(Level::ERROR, "Could not get runmd from url {url}, {err}");
+                        return None;
+                    }
                 }
             }
-        } else {
-            match Host::runmd::<Lifec>().await {
-                Ok(host) => Some(host),
-                Err(err) => {
-                    event!(
-                        Level::ERROR,
-                        "Could not load `.runmd` from current directory {err}"
-                    );
-                    None
+            Self {
+                runmd_path: Some(runmd_path),
+                ..
+            } => {
+                let mut runmd_path = PathBuf::from(runmd_path);
+                if !runmd_path.ends_with(".runmd") || runmd_path.is_dir() {
+                    runmd_path = runmd_path.join(".runmd");
+                }
+    
+                match Host::open::<Lifec>(runmd_path).await {
+                    Ok(host) => Some(host),
+                    Err(err) => {
+                        event!(Level::ERROR, "Could not load runmd from path {err}");
+                        None
+                    }
+                }
+            },
+            _ => {
+                match Host::runmd::<Lifec>().await {
+                    Ok(host) => Some(host),
+                    Err(err) => {
+                        event!(
+                            Level::ERROR,
+                            "Could not load `.runmd` from current directory {err}"
+                        );
+                        None
+                    }
                 }
             }
         }
