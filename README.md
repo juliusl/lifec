@@ -8,32 +8,49 @@ This is the extent of what lifec provides. Since the Host can be consumed into a
 
 ## Starting an engine
 
-An engine is declared within a control block. For example,
+An engine is declared within a control block. This is an example of what a `runmd` file might look like,
 
 ```md
-<``` control>
+# Ubuntu 
+
+## Control Settings
+- This is a control block, it declares an engine with two events.
+- On completion, the engine is set to exit
+
+<``` ubuntu>
 + .engine
 : .event setup
 : .event install
 : .exit
 <```>
 
-<``` setup control>
+## Setup OS Environment
+- An event is configured w/ plugins from a runtime
+- This is provided by the host/project interpreting the runmd
+- Below is an example of usage of one of the default plugins `process`
+
+<``` setup ubuntu>
 + .runtime
 : .process apt-get update
 : .process apt-get upgrade
 <```>
 
-<``` install control>
+## Install dependencies
+- Another example, this time also uses the default plugin `println` to print a message to stdout
+
+<``` install ubuntu>
 + .runtime
 : .stop_on_error
 : .process apt-get install jq, curl
+: .println Done installing dependencies
 <```>
 ```
 
-*Note - The syntax `<``` setup control>` is just a way to escape the blocks within markdown. But in the normal case the `<>` are not required in either markdown or runmd.
+*Note - The syntax `<``` setup control>` is just a way to escape the blocks within markdown. But in the normal case using `<>` is not required in either `markdown` or `runmd`.
 
-With a host, you can parse the above, and start this engine by name, i.e `host.start("control")`.
+With a host, you can parse the above, and start the engine by name, i.e `host.start("ubuntu")`.
+
+As demonstrated above, the main advantage of the `runmd` format is being able to document sequences of events w/ the actual documentation for those events in one file. Typically, this type of information would be stored in a script or json file which is usually seperated from documentation.
 
 ## Engine lifecycle
 
@@ -57,7 +74,7 @@ If no option is used, then runtime will not do anything else. This leaves it up 
 
 * `.fix` - If a runtime is set to `.stop_on_error`, registering a `.fix` within an event runtime can be declared to attempt to fix the stopped sequence.  
 
-* `.event <name> <symbol>` - Passing two identifiers will link in an event defined in a different control namespace. This is advanced because it creates a dependency between two control domains, but overall this can sometimes be desired behavior. Especially when prototyping.
+* `.event <name> <symbol>` - Passing two identifiers will link in an event defined in a different control namespace. This is advanced because it creates a dependency between two control symbols, but overall this can sometimes be desired behavior, especially when prototyping.
 
 ## Plugin Development
 TODO
