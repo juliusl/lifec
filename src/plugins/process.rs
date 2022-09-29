@@ -1,3 +1,5 @@
+use std::str::from_utf8;
+
 use atlier::system::Value;
 use crate::{AttributeParser, BlockObject, BlockProperties, CustomAttribute};
 use specs::{Component, DenseVecStorage};
@@ -36,6 +38,13 @@ impl Plugin for Process {
             p.define_child(last, "env", Value::Symbol(var_name.to_string()));
             p.define_child(last, var_name, Value::Symbol(value));
         }));
+
+         // Enable .arg to declare environment variables
+         parser.add_custom(CustomAttribute::new_with("arg", |p, value| {
+            let last = p.last_child_entity().expect("should have added an entity for the process");
+
+            p.define_child(last, "arg", Value::Symbol(value.to_string()));
+        }));
     }
 
     fn call(context: &super::ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
@@ -59,7 +68,6 @@ impl Plugin for Process {
                 command_task.kill_on_drop(true);
 
                 // Set up any env variables
-                // TODO: Make this a generic extension method
                 for (env_name, env_val) in tc
                     .state()
                     .find_symbol_values("env")
@@ -68,6 +76,15 @@ impl Plugin for Process {
                 {
                     event!(Level::TRACE, "Setting env var {env_name}");
                     command_task.env(env_name, env_val);
+                }
+
+                // Set up any args
+                for arg in tc
+                    .state()
+                    .find_symbol_values("arg")
+                {
+                    event!(Level::TRACE, "Setting arg {arg}");
+                    command_task.arg(arg);
                 }
 
                 // Set current directory if work_dir is set
@@ -79,11 +96,23 @@ impl Plugin for Process {
                    output = command_task.output() => {
                         match output {
                             Ok(output) => {
-                                for b in output.stdout.clone() {
-                                    tc.send_char(b).await;
-                                }
-                                for b in output.stderr.clone() {
-                                    tc.send_char(b).await;
+                                // for b in output.stdout.clone() {
+                                //     tc.send_char(b).await;
+                                // }
+                                // for b in output.stderr.clone() {
+                                //     tc.send_char(b).await;
+                                // }
+
+                                let stdout = output.stdout.clone();
+                                match from_utf8(stdout.as_slice()) {
+                                    Ok(stdout) => {
+                                        for line in stdout.lines() {
+                                            println!("{}", line);
+                                        }
+                                    },
+                                    Err(err) => {
+                                        event!(Level::ERROR, "Could not read stdout {err}")
+                                    },
                                 }
                                 // Completed process, publish result
                                 tc.update_progress("# Finished, recording output", 0.30).await;
@@ -113,6 +142,7 @@ impl BlockObject for Process {
             .require("process")
             .optional("current_dir")
             .optional("env")
+            .optional("arg")
     }
 
     fn parser(&self) -> Option<CustomAttribute> {
