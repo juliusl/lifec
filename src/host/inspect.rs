@@ -57,7 +57,15 @@ impl InspectExtensions for Host {
                     for e in sequence.iter_entities() {
                         let runtime_block = blocks.get(e).expect("should exist");
                         println!("Event block:          {} {}", runtime_block.name(), runtime_block.symbol());
-                        println!("Events:");
+                        let control_values = runtime_block.map_control();
+                        if !control_values.is_empty() {
+                            println!("\nControl values:");
+                            control_values.iter().for_each(|(name, value)| {
+                                println!("\t{name}: {value}");
+                            });
+                            println!();
+                        }
+                        println!("Plugin Calls:");
                         for index in runtime_block.index().iter().filter(|i| i.root().name() == "runtime") {
                             for (e, props) in index.iter_children() {
                                     println!("\tentity-id: {e}");

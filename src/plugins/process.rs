@@ -1,4 +1,4 @@
-use std::str::from_utf8;
+use std::{str::from_utf8, path::PathBuf};
 
 use atlier::system::Value;
 use crate::{AttributeParser, BlockObject, BlockProperties, CustomAttribute};
@@ -89,13 +89,23 @@ impl Plugin for Process {
 
                 // Set current directory if work_dir is set
                 if let Some(work_dir) = tc.state().find_symbol("current_dir") {
-                    command_task.current_dir(work_dir);
+                    let path = PathBuf::from(&work_dir);
+                    match path.canonicalize() {
+                        Ok(work_dir) => {
+                            command_task.current_dir(work_dir);
+                        },
+                        Err(err) => {
+                            event!(Level::ERROR, "Could not canonicalize path {work_dir}, {err}");
+                        },
+                    }
                 }
 
                 select! {
                    output = command_task.output() => {
                         match output {
                             Ok(output) => {
+                                
+                                // TODO
                                 // for b in output.stdout.clone() {
                                 //     tc.send_char(b).await;
                                 // }
