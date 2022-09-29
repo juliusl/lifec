@@ -95,7 +95,7 @@ impl Plugin for Process {
                             command_task.current_dir(work_dir);
                         },
                         Err(err) => {
-                            event!(Level::ERROR, "Could not canonicalize path {work_dir}, {err}");
+                            panic!("Could not canonicalize path {work_dir}, {err}");
                         },
                     }
                 }

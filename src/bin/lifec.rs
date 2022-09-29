@@ -24,7 +24,7 @@ async fn main() {
                 host.print_lifecycle_graph();
             }
             Lifec {
-                command: Some(Commands::PrintEngineEventGraph),
+                command: Some(Commands::PrintEngineGraph),
                 ..
             } => {
                 host.print_engine_event_graph();
@@ -47,7 +47,7 @@ async fn main() {
 /// 
 #[derive(Debug, Parser)]
 #[clap(name = "lifec")]
-#[clap(about = "Utilities for working with World created by lifec")]
+#[clap(about = "Utilities for working with the World created by lifec")]
 struct Lifec {
     /// Path to runmd file, (defaults to .runmd in the current directory if not used)
     #[clap(short, long)]
@@ -66,7 +66,7 @@ enum Commands {
     /// Prints the lifecycle graph,
     PrintLifecycleGraph,
     /// Prints the engine event graph,
-    PrintEngineEventGraph,
+    PrintEngineGraph,
     /// Starts an event,
     Start(Start),
 }
