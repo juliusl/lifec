@@ -30,7 +30,7 @@ impl Interpreter for Once {
 
     fn interpret(&self, world: &specs::World, block: &reality::Block) {
         if !block.is_control_block() && !block.is_root_block() {
-            
+            todo!()
         }
     }
 }

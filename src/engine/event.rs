@@ -133,7 +133,7 @@ impl SpecialAttribute for Event {
                 parser.define("event", Value::Symbol(format!("{name} {symbol}")));
             },
             (Some(symbol), None) => {
-                parser.define("event", Value::Symbol(symbol.to_string()));
+                parser.define("event", Value::Symbol(format!(" {symbol}")));
             },
             _ => {
                 event!(Level::ERROR, "Invalid format idents state");

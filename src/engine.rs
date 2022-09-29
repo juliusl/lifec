@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{AttributeParser, Block, BlockProperty, Interpreter, SpecialAttribute};
-use specs::{Component, VecStorage, World, WorldExt, Entity};
+use specs::{Component, Entity, VecStorage, World, WorldExt};
 
 mod event;
 pub use event::Event;
@@ -29,8 +29,9 @@ mod once;
 pub use once::Once;
 
 mod lifecycle;
-pub use lifecycle::LifecycleResolver;
 pub use lifecycle::LifecycleOptions;
+pub use lifecycle::LifecycleResolver;
+
 
 /// An engine is a sequence of events, this component manages
 /// sequences of events
@@ -75,10 +76,12 @@ pub struct Engine;
 
 impl Engine {
     /// Finds the entity for a block,
-    /// 
+    ///
     pub fn find_block(world: &World, expression: impl AsRef<str>) -> Option<Entity> {
         let block_list = world.read_resource::<HashMap<String, Entity>>();
-        
+
+        tracing::event!(tracing::Level::TRACE, "Looking for block {}", expression.as_ref());
+
         block_list.get(expression.as_ref()).cloned()
     }
 }
@@ -120,6 +123,32 @@ impl Interpreter for Engine {
                 .write_component()
                 .insert(block_entity, self.clone())
                 .expect("should be able to insert engine component");
+
+            if let Some(engine) = block.index().iter().find(|b| b.root().name() == "engine") {
+                let events = engine
+                    .properties()
+                    .property("event")
+                    .and_then(BlockProperty::symbol_vec)
+                    .expect("events must be symbols");
+
+                let mut engine_sequence = Sequence::default();
+                for event in events {
+                    let mut expression = event.to_string();
+                    if event.starts_with(" ") {
+                        expression = format!("{} {}", event.trim(), block.symbol());
+                    }
+
+                    if let Some(event_entity) = Engine::find_block(world, expression) {
+                        engine_sequence.add(event_entity);
+                    }
+                }
+
+                world
+                    .write_component()
+                    .insert(block_entity, engine_sequence)
+                    .expect("should be able to insert component");
+            }
+
             return;
         }
 

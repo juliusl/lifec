@@ -35,13 +35,13 @@ impl Host {
     /// Returns a immutable reference to the world,
     ///
     pub fn world(&self) -> &World {
-        &self.world
+        self.as_ref()
     }
 
     /// Returns a mutable reference to the world,
     ///
     pub fn world_mut(&mut self) -> &mut World {
-        &mut self.world
+        self.as_mut()
     }
 
     /// Opens the .runmd file in the current directory,
@@ -124,6 +124,18 @@ impl Host {
                 TryRecvError::Closed => true,
             },
         }
+    }
+}
+
+impl AsRef<World> for Host {
+    fn as_ref(&self) -> &World {
+        &self.world
+    }
+}
+
+impl AsMut<World> for Host {
+    fn as_mut(&mut self) -> &mut World {
+        &mut self.world
     }
 }
 

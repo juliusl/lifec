@@ -3,6 +3,7 @@ use specs::{Join, World, WorldExt};
 use tracing::event;
 use tracing::Level;
 
+use crate::LifecycleOptions;
 use crate::{plugins::Println, AttributeGraph, Engine, Event, Install, Process, Runtime, Timer, engine::{Fork, Next, Repeat, LifecycleResolver}, Exit};
 
 /// Trait to facilitate
@@ -27,10 +28,11 @@ pub trait Project {
     ///
     fn world() -> World {
         let mut world = specs::World::new();
-        world.register::<Engine>();
         world.register::<Event>();
+        world.register::<Engine>();
         world.register::<Runtime>();
         world.register::<AttributeGraph>();
+        world.register::<LifecycleOptions>();
         world.insert(Self::runtime());
         world
     }
@@ -92,6 +94,7 @@ pub trait Project {
             event!(Level::TRACE, "Interpreted block {} {}", block.name(), block.symbol());
         }
 
+        // Resolve lifecycle settings before returning
         {
             let lifecycle_resolver = world.system_data::<LifecycleResolver>();
             let settings = lifecycle_resolver.resolve_lifecycle();
