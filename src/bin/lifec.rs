@@ -1,9 +1,8 @@
-use std::{error::Error, path::PathBuf};
-
-use clap::{Args, Parser, Subcommand};
 use lifec::{Host, InspectExtensions, Project};
-use tracing::{event, Level};
+use clap::{Args, Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
+use tracing::{event, Level};
+use std::path::PathBuf;
 
 /// Simple program for parsing runmd into a World
 ///
