@@ -124,6 +124,18 @@ impl Plugin for Process {
                                         event!(Level::ERROR, "Could not read stdout {err}")
                                     },
                                 }
+
+                                let stderr = output.stderr.clone();
+                                match from_utf8(stderr.as_slice()) {
+                                    Ok(stderr) => {
+                                        for line in stderr.lines() {
+                                            eprintln!("{}", line);
+                                        }
+                                    },
+                                    Err(err) => {
+                                        event!(Level::ERROR, "Could not read stdout {err}")
+                                    },
+                                }
                                 // Completed process, publish result
                                 tc.update_progress("# Finished, recording output", 0.30).await;
                                 // Self::resolve_output(&mut tc, command, start_time, output);
