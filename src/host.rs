@@ -109,7 +109,7 @@ impl Host {
                 ..
             } => {
                 let mut runmd_path = PathBuf::from(runmd_path);
-                if !runmd_path.ends_with(".runmd") || runmd_path.is_dir() {
+                if runmd_path.is_dir() {
                     runmd_path = runmd_path.join(".runmd");
                 }
     
