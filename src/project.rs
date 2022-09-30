@@ -4,6 +4,7 @@ use tracing::event;
 use tracing::Level;
 
 use crate::LifecycleOptions;
+use crate::engine::Loop;
 use crate::{plugins::Println, AttributeGraph, Engine, Event, Install, Process, Runtime, Timer, engine::{Fork, Next, Repeat, LifecycleResolver}, Exit};
 
 /// Trait to facilitate
@@ -70,6 +71,9 @@ pub trait Project {
         let exit = Exit::default();
         exit.initialize(&mut world);
 
+        let r#loop = Loop::default();
+        r#loop.initialize(&mut world);
+
         // Setup graphs for all plugin entities
         for (entity, block_index) in
             (&world.entities(), &world.read_component::<BlockIndex>()).join()
@@ -90,6 +94,7 @@ pub trait Project {
             fork.interpret(&world, block);
             next.interpret(&world, block);
             exit.interpret(&world, block);
+            r#loop.interpret(&world, block);
             Self::interpret(&world, block);
             event!(Level::TRACE, "Interpreted block {} {}", block.name(), block.symbol());
         }
