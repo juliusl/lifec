@@ -1,8 +1,7 @@
-use std::time::Duration;
 
-use lifec::{Host, Inspector, Project, Start, Sequencer};
-use clap::{Parser, Subcommand};
+use lifec::{Host, Inspector, Project, Sequencer, Start};
 use tracing_subscriber::EnvFilter;
+use clap::{Parser, Subcommand};
 
 /// Simple program for parsing runmd into a World
 ///
@@ -11,15 +10,19 @@ async fn main() {
     let cli = Lifec::parse();
 
     tracing_subscriber::fmt::Subscriber::builder()
-    .with_env_filter(if !cli.debug {
-        EnvFilter::from_default_env()
-            .add_directive("lifec=info".parse().expect("should be ok"))
-    } else {
-        EnvFilter::from_default_env()
-            .add_directive("lifec=debug".parse().expect("should be ok"))
-    })
-    .compact()
-    .init();
+        .with_env_filter(if !cli.debug {
+            EnvFilter::builder()
+                .with_default_directive("lifec=info".parse().expect("should parse"))
+                .from_env()
+                .expect("should work")
+        } else {
+            EnvFilter::builder()
+                .with_default_directive("lifec=debug".parse().expect("should parse"))
+                .from_env()
+                .expect("should work")
+        })
+        .compact()
+        .init();
 
     match cli {
         Lifec {
@@ -32,37 +35,55 @@ async fn main() {
             match (runmd_path, url) {
                 (Some(runmd_path), None) => {
                     host.set_path(runmd_path);
-                }, 
+                }
                 (None, Some(url)) => {
                     host.set_url(url);
-                }, 
+                }
                 _ => {}
             }
 
             match c {
                 Commands::Start(start) => {
                     host.set_command(lifec::Commands::Start(start));
-                    let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
-                    host.link_sequences();
-                    host.handle_start();
-                    
-                    let host_rutime = host.world_mut().remove::<tokio::runtime::Runtime>().expect("should remove tokio runtime");
-                    host_rutime.shutdown_background();
-                }
-                Commands::Host(host) => {
-                    let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+                    let mut host = host
+                        .create_host::<Lifec>()
+                        .await
+                        .expect("Should be able to create host");
                     host.link_sequences();
                     host.handle_start();
 
-                    let host_rutime = host.world_mut().remove::<tokio::runtime::Runtime>().expect("should remove tokio runtime");
+                    let host_rutime = host
+                        .world_mut()
+                        .remove::<tokio::runtime::Runtime>()
+                        .expect("should remove tokio runtime");
+                    host_rutime.shutdown_background();
+                }
+                Commands::Host(host) => {
+                    let mut host = host
+                        .create_host::<Lifec>()
+                        .await
+                        .expect("Should be able to create host");
+                    host.link_sequences();
+                    host.handle_start();
+
+                    let host_rutime = host
+                        .world_mut()
+                        .remove::<tokio::runtime::Runtime>()
+                        .expect("should remove tokio runtime");
                     host_rutime.shutdown_background();
                 }
                 Commands::PrintEngineGraph => {
-                    let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+                    let mut host = host
+                        .create_host::<Lifec>()
+                        .await
+                        .expect("Should be able to create host");
                     host.print_engine_event_graph();
                 }
                 Commands::PrintLifecycleGraph => {
-                    let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+                    let mut host = host
+                        .create_host::<Lifec>()
+                        .await
+                        .expect("Should be able to create host");
                     host.print_lifecycle_graph();
                 }
             }
@@ -74,11 +95,13 @@ async fn main() {
 }
 
 /// Struct for cli state,
-/// 
+///
 #[derive(Debug, Parser)]
 #[clap(name = "lifec")]
 #[clap(arg_required_else_help = true)]
-#[clap(about = "Utilities for working with the World created by lifec, limited to process, install, println, timer plugins")]
+#[clap(
+    about = "Utilities for working with the World created by lifec, limited to process, install, println, timer plugins"
+)]
 struct Lifec {
     /// URL to runmd to fetch to create host
     #[clap(long)]
@@ -94,7 +117,7 @@ struct Lifec {
 }
 
 /// Enumeration of commands,
-/// 
+///
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Prints the lifecycle graph,

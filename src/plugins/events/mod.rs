@@ -14,14 +14,14 @@ use tokio::sync::{
 use tracing::event;
 use tracing::Level;
 
-use crate::AttributeGraph;
-use crate::Engine;
-use crate::LifecycleOptions;
 use crate::engine::Connection;
 use crate::engine::Sequence;
+use crate::AttributeGraph;
 use crate::AttributeIndex;
+use crate::Engine;
 use crate::Event;
 use crate::Extension;
+use crate::LifecycleOptions;
 use crate::Operation;
 use crate::Runtime;
 
@@ -34,7 +34,6 @@ use super::BlockAddress;
 use super::{Thunk, ThunkContext};
 mod proxy_dispatcher;
 pub use proxy_dispatcher::ProxyDispatcher;
-
 
 /// Event runtime drives the tokio::Runtime and schedules/monitors/orchestrates task entities
 #[derive(Default)]
@@ -331,77 +330,107 @@ impl<'a> System<'a> for EventRuntime {
                                             event!(Level::DEBUG, "found cursor {}", cursor.id());
                                             dispatch_queue.push((cursor, thunk_context));
                                         } else {
-                                            if let Some(lifecycle_option) = lifecycle_options.get_mut(entity) {
-                                                event!(Level::DEBUG, "found lifecycle option {:?}", lifecycle_option);
-                                                match lifecycle_option {
-                                                    LifecycleOptions::Repeat { remaining, start } if *remaining > 0 => {
-                                                        *remaining -= 1;
-                                                        event!(Level::DEBUG, "looking for engine for {:?}", start);
-                                                        if let Some(engine) = engines.get(*start) {
-                                                            event!(Level::DEBUG, "found engine");
-                                                            if let Some(start) = engine.start() {
-                                                                event!(Level::DEBUG, "found start -> {}", start.id());
-                                                                dispatch_queue.push((start, thunk_context.clone()));
-                                                            }
+                                            // Finds the start of an engine
+                                            let find_engine =
+                                                |start: Entity, engines: &ReadStorage<Engine>| {
+                                                    event!(
+                                                        Level::DEBUG,
+                                                        "looking for engine for {:?}",
+                                                        start
+                                                    );
+                                                    if let Some(engine) = engines.get(start) {
+                                                        event!(Level::DEBUG, "found engine");
+                                                        if let Some(start) = engine.start() {
+                                                            event!(
+                                                                Level::DEBUG,
+                                                                "found start -> {}",
+                                                                start.id()
+                                                            );
+                                                            return Some(start);
                                                         }
-                                                    },
-                                                    LifecycleOptions::Repeat { remaining, start } if *remaining == 0 => {
-                                                        event!(Level::DEBUG, "looking for engine for {:?}", start);
-                                                        if let Some(engine) = engines.get(*start) {
-                                                            event!(Level::DEBUG, "found engine");
-                                                            if let Some(start) = engine.start() {
-                                                                event!(Level::DEBUG, "found start -> {}", start.id());
-                                                                dispatch_queue.push((start, thunk_context.clone()));
-                                                            }
+                                                    }
+                                                    None
+                                                };
+
+                                            if let Some(lifecycle_option) =
+                                                lifecycle_options.get_mut(entity)
+                                            {
+                                                event!(
+                                                    Level::DEBUG,
+                                                    "found lifecycle option {:?}",
+                                                    lifecycle_option
+                                                );
+                                                match lifecycle_option {
+                                                    LifecycleOptions::Repeat {
+                                                        remaining,
+                                                        start,
+                                                    } if *remaining > 0 => {
+                                                        *remaining -= 1;
+                                                        if let Some(engine) =
+                                                            find_engine(*start, &engines)
+                                                        {
+                                                            dispatch_queue.push((
+                                                                engine,
+                                                                thunk_context.clone(),
+                                                            ));
+                                                        }
+                                                    }
+                                                    LifecycleOptions::Repeat {
+                                                        remaining,
+                                                        start,
+                                                    } if *remaining == 1 => {
+                                                        if let Some(engine) =
+                                                            find_engine(*start, &engines)
+                                                        {
+                                                            dispatch_queue.push((
+                                                                engine,
+                                                                thunk_context.clone(),
+                                                            ));
                                                         }
                                                         *lifecycle_option = LifecycleOptions::Once;
-
-                                                    },
+                                                    }
                                                     LifecycleOptions::Fork(forks) => {
                                                         while let Some(fork) = forks.pop() {
-                                                            // TODO DRY
-                                                            event!(Level::DEBUG, "looking for engine for {:?}", fork);
-                                                            if let Some(engine) = engines.get(fork) {
-                                                                event!(Level::DEBUG, "found engine");
-                                                                if let Some(start) = engine.start() {
-                                                                    event!(Level::DEBUG, "found start -> {}", start.id());
-                                                                    dispatch_queue.push((start, thunk_context.clone()));
-                                                                }
+                                                            if let Some(engine) =
+                                                                find_engine(fork, &engines)
+                                                            {
+                                                                dispatch_queue.push((
+                                                                    engine,
+                                                                    thunk_context.clone(),
+                                                                ));
                                                             }
                                                         }
 
                                                         *lifecycle_option = LifecycleOptions::Exit;
-                                                    },
+                                                    }
                                                     LifecycleOptions::Next(next) => {
-                                                        event!(Level::DEBUG, "looking for engine for {:?}", next);
-                                                        if let Some(engine) = engines.get(*next) {
-                                                            event!(Level::DEBUG, "found engine");
-                                                            if let Some(start) = engine.start() {
-                                                                event!(Level::DEBUG, "found start -> {}", start.id());
-                                                                dispatch_queue.push((start, thunk_context.clone()));
-                                                            }
+                                                        if let Some(engine) =
+                                                            find_engine(*next, &engines)
+                                                        {
+                                                            dispatch_queue.push((
+                                                                engine,
+                                                                thunk_context.clone(),
+                                                            ));
                                                         }
 
                                                         *lifecycle_option = LifecycleOptions::Exit;
-                                                    },
+                                                    }
                                                     LifecycleOptions::Loop(next) => {
-                                                        event!(Level::DEBUG, "looking for engine for {:?}", next);
-                                                        if let Some(engine) = engines.get(*next) {
-                                                            event!(Level::DEBUG, "found engine");
-                                                            if let Some(start) = engine.start() {
-                                                                event!(Level::DEBUG, "found start -> {}", start.id());
-                                                                dispatch_queue.push((start, thunk_context.clone()));
-                                                            }
+                                                        if let Some(engine) =
+                                                            find_engine(*next, &engines)
+                                                        {
+                                                            dispatch_queue.push((
+                                                                engine,
+                                                                thunk_context.clone(),
+                                                            ));
                                                         }
-                                                    },
-                                                    LifecycleOptions::Exit => {
-                                                    },
+                                                    }
                                                     LifecycleOptions::Once => {
                                                         // Should exit next
                                                         *lifecycle_option = LifecycleOptions::Exit;
                                                     }
-                                                    _ => {
-                                                    }
+                                                    LifecycleOptions::Exit => {}
+                                                    _ => {}
                                                 }
                                             }
                                         }
@@ -424,7 +453,12 @@ impl<'a> System<'a> for EventRuntime {
                     "start event:\n\t{}\n\t{}\n\t{}\n\t{}",
                     entity.id(),
                     &event_name,
-                    format!("parent - {}", attribute_graph.and_then(|g| Some(g.unscope().entity_id())).unwrap_or_default()),
+                    format!(
+                        "parent - {}",
+                        attribute_graph
+                            .and_then(|g| Some(g.unscope().entity_id()))
+                            .unwrap_or_default()
+                    ),
                     initial_context.state().hash_code()
                 );
                 let thunk = thunk.clone();
@@ -433,15 +467,11 @@ impl<'a> System<'a> for EventRuntime {
                 let mut context = initial_context
                     .enable_async(entity, runtime_handle)
                     .enable_https_client(https_client.clone())
-                    .enable_dispatcher({
-                        dispatcher.clone()
-                    })
-                    .enable_operation_dispatcher({
-                        operation_dispatcher.clone()
-                    })
+                    .enable_dispatcher({ dispatcher.clone() })
+                    .enable_operation_dispatcher({ operation_dispatcher.clone() })
                     .enable_status_updates(status_update_channel.clone())
                     .to_owned();
-                
+
                 if let Some(graph) = attribute_graph {
                     context = context.with_state(graph.clone());
                 }
@@ -520,6 +550,22 @@ impl<'a> System<'a> for EventRuntime {
         while let Some((next, last)) = dispatch_queue.pop() {
             if let Some(event) = events.get_mut(next) {
                 let last_id = last.state().entity_id();
+
+                if last_id == next.id()
+                    && lifecycle_options
+                        .get(next)
+                        .and_then(|o| {
+                            if let LifecycleOptions::Loop(_) = o {
+                                Some(false)
+                            } else {
+                                Some(true)
+                            }
+                        })
+                        .unwrap_or_default()
+                {
+                    event!(Level::WARN, "Loop detected, skipping");
+                    continue;
+                }
 
                 event.fire(last.clone());
                 event!(
