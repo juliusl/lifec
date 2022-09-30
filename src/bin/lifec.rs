@@ -60,7 +60,7 @@ async fn main() {
 /// 
 #[derive(Debug, Parser)]
 #[clap(name = "lifec")]
-#[clap(about = "Utilities for working with the World created by lifec")]
+#[clap(about = "Utilities for working with the World created by lifec, limited to process, install, println, timer plugins")]
 struct Lifec {
     /// URL to runmd to fetch to create host
     #[clap(long)]
