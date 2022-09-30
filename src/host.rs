@@ -21,6 +21,7 @@ pub use commands::Commands;
 /// project type,
 ///
 #[derive(Default, Args)]
+#[clap(arg_required_else_help=true)]
 pub struct Host {
     /// URL to runmd to use when configuring this mirror engine
     #[clap(long)]
