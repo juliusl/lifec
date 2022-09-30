@@ -47,6 +47,8 @@ pub use engine::Sequence;
 
 mod host;
 pub use host::Host;
+pub use host::Start;
+pub use host::Commands;
 pub use host::InspectExtensions;
 
 mod project;

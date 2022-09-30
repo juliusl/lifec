@@ -1,8 +1,6 @@
-use lifec::{Host, InspectExtensions, Project};
-use clap::{Args, Parser, Subcommand};
+use lifec::{Host, InspectExtensions, Project, Start};
+use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
-use tracing::{event, Level};
-use std::path::PathBuf;
 
 /// Simple program for parsing runmd into a World
 ///
@@ -14,30 +12,62 @@ async fn main() {
         .init();
 
     let cli = Lifec::parse();
-    let host = cli.create_host().await;
-    match host {
-        Some(mut host) => match cli {
-            Lifec {
-                command: Some(Commands::PrintLifecycleGraph),
-                ..
-            } => {
-                host.print_lifecycle_graph();
-            }
-            Lifec {
-                command: Some(Commands::PrintEngineGraph),
-                ..
-            } => {
-                host.print_engine_event_graph();
-            }
-            Lifec {
-                command: Some(Commands::Start(Start { id: Some(id), .. })),
-                ..
-            } => {
-                host.start(id);
-            }
-            _ => {}
-        },
-        None => {
+    match cli {
+        Lifec {
+            command: Some(Commands::Host(host)),
+            ..
+        } => {
+            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+            host.handle_start();
+        }
+        Lifec {
+            command: Some(Commands::PrintLifecycleGraph(host)),
+            ..
+        } => {
+            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+            host.print_lifecycle_graph()
+        }
+        Lifec {
+            command: Some(Commands::PrintEngineGraph(host)),
+            ..
+        } => {
+            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+            host.print_engine_event_graph()
+        }
+        // TODO -- DRY
+        Lifec {
+            command: Some(Commands::Start(start)),
+            runmd_path: Some(runmd_path),
+            ..
+        } => {
+            let mut host = Host::default();
+            host.set_command(lifec::Commands::Start(start));
+            host.set_path(runmd_path);
+            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+            host.handle_start();
+        }
+        Lifec {
+            command: Some(Commands::Start(start)),
+            url: Some(url),
+            ..
+        } => {
+            let mut host = Host::default();
+            host.set_command(lifec::Commands::Start(start));
+            host.set_url(url);
+            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+            host.handle_start();
+        }
+        Lifec {
+            command: Some(Commands::Start(start)),
+            url: None,
+            runmd_path: None,
+        } => {
+            let mut host = Host::default();
+            host.set_command(lifec::Commands::Start(start));
+            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+            host.handle_start();
+        }
+        _ => {
             eprintln!("Could not load host, run with `RUST_LOG=lifec=debug` for more information");
         }
     }
@@ -49,12 +79,13 @@ async fn main() {
 #[clap(name = "lifec")]
 #[clap(about = "Utilities for working with the World created by lifec")]
 struct Lifec {
-    /// Path to runmd file, (defaults to .runmd in the current directory if not used)
-    #[clap(short, long)]
-    runmd_path: Option<String>,
-    /// Url to get runmd from, must use `https`
+    /// URL to runmd to use when configuring this mirror engine
     #[clap(long)]
     url: Option<String>,
+    /// Path to runmd file used to configure the mirror engine
+    /// Defaults to .runmd
+    #[clap(long)]
+    runmd_path: Option<String>,
     #[clap(subcommand)]
     command: Option<Commands>,
 }
@@ -64,83 +95,13 @@ struct Lifec {
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Prints the lifecycle graph,
-    PrintLifecycleGraph,
+    PrintLifecycleGraph(Host),
     /// Prints the engine event graph,
-    PrintEngineGraph,
-    /// Starts an event,
+    PrintEngineGraph(Host),
+    /// Host commands,
+    Host(Host),
+    /// Shortcut for `host start` command,
     Start(Start),
-}
-
-/// Struct for `start` command arguments
-/// 
-#[derive(Debug, Args)]
-struct Start {
-    /// Entity id of the event to start,
-    ///
-    /// The entity id can be retrieved from the print-engine-event-graph command
-    ///
-    #[clap(long)]
-    id: Option<u32>,
-    /// Name of engine control block to search for to start,
-    /// 
-    /// This will start the first event in the engine sequence,
-    /// 
-    #[clap(long)]
-    engine_name: Option<String>,
-}
-
-impl Lifec {
-    /// Creates a new lifec host,
-    /// 
-    /// Will parse runmd from either a url, local file path, or current directory
-    ///
-    pub async fn create_host(&self) -> Option<Host> {
-        match self {
-            Self {
-                url: Some(url),
-                ..
-            } => {
-                match Host::get::<Lifec>(url).await {
-                    Ok(host) => {
-                        return Some(host);
-                    }
-                    Err(err) => {
-                        event!(Level::ERROR, "Could not get runmd from url {url}, {err}");
-                        return None;
-                    }
-                }
-            }
-            Self {
-                runmd_path: Some(runmd_path),
-                ..
-            } => {
-                let mut runmd_path = PathBuf::from(runmd_path);
-                if !runmd_path.ends_with(".runmd") || runmd_path.is_dir() {
-                    runmd_path = runmd_path.join(".runmd");
-                }
-    
-                match Host::open::<Lifec>(runmd_path).await {
-                    Ok(host) => Some(host),
-                    Err(err) => {
-                        event!(Level::ERROR, "Could not load runmd from path {err}");
-                        None
-                    }
-                }
-            },
-            _ => {
-                match Host::runmd::<Lifec>().await {
-                    Ok(host) => Some(host),
-                    Err(err) => {
-                        event!(
-                            Level::ERROR,
-                            "Could not load `.runmd` from current directory {err}"
-                        );
-                        None
-                    }
-                }
-            }
-        }
-    }
 }
 
 impl Project for Lifec {

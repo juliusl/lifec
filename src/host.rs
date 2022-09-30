@@ -1,20 +1,145 @@
+use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use specs::{DispatcherBuilder, World, WorldExt};
-use std::{error::Error, path::PathBuf, str::from_utf8};
+use std::{error::Error, fmt::Debug, path::PathBuf, str::from_utf8};
 use tokio::sync::oneshot::error::TryRecvError;
 use tracing::{event, Level};
 
-use crate::{plugins::EventRuntime, ExitListener, Project, Event, ThunkContext};
+use crate::{plugins::EventRuntime, Event, ExitListener, Project, ThunkContext};
 
 mod inspect;
 pub use inspect::InspectExtensions;
 
+mod start;
+pub use start::Start;
+
+mod commands;
+pub use commands::Commands;
+
 /// Struct for starting engines compiled from a
 /// project type,
 ///
+#[derive(Default, Args)]
 pub struct Host {
-    world: World,
+    /// URL to runmd to use when configuring this mirror engine
+    #[clap(long)]
+    url: Option<String>,
+    /// Path to runmd file used to configure the mirror engine
+    /// Defaults to .runmd
+    #[clap(long)]
+    runmd_path: Option<String>,
+    #[clap(subcommand)]
+    commands: Option<Commands>,
+    #[clap(skip)]
+    world: Option<World>,
+}
+
+/// CLI functions
+/// 
+impl Host {
+    /// Handles the current command
+    /// 
+    pub fn handle_start(&mut self) {
+        match self.command() {
+            Some(Commands::Start(Start { id: Some(id), .. })) => {
+                 self.start(*id);
+            }
+            Some(Commands::Start(Start { engine_name: Some(_engine_name), .. })) => {
+                 todo!()
+            }
+            _ => {
+                unreachable!("A command should exist by this point")
+            }
+        }
+    }
+
+    /// Returns the current command,
+    /// 
+    pub fn command(&self) -> Option<&Commands> {
+        self.commands.as_ref()
+    }
+
+    /// Sets the command argument,
+    /// 
+    pub fn set_command(&mut self, command: Commands) {
+        self.commands = Some(command);
+    }
+
+    /// Sets the runmd path argument, if None defaults to ./.runmd
+    /// 
+    pub fn set_path(&mut self, path: impl AsRef<str>) {
+        self.runmd_path = Some(path.as_ref().to_string());
+    }
+
+    /// Sets the runmd url argument,
+    /// 
+    pub fn set_url(&mut self, url: impl AsRef<str>) {
+        self.url = Some(url.as_ref().to_string());
+    }
+
+    /// Creates a new lifec host,
+    /// 
+    /// Will parse runmd from either a url, local file path, or current directory
+    ///
+    pub async fn create_host<P>(&self) -> Option<Host> 
+    where
+        P: Project
+    {
+        let command = self.command().cloned();
+        match self {
+            Self {
+                url: Some(url),
+                ..
+            } => {
+                match Host::get::<P>(url).await {
+                    Ok(mut host) => {
+                        host.commands = command;
+                        return Some(host);
+                    }
+                    Err(err) => {
+                        event!(Level::ERROR, "Could not get runmd from url {url}, {err}");
+                        return None;
+                    }
+                }
+            }
+            Self {
+                runmd_path: Some(runmd_path),
+                ..
+            } => {
+                let mut runmd_path = PathBuf::from(runmd_path);
+                if !runmd_path.ends_with(".runmd") || runmd_path.is_dir() {
+                    runmd_path = runmd_path.join(".runmd");
+                }
+    
+                match Host::open::<P>(runmd_path).await {
+                    Ok(mut host) => { 
+                        host.commands = command;    
+                        Some(host) 
+                    },
+                    Err(err) => {
+                        event!(Level::ERROR, "Could not load runmd from path {err}");
+                        None
+                    }
+                }
+            },
+            _ => {
+                match Host::runmd::<P>().await {
+                    Ok(mut host) => {
+                        host.commands = command;
+                        Some(host)
+                    },
+                    Err(err) => {
+                        event!(
+                            Level::ERROR,
+                            "Could not load `.runmd` from current directory {err}"
+                        );
+                        None
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Host {
@@ -35,13 +160,13 @@ impl Host {
     /// Returns a immutable reference to the world,
     ///
     pub fn world(&self) -> &World {
-        self.as_ref()
+        self.world.as_ref().expect("World should exist")
     }
 
     /// Returns a mutable reference to the world,
     ///
     pub fn world_mut(&mut self) -> &mut World {
-        self.as_mut()
+        self.world.as_mut().expect("World should exist")
     }
 
     /// Opens the .runmd file in the current directory,
@@ -108,14 +233,17 @@ impl Host {
         P: Project,
     {
         Self {
-            world: P::compile(content),
+            runmd_path: None,
+            url: None,
+            commands: None,
+            world: Some(P::compile(content)),
         }
     }
 
     /// Returns true if should exit,
     ///
     pub fn should_exit(&self) -> bool {
-        let mut exit_listener = self.world.write_resource::<ExitListener>();
+        let mut exit_listener = self.world().write_resource::<ExitListener>();
         match exit_listener.1.try_recv() {
             Ok(_) => true,
             Err(err) => match err {
@@ -126,7 +254,7 @@ impl Host {
     }
 
     /// Starts an event entity,
-    /// 
+    ///
     pub fn start(&mut self, event_entity: u32) {
         let mut dispatcher = {
             let dispatcher = Host::dispatcher_builder();
@@ -147,20 +275,18 @@ impl Host {
     }
 }
 
-impl AsRef<World> for Host {
-    fn as_ref(&self) -> &World {
-        &self.world
+impl Debug for Host {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Host")
+            .field("url", &self.url)
+            .field("runmd_path", &self.runmd_path)
+            .finish()
     }
 }
 
-impl AsMut<World> for Host {
-    fn as_mut(&mut self) -> &mut World {
-        &mut self.world
-    }
-}
 
 impl Into<World> for Host {
     fn into(self) -> World {
-        self.world
+        self.world.unwrap()
     }
 }
