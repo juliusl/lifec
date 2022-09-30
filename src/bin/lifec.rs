@@ -6,12 +6,21 @@ use tracing_subscriber::EnvFilter;
 ///
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::Subscriber::builder()
-        .with_env_filter(EnvFilter::from_default_env())
-        .compact()
-        .init();
-
     let cli = Lifec::parse();
+
+    tracing_subscriber::fmt::Subscriber::builder()
+    .with_env_filter(if !cli.debug {
+        EnvFilter::from_default_env()
+            .add_directive("acr=info".parse().expect("should be ok"))
+            .add_directive("lifec=info".parse().expect("should be ok"))
+    } else {
+        EnvFilter::from_default_env()
+            .add_directive("acr=debug".parse().expect("should be ok"))
+            .add_directive("lifec=debug".parse().expect("should be ok"))
+    })
+    .compact()
+    .init();
+
     match cli {
         Lifec {
             runmd_path,
@@ -60,6 +69,7 @@ async fn main() {
 /// 
 #[derive(Debug, Parser)]
 #[clap(name = "lifec")]
+#[clap(arg_required_else_help = true)]
 #[clap(about = "Utilities for working with the World created by lifec, limited to process, install, println, timer plugins")]
 struct Lifec {
     /// URL to runmd to fetch to create host
@@ -68,6 +78,9 @@ struct Lifec {
     /// Path to runmd file to create host
     #[clap(long)]
     runmd_path: Option<String>,
+    /// Turns on debug logging
+    #[clap(long, action)]
+    debug: bool,
     #[clap(subcommand)]
     command: Option<Commands>,
 }
