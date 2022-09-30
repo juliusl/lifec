@@ -185,10 +185,11 @@ impl Host {
     where
         P: Project,
     {
-        match tokio::fs::read_to_string(path.into()).await {
+        let path = path.into();
+        match tokio::fs::read_to_string(&path).await {
             Ok(runmd) => Ok(Host::load_content::<P>(runmd)),
             Err(err) => {
-                event!(Level::ERROR, "Could not open file {err}");
+                event!(Level::ERROR, "Could not open file {:?}, {err}", path);
                 Err(err)
             }
         }
