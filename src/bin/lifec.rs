@@ -14,58 +14,41 @@ async fn main() {
     let cli = Lifec::parse();
     match cli {
         Lifec {
-            command: Some(Commands::Host(host)),
-            ..
-        } => {
-            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
-            host.handle_start();
-        }
-        Lifec {
-            command: Some(Commands::PrintLifecycleGraph(host)),
-            ..
-        } => {
-            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
-            host.print_lifecycle_graph()
-        }
-        Lifec {
-            command: Some(Commands::PrintEngineGraph(host)),
-            ..
-        } => {
-            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
-            host.print_engine_event_graph()
-        }
-        // TODO -- DRY
-        Lifec {
-            command: Some(Commands::Start(start)),
-            runmd_path: Some(runmd_path),
+            runmd_path,
+            url,
+            command: Some(c),
             ..
         } => {
             let mut host = Host::default();
-            host.set_command(lifec::Commands::Start(start));
-            host.set_path(runmd_path);
-            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
-            host.handle_start();
-        }
-        Lifec {
-            command: Some(Commands::Start(start)),
-            url: Some(url),
-            ..
-        } => {
-            let mut host = Host::default();
-            host.set_command(lifec::Commands::Start(start));
-            host.set_url(url);
-            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
-            host.handle_start();
-        }
-        Lifec {
-            command: Some(Commands::Start(start)),
-            url: None,
-            runmd_path: None,
-        } => {
-            let mut host = Host::default();
-            host.set_command(lifec::Commands::Start(start));
-            let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
-            host.handle_start();
+            match (runmd_path, url) {
+                (Some(runmd_path), None) => {
+                    host.set_path(runmd_path);
+                }, 
+                (None, Some(url)) => {
+                    host.set_url(url);
+                }, 
+                _ => {}
+            }
+
+            match c {
+                Commands::Start(start) => {
+                    host.set_command(lifec::Commands::Start(start));
+                    let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+                    host.handle_start();
+                }
+                Commands::Host(host) => {
+                    let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+                    host.handle_start();
+                }
+                Commands::PrintEngineGraph => {
+                    let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+                    host.print_engine_event_graph();
+                }
+                Commands::PrintLifecycleGraph => {
+                    let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+                    host.print_lifecycle_graph();
+                }
+            }
         }
         _ => {
             eprintln!("Could not load host, run with `RUST_LOG=lifec=debug` for more information");
@@ -79,11 +62,10 @@ async fn main() {
 #[clap(name = "lifec")]
 #[clap(about = "Utilities for working with the World created by lifec")]
 struct Lifec {
-    /// URL to runmd to use when configuring this mirror engine
+    /// URL to runmd to fetch to create host
     #[clap(long)]
     url: Option<String>,
-    /// Path to runmd file used to configure the mirror engine
-    /// Defaults to .runmd
+    /// Path to runmd file to create host
     #[clap(long)]
     runmd_path: Option<String>,
     #[clap(subcommand)]
@@ -95,9 +77,9 @@ struct Lifec {
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Prints the lifecycle graph,
-    PrintLifecycleGraph(Host),
+    PrintLifecycleGraph,
     /// Prints the engine event graph,
-    PrintEngineGraph(Host),
+    PrintEngineGraph,
     /// Host commands,
     Host(Host),
     /// Shortcut for `host start` command,

@@ -39,11 +39,21 @@ impl Plugin for Process {
             p.define_child(last, var_name, Value::Symbol(value));
         }));
 
-         // Enable .arg to declare environment variables
+         // Enable .arg to declare arguments
          parser.add_custom(CustomAttribute::new_with("arg", |p, value| {
             let last = p.last_child_entity().expect("should have added an entity for the process");
 
             p.define_child(last, "arg", Value::Symbol(value.to_string()));
+        }));
+
+        // Enable .flag to declare arguments
+        // This will split by spaces and trim
+        parser.add_custom(CustomAttribute::new_with("flag", |p, value| {
+            let last = p.last_child_entity().expect("should have added an entity for the process"); 
+
+            for arg in value.split(" ") {
+                p.define_child(last, "arg", Value::Symbol(arg.trim().to_string()));
+            }
         }));
     }
 
