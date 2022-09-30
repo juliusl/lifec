@@ -49,7 +49,8 @@ mod host;
 pub use host::Host;
 pub use host::Start;
 pub use host::Commands;
-pub use host::InspectExtensions;
+pub use host::Inspector;
+pub use host::Sequencer;
 
 mod project;
 pub use project::Project;

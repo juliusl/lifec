@@ -42,9 +42,10 @@ impl<'a> LifecycleResolver<'a> {
                 (Some(Repeat(Some(remaining))), None, None, None, None) if *remaining > 0 => {
                     LifecycleOptions::Repeat {
                         remaining: *remaining,
+                        start: entity,
                     }
                 }
-                (None, Some(Loop), None, None, None) => LifecycleOptions::Loop,
+                (None, Some(Loop), None, None, None) => LifecycleOptions::Loop(entity),
                 (None, None, Some(Exit(Some(()))), None, None) => LifecycleOptions::Exit,
                 (None, None, None, Some(Next(Some(next))), None) => LifecycleOptions::Next(*next),
                 (None, None, None, None, Some(Fork(forks))) => LifecycleOptions::Fork(forks.to_vec()),
@@ -69,7 +70,7 @@ impl<'a> LifecycleResolver<'a> {
 pub enum LifecycleOptions {
     /// Repeat the engine,
     ///
-    Repeat { remaining: usize },
+    Repeat { remaining: usize, start: Entity },
     /// Signal multiple engines to begin,
     ///
     Fork(Vec<Entity>),
@@ -78,7 +79,7 @@ pub enum LifecycleOptions {
     Next(Entity),
     /// Loop indefinitely,
     ///
-    Loop,
+    Loop(Entity),
     /// (Default) Signals that this engine should exit next,
     ///
     /// All engines must have signaled for exit,
@@ -89,6 +90,9 @@ pub enum LifecycleOptions {
     /// Repeat will eventually resolve to Exit,
     ///
     Exit,
+    /// Will execute once and exit
+    /// 
+    Once,
 }
 
 impl Default for LifecycleOptions {

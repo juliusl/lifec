@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
+use crate::ThunkContext;
 use crate::{AttributeParser, Block, BlockProperty, Interpreter, SpecialAttribute};
-use specs::{Component, Entity, VecStorage, World, WorldExt};
+use specs::{Component, Entity, VecStorage, World, WorldExt, WriteStorage};
 
 mod event;
 pub use event::Event;
@@ -75,9 +76,23 @@ pub use lifecycle::LifecycleResolver;
 ///
 #[derive(Clone, Default, Debug, Component)]
 #[storage(VecStorage)]
-pub struct Engine;
+pub struct Engine {
+    begin: Option<Entity>,
+}
 
 impl Engine {
+    /// Starts an engine,
+    /// 
+    pub fn start(&self) -> Option<Entity> {
+        self.begin.clone()
+    }
+
+    /// Sets the start entity for this engine,
+    /// 
+    pub fn set_start(&mut self, start: Entity) {
+        self.begin = Some(start);
+    }
+
     /// Finds the entity for a block,
     ///
     pub fn find_block(world: &World, expression: impl AsRef<str>) -> Option<Entity> {

@@ -1,4 +1,6 @@
-use lifec::{Host, InspectExtensions, Project, Start};
+use std::time::Duration;
+
+use lifec::{Host, Inspector, Project, Start, Sequencer};
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
@@ -11,11 +13,9 @@ async fn main() {
     tracing_subscriber::fmt::Subscriber::builder()
     .with_env_filter(if !cli.debug {
         EnvFilter::from_default_env()
-            .add_directive("acr=info".parse().expect("should be ok"))
             .add_directive("lifec=info".parse().expect("should be ok"))
     } else {
         EnvFilter::from_default_env()
-            .add_directive("acr=debug".parse().expect("should be ok"))
             .add_directive("lifec=debug".parse().expect("should be ok"))
     })
     .compact()
@@ -43,11 +43,19 @@ async fn main() {
                 Commands::Start(start) => {
                     host.set_command(lifec::Commands::Start(start));
                     let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+                    host.link_sequences();
                     host.handle_start();
+                    
+                    let host_rutime = host.world_mut().remove::<tokio::runtime::Runtime>().expect("should remove tokio runtime");
+                    host_rutime.shutdown_background();
                 }
                 Commands::Host(host) => {
                     let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");
+                    host.link_sequences();
                     host.handle_start();
+
+                    let host_rutime = host.world_mut().remove::<tokio::runtime::Runtime>().expect("should remove tokio runtime");
+                    host_rutime.shutdown_background();
                 }
                 Commands::PrintEngineGraph => {
                     let mut host = host.create_host::<Lifec>().await.expect("Should be able to create host");

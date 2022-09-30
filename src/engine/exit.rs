@@ -1,6 +1,8 @@
 use reality::{Interpreter, SpecialAttribute};
-use specs::{Component, DenseVecStorage, WorldExt};
+use specs::{Component, DenseVecStorage, WorldExt, ReadStorage};
 use tokio::sync::oneshot;
+
+use crate::LifecycleOptions;
 
 /// Special attribute for engine to setup exiting on completion
 ///
@@ -76,5 +78,18 @@ impl ExitListener {
     pub fn new() -> Self {
         let (tx, rx) = oneshot::channel();
         Self(tx, rx)
+    }
+
+    /// Checks to see if it should exit, if so -- signals the exit
+    /// 
+    pub fn check_exit(self, exits: ReadStorage<LifecycleOptions>) {
+        let should_exit = exits.as_slice().iter().all(|e| match e {
+            LifecycleOptions::Exit => true,
+            _ => false,
+        });
+
+        if should_exit {
+            self.0.send(()).ok();
+        }
     }
 }

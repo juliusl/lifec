@@ -1,23 +1,23 @@
 use std::collections::HashMap;
 
 use reality::Block;
-use specs::{Read, Entity, ReadStorage, Join};
+use specs::{Entities, Entity, Join, Read, ReadStorage};
 
-use crate::{Host, LifecycleOptions, Engine, Sequence};
+use crate::{Engine, Event, Host, LifecycleOptions, Sequence};
 
 /// Extension methods for inspecting World state after the world is done building,
-/// 
-pub trait InspectExtensions {
+///
+pub trait Inspector {
     /// Prints the lifecycle graph
-    /// 
+    ///
     fn print_lifecycle_graph(&mut self);
 
     /// Prints the engine event graph
-    /// 
+    ///
     fn print_engine_event_graph(&mut self);
 }
 
-impl InspectExtensions for Host {
+impl Inspector for Host {
     fn print_lifecycle_graph(&mut self) {
         self.world_mut().exec(
             |(options, blocks): (Read<HashMap<Entity, LifecycleOptions>>, ReadStorage<Block>)| {
@@ -43,42 +43,56 @@ impl InspectExtensions for Host {
 
     fn print_engine_event_graph(&mut self) {
         self.world_mut().exec(
-            |(blocks, engines, sequences): (
+            |(entities, blocks, engines, sequences, events): (
+                Entities,
                 ReadStorage<Block>,
                 ReadStorage<Engine>,
                 ReadStorage<Sequence>,
+                ReadStorage<Event>,
             )| {
                 for (block, _, sequence) in (&blocks, &engines, &sequences).join() {
-                    let mut block_name = block.name().to_string();
-                    if block_name.is_empty() {
-                        block_name = "```".to_string();
-                    }
-                        println!("Engine control block: {} {}", block_name, block.symbol());
+                    println!("{}: {}", block.entity(), block.symbol());
                     for e in sequence.iter_entities() {
                         let runtime_block = blocks.get(e).expect("should exist");
-                        println!("Event block:          {} {}", runtime_block.name(), runtime_block.symbol());
+                        println!(
+                            "  {}: {} {}",
+                            e.id(),
+                            runtime_block.name(),
+                            runtime_block.symbol()
+                        );
                         let control_values = runtime_block.map_control();
                         if !control_values.is_empty() {
-                            println!("\nControl values:");
                             control_values.iter().for_each(|(name, value)| {
-                                println!("\t{name}: {value}");
+                                println!("\t# {name}: {value}");
                             });
-                            println!();
                         }
-                        println!("Plugin Calls:");
-                        for index in runtime_block.index().iter().filter(|i| i.root().name() == "runtime") {
+                        for index in runtime_block
+                            .index()
+                            .iter()
+                            .filter(|i| i.root().name() == "runtime")
+                        {
                             for (e, props) in index.iter_children() {
-                                    println!("\tentity-id: {e}");
-                                for (name, prop) in props.iter_properties(){
-                                    println!("\tproperty:  {name}");
-                                    println!("\tvalue:     {:?}", prop);
-                                    println!();
+                                let event = entities.entity(*e);
+                                let event = events.get(event).expect("should be an event");
+                                let plugin = event.1 .0;
+                                println!(
+                                    "    {e}: {} {:?}",
+                                    plugin,
+                                    props
+                                        .property(plugin)
+                                        .expect("should be a symbol")
+                                        .symbol()
+                                        .unwrap()
+                                );
+                                for (name, prop) in props.iter_properties().filter(|p| p.0 != plugin) {
+                                    println!("      {name} {:?}", prop);
                                 }
                                 println!();
                             }
                         }
+                        println!();
                     }
-                    println!("");
+                    println!();
                 }
             },
         );

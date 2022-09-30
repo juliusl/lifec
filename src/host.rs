@@ -1,15 +1,16 @@
 use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
-use specs::{DispatcherBuilder, World, WorldExt};
+use specs::{DispatcherBuilder, Join, World, WorldExt};
 use std::{error::Error, fmt::Debug, path::PathBuf, str::from_utf8};
-use tokio::sync::oneshot::error::TryRecvError;
 use tracing::{event, Level};
 
-use crate::{plugins::EventRuntime, Event, ExitListener, Project, ThunkContext};
+use crate::{
+    plugins::EventRuntime, Engine, Event, LifecycleOptions, Project, ThunkContext,
+};
 
-mod inspect;
-pub use inspect::InspectExtensions;
+mod inspector;
+pub use inspector::Inspector;
 
 mod start;
 pub use start::Start;
@@ -17,11 +18,14 @@ pub use start::Start;
 mod commands;
 pub use commands::Commands;
 
+mod sequencer;
+pub use sequencer::Sequencer;
+
 /// Struct for starting engines compiled from a
 /// project type,
 ///
 #[derive(Default, Args)]
-#[clap(arg_required_else_help=true)]
+#[clap(arg_required_else_help = true)]
 pub struct Host {
     /// URL to runmd to use when configuring this mirror engine
     #[clap(long)]
@@ -37,17 +41,36 @@ pub struct Host {
 }
 
 /// CLI functions
-/// 
+///
 impl Host {
     /// Handles the current command
-    /// 
+    ///
     pub fn handle_start(&mut self) {
         match self.command() {
             Some(Commands::Start(Start { id: Some(id), .. })) => {
-                 self.start(*id);
+                self.start(*id);
             }
-            Some(Commands::Start(Start { engine_name: Some(_engine_name), .. })) => {
-                 todo!()
+            Some(Commands::Start(Start {
+                engine_name: Some(_engine_name),
+                ..
+            })) => {
+                let mut engine_start = None;
+
+                if let Some(entity) =
+                Engine::find_block(self.world(), format!(" {}",  _engine_name))
+            {
+                if let Some(start) = self
+                    .world()
+                    .read_component::<Engine>()
+                    .get(entity)
+                    .and_then(|e| e.start())
+                {
+                    engine_start = Some(start);
+                }
+            }
+
+                let start = engine_start.take().expect("Should have a starting entity");
+                self.start(start.id());
             }
             _ => {
                 unreachable!("A command should exist by this point")
@@ -56,54 +79,49 @@ impl Host {
     }
 
     /// Returns the current command,
-    /// 
+    ///
     pub fn command(&self) -> Option<&Commands> {
         self.commands.as_ref()
     }
 
     /// Sets the command argument,
-    /// 
+    ///
     pub fn set_command(&mut self, command: Commands) {
         self.commands = Some(command);
     }
 
     /// Sets the runmd path argument, if None defaults to ./.runmd
-    /// 
+    ///
     pub fn set_path(&mut self, path: impl AsRef<str>) {
         self.runmd_path = Some(path.as_ref().to_string());
     }
 
     /// Sets the runmd url argument,
-    /// 
+    ///
     pub fn set_url(&mut self, url: impl AsRef<str>) {
         self.url = Some(url.as_ref().to_string());
     }
 
     /// Creates a new lifec host,
-    /// 
+    ///
     /// Will parse runmd from either a url, local file path, or current directory
     ///
-    pub async fn create_host<P>(&self) -> Option<Host> 
+    pub async fn create_host<P>(&self) -> Option<Host>
     where
-        P: Project
+        P: Project,
     {
         let command = self.command().cloned();
         match self {
-            Self {
-                url: Some(url),
-                ..
-            } => {
-                match Host::get::<P>(url).await {
-                    Ok(mut host) => {
-                        host.commands = command;
-                        return Some(host);
-                    }
-                    Err(err) => {
-                        event!(Level::ERROR, "Could not get runmd from url {url}, {err}");
-                        return None;
-                    }
+            Self { url: Some(url), .. } => match Host::get::<P>(url).await {
+                Ok(mut host) => {
+                    host.commands = command;
+                    return Some(host);
                 }
-            }
+                Err(err) => {
+                    event!(Level::ERROR, "Could not get runmd from url {url}, {err}");
+                    return None;
+                }
+            },
             Self {
                 runmd_path: Some(runmd_path),
                 ..
@@ -112,33 +130,31 @@ impl Host {
                 if runmd_path.is_dir() {
                     runmd_path = runmd_path.join(".runmd");
                 }
-    
+
                 match Host::open::<P>(runmd_path).await {
-                    Ok(mut host) => { 
-                        host.commands = command;    
-                        Some(host) 
-                    },
+                    Ok(mut host) => {
+                        host.commands = command;
+                        Some(host)
+                    }
                     Err(err) => {
                         event!(Level::ERROR, "Could not load runmd from path {err}");
                         None
                     }
                 }
-            },
-            _ => {
-                match Host::runmd::<P>().await {
-                    Ok(mut host) => {
-                        host.commands = command;
-                        Some(host)
-                    },
-                    Err(err) => {
-                        event!(
-                            Level::ERROR,
-                            "Could not load `.runmd` from current directory {err}"
-                        );
-                        None
-                    }
-                }
             }
+            _ => match Host::runmd::<P>().await {
+                Ok(mut host) => {
+                    host.commands = command;
+                    Some(host)
+                }
+                Err(err) => {
+                    event!(
+                        Level::ERROR,
+                        "Could not load `.runmd` from current directory {err}"
+                    );
+                    None
+                }
+            },
         }
     }
 }
@@ -234,7 +250,7 @@ impl Host {
     where
         P: Project,
     {
-        Self {
+         Self {
             runmd_path: None,
             url: None,
             commands: None,
@@ -242,16 +258,21 @@ impl Host {
         }
     }
 
-    /// Returns true if should exit,
+    /// Returns true if the host should exit,
     ///
     pub fn should_exit(&self) -> bool {
-        let mut exit_listener = self.world().write_resource::<ExitListener>();
-        match exit_listener.1.try_recv() {
-            Ok(_) => true,
-            Err(err) => match err {
-                TryRecvError::Empty => false,
-                TryRecvError::Closed => true,
-            },
+        let lifecycle_options = self.world().read_component::<LifecycleOptions>();
+        let events = self.world().read_component::<Event>();
+        if (&events, &lifecycle_options).join().all(|(_, l)| match l {
+            LifecycleOptions::Exit => true,
+            _ => false,
+        }) {
+            events.as_slice().iter().all(|e| match e {
+                Event(.., None) => true,
+                _ => false
+            })
+        } else {
+            false
         }
     }
 
@@ -270,7 +291,6 @@ impl Host {
         }
         self.world_mut().maintain();
 
-        // TODO - Exit is currently in development
         while !self.should_exit() {
             dispatcher.dispatch(self.world());
         }
@@ -285,7 +305,6 @@ impl Debug for Host {
             .finish()
     }
 }
-
 
 impl Into<World> for Host {
     fn into(self) -> World {
