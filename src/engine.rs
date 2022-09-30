@@ -103,6 +103,7 @@ impl SpecialAttribute for Engine {
         parser.with_custom::<Next>();
         parser.with_custom::<Fork>();
         parser.with_custom::<Repeat>();
+        parser.with_custom::<Loop>();
     }
 }
 
