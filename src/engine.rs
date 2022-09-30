@@ -16,6 +16,9 @@ mod exit;
 pub use self::exit::ExitListener;
 pub use exit::Exit;
 
+mod r#loop;
+pub use r#loop::Loop;
+
 mod repeat;
 pub use repeat::Repeat;
 

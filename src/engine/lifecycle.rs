@@ -1,4 +1,4 @@
-use super::{Fork, Next, Repeat};
+use super::{Fork, Next, Repeat, Loop};
 use crate::{Engine, Exit};
 use specs::{prelude::*, Component};
 use std::collections::HashMap;
@@ -12,6 +12,7 @@ pub struct LifecycleResolver<'a> {
     entities: Entities<'a>,
     engine: ReadStorage<'a, Engine>,
     repeat: ReadStorage<'a, Repeat>,
+    r#loop: ReadStorage<'a, Loop>,
     exit: ReadStorage<'a, Exit>,
     next: ReadStorage<'a, Next>,
     fork: ReadStorage<'a, Fork>,
@@ -26,26 +27,27 @@ impl<'a> LifecycleResolver<'a> {
     pub fn resolve_lifecycle(mut self) -> HashMap<Entity, LifecycleOptions> {
         let mut lifecycle_settings = HashMap::default();
 
-        for (entity, _, repeat, exit, next, fork) in (
+        for (entity, _, repeat, r#loop, exit, next, fork) in (
             &self.entities,
             &self.engine,
             self.repeat.maybe(),
+            self.r#loop.maybe(),
             self.exit.maybe(),
             self.next.maybe(),
             self.fork.maybe(),
         )
             .join()
         {
-            let option = match (repeat, exit, next, fork) {
-                (Some(Repeat(Some(remaining))), None, None, None) if *remaining > 0 => {
+            let option = match (repeat, r#loop, exit, next, fork) {
+                (Some(Repeat(Some(remaining))), None, None, None, None) if *remaining > 0 => {
                     LifecycleOptions::Repeat {
                         remaining: *remaining,
                     }
                 }
-                (Some(Repeat(None)), None, None, None) => LifecycleOptions::Loop,
-                (None, Some(Exit(Some(()))), None, None) => LifecycleOptions::Exit,
-                (None, None, Some(Next(Some(next))), None) => LifecycleOptions::Next(*next),
-                (None, None, None, Some(Fork(forks))) => LifecycleOptions::Fork(forks.to_vec()),
+                (None, Some(Loop), None, None, None) => LifecycleOptions::Loop,
+                (None, None, Some(Exit(Some(()))), None, None) => LifecycleOptions::Exit,
+                (None, None, None, Some(Next(Some(next))), None) => LifecycleOptions::Next(*next),
+                (None, None, None, None, Some(Fork(forks))) => LifecycleOptions::Fork(forks.to_vec()),
                 _ => LifecycleOptions::Exit,
             };
 
