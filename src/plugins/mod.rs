@@ -12,7 +12,7 @@ pub use network::BlockAddress;
 
 mod events;
 pub use events::EventRuntime;
-pub use events::ProxyDispatcher;
+pub use events::EventListener;
 
 mod thunks;
 pub use thunks::CancelThunk;
@@ -129,6 +129,13 @@ pub trait Plugin {
 
                 parser.define("sequence", Value::Int(child.id() as i32));
                 parser.define_child(child.clone(), Self::symbol(), Value::Symbol(content));
+                // TODO - This gets crowded if added by default 
+                // if !Self::description().is_empty() {
+                //     parser.define_child(child.clone(), "description", Self::description());
+                // }
+                // if !Self::caveats().is_empty() {                    
+                //     parser.define_child(child.clone(), "caveats", Self::caveats());
+                // }
                 Self::compile(parser);
             }
         })

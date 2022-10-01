@@ -2,7 +2,7 @@ use atlier::system::{Attribute, Value};
 use reality::BlockProperties;
 use specs::{storage::HashMapStorage, Component, Entity};
 use std::{
-    collections::hash_map::DefaultHasher,
+    collections::{hash_map::DefaultHasher, BTreeMap},
     hash::{Hash, Hasher},
 };
 use tracing::{event, Level};
@@ -92,8 +92,8 @@ impl AttributeIndex for AttributeGraph {
         }
     }
 
-    fn values(&self) -> Vec<(String, Vec<Value>)> {
-        let mut values = vec![];
+    fn values(&self) -> BTreeMap<String, Vec<Value>> {
+        let mut values = BTreeMap::default();
         for (name, property) in self.resolve_properties().iter_properties() {
             let mut property_values = vec![];
 
@@ -111,7 +111,7 @@ impl AttributeIndex for AttributeGraph {
                 }
             }
 
-            values.push((name.to_string(), property_values));
+            values.insert(name.to_string(), property_values);
         }
 
         values

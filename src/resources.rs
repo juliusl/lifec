@@ -65,7 +65,7 @@ impl Resources {
     where
         C: RustEmbed,
     {
-        if let Some(src) = tc.state().find_text(attribute_name) {
+        if let Some(src) = tc.state().find_symbol(attribute_name) {
             self.read_string::<C>(tc, &src).await
         }  else {
             None
@@ -81,7 +81,7 @@ impl Resources {
     where
         C: RustEmbed,
     {
-        if let Some(src) = tc.state().find_text(attribute_name) {
+        if let Some(src) = tc.state().find_symbol(attribute_name) {
             self.read_binary::<C>(tc, &src).await
         }  else {
             None

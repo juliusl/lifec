@@ -70,14 +70,14 @@ async fn main() {
                         .expect("should remove tokio runtime");
                     host_rutime.shutdown_background();
                 }
-                Commands::PrintEngineGraph => {
+                Commands::PrintEngines => {
                     let mut host = host
                         .create_host::<Lifec>()
                         .await
                         .expect("Should be able to create host");
                     host.print_engine_event_graph();
                 }
-                Commands::PrintLifecycleGraph => {
+                Commands::PrintLifecycle => {
                     let mut host = host
                         .create_host::<Lifec>()
                         .await
@@ -119,9 +119,9 @@ struct Lifec {
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Prints the lifecycle graph,
-    PrintLifecycleGraph,
+    PrintLifecycle,
     /// Prints the engine event graph,
-    PrintEngineGraph,
+    PrintEngines,
     /// Host commands,
     Host(Host),
     /// Shortcut for `host start` command,

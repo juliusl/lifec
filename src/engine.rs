@@ -141,7 +141,7 @@ impl Interpreter for Engine {
                 .insert(block_entity, self.clone())
                 .expect("should be able to insert engine component");
 
-            if let Some(engine) = block.index().iter().find(|b| b.root().name() == "engine") {
+            for engine in block.index().iter().filter(|b| b.root().name() == "engine") {
                 let events = engine
                     .properties()
                     .property("event")

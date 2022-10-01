@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, BTreeMap};
 
 use atlier::system::{Attribute, Value};
 
@@ -33,9 +33,9 @@ pub trait AttributeIndex {
     ///
     fn replace_attribute(&mut self, attr: Attribute);
 
-    /// Return all indexed values,
+    /// Returns a map of indexed values,
     /// 
-    fn values(&self) -> Vec<(String, Vec<Value>)>;
+    fn values(&self) -> BTreeMap<String, Vec<Value>>;
 
     /// Finds all text values with name, 
     /// 
@@ -63,7 +63,7 @@ pub trait AttributeIndex {
         }).collect()
     }
 
-    /// Finds a text value from an attribute
+  /// Finds a text value from an attribute
     ///
     fn find_text(&self, with_name: impl AsRef<str>) -> Option<String> {
         if let Some(Value::TextBuffer(a)) = self.find_value(with_name) {

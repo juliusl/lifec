@@ -135,7 +135,6 @@ impl ThunkContext {
         let mut async_enabled = self.clone();
         async_enabled.entity = Some(entity);
         async_enabled.handle = Some(handle);
-        // async_enabled.as_mut().set_parent_entity(entity);
         async_enabled
     }
 
@@ -205,7 +204,7 @@ impl ThunkContext {
         if let Some(_) = self.dispatcher {
             let address = self
                 .state()
-                .find_text("address")
+                .find_symbol("address")
                 .unwrap_or("127.0.0.1:0".to_string());
 
             let listener = TcpListener::bind(address)
@@ -242,7 +241,7 @@ impl ThunkContext {
     pub async fn enable_socket(&mut self) -> Option<Arc<UdpSocket>> {
         let address = self
             .state()
-            .find_text("address")
+            .find_symbol("address")
             .unwrap_or("127.0.0.1:0".to_string());
 
         match UdpSocket::bind(address).await {
@@ -271,22 +270,16 @@ impl ThunkContext {
     /// 
     pub async fn send_char(&self, c: u8) {
         if let Some(entity) = self.entity {
-            event!(Level::TRACE, "sending message to {}", entity.id());
             if let Some(char_device) = &self.char_device {
-                event!(Level::TRACE, "has char device");
                 match char_device.send((entity.id(), c)).await {
-                    Ok(_) => event!(Level::TRACE, "sent byte for {:?}", entity),
+                    Ok(_) => event!(Level::TRACE, "sent char for {:?}", entity),
                     Err(err) => event!(
                         Level::ERROR,
-                        "error sending byte to char_device, {err}, {:?}",
+                        "error sending char, {err}, {:?}",
                         entity
                     ),
                 }
-            } else {
-                event!(Level::TRACE, "missing char device");
             }
-        } else {
-            event!(Level::WARN, "entity is not set to send_char");
         }
     }
 

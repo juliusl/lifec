@@ -7,6 +7,7 @@ use tracing::{event, Level};
 
 use crate::{
     plugins::{CancelThunk, EventRuntime},
+    project::{RunmdListener, OperationListener, ErrorContextListener, CompletedPluginListener},
     Engine, Event, LifecycleOptions, Project, ThunkContext,
 };
 
@@ -162,6 +163,97 @@ impl Host {
         dispatcher_builder.with(EventRuntime::default(), "event_runtime", &[])
     }
 
+    /// Add's a runmd listener to a dispatcher,
+    /// 
+    /// The name of the system will be "runmd_listener"
+    /// 
+    pub fn add_runmd_listener<'a, 'b, P>(
+        thunk_context: ThunkContext,
+        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
+    ) 
+    where
+        P: Project + From<ThunkContext> + Send + 'a
+    {
+        dispatcher_builder.add(
+            RunmdListener::<P>::from(thunk_context),
+            "runmd_listener",
+            &["event_runtime"],
+        );
+    }
+
+    
+    /// Add's an operation listener to a dispatcher,
+    /// 
+    /// The name of the system will be "operation_listener"
+    /// 
+    pub fn add_operation_listener<'a, 'b, P>(
+        thunk_context: ThunkContext,
+        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
+    ) 
+    where
+        P: Project + From<ThunkContext> + Send + 'a
+    {
+        dispatcher_builder.add(
+            OperationListener::<P>::from(thunk_context),
+            "operation_listener",
+            &["event_runtime"],
+        );
+    }
+
+    /// Add's an error context listener to a dispatcher
+    /// 
+    /// The name of the system will be "error_context_listener"
+    /// 
+    pub fn add_error_context_listener<'a, 'b, P>(
+        thunk_context: ThunkContext,
+        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
+    ) 
+    where
+        P: Project + From<ThunkContext> + Send + 'a
+    {
+        dispatcher_builder.add(
+            ErrorContextListener::<P>::from(thunk_context),
+            "error_context_listener",
+            &["event_runtime"],
+        );
+    }
+
+    /// Add's an error context listener to a dispatcher,
+    /// 
+    /// The name of the system will be "completed_plugin_listener"
+    /// 
+    pub fn add_completed_plugin_listener<'a, 'b, P>(
+        thunk_context: ThunkContext,
+        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
+    ) 
+    where
+        P: Project + From<ThunkContext> + Send + 'a
+    {
+        dispatcher_builder.add(
+            CompletedPluginListener::<P>::from(thunk_context),
+            "completed_plugin_listener",
+            &["event_runtime"],
+        );
+    }
+
+    /// Add's a status update listener to a dispatcher,
+    /// 
+    /// The name of the system will be "status_update_listener"
+    /// 
+    pub fn add_status_update_listener<'a, 'b, P>(
+        thunk_context: ThunkContext,
+        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
+    ) 
+    where
+        P: Project + From<ThunkContext> + Send + 'a
+    {
+        dispatcher_builder.add(
+            CompletedPluginListener::<P>::from(thunk_context),
+            "status_update_listener",
+            &["event_runtime"],
+        );
+    }
+
     /// Returns a immutable reference to the world,
     ///
     pub fn world(&self) -> &World {
@@ -244,7 +336,7 @@ impl Host {
             commands: None,
             world: Some(P::compile(content)),
         };
-        
+
         host.link_sequences();
         host
     }
@@ -260,7 +352,7 @@ impl Host {
                 (Event(.., None), LifecycleOptions::Exit(None)) => {
                     event!(Level::TRACE, "{:?} has exited", entity);
                     true
-                },
+                }
                 _ => {
                     event!(Level::TRACE, "{:?} is alive", entity);
                     false
@@ -306,17 +398,20 @@ impl Host {
         };
         dispatcher.setup(self.world_mut());
 
+        // Starts an event
         let event = self.world().entities().entity(event_entity);
         if let Some(event) = self.world().write_component::<Event>().get_mut(event) {
             event.fire(ThunkContext::default());
         }
         self.world_mut().maintain();
 
+        // Waits for the event runtime to complete
         while !self.should_exit() {
             dispatcher.dispatch(self.world());
             self.world_mut().maintain();
         }
 
+        // Exits by shutting down the inner tokio runtime
         self.exit();
     }
 
@@ -401,9 +496,17 @@ mod test {
         host.handle_start::<Test>();
 
         // Make sure everything exited successfully
-        assert!(logs_contain("lifec::host: Entity(3, Generation(1)) has exited"));
-        assert!(logs_contain("lifec::host: Entity(6, Generation(1)) has exited"));
-        assert!(logs_contain("lifec::host: Entity(9, Generation(1)) has exited"));
-        assert!(logs_contain("lifec::host: Entity(13, Generation(1)) has exited"));
+        assert!(logs_contain(
+            "lifec::host: Entity(3, Generation(1)) has exited"
+        ));
+        assert!(logs_contain(
+            "lifec::host: Entity(6, Generation(1)) has exited"
+        ));
+        assert!(logs_contain(
+            "lifec::host: Entity(9, Generation(1)) has exited"
+        ));
+        assert!(logs_contain(
+            "lifec::host: Entity(13, Generation(1)) has exited"
+        ));
     }
 }

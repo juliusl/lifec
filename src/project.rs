@@ -1,12 +1,28 @@
 use reality::{Block, BlockIndex, Interpreter, Parser};
-use specs::DispatcherBuilder;
+use specs::{DispatcherBuilder, Entity};
 use specs::{Join, World, WorldExt};
 use tracing::event;
 use tracing::Level;
 
-use crate::LifecycleOptions;
+use crate::{LifecycleOptions, Operation};
 use crate::engine::Loop;
+use crate::plugins::{StatusUpdate, ErrorContext};
 use crate::{plugins::Println, AttributeGraph, Engine, Event, Install, Process, Runtime, Timer, engine::{Fork, Next, Repeat, LifecycleResolver}, Exit};
+
+mod runmd_listener;
+pub use runmd_listener::RunmdListener;
+
+mod status_update_listener;
+pub use status_update_listener::StatusUpdateListener;
+
+mod completed_plugin_listener;
+pub use completed_plugin_listener::CompletedPluginListener;
+
+mod operation_listener;
+pub use operation_listener::OperationListener;
+
+mod error_context_listener;
+pub use error_context_listener::ErrorContextListener;
 
 /// Trait to facilitate
 ///
@@ -17,8 +33,27 @@ pub trait Project {
 
     /// Override to customize the dispatcher,
     /// 
-    fn configure_dispatcher(_dispatcher_builder: &mut DispatcherBuilder) {
-    }
+    fn configure_dispatcher(_dispatcher_builder: &mut DispatcherBuilder) {}
+
+    /// Override to receive/handle runmd
+    /// 
+    fn on_runmd(&mut self, _runmd: String) {}
+
+    /// Override to receive/handle status updates
+    /// 
+    fn on_status_update(&mut self, _status_update: StatusUpdate) {}
+
+    /// Override to receive/handle operations
+    /// 
+    fn on_operation(&mut self, _operation: Operation) {}
+
+    /// Override to receive/handle errors
+    /// 
+    fn on_error_context(&mut self, _error: ErrorContext) {}
+
+    /// Override to receive/handle the entity when a plugin call completes
+    /// 
+    fn on_completed_plugin_call(&mut self, _entity: Entity) {}
 
     /// Interpret a compiled block, this will run after the Engine
     /// has a chance to interpret.

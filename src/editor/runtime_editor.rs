@@ -198,11 +198,7 @@ impl Extension for RuntimeEditor {
         // This drives status and progress updates of running tasks
         List::<Task>::default().on_run(world);
 
-        // Listen for completed thunks
-        for listener in self.listeners.clone().iter() {
-            (listener)(self, world);
-        }
-
+        // TODO -- useful
         let mut rx = world.write_resource::<tokio::sync::mpsc::Receiver<AttributeGraph>>();
         if let Some(graph) = rx.try_recv().ok() {
             let project = Project::from(graph);
@@ -272,6 +268,7 @@ impl Extension for RuntimeEditor {
             }
         }
 
+        // TODO -- Useful
         let mut rx = world.write_resource::<tokio::sync::mpsc::Receiver<ErrorContext>>();
         if let Some(error) = rx.try_recv().ok() {
             for (name, problem) in error.errors() {

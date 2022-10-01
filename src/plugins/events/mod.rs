@@ -1,18 +1,30 @@
+use super::{
+    thunks::{CancelThunk, ErrorContext, SecureClient, StatusUpdate},
+    Archive, BlockAddress, Thunk, ThunkContext,
+};
+use crate::{
+    engine::{Connection, Sequence},
+    AttributeGraph, AttributeIndex, Engine, Event, Extension, LifecycleOptions, Operation, Runtime,
+};
 use hyper::Client;
 use hyper_tls::HttpsConnector;
-use specs::{Entity, ReadStorage, World, shred::SetupHandler, Entities, Join, Read, System, WorldExt, WriteStorage};
+use specs::{
+    shred::SetupHandler, Entities, Entity, Join, Read, ReadStorage, System, World, WorldExt,
+    WriteStorage,
+};
 use std::sync::Arc;
-use tokio::sync::{broadcast, self, mpsc::{self, Sender}};
+use tokio::sync::{
+    self, broadcast,
+    mpsc::{self, Sender},
+};
 use tracing::event;
 use tracing::Level;
-use crate::{engine::{Connection, Sequence}, AttributeGraph, AttributeIndex, Engine, Event, Extension, LifecycleOptions, Operation, Runtime};
-use super::{thunks::{CancelThunk, ErrorContext, SecureClient, StatusUpdate}, Archive, BlockAddress, Thunk, ThunkContext};
 
-mod proxy_dispatcher;
-pub use proxy_dispatcher::ProxyDispatcher;
+mod event_listener;
+pub use event_listener::EventListener;
 
 /// Event runtime drives the tokio::Runtime and schedules/monitors/orchestrates plugin events
-/// 
+///
 #[derive(Default)]
 pub struct EventRuntime;
 
@@ -48,6 +60,25 @@ impl SetupHandler<sync::mpsc::Sender<StatusUpdate>> for EventRuntime {
         world.insert(rx);
     }
 }
+
+/// Setup for tokio-mulitple-producers single-consumer channel for status updates
+impl SetupHandler<sync::mpsc::Receiver<StatusUpdate>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<StatusUpdate>(30);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
+/// Setup for tokio-broadcast channel for entity updates
+impl SetupHandler<sync::broadcast::Receiver<Entity>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = broadcast::channel::<Entity>(100);
+        world.insert(rx);
+        world.insert(tx);
+    }
+}
+
 
 /// Setup for tokio-broadcast channel for entity updates
 impl SetupHandler<sync::broadcast::Sender<Entity>> for EventRuntime {
