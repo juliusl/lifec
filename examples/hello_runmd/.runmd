@@ -1,5 +1,8 @@
-# Example of an engine setup 
+# Example of a chaotic engine setup 
+- This example is meant to try to cover a couple of different examples of lifecycle options
 
+## Testing out fork lifecycle option
+- the fork option allows the engine to start several other engines in parallel
 
 ``` test_block1
 + .engine
@@ -11,6 +14,9 @@
 + .runtime
 : .println test_block1
  ```
+## Testing out repeat lifecycle option
+- repeat will loop back to the start of the engine and decrement a specified counter
+- there is also a loop option, but that is not covered in this file 
 
 ``` test_block2
 + .engine
@@ -23,6 +29,9 @@
 : .println test_block2
 ```
 
+## Testing out next lifecycle option
+- next will signal just a single engine to begin,
+
 ``` azure
 + .engine 
 : .event test
@@ -33,6 +42,10 @@
 + .runtime
 : .println testing
 ```
+
+## Testing out exit lifecycle option
+- exit will indicate that the entity is non-active
+- all lifecycle options (minus the loop option) will eventually exit, when all entities have an exit, then host.should_exit() will return true
 
 ``` containerd
 + .engine
