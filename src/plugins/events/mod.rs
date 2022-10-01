@@ -1,41 +1,18 @@
 use hyper::Client;
 use hyper_tls::HttpsConnector;
-use specs::Entity;
-use specs::ReadStorage;
-use specs::World;
-use specs::Write;
-use specs::{shred::SetupHandler, Entities, Join, Read, System, WorldExt, WriteStorage};
+use specs::{Entity, ReadStorage, World, shred::SetupHandler, Entities, Join, Read, System, WorldExt, WriteStorage};
 use std::sync::Arc;
-use tokio::sync::broadcast;
-use tokio::sync::{
-    self,
-    mpsc::{self, Sender},
-};
+use tokio::sync::{broadcast, self, mpsc::{self, Sender}};
 use tracing::event;
 use tracing::Level;
+use crate::{engine::{Connection, Sequence}, AttributeGraph, AttributeIndex, Engine, Event, Extension, LifecycleOptions, Operation, Runtime};
+use super::{thunks::{CancelThunk, ErrorContext, SecureClient, StatusUpdate}, Archive, BlockAddress, Thunk, ThunkContext};
 
-use crate::engine::Connection;
-use crate::engine::Sequence;
-use crate::AttributeGraph;
-use crate::AttributeIndex;
-use crate::Engine;
-use crate::Event;
-use crate::Extension;
-use crate::LifecycleOptions;
-use crate::Operation;
-use crate::Runtime;
-
-use super::thunks::CancelThunk;
-use super::thunks::ErrorContext;
-use super::thunks::SecureClient;
-use super::thunks::StatusUpdate;
-use super::Archive;
-use super::BlockAddress;
-use super::{Thunk, ThunkContext};
 mod proxy_dispatcher;
 pub use proxy_dispatcher::ProxyDispatcher;
 
-/// Event runtime drives the tokio::Runtime and schedules/monitors/orchestrates task entities
+/// Event runtime drives the tokio::Runtime and schedules/monitors/orchestrates plugin events
+/// 
 #[derive(Default)]
 pub struct EventRuntime;
 
@@ -330,6 +307,7 @@ impl<'a> System<'a> for EventRuntime {
                                             event!(Level::TRACE, "found cursor {}", cursor.id());
                                             dispatch_queue.push((cursor, thunk_context));
                                         } else {
+                                            // Since there isn't a cursor, the lifecycle option decides what should happen next
                                             // Finds the start of an engine
                                             let find_engine =
                                                 |start: Entity, engines: &ReadStorage<Engine>| {

@@ -1,8 +1,8 @@
 use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
-use specs::{DispatcherBuilder, Join, World, WorldExt, Write, WriteStorage};
-use std::{error::Error, fmt::Debug, ops::Deref, path::PathBuf, str::from_utf8};
+use specs::{DispatcherBuilder, Join, World, WorldExt, WriteStorage};
+use std::{error::Error, fmt::Debug, path::PathBuf, str::from_utf8};
 use tracing::{event, Level};
 
 use crate::{

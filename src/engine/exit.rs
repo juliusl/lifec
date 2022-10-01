@@ -1,8 +1,5 @@
 use reality::{Interpreter, SpecialAttribute};
-use specs::{Component, DenseVecStorage, WorldExt, ReadStorage};
-use tokio::sync::oneshot;
-
-use crate::LifecycleOptions;
+use specs::{Component, DenseVecStorage, WorldExt};
 
 /// Special attribute for engine to setup exiting on completion
 ///
