@@ -231,4 +231,25 @@ impl AttributeIndex for AttributeGraph {
             properties.add(name, value.clone());
         }
     }
+
+    fn replace_attribute(&mut self, attr: Attribute) {
+        let root = self.index.root().name().to_string();
+
+        let properties = if self.index.root().id() != attr.id() {
+            self.index
+                .child_properties_mut(attr.id)
+                .expect("Trying to add an attribute that is out of context of the current index")
+        } else {
+            self.index.properties_mut()
+        };
+
+        if attr.is_stable() {
+            // If added through this with/add functions, then the attribute should 
+            // always be stable
+            properties.set(attr.name, BlockProperty::Single(attr.value.clone()));
+        } else if let Some((name, value)) = attr.transient {
+            let name = name.trim_start_matches(&root);
+            properties.set(name, BlockProperty::Single(value.clone()));
+        }
+    }
 }
