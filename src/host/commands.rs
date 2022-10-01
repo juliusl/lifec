@@ -10,3 +10,11 @@ pub enum Commands {
     /// 
     Start(Start), 
 }
+
+impl Commands {
+    /// Helper method to configure a start command,
+    /// 
+    pub fn start_engine(name: impl AsRef<str>) -> Self {
+        Self::Start(Start { engine_name: Some(name.as_ref().to_string()), id: None })
+    }
+}

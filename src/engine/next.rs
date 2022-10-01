@@ -24,7 +24,7 @@ impl SpecialAttribute for Next {
                 parser.define("next", Value::Symbol(format!("{name} {symbol}")));
             }
             (Some(symbol), None) => {
-                parser.define("next", Value::Symbol(format!(" {symbol}")));
+                parser.define("next", Value::Symbol(format!("{symbol}")));
             }
             _ => {
                 event!(Level::ERROR, "Invalid format idents state");

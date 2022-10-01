@@ -327,22 +327,22 @@ impl<'a> System<'a> for EventRuntime {
                                     } else {
                                         event!(Level::DEBUG, "seqeunce, completed");
                                         if let Some(cursor) = sequence.cursor() {
-                                            event!(Level::DEBUG, "found cursor {}", cursor.id());
+                                            event!(Level::TRACE, "found cursor {}", cursor.id());
                                             dispatch_queue.push((cursor, thunk_context));
                                         } else {
                                             // Finds the start of an engine
                                             let find_engine =
                                                 |start: Entity, engines: &ReadStorage<Engine>| {
                                                     event!(
-                                                        Level::DEBUG,
+                                                        Level::TRACE,
                                                         "looking for engine for {:?}",
                                                         start
                                                     );
                                                     if let Some(engine) = engines.get(start) {
-                                                        event!(Level::DEBUG, "found engine");
+                                                        event!(Level::TRACE, "found engine");
                                                         if let Some(start) = engine.start() {
                                                             event!(
-                                                                Level::DEBUG,
+                                                                Level::TRACE,
                                                                 "found start -> {}",
                                                                 start.id()
                                                             );
@@ -375,20 +375,6 @@ impl<'a> System<'a> for EventRuntime {
                                                             ));
                                                         }
                                                     }
-                                                    LifecycleOptions::Repeat {
-                                                        remaining,
-                                                        start,
-                                                    } if *remaining == 1 => {
-                                                        if let Some(engine) =
-                                                            find_engine(*start, &engines)
-                                                        {
-                                                            dispatch_queue.push((
-                                                                engine,
-                                                                thunk_context.clone(),
-                                                            ));
-                                                        }
-                                                        *lifecycle_option = LifecycleOptions::Once;
-                                                    }
                                                     LifecycleOptions::Fork(forks) => {
                                                         while let Some(fork) = forks.pop() {
                                                             if let Some(engine) =
@@ -401,7 +387,12 @@ impl<'a> System<'a> for EventRuntime {
                                                             }
                                                         }
 
-                                                        *lifecycle_option = LifecycleOptions::Exit;
+                                                        lifecycle_options
+                                                            .insert(
+                                                                entity,
+                                                                LifecycleOptions::exited(),
+                                                            )
+                                                            .expect("Should be able to insert");
                                                     }
                                                     LifecycleOptions::Next(next) => {
                                                         if let Some(engine) =
@@ -413,7 +404,12 @@ impl<'a> System<'a> for EventRuntime {
                                                             ));
                                                         }
 
-                                                        *lifecycle_option = LifecycleOptions::Exit;
+                                                        lifecycle_options
+                                                            .insert(
+                                                                entity,
+                                                                LifecycleOptions::exited(),
+                                                            )
+                                                            .expect("Should be able to insert");
                                                     }
                                                     LifecycleOptions::Loop(next) => {
                                                         if let Some(engine) =
@@ -425,12 +421,27 @@ impl<'a> System<'a> for EventRuntime {
                                                             ));
                                                         }
                                                     }
-                                                    LifecycleOptions::Once => {
-                                                        // Should exit next
-                                                        *lifecycle_option = LifecycleOptions::Exit;
+                                                    _ => {
+                                                        event!(
+                                                            Level::DEBUG,
+                                                            "exit event:\n\t{} -> exit\n\t{}\n\t{}\n\t{}",
+                                                            entity.id(),
+                                                            &event_name,
+                                                            format!(
+                                                                "parent - {}",
+                                                                attribute_graph
+                                                                    .and_then(|g| Some(g.unscope().entity_id()))
+                                                                    .unwrap_or_default()
+                                                            ),
+                                                            thunk_context.state().hash_code()
+                                                        );
+                                                        lifecycle_options
+                                                            .insert(
+                                                                entity,
+                                                                LifecycleOptions::exited(),
+                                                            )
+                                                            .expect("Should be able to insert");
                                                     }
-                                                    LifecycleOptions::Exit => {}
-                                                    _ => {}
                                                 }
                                             }
                                         }
@@ -467,8 +478,8 @@ impl<'a> System<'a> for EventRuntime {
                 let mut context = initial_context
                     .enable_async(entity, runtime_handle)
                     .enable_https_client(https_client.clone())
-                    .enable_dispatcher({ dispatcher.clone() })
-                    .enable_operation_dispatcher({ operation_dispatcher.clone() })
+                    .enable_dispatcher(dispatcher.clone())
+                    .enable_operation_dispatcher(operation_dispatcher.clone())
                     .enable_status_updates(status_update_channel.clone())
                     .to_owned();
 
@@ -551,19 +562,27 @@ impl<'a> System<'a> for EventRuntime {
             if let Some(event) = events.get_mut(next) {
                 let last_id = last.state().entity_id();
 
+                // Is this an intentional loop?
                 if last_id == next.id()
                     && lifecycle_options
                         .get(next)
-                        .and_then(|o| {
-                            if let LifecycleOptions::Loop(_) = o {
+                        .and_then(|o| match o {
+                            LifecycleOptions::Loop(_) => Some(false),
+                            LifecycleOptions::Repeat { remaining, .. } if *remaining > 0 => {
                                 Some(false)
-                            } else {
-                                Some(true)
                             }
+                            LifecycleOptions::Repeat { remaining, .. } if *remaining == 0 => {
+                                Some(false)
+                            }
+                            LifecycleOptions::Once => Some(false),
+                            _ => Some(true),
                         })
                         .unwrap_or_default()
                 {
-                    event!(Level::WARN, "Loop detected, skipping");
+                    event!(Level::WARN, "Loop detected, setting lifecycle to exit");
+                    lifecycle_options
+                        .insert(next, LifecycleOptions::exited())
+                        .expect("should be able to insert");
                     continue;
                 }
 

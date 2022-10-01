@@ -17,7 +17,7 @@ impl SpecialAttribute for Fork {
 
     fn parse(parser: &mut reality::AttributeParser, content: impl AsRef<str>) {
         for control_block in Fork::parse_idents(content.as_ref()) {
-            parser.define("fork", Value::Symbol(format!(" {control_block}")));
+            parser.define("fork", Value::Symbol(format!("{control_block}")));
         }
     }
 }

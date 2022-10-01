@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
-use crate::ThunkContext;
 use crate::{AttributeParser, Block, BlockProperty, Interpreter, SpecialAttribute};
-use specs::{Component, Entity, VecStorage, World, WorldExt, WriteStorage};
+use specs::{Component, Entity, VecStorage, World, WorldExt};
 
 mod event;
 pub use event::Event;
@@ -14,7 +13,6 @@ mod connection;
 pub use connection::Connection;
 
 mod exit;
-pub use self::exit::ExitListener;
 pub use exit::Exit;
 
 mod r#loop;
@@ -98,7 +96,7 @@ impl Engine {
     pub fn find_block(world: &World, expression: impl AsRef<str>) -> Option<Entity> {
         let block_list = world.read_resource::<HashMap<String, Entity>>();
 
-        tracing::event!(tracing::Level::TRACE, "Looking for block {}", expression.as_ref());
+        tracing::event!(tracing::Level::DEBUG, "Looking for block ``` {}", expression.as_ref());
 
         block_list.get(expression.as_ref()).cloned()
     }
@@ -152,12 +150,9 @@ impl Interpreter for Engine {
 
                 let mut engine_sequence = Sequence::default();
                 for event in events {
-                    let mut expression = event.to_string();
-                    if event.starts_with(" ") {
-                        expression = format!("{} {}", event.trim(), block.symbol());
-                    }
+                    let expression = format!("{} {}", event.trim(), block.symbol());
 
-                    if let Some(event_entity) = Engine::find_block(world, expression) {
+                    if let Some(event_entity) = Engine::find_block(world, expression.trim()) {
                         engine_sequence.add(event_entity);
                     }
                 }

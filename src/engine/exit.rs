@@ -43,7 +43,6 @@ impl SpecialAttribute for Exit {
 impl Interpreter for Exit {
     fn initialize(&self, world: &mut specs::World) {
         world.register::<Exit>();
-        world.insert(ExitListener::new());
     }
 
     fn interpret(&self, world: &specs::World, block: &reality::Block) {
@@ -61,35 +60,6 @@ impl Interpreter for Exit {
                         .expect("should be able to insert component");
                 }
             }
-        }
-    }
-}
-
-/// Wrapper struct over a oneshot channel,
-///
-pub struct ExitListener(
-    pub tokio::sync::oneshot::Sender<()>,
-    pub tokio::sync::oneshot::Receiver<()>,
-);
-
-impl ExitListener {
-    /// Creates a new exit listener resource
-    ///
-    pub fn new() -> Self {
-        let (tx, rx) = oneshot::channel();
-        Self(tx, rx)
-    }
-
-    /// Checks to see if it should exit, if so -- signals the exit
-    /// 
-    pub fn check_exit(self, exits: ReadStorage<LifecycleOptions>) {
-        let should_exit = exits.as_slice().iter().all(|e| match e {
-            LifecycleOptions::Exit => true,
-            _ => false,
-        });
-
-        if should_exit {
-            self.0.send(()).ok();
         }
     }
 }

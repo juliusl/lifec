@@ -1,12 +1,13 @@
 use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
-use specs::{DispatcherBuilder, Join, World, WorldExt};
-use std::{error::Error, fmt::Debug, path::PathBuf, str::from_utf8};
+use specs::{DispatcherBuilder, Join, World, WorldExt, Write, WriteStorage};
+use std::{error::Error, fmt::Debug, ops::Deref, path::PathBuf, str::from_utf8};
 use tracing::{event, Level};
 
 use crate::{
-    plugins::EventRuntime, Engine, Event, LifecycleOptions, Project, ThunkContext,
+    plugins::{CancelThunk, EventRuntime},
+    Engine, Event, LifecycleOptions, Project, ThunkContext,
 };
 
 mod inspector;
@@ -45,32 +46,19 @@ pub struct Host {
 impl Host {
     /// Handles the current command
     ///
-    pub fn handle_start(&mut self) {
+    pub fn handle_start<P>(&mut self)
+    where
+        P: Project,
+    {
         match self.command() {
             Some(Commands::Start(Start { id: Some(id), .. })) => {
-                self.start(*id);
+                self.start::<P>(*id);
             }
             Some(Commands::Start(Start {
-                engine_name: Some(_engine_name),
+                engine_name: Some(engine_name),
                 ..
             })) => {
-                let mut engine_start = None;
-
-                if let Some(entity) =
-                Engine::find_block(self.world(), format!(" {}",  _engine_name))
-            {
-                if let Some(start) = self
-                    .world()
-                    .read_component::<Engine>()
-                    .get(entity)
-                    .and_then(|e| e.start())
-                {
-                    engine_start = Some(start);
-                }
-            }
-
-                let start = engine_start.take().expect("Should have a starting entity");
-                self.start(start.id());
+                self.start_with::<P>(engine_name.clone());
             }
             _ => {
                 unreachable!("A command should exist by this point")
@@ -250,37 +238,70 @@ impl Host {
     where
         P: Project,
     {
-         Self {
+        let mut host = Self {
             runmd_path: None,
             url: None,
             commands: None,
             world: Some(P::compile(content)),
-        }
+        };
+        
+        host.link_sequences();
+        host
     }
 
     /// Returns true if the host should exit,
     ///
     pub fn should_exit(&self) -> bool {
+        let entities = self.world().entities();
         let lifecycle_options = self.world().read_component::<LifecycleOptions>();
         let events = self.world().read_component::<Event>();
-        if (&events, &lifecycle_options).join().all(|(_, l)| match l {
-            LifecycleOptions::Exit => true,
-            _ => false,
-        }) {
-            events.as_slice().iter().all(|e| match e {
-                Event(.., None) => true,
-                _ => false
-            })
+        if (&entities, &events, &lifecycle_options).join().all(
+            |(entity, event, lifecycle_option)| match (event, lifecycle_option) {
+                (Event(.., None), LifecycleOptions::Exit(None)) => {
+                    event!(Level::TRACE, "{:?} has exited", entity);
+                    true
+                },
+                _ => {
+                    event!(Level::TRACE, "{:?} is alive", entity);
+                    false
+                }
+            },
+        ) {
+            true
         } else {
             false
         }
     }
 
+    /// Starts by finding the start event from an engine_name,
+    ///
+    pub fn start_with<P>(&mut self, engine_name: impl AsRef<str>)
+    where
+        P: Project,
+    {
+        let engine_name = engine_name.as_ref();
+
+        if let Some(start) = Engine::find_block(self.world(), engine_name.trim()).and_then(|e| {
+            self.world()
+                .read_component::<Engine>()
+                .get(e)
+                .and_then(|e| e.start())
+        }) {
+            self.start::<P>(start.clone().id());
+        } else {
+            panic!("Did not start {engine_name}");
+        }
+    }
+
     /// Starts an event entity,
     ///
-    pub fn start(&mut self, event_entity: u32) {
+    pub fn start<P>(&mut self, event_entity: u32)
+    where
+        P: Project,
+    {
         let mut dispatcher = {
-            let dispatcher = Host::dispatcher_builder();
+            let mut dispatcher = Host::dispatcher_builder();
+            P::configure_dispatcher(&mut dispatcher);
             dispatcher.build()
         };
         dispatcher.setup(self.world_mut());
@@ -293,7 +314,26 @@ impl Host {
 
         while !self.should_exit() {
             dispatcher.dispatch(self.world());
+            self.world_mut().maintain();
         }
+
+        self.exit();
+    }
+
+    /// Shuts down systems and cancels all thunks,
+    ///
+    pub fn exit(&mut self) {
+        self.world_mut()
+            .exec(|mut cancel_tokens: WriteStorage<CancelThunk>| {
+                for token in cancel_tokens.drain().join() {
+                    token.0.send(()).ok();
+                }
+            });
+
+        self.world_mut()
+            .remove::<tokio::runtime::Runtime>()
+            .expect("should be able to remove")
+            .shutdown_background();
     }
 }
 
@@ -309,5 +349,61 @@ impl Debug for Host {
 impl Into<World> for Host {
     fn into(self) -> World {
         self.world.unwrap()
+    }
+}
+
+mod test {
+    struct Test;
+
+    impl crate::Project for Test {
+        fn configure_engine(_engine: &mut crate::Engine) {}
+
+        fn interpret(_world: &specs::World, _block: &reality::Block) {}
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn test_host() {
+        use crate::{Commands, Host};
+        let mut host = Host::load_content::<Test>(
+            r#"
+        ``` repeat
+        + .engine 
+        : .event print_1
+        : .event print_2
+        : .repeat 5
+        ```
+
+        ``` print_1 repeat
+        + .runtime
+        : .println hello
+        ```
+
+        ``` print_2 repeat
+        + .runtime
+        : .println world
+        ```
+        "#,
+        );
+
+        host.set_command(Commands::start_engine("repeat"));
+        host.handle_start::<Test>();
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_example() {
+        use crate::{Commands, Host};
+        let mut host = Host::open::<Test>("examples/hello_runmd/.runmd")
+            .await
+            .expect("should load");
+        host.set_command(Commands::start_engine("test_block1"));
+        host.handle_start::<Test>();
+
+        // Make sure everything exited successfully
+        assert!(logs_contain("lifec::host: Entity(3, Generation(1)) has exited"));
+        assert!(logs_contain("lifec::host: Entity(6, Generation(1)) has exited"));
+        assert!(logs_contain("lifec::host: Entity(9, Generation(1)) has exited"));
+        assert!(logs_contain("lifec::host: Entity(13, Generation(1)) has exited"));
     }
 }

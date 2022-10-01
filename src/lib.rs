@@ -41,7 +41,6 @@ mod engine;
 pub use engine::Engine;
 pub use engine::Event;
 pub use engine::Exit;
-pub use engine::ExitListener;
 pub use engine::LifecycleOptions;
 pub use engine::Sequence;
 

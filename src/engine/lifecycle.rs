@@ -46,10 +46,10 @@ impl<'a> LifecycleResolver<'a> {
                     }
                 }
                 (None, Some(Loop), None, None, None) => LifecycleOptions::Loop(entity),
-                (None, None, Some(Exit(Some(()))), None, None) => LifecycleOptions::Exit,
+                (None, None, Some(Exit(Some(()))), None, None) => LifecycleOptions::Exit(Some(())),
                 (None, None, None, Some(Next(Some(next))), None) => LifecycleOptions::Next(*next),
                 (None, None, None, None, Some(Fork(forks))) => LifecycleOptions::Fork(forks.to_vec()),
-                _ => LifecycleOptions::Exit,
+                _ => LifecycleOptions::Exit(Some(())),
             };
 
             lifecycle_settings.insert(entity, option.clone());
@@ -89,14 +89,22 @@ pub enum LifecycleOptions {
     ///
     /// Repeat will eventually resolve to Exit,
     ///
-    Exit,
+    Exit(Option<()>),
     /// Will execute once and exit
     /// 
     Once,
 }
 
+impl LifecycleOptions {
+    /// Returns an exited lifecycle option,
+    /// 
+    pub fn exited() -> Self {
+        Self::Exit(None)
+    }
+}
+
 impl Default for LifecycleOptions {
     fn default() -> Self {
-        LifecycleOptions::Exit
+        LifecycleOptions::Exit(Some(()))
     }
 }

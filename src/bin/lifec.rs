@@ -1,5 +1,5 @@
 
-use lifec::{Host, Inspector, Project, Sequencer, Start};
+use lifec::{Host, Inspector, Project, Start};
 use tracing_subscriber::EnvFilter;
 use clap::{Parser, Subcommand};
 
@@ -49,8 +49,7 @@ async fn main() {
                         .create_host::<Lifec>()
                         .await
                         .expect("Should be able to create host");
-                    host.link_sequences();
-                    host.handle_start();
+                    host.handle_start::<Lifec>();
 
                     let host_rutime = host
                         .world_mut()
@@ -63,8 +62,7 @@ async fn main() {
                         .create_host::<Lifec>()
                         .await
                         .expect("Should be able to create host");
-                    host.link_sequences();
-                    host.handle_start();
+                    host.handle_start::<Lifec>();
 
                     let host_rutime = host
                         .world_mut()

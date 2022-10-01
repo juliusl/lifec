@@ -1,4 +1,5 @@
 use reality::{Block, BlockIndex, Interpreter, Parser};
+use specs::DispatcherBuilder;
 use specs::{Join, World, WorldExt};
 use tracing::event;
 use tracing::Level;
@@ -13,6 +14,11 @@ pub trait Project {
     /// TODO: Currently Engine is stateless, but leaving this here as an extension point
     /// 
     fn configure_engine(engine: &mut Engine);
+
+    /// Override to customize the dispatcher,
+    /// 
+    fn configure_dispatcher(_dispatcher_builder: &mut DispatcherBuilder) {
+    }
 
     /// Interpret a compiled block, this will run after the Engine
     /// has a chance to interpret.
