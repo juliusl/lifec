@@ -4,7 +4,7 @@ use specs::{Join, World, WorldExt};
 use tracing::event;
 use tracing::Level;
 
-use crate::{LifecycleOptions, Operation};
+use crate::{LifecycleOptions, Operation, ThunkContext};
 use crate::engine::Loop;
 use crate::plugins::{StatusUpdate, ErrorContext};
 use crate::{plugins::Println, AttributeGraph, Engine, Event, Install, Process, Runtime, Timer, engine::{Fork, Next, Repeat, LifecycleResolver}, Exit};
@@ -33,7 +33,7 @@ pub trait Project {
 
     /// Override to customize the dispatcher,
     /// 
-    fn configure_dispatcher(_dispatcher_builder: &mut DispatcherBuilder) {}
+    fn configure_dispatcher(_dispatcher_builder: &mut DispatcherBuilder, context: Option<ThunkContext>) {}
 
     /// Override to receive/handle runmd
     /// 

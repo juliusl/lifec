@@ -1,13 +1,13 @@
 use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
-use specs::{DispatcherBuilder, Join, World, WorldExt, WriteStorage};
+use specs::{DispatcherBuilder, Join, World, WorldExt, WriteStorage, Entity};
 use std::{error::Error, fmt::Debug, path::PathBuf, str::from_utf8};
 use tracing::{event, Level};
 
 use crate::{
     plugins::{CancelThunk, EventRuntime},
-    project::{RunmdListener, OperationListener, ErrorContextListener, CompletedPluginListener},
+    project::{CompletedPluginListener, ErrorContextListener, OperationListener, RunmdListener},
     Engine, Event, LifecycleOptions, Project, ThunkContext,
 };
 
@@ -53,7 +53,7 @@ impl Host {
     {
         match self.command() {
             Some(Commands::Start(Start { id: Some(id), .. })) => {
-                self.start::<P>(*id);
+                self.start::<P>(*id, None);
             }
             Some(Commands::Start(Start {
                 engine_name: Some(engine_name),
@@ -164,15 +164,14 @@ impl Host {
     }
 
     /// Add's a runmd listener to a dispatcher,
-    /// 
+    ///
     /// The name of the system will be "runmd_listener"
-    /// 
+    ///
     pub fn add_runmd_listener<'a, 'b, P>(
         thunk_context: ThunkContext,
         dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
-    ) 
-    where
-        P: Project + From<ThunkContext> + Send + 'a
+    ) where
+        P: Project + From<ThunkContext> + Send + 'a,
     {
         dispatcher_builder.add(
             RunmdListener::<P>::from(thunk_context),
@@ -181,17 +180,15 @@ impl Host {
         );
     }
 
-    
     /// Add's an operation listener to a dispatcher,
-    /// 
+    ///
     /// The name of the system will be "operation_listener"
-    /// 
+    ///
     pub fn add_operation_listener<'a, 'b, P>(
         thunk_context: ThunkContext,
         dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
-    ) 
-    where
-        P: Project + From<ThunkContext> + Send + 'a
+    ) where
+        P: Project + From<ThunkContext> + Send + 'a,
     {
         dispatcher_builder.add(
             OperationListener::<P>::from(thunk_context),
@@ -201,15 +198,14 @@ impl Host {
     }
 
     /// Add's an error context listener to a dispatcher
-    /// 
+    ///
     /// The name of the system will be "error_context_listener"
-    /// 
+    ///
     pub fn add_error_context_listener<'a, 'b, P>(
         thunk_context: ThunkContext,
         dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
-    ) 
-    where
-        P: Project + From<ThunkContext> + Send + 'a
+    ) where
+        P: Project + From<ThunkContext> + Send + 'a,
     {
         dispatcher_builder.add(
             ErrorContextListener::<P>::from(thunk_context),
@@ -219,15 +215,14 @@ impl Host {
     }
 
     /// Add's an error context listener to a dispatcher,
-    /// 
+    ///
     /// The name of the system will be "completed_plugin_listener"
-    /// 
+    ///
     pub fn add_completed_plugin_listener<'a, 'b, P>(
         thunk_context: ThunkContext,
         dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
-    ) 
-    where
-        P: Project + From<ThunkContext> + Send + 'a
+    ) where
+        P: Project + From<ThunkContext> + Send + 'a,
     {
         dispatcher_builder.add(
             CompletedPluginListener::<P>::from(thunk_context),
@@ -237,15 +232,14 @@ impl Host {
     }
 
     /// Add's a status update listener to a dispatcher,
-    /// 
+    ///
     /// The name of the system will be "status_update_listener"
-    /// 
+    ///
     pub fn add_status_update_listener<'a, 'b, P>(
         thunk_context: ThunkContext,
         dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
-    ) 
-    where
-        P: Project + From<ThunkContext> + Send + 'a
+    ) where
+        P: Project + From<ThunkContext> + Send + 'a,
     {
         dispatcher_builder.add(
             CompletedPluginListener::<P>::from(thunk_context),
@@ -365,6 +359,17 @@ impl Host {
         }
     }
 
+    /// Finds the starting entity from some expression,
+    /// 
+    pub fn find_start(&self, expression: impl AsRef<str>) -> Option<Entity> {
+        Engine::find_block(self.world(), expression.as_ref().trim()).and_then(|e| {
+            self.world()
+                .read_component::<Engine>()
+                .get(e)
+                .and_then(|e| e.start())
+        })
+    }
+
     /// Starts by finding the start event from an engine_name,
     ///
     pub fn start_with<P>(&mut self, engine_name: impl AsRef<str>)
@@ -373,13 +378,19 @@ impl Host {
     {
         let engine_name = engine_name.as_ref();
 
-        if let Some(start) = Engine::find_block(self.world(), engine_name.trim()).and_then(|e| {
-            self.world()
-                .read_component::<Engine>()
-                .get(e)
-                .and_then(|e| e.start())
-        }) {
-            self.start::<P>(start.clone().id());
+        if let Some(start) = self.find_start(engine_name) {
+            // If the starting entity has a thunk context, this will be passed to the configure_dispatcher method
+            // on the project. The project can use that context to initialize listeners
+            // 
+            let tc = self.world()
+                .read_component::<ThunkContext>()
+                .get(start)
+                .cloned();
+            
+            self.start::<P>(
+                start.clone().id(),
+                tc,
+            );
         } else {
             panic!("Did not start {engine_name}");
         }
@@ -387,13 +398,13 @@ impl Host {
 
     /// Starts an event entity,
     ///
-    pub fn start<P>(&mut self, event_entity: u32)
+    pub fn start<P>(&mut self, event_entity: u32, thunk_context: Option<ThunkContext>)
     where
         P: Project,
     {
         let mut dispatcher = {
             let mut dispatcher = Host::dispatcher_builder();
-            P::configure_dispatcher(&mut dispatcher);
+            P::configure_dispatcher(&mut dispatcher, thunk_context);
             dispatcher.build()
         };
         dispatcher.setup(self.world_mut());
