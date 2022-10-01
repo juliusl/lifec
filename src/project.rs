@@ -31,39 +31,25 @@ pub trait Project {
     /// 
     fn configure_engine(engine: &mut Engine);
 
-    /// Override to customize the dispatcher,
-    /// 
-    fn configure_dispatcher(_dispatcher_builder: &mut DispatcherBuilder, context: Option<ThunkContext>) {}
-
-    /// Override to receive/handle runmd
-    /// 
-    fn on_runmd(&mut self, _runmd: String) {}
-
-    /// Override to receive/handle status updates
-    /// 
-    fn on_status_update(&mut self, _status_update: StatusUpdate) {}
-
-    /// Override to receive/handle operations
-    /// 
-    fn on_operation(&mut self, _operation: Operation) {}
-
-    /// Override to receive/handle errors
-    /// 
-    fn on_error_context(&mut self, _error: ErrorContext) {}
-
-    /// Override to receive/handle the entity when a plugin call completes
-    /// 
-    fn on_completed_plugin_call(&mut self, _entity: Entity) {}
-
     /// Interpret a compiled block, this will run after the Engine
     /// has a chance to interpret.
     ///
     fn interpret(world: &World, block: &Block);
 
+    /// Override to customize the dispatcher,
+    /// 
+    fn configure_dispatcher(_dispatcher_builder: &mut DispatcherBuilder, _context: Option<ThunkContext>) {}
+
     /// Override to provide a custom Runtime,
     ///
     fn runtime() -> Runtime {
         default_runtime()
+    }
+
+    /// Override to provide a custom Parser,
+    /// 
+    fn parser() -> Parser {
+        default_parser(Self::world())
     }
 
     /// Override to provide a custom World when compile is called,
@@ -87,9 +73,7 @@ pub trait Project {
     /// Override with care as this adds critical components for the event runtime,
     ///
     fn compile(runmd: impl AsRef<str>) -> World {
-        let parser = Parser::new_with(Self::world())
-            .with_special_attr::<Runtime>()
-            .with_special_attr::<Engine>()
+        let parser = Self::parser()
             .parse(runmd);
         
         let mut world = parser.commit();
@@ -149,6 +133,26 @@ pub trait Project {
 
         world
     }
+    
+    /// Override to receive/handle runmd
+    /// 
+    fn on_runmd(&mut self, _runmd: String) {}
+
+    /// Override to receive/handle status updates
+    /// 
+    fn on_status_update(&mut self, _status_update: StatusUpdate) {}
+
+    /// Override to receive/handle operations
+    /// 
+    fn on_operation(&mut self, _operation: Operation) {}
+
+    /// Override to receive/handle errors
+    /// 
+    fn on_error_context(&mut self, _error: ErrorContext) {}
+
+    /// Override to receive/handle the entity when a plugin call completes
+    /// 
+    fn on_completed_plugin_call(&mut self, _entity: Entity) {}
 }
 
 /// Returns a basic runtime with standard plugins,
@@ -160,4 +164,13 @@ pub fn default_runtime() -> Runtime {
     runtime.install_with_custom::<Install>("");
     runtime.install_with_custom::<Timer>("");
     runtime
+}
+
+
+/// Returns a basic reality parser,
+/// 
+pub fn default_parser(world: World) -> Parser {
+    Parser::new_with(world)
+        .with_special_attr::<Runtime>()
+        .with_special_attr::<Engine>()
 }
