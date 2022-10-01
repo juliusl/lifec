@@ -54,6 +54,7 @@ pub use host::Sequencer;
 mod project;
 pub use project::Project;
 pub use project::default_runtime;
+pub use project::default_parser;
 
 /// This function is provided by types that implement the Engine trait
 pub type SetupFn = fn(&World) -> Entity;
