@@ -1,7 +1,7 @@
 use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
-use specs::{DispatcherBuilder, Join, World, WorldExt, WriteStorage, Entity};
+use specs::{DispatcherBuilder, Entity, Join, World, WorldExt, WriteStorage, Dispatcher};
 use std::{error::Error, fmt::Debug, path::PathBuf, str::from_utf8};
 use tracing::{event, Level};
 
@@ -360,7 +360,7 @@ impl Host {
     }
 
     /// Finds the starting entity from some expression,
-    /// 
+    ///
     pub fn find_start(&self, expression: impl AsRef<str>) -> Option<Entity> {
         Engine::find_block(self.world(), expression.as_ref().trim()).and_then(|e| {
             self.world()
@@ -381,16 +381,14 @@ impl Host {
         if let Some(start) = self.find_start(engine_name) {
             // If the starting entity has a thunk context, this will be passed to the configure_dispatcher method
             // on the project. The project can use that context to initialize listeners
-            // 
-            let tc = self.world()
+            //
+            let tc = self
+                .world()
                 .read_component::<ThunkContext>()
                 .get(start)
                 .cloned();
-            
-            self.start::<P>(
-                start.clone().id(),
-                tc,
-            );
+
+            self.start::<P>(start.clone().id(), tc);
         } else {
             panic!("Did not start {engine_name}");
         }
@@ -411,11 +409,15 @@ impl Host {
 
         // Starts an event
         let event = self.world().entities().entity(event_entity);
-        if let Some(event) = self.world().write_component::<Event>().get_mut(event) {
-            event.fire(ThunkContext::default());
-        }
-        self.world_mut().maintain();
+        self.start_event(event, ThunkContext::default());
 
+        // Waits for event runtime to exit
+        self.wait_for_exit(&mut dispatcher);
+    }
+
+    /// Waits for the host systems to exit,
+    /// 
+    pub fn wait_for_exit<'a, 'b>(&mut self, dispatcher: &mut Dispatcher<'a, 'b>) {
         // Waits for the event runtime to complete
         while !self.should_exit() {
             dispatcher.dispatch(self.world());
@@ -424,6 +426,15 @@ impl Host {
 
         // Exits by shutting down the inner tokio runtime
         self.exit();
+    }
+
+    /// Starts an event,
+    ///
+    pub fn start_event(&mut self, event: Entity, thunk_context: ThunkContext) {
+        if let Some(event) = self.world().write_component::<Event>().get_mut(event) {
+            event.fire(thunk_context);
+        }
+        self.world_mut().maintain();
     }
 
     /// Shuts down systems and cancels all thunks,

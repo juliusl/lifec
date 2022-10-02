@@ -57,6 +57,7 @@ pub trait Project {
         world.register::<Runtime>();
         world.register::<AttributeGraph>();
         world.register::<LifecycleOptions>();
+        world.register::<ThunkContext>();
         world.insert(Self::runtime());
         world
     }
