@@ -20,6 +20,8 @@ pub use reality::{
 };
 use tracing::{event, Level};
 
+pub mod prelude;
+
 mod resources;
 pub use resources::Resources;
 
