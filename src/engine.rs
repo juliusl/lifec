@@ -75,20 +75,22 @@ pub use lifecycle::LifecycleResolver;
 #[derive(Clone, Default, Debug, Component)]
 #[storage(VecStorage)]
 pub struct Engine {
-    begin: Option<Entity>,
+    /// Pointer to the start of the engine sequence
+    /// 
+    start: Option<Entity>,
 }
 
 impl Engine {
     /// Starts an engine,
     /// 
     pub fn start(&self) -> Option<Entity> {
-        self.begin.clone()
+        self.start.clone()
     }
 
     /// Sets the start entity for this engine,
     /// 
     pub fn set_start(&mut self, start: Entity) {
-        self.begin = Some(start);
+        self.start = Some(start);
     }
 
     /// Finds the entity for a block,

@@ -129,10 +129,6 @@ enum Commands {
 }
 
 impl Project for Lifec {
-    fn configure_engine(_engine: &mut lifec::Engine) {
-        // No-op
-    }
-
     fn interpret(_world: &lifec::World, _block: &lifec::Block) {
         // No-op
     }

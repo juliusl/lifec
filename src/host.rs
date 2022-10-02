@@ -462,8 +462,6 @@ mod test {
     struct Test;
 
     impl crate::Project for Test {
-        fn configure_engine(_engine: &mut crate::Engine) {}
-
         fn interpret(_world: &specs::World, _block: &reality::Block) {}
     }
 

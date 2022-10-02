@@ -27,10 +27,6 @@ pub use error_context_listener::ErrorContextListener;
 /// Trait to facilitate
 ///
 pub trait Project {
-    /// TODO: Currently Engine is stateless, but leaving this here as an extension point
-    /// 
-    fn configure_engine(engine: &mut Engine);
-
     /// Interpret a compiled block, this will run after the Engine
     /// has a chance to interpret.
     ///
@@ -79,8 +75,6 @@ pub trait Project {
         let mut world = parser.commit();
 
         let engine = &mut Engine::default();
-
-        Self::configure_engine(engine);
         engine.initialize(&mut world);
 
         // Engine lifecycle options
