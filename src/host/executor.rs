@@ -27,12 +27,7 @@ impl Executor for Host {
 
         thunk_context.commit();
 
-        let handle = {
-            let runtime = self.world().read_resource::<tokio::runtime::Runtime>();
-            let handle = runtime.handle().clone();
-            handle
-        };
-
+        let handle = thunk_context.handle().expect("should be a handle");
         for e in thunk_context
             .state()
             .find_values("sequence")
