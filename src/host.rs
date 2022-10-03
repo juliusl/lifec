@@ -2,7 +2,7 @@ use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use specs::{DispatcherBuilder, Entity, Join, World, WorldExt, WriteStorage, Dispatcher};
-use std::{error::Error, fmt::Debug, path::PathBuf, str::from_utf8};
+use std::{error::Error, fmt::Debug, path::PathBuf, str::from_utf8, sync::Arc};
 use tracing::{event, Level};
 
 use crate::{
@@ -266,6 +266,12 @@ impl Host {
             "start_command_listener",
             &["event_runtime"],
         );
+    }
+
+    /// Get a reference to the world,
+    /// 
+    pub fn world_ref(&self) -> Arc<&World> {
+        Arc::new(self.world.as_ref().expect("should exist"))
     }
 
     /// Returns a immutable reference to the world,
