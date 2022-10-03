@@ -2,6 +2,7 @@ use std::{net::SocketAddr, sync::Arc, future::Future};
 
 use crate::{ AttributeGraph, Operation, AttributeIndex, plugins::network::BlockAddress};
 
+use reality::Block;
 use specs::{Component, DenseVecStorage, Entity};
 use tokio::{
     io::{self, AsyncBufReadExt, BufReader},
@@ -36,6 +37,9 @@ use super::{SecureClient, StatusUpdate, CancelSource, CancelToken, ErrorContext}
 #[derive(Component, Default, Clone)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
+    /// Block data
+    block: Option<Block>,
+    /// Error graph recorded if the previous plugin call encountered an error
     error_graph: Option<AttributeGraph>,
     /// Previous graph used w/ this context
     previous_graph: Option<AttributeGraph>,
@@ -70,6 +74,14 @@ pub struct ThunkContext {
 
 /// This block has all the async related features
 impl ThunkContext {
+    /// Returns a clone of the block that originated this context,
+    /// 
+    /// Typically using this directly is advanced, it's more likely that state/state_mut are used to get state data,
+    /// 
+    pub fn block(&self) -> Option<Block> {
+        self.block.clone()
+    }
+
     /// Returns the current state of this thunk context,
     /// 
     pub fn state(&self) -> &impl AttributeIndex {
@@ -93,6 +105,14 @@ impl ThunkContext {
     pub fn with_state(&self, state: impl Into<AttributeGraph>) -> Self {
         let mut context = self.clone();
         context.graph = state.into();
+        context
+    }
+
+    /// Returns a new context with state, 
+    /// 
+    pub fn with_block(&self, block: &Block) -> Self {
+        let mut context = self.clone();
+        context.block = Some(block.clone());
         context
     }
 

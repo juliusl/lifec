@@ -8,6 +8,7 @@ use crate::{
 };
 use hyper::Client;
 use hyper_tls::HttpsConnector;
+use reality::Block;
 use specs::{
     shred::SetupHandler, Entities, Entity, Join, Read, ReadStorage, System, World, WorldExt,
     WriteStorage,
@@ -173,6 +174,7 @@ impl<'a> System<'a> for EventRuntime {
         ReadStorage<'a, Runtime>,
         ReadStorage<'a, AttributeGraph>,
         ReadStorage<'a, Engine>,
+        ReadStorage<'a, Block>,
         WriteStorage<'a, Event>,
         WriteStorage<'a, ThunkContext>,
         WriteStorage<'a, Sequence>,
@@ -198,6 +200,7 @@ impl<'a> System<'a> for EventRuntime {
             lifec_runtimes,
             attribute_graphs,
             engines,
+            blocks,
             mut events,
             mut contexts,
             mut sequences,
@@ -210,11 +213,12 @@ impl<'a> System<'a> for EventRuntime {
     ) {
         let mut dispatch_queue = vec![];
 
-        for (entity, _connection, _lifec_runtime, attribute_graph, event) in (
+        for (entity, _connection, _lifec_runtime, attribute_graph, block, event) in (
             &entities,
             connections.maybe(),
             lifec_runtimes.maybe(),
             attribute_graphs.maybe(),
+            blocks.maybe(),
             &mut events,
         )
             .join()
@@ -493,7 +497,13 @@ impl<'a> System<'a> for EventRuntime {
                     .to_owned();
 
                 if let Some(graph) = attribute_graph {
+                    event!(Level::TRACE, "Adding attribute graph to context for {}", entity.id());
                     context = context.with_state(graph.clone());
+                }
+
+                if let Some(block) = block {
+                    event!(Level::TRACE, "Adding block to context for {}", entity.id());
+                    context = context.with_block(block);
                 }
 
                 // TODO: This might be a good place to refactor w/ v2 operation
