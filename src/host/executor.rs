@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use crate::AttributeGraph;
 use crate::AttributeIndex;
 use crate::Event;
 use crate::Host;
@@ -24,6 +25,8 @@ impl Executor for Host {
     fn execute(&mut self, thunk_context: &ThunkContext) -> ThunkContext {
         let mut thunk_context = thunk_context.clone();
 
+        thunk_context.commit();
+
         let handle = {
             let runtime = self.world().read_resource::<tokio::runtime::Runtime>();
             let handle = runtime.handle().clone();
@@ -45,12 +48,15 @@ impl Executor for Host {
             thunk_context = thunk_context.enable_async(e, handle.clone());
 
             let event = self.world().read_component::<Event>();
+            let graphs = self.world().read_component::<AttributeGraph>();
             let Event(event_name, Thunk(plugin_name, call, ..), ..) =
                 event.get(e).expect("should exist");
+            let graph = graphs.get(e).expect("should exist");
 
             event!(Level::DEBUG, "Starting {event_name} {plugin_name}");
+
             let mut operation = Operation {
-                context: thunk_context.clone(),
+                context: thunk_context.with_state(graph.clone()),
                 task: call(&thunk_context),
             };
 
