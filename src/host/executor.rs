@@ -17,12 +17,18 @@ pub trait Executor {
     ///
     /// Looks for a sequence property in thunk context which is a list of properties,
     ///
-    fn execute(&self, thunk_context: &ThunkContext) -> ThunkContext;
+    fn execute(&mut self, thunk_context: &ThunkContext) -> ThunkContext;
 }
 
 impl Executor for Host {
-    fn execute(&self, thunk_context: &ThunkContext) -> ThunkContext {
+    fn execute(&mut self, thunk_context: &ThunkContext) -> ThunkContext {
         let mut thunk_context = thunk_context.clone();
+
+        let handle = {
+            let runtime = self.world().read_resource::<tokio::runtime::Runtime>();
+            let handle = runtime.handle().clone();
+            handle
+        };
 
         for e in thunk_context
             .state()
@@ -35,7 +41,9 @@ impl Executor for Host {
                     None
                 }
             })
-        {
+        {        
+            thunk_context = thunk_context.enable_async(e, handle.clone());
+
             let event = self.world().read_component::<Event>();
             let Event(event_name, Thunk(plugin_name, call, ..), ..) =
                 event.get(e).expect("should exist");
