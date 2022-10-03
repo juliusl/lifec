@@ -1,6 +1,6 @@
 use atlier::system::{Attribute, Value};
 use reality::BlockProperties;
-use specs::{storage::HashMapStorage, Component, Entity};
+use specs::{storage::HashMapStorage, Component};
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     hash::{Hash, Hasher},
@@ -21,7 +21,7 @@ pub struct AttributeGraph {
     index: BlockIndex,
     /// Scopes the graph to a child entity
     ///
-    child: Option<Entity>,
+    child: Option<u32>,
 }
 
 impl AttributeGraph {
@@ -51,8 +51,8 @@ impl AttributeGraph {
     /// 
     /// If the child is not a part of this graph, nothing is returned
     /// 
-    pub fn scope(&self, child: Entity) -> Option<AttributeGraph> {
-        if let Some(_) = self.index.child_properties(child.id()) {
+    pub fn scope(&self, child: u32) -> Option<AttributeGraph> {
+        if let Some(_) = self.index.child_properties(child) {
             let mut clone = self.clone();
             clone.child = Some(child);
             Some(clone)
@@ -74,7 +74,7 @@ impl AttributeGraph {
     fn resolve_properties(&self) -> &BlockProperties {
         if let Some(child) = self
             .child
-            .and_then(|child| self.index.child_properties(child.id()))
+            .and_then(|child| self.index.child_properties(child))
         {
             child
         } else {
@@ -86,7 +86,7 @@ impl AttributeGraph {
 impl AttributeIndex for AttributeGraph {
     fn entity_id(&self) -> u32 {
         if let Some(child) = self.child {
-            child.id()
+            child
         } else {
             self.index.root().id()
         }

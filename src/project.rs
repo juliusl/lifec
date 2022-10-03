@@ -109,7 +109,7 @@ pub trait Project {
         {
             let mut graph = AttributeGraph::new(block_index.clone());
             if entity.id() != block_index.root().id() {
-                graph = graph.scope(entity).expect("invalid block index state");
+                graph = graph.scope(entity.id()).expect("invalid block index state");
             }
             world
                 .write_component()
