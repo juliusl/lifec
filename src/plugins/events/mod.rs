@@ -359,7 +359,7 @@ impl<'a> System<'a> for EventRuntime {
                                     } else {
                                         event!(Level::DEBUG, "seqeunce, completed");
                                         if let Some(cursor) = sequence.cursor() {
-                                            event!(Level::TRACE, "found cursor {}", cursor.id());
+                                            event!(Level::DEBUG, "found cursor {}", cursor.id());
                                             dispatch_queue.push((cursor, thunk_context));
                                         } else {
                                             // Since there isn't a cursor, the lifecycle option decides what should happen next
