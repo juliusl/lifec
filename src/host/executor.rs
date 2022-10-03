@@ -29,9 +29,7 @@ pub trait Executor {
 
 impl Executor for Host {
     fn execute(&mut self, thunk_context: &ThunkContext) -> (JoinHandle<ThunkContext>, Sender<()>){
-        let thunk_context = thunk_context.clone();
-
-        thunk_context.commit();
+        let thunk_context = thunk_context.commit();
 
         let handle = thunk_context.handle().expect("should be a handle").clone();
 
