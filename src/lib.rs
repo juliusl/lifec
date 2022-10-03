@@ -55,6 +55,7 @@ pub use host::Sequencer;
 
 mod project;
 pub use project::Project;
+pub use project::Source;
 pub use project::default_runtime;
 pub use project::default_parser;
 
