@@ -52,6 +52,7 @@ pub use host::Start;
 pub use host::Commands;
 pub use host::Inspector;
 pub use host::Sequencer;
+pub use host::Executor;
 
 mod project;
 pub use project::Project;
