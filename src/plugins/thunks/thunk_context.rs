@@ -102,6 +102,20 @@ impl ThunkContext {
         self.previous_graph.as_ref()
     }
 
+    /// Copies previous state to the current state, 
+    /// 
+    /// This is so that previous values can move forward to the next plugin, when .commit() gets called. 
+    /// 
+    pub fn copy_previous(&mut self) {
+        if let Some(previous) = self.previous() {
+            for (name, value) in previous.values() {
+                for value in value {
+                    self.state_mut().with(&name, value);
+                }
+            }
+        }
+    }
+
     /// Returns a new context with state, 
     /// 
     pub fn with_state(&self, state: impl Into<AttributeGraph>) -> Self {
