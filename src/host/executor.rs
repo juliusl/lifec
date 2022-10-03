@@ -16,7 +16,7 @@ use tracing::{event, Level};
 pub trait Executor {
     /// Executes a sequence of events,
     ///
-    /// Looks for a sequence property in thunk context which is a list of properties,
+    /// Looks for a `sequence` property in thunk context which is a list of plugin call entities,
     ///
     fn execute(&mut self, thunk_context: &ThunkContext) -> ThunkContext;
 }
