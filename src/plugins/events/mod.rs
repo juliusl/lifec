@@ -147,7 +147,7 @@ impl SetupHandler<sync::mpsc::Sender<Operation>> for EventRuntime {
 /// Setup for tokio-mulitple-producers single-consumer channel for host start command
 impl SetupHandler<sync::mpsc::Receiver<Start>> for EventRuntime {
     fn setup(world: &mut specs::World) {
-        let (tx, rx) = mpsc::channel::<Operation>(10);
+        let (tx, rx) = mpsc::channel::<Start>(10);
         world.insert(tx);
         world.insert(rx);
     }
@@ -156,7 +156,7 @@ impl SetupHandler<sync::mpsc::Receiver<Start>> for EventRuntime {
 /// Setup for tokio-mulitple-producers single-consumer channel for host start command
 impl SetupHandler<sync::mpsc::Sender<Start>> for EventRuntime {
     fn setup(world: &mut specs::World) {
-        let (tx, rx) = mpsc::channel::<Operation>(10);
+        let (tx, rx) = mpsc::channel::<Start>(10);
         world.insert(tx);
         world.insert(rx);
     }
