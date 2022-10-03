@@ -56,8 +56,8 @@ impl Executor for Host {
             event!(Level::DEBUG, "Starting {event_name} {plugin_name}");
 
             let mut operation = Operation {
-                context: thunk_context.with_state(graph.clone()),
-                task: call(&thunk_context),
+                context: thunk_context.clone(),
+                task: call(&thunk_context.with_state(graph.clone())),
             };
 
             // TODO -- probably need to have a way to configure this
