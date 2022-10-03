@@ -61,18 +61,9 @@ impl Sequencer for Host {
 
                 for (control, atlas) in control_atlas.iter() {
                     let mut start = None;
-                    for (from, to) in atlas.iter() {
+                    if let Some((from, _)) = atlas.first() {
                         if start.is_none() {
                             start = Some(from);
-                        }
-
-                        event!(Level::DEBUG, "Setting cursor {} -> {:?}", from.id(), to);
-                        if let Some(seq) = sequences.get_mut(*from) {
-                            if let Some(to) = to {
-                                if from.id() != to.id() {
-                                    seq.set_cursor(*to);
-                                }
-                            }
                         }
                     }
 
