@@ -23,6 +23,9 @@ pub use commands::Commands;
 mod sequencer;
 pub use sequencer::Sequencer;
 
+mod executor;
+pub use executor::Executor;
+
 /// Struct for starting engines compiled from a
 /// project type,
 ///
