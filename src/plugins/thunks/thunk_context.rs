@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, sync::Arc, future::Future};
 
-use crate::{ AttributeGraph, Operation, AttributeIndex, plugins::network::BlockAddress};
+use crate::{ AttributeGraph, Operation, AttributeIndex, plugins::network::BlockAddress, Start};
 
 use reality::Block;
 use specs::{Component, DenseVecStorage, Entity};
@@ -57,6 +57,8 @@ pub struct ThunkContext {
     dispatcher: Option<Sender<String>>,
     /// Dispatcher for operations
     operation_dispatcher: Option<Sender<Operation>>,
+    /// Dispatcher for start commands
+    start_command_dispatcher: Option<Sender<Start>>,
     /// Channel to send bytes to a listening char_device
     char_device: Option<Sender<(u32, u8)>>,
     /// UDP socket,
@@ -202,6 +204,16 @@ impl ThunkContext {
         self
     }
 
+    /// Returns a context w/ the start command dispatcher enabled
+    /// 
+    pub fn enable_start_command_dispatcher(
+        &mut self,
+        start_commands: Sender<Start>,
+    ) -> &mut ThunkContext {
+        self.start_command_dispatcher = Some(start_commands);
+        self
+    }
+
     /// Enables output to a char_device, a plugin can use to output bytes to.
     ///
     /// The implementation of the char_device, can choose how to handle this output,
@@ -332,6 +344,14 @@ impl ThunkContext {
     pub async fn dispatch(&self, runmd: impl AsRef<str>) {
         if let Some(dispatcher) = &self.dispatcher {
             dispatcher.send(runmd.as_ref().to_string()).await.ok();
+        }
+    }
+
+    /// Dispatches a start command,
+    /// 
+    pub async fn dispatch_start_command(&self, start_command: Start) {
+        if let Some(dispatcher) = &self.start_command_dispatcher {
+            dispatcher.send(start_command).await.ok();
         }
     }
 

@@ -186,6 +186,7 @@ impl<'a> System<'a> for EventRuntime {
         Read<'a, Sender<String>, EventRuntime>,
         Read<'a, Sender<Operation>, EventRuntime>,
         Read<'a, Sender<ErrorContext>, EventRuntime>,
+        Read<'a, Sender<Start>, EventRuntime>,
         Read<'a, sync::broadcast::Sender<Entity>, EventRuntime>,
         Entities<'a>,
         ReadStorage<'a, Connection>,
@@ -212,6 +213,7 @@ impl<'a> System<'a> for EventRuntime {
             dispatcher,
             operation_dispatcher,
             error_dispatcher,
+            start_command_dispatcher,
             thunk_complete_channel,
             entities,
             connections,
@@ -512,6 +514,7 @@ impl<'a> System<'a> for EventRuntime {
                     .enable_dispatcher(dispatcher.clone())
                     .enable_operation_dispatcher(operation_dispatcher.clone())
                     .enable_status_updates(status_update_channel.clone())
+                    .enable_start_command_dispatcher(start_command_dispatcher.clone())
                     .to_owned();
 
                 if let Some(graph) = attribute_graph {
