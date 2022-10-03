@@ -7,7 +7,7 @@ use tracing::{event, Level};
 
 use crate::{
     plugins::{CancelThunk, EventRuntime},
-    project::{CompletedPluginListener, ErrorContextListener, OperationListener, RunmdListener},
+    project::{CompletedPluginListener, ErrorContextListener, OperationListener, RunmdListener, StartCommandListener},
     Engine, Event, LifecycleOptions, Project, ThunkContext,
 };
 
@@ -244,6 +244,23 @@ impl Host {
         dispatcher_builder.add(
             CompletedPluginListener::<P>::from(thunk_context),
             "status_update_listener",
+            &["event_runtime"],
+        );
+    }
+
+    /// Add's a status update listener to a dispatcher,
+    ///
+    /// The name of the system will be "status_update_listener"
+    ///
+    pub fn add_start_command_listener<'a, 'b, P>(
+        thunk_context: ThunkContext,
+        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
+    ) where
+        P: Project + From<ThunkContext> + Send + 'a,
+    {
+        dispatcher_builder.add(
+            StartCommandListener::<P>::from(thunk_context),
+            "start_command_listener",
             &["event_runtime"],
         );
     }
