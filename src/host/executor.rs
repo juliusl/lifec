@@ -68,6 +68,7 @@ impl Executor for Host {
             let rx = rx;
             for e in calls
             {
+                // TODO -- link this with above
                 let (tx, rx) = oneshot::channel::<()>();
 
                 thunk_context = thunk_context.enable_async(e, handle.clone());
