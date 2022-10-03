@@ -430,6 +430,9 @@ impl Host {
 
         // Waits for event runtime to exit
         self.wait_for_exit(&mut dispatcher);
+        
+        // Exits by shutting down the inner tokio runtime
+        self.exit();
     }
 
     /// Waits for the host systems to exit,
@@ -440,9 +443,6 @@ impl Host {
             dispatcher.dispatch(self.world());
             self.world_mut().maintain();
         }
-
-        // Exits by shutting down the inner tokio runtime
-        self.exit();
     }
 
     /// Starts an event,
