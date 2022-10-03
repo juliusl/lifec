@@ -34,7 +34,7 @@ use super::{SecureClient, StatusUpdate, CancelSource, CancelToken, ErrorContext}
 /// that context will keep it's async deps for subsequent calls. This ensures that as long as a plugin only makes changes
 /// to the context once, on subsequent calls of the plugin, the context will remain the same.
 ///
-#[derive(Component, Default, Clone)]
+#[derive(Debug, Component, Default, Clone)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
     /// Block data

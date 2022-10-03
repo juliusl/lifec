@@ -3,45 +3,44 @@ use tokio::sync::mpsc::error::TryRecvError;
 
 use crate::{ThunkContext, Project, plugins::EventListener};
 
-/// System for listening to status updates,
+/// System for listening to runmd,
 /// 
-pub struct StatusUpdateListener<P>
+pub struct StartCommandListener<P>
 where
     P: Project + From<ThunkContext>
 {
     listener: P
 }
 
-impl<P> From<ThunkContext> for StatusUpdateListener<P> 
+impl<P> From<ThunkContext> for StartCommandListener<P> 
 where
     P: Project + From<ThunkContext>
 {
     fn from(context: ThunkContext) -> Self {
-        StatusUpdateListener { listener: P::from(context) }
+        StartCommandListener { listener: P::from(context) }
     }
 }
 
-impl<'a, P> System<'a> for StatusUpdateListener<P>
+impl<'a, P> System<'a> for StartCommandListener<P>
 where
     P: Project + From<ThunkContext> 
 {
     type SystemData = EventListener<'a>;
 
-    fn run(&mut self, EventListener{ mut status_updates, .. }: Self::SystemData) {
-        match status_updates.try_recv() {
-            Ok(status_update) => {
-                self.listener.on_status_update(status_update)
+    fn run(&mut self, EventListener{ mut start_commands, .. }: Self::SystemData) {
+        match start_commands.try_recv() {
+            Ok(start_command) => {
+                self.listener.on_start_command(start_command)
             },
             Err(err) => match err {
                 TryRecvError::Empty => {
-                    // No-op
+                    
                 },
                 TryRecvError::Disconnected => {
-                    panic!("status update channel has disconnected")
+                    panic!("start command channel has disconnected")
                 },
             },
         }
     }
 }
-
 

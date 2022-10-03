@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     engine::{Connection, Sequence},
-    AttributeGraph, AttributeIndex, Engine, Event, Extension, LifecycleOptions, Operation, Runtime,
+    AttributeGraph, AttributeIndex, Engine, Event, Extension, LifecycleOptions, Operation, Runtime, Start,
 };
 use hyper::Client;
 use hyper_tls::HttpsConnector;
@@ -137,6 +137,24 @@ impl SetupHandler<sync::mpsc::Receiver<Operation>> for EventRuntime {
 
 /// Setup for tokio-mulitple-producers single-consumer channel for status updates
 impl SetupHandler<sync::mpsc::Sender<Operation>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<Operation>(10);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
+/// Setup for tokio-mulitple-producers single-consumer channel for host start command
+impl SetupHandler<sync::mpsc::Receiver<Start>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<Operation>(10);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
+/// Setup for tokio-mulitple-producers single-consumer channel for host start command
+impl SetupHandler<sync::mpsc::Sender<Start>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         let (tx, rx) = mpsc::channel::<Operation>(10);
         world.insert(tx);

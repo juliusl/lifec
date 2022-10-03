@@ -1,5 +1,7 @@
 use clap::Args;
 
+use crate::ThunkContext;
+
 /// Struct for `start` command arguments
 /// 
 #[derive(Debug, Clone, Args)]
@@ -16,4 +18,10 @@ pub struct Start {
     /// 
     #[clap(long)]
     pub engine_name: Option<String>,
+    /// Optional thunk context to use to start the event,
+    /// 
+    /// Advanced use case,
+    /// 
+    #[clap(skip)]
+    pub thunk_context: Option<ThunkContext>,
 }

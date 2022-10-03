@@ -37,7 +37,7 @@ where
                     // No-op
                 },
                 TryRecvError::Disconnected => {
-                    panic!("runmd channel has disconnected")
+                    panic!("operation channel has disconnected")
                 },
             },
         }

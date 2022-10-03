@@ -4,7 +4,7 @@ use specs::{Join, World, WorldExt};
 use tracing::event;
 use tracing::Level;
 
-use crate::{LifecycleOptions, Operation, ThunkContext};
+use crate::{LifecycleOptions, Operation, ThunkContext, Start};
 use crate::engine::Loop;
 use crate::plugins::{StatusUpdate, ErrorContext};
 use crate::{plugins::Println, AttributeGraph, Engine, Event, Install, Process, Runtime, Timer, engine::{Fork, Next, Repeat, LifecycleResolver}, Exit};
@@ -23,6 +23,9 @@ pub use operation_listener::OperationListener;
 
 mod error_context_listener;
 pub use error_context_listener::ErrorContextListener;
+
+mod start_command_listener;
+pub use start_command_listener::StartCommandListener;
 
 /// Trait to facilitate
 ///
@@ -148,6 +151,10 @@ pub trait Project {
     /// Override to receive/handle the entity when a plugin call completes
     /// 
     fn on_completed_plugin_call(&mut self, _entity: Entity) {}
+
+    /// Override to receive/handle start commands,
+    /// 
+    fn on_start_command(&mut self, _start_command: Start) {}
 }
 
 /// Returns a basic runtime with standard plugins,
