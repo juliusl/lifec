@@ -27,6 +27,9 @@ pub use error_context_listener::ErrorContextListener;
 mod start_command_listener;
 pub use start_command_listener::StartCommandListener;
 
+mod source;
+pub use source::Source;
+
 /// Trait to facilitate
 ///
 pub trait Project {
@@ -74,9 +77,12 @@ pub trait Project {
     ///
     fn compile(runmd: impl AsRef<str>) -> World {
         let parser = Self::parser()
-            .parse(runmd);
+            .parse(runmd.as_ref());
         
         let mut world = parser.commit();
+
+        // Save source to world
+        world.insert(Source(runmd.as_ref().to_string()));
 
         let engine = &mut Engine::default();
         engine.initialize(&mut world);
