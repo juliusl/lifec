@@ -17,6 +17,11 @@ pub use reality::{
     CustomAttribute,
     SpecialAttribute,
     Interpreter,
+    wire::BlobDevice,
+    wire::BlobSource,
+    wire::ContentBroker,
+    wire::MemoryBlobSource,
+    wire::Sha256Digester,
 };
 use tracing::{event, Level};
 

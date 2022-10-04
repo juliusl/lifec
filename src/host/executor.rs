@@ -63,11 +63,11 @@ impl Executor for Host {
         let task = handle.spawn(async move {
             let mut thunk_context = thunk_context.clone();
             let handle = thunk_context.handle().expect("should be a handle");
-            let rx = rx;
+            let _rx = rx;
             for e in calls
             {
                 // TODO -- link this with above
-                let (tx, rx) = oneshot::channel::<()>();
+                let (_tx, rx) = oneshot::channel::<()>();
 
                 thunk_context = thunk_context.enable_async(e, handle.clone());
 
@@ -85,19 +85,6 @@ impl Executor for Host {
                 if let Some(context) = operation.task(rx).await {
                     thunk_context = context.commit();
                 }
-
-                // TODO -- probably need to have a way to configure this
-                // if let Some(result) = operation.task().await {
-                //     thunk_context = result.commit();
-                // } else {
-                //     event!(
-                //         Level::ERROR,
-                //         "Error, couldn't finish operation {event_name} {plugin_name}"
-                //     );
-                //     thunk_context.error(|g| {
-                //         g.add_symbol("error", "Couldn't finish executing sequence");
-                //     })
-                // }
             }
 
             thunk_context
