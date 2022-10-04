@@ -104,6 +104,12 @@ impl ThunkContext {
         self.previous_graph.as_ref()
     }
 
+    /// Returns an attribute index that checks both current and previous states for values,
+    /// 
+    pub fn search(&self) -> &impl AttributeIndex {
+        self
+    }
+
     /// Copies previous state to the current state, 
     /// 
     /// This is so that previous values can move forward to the next plugin, when .commit() gets called. 
