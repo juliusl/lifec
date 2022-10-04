@@ -79,7 +79,7 @@ impl Runtime {
             self.custom_attributes
                 .insert(custom_attr.ident(), custom_attr);
 
-            event!(Level::INFO, "install custom attribute: .{}", P::symbol());
+            event!(Level::TRACE, "install custom attribute: .{}", P::symbol());
         }
     }
 }
