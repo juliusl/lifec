@@ -19,6 +19,8 @@ use tokio::{
 use tracing::event;
 use tracing::Level;
 
+pub mod thunk_context_ext;
+
 use super::{SecureClient, StatusUpdate, CancelSource, CancelToken, ErrorContext};
 
 /// Thunk context is the major component for thunks,

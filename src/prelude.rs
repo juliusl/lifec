@@ -4,3 +4,4 @@ pub use crate::Block;
 pub use crate::WorldExt;
 pub use crate::AttributeGraph;
 pub use crate::AttributeIndex;
+pub use crate::plugins::*;
