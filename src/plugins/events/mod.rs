@@ -174,9 +174,6 @@ impl SetupHandler<SecureClient> for EventRuntime {
     fn setup(world: &mut World) {
         let https = HttpsConnector::new();
         let client = Client::builder()
-            // TODO
-            .http1_title_case_headers(true)
-            .http1_preserve_header_case(true)
             .build::<_, hyper::Body>(https);
         world.insert(client);
     }
