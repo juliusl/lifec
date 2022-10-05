@@ -34,6 +34,9 @@ mod lifecycle;
 pub use lifecycle::LifecycleOptions;
 pub use lifecycle::LifecycleResolver;
 
+mod activity;
+pub use activity::Activity;
+
 
 /// An engine is a sequence of events, this component manages
 /// sequences of events
@@ -127,6 +130,7 @@ impl Interpreter for Engine {
         world.register::<Event>();
         world.register::<Sequence>();
         world.register::<Connection>();
+        world.register::<Activity>();
     }
 
     /// Handles interpreting blocks and setting up sequences

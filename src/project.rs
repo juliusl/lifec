@@ -5,7 +5,7 @@ use tracing::event;
 use tracing::Level;
 
 use crate::{LifecycleOptions, Operation, ThunkContext, Start};
-use crate::engine::Loop;
+use crate::engine::{Loop, Activity};
 use crate::plugins::{StatusUpdate, ErrorContext};
 use crate::{plugins::Println, AttributeGraph, Engine, Event, Install, Process, Runtime, Timer, engine::{Fork, Next, Repeat, LifecycleResolver}, Exit};
 
@@ -57,13 +57,7 @@ pub trait Project {
     /// Override to provide a custom World when compile is called,
     ///
     fn world() -> World {
-        let mut world = specs::World::new();
-        world.register::<Event>();
-        world.register::<Engine>();
-        world.register::<Runtime>();
-        world.register::<AttributeGraph>();
-        world.register::<LifecycleOptions>();
-        world.register::<ThunkContext>();
+        let mut world = default_world();
         world.insert(Self::runtime());
         world
     }
@@ -104,8 +98,8 @@ pub trait Project {
         r#loop.initialize(&mut world);
 
         // Setup graphs for all plugin entities
-        for (entity, block_index) in
-            (&world.entities(), &world.read_component::<BlockIndex>()).join()
+        for (entity, block_index, event) in
+            (&world.entities(), &world.read_component::<BlockIndex>(), world.read_component::<Event>().maybe()).join()
         {
             let mut graph = AttributeGraph::new(block_index.clone());
             if entity.id() != block_index.root().id() {
@@ -114,7 +108,13 @@ pub trait Project {
             world
                 .write_component()
                 .insert(entity, graph)
-                .expect("Could not insert graph for entity");
+                .expect("Should be able to insert graph for entity");
+
+            if let Some(_) = event {
+                world.write_component()
+                    .insert(entity, Activity::default())
+                    .expect("Should be able to insert an activity");
+            }
         }
 
         for block in world.read_component::<Block>().join() {
@@ -182,3 +182,16 @@ pub fn default_parser(world: World) -> Parser {
         .with_special_attr::<Runtime>()
         .with_special_attr::<Engine>()
 }
+
+pub fn default_world() -> World {
+    let mut world = specs::World::new();
+    world.register::<Event>();
+    world.register::<Engine>();
+    world.register::<Runtime>();
+    world.register::<AttributeGraph>();
+    world.register::<LifecycleOptions>();
+    world.register::<ThunkContext>();
+    world.register::<Activity>();
+    world
+}
+

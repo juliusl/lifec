@@ -18,7 +18,7 @@ pub trait Sequencer {
 impl Sequencer for Host {
     fn link_sequences(&mut self) {
         self.world_mut().exec(
-            |(entities, blocks, _events, mut engines, mut sequences, mut lifecycle_options): (
+            |(entities, blocks, _events, mut engines, sequences, mut lifecycle_options): (
                 Entities,
                 ReadStorage<Block>,
                 ReadStorage<Event>,

@@ -3,7 +3,7 @@ use super::{
     Archive, BlockAddress, Thunk, ThunkContext,
 };
 use crate::{
-    engine::{Connection, Sequence},
+    engine::{Connection, Sequence, Activity},
     AttributeGraph, AttributeIndex, Engine, Event, Extension, LifecycleOptions, Operation, Runtime, Start,
 };
 use hyper::Client;
@@ -203,6 +203,7 @@ impl<'a> System<'a> for EventRuntime {
         WriteStorage<'a, Archive>,
         WriteStorage<'a, BlockAddress>,
         WriteStorage<'a, LifecycleOptions>,
+        WriteStorage<'a, Activity>,
     );
 
     fn run(
@@ -230,6 +231,7 @@ impl<'a> System<'a> for EventRuntime {
             mut archives,
             mut block_addresses,
             mut lifecycle_options,
+            mut activities,
         ): Self::SystemData,
     ) {
         let mut dispatch_queue = vec![];
@@ -280,6 +282,10 @@ impl<'a> System<'a> for EventRuntime {
                         if let Some(error_context) = thunk_context.get_errors() {
                             event!(Level::ERROR, "plugin error context generated");
                             let thunk_context = thunk_context.clone();
+
+                            if let Some(activity) = activities.get(entity) {
+                                activities.insert(entity, activity.complete(Some(&error_context))).expect("should be able to update activity");
+                            }
 
                             if let Some(previous) =
                                 error_contexts.insert(entity, error_context.clone()).ok()
@@ -340,6 +346,10 @@ impl<'a> System<'a> for EventRuntime {
                         match contexts.insert(entity, thunk_context.clone()) {
                             Ok(_) => {
                                 thunk_complete_channel.send(entity).ok();
+                                
+                                if let Some(activity) = activities.get(entity) {
+                                    activities.insert(entity, activity.complete(None)).expect("should be able to update activity");
+                                }
 
                                 // if the entity has a sequence, dispatch the next event
                                 if let Some(sequence) = sequences.get(entity) {

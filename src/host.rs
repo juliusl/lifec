@@ -11,6 +11,9 @@ use crate::{
     Engine, Event, LifecycleOptions, Project, ThunkContext,
 };
 
+mod traverse;
+pub use traverse::Traverse;
+
 mod inspector;
 pub use inspector::Inspector;
 
