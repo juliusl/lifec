@@ -55,6 +55,17 @@ impl Plugin for Process {
                 p.define_child(last, "arg", Value::Symbol(arg.trim().to_string()));
             }
         }));
+
+        // Enable .inherit, will inherit arg/env from previous state
+        parser.add_custom_with("inherit", |p, value| {
+            let last = p.last_child_entity().expect("should have added an entity for the process"); 
+            
+            if value.is_empty() {
+                p.define_child(last, "inherit", true);
+            }
+
+            // todo, could parse and only take the value as a complex
+        });
     }
 
     fn call(context: &super::ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
@@ -95,6 +106,29 @@ impl Plugin for Process {
                 {
                     event!(Level::TRACE, "Setting arg {arg}");
                     command_task.arg(arg);
+                }
+
+                match tc.previous() {
+                    // If inherit is enabled, inherit env/arg values from previous state
+                    Some(previous) if tc.is_enabled("inherit") => {
+                        for (env_name, env_val) in previous
+                        .find_symbol_values("env")
+                        .iter()
+                        .filter_map(|e| tc.state().find_symbol(e).and_then(|s| Some((e, s))))
+                    {
+                        event!(Level::TRACE, "Setting env var {env_name}");
+                        command_task.env(env_name, env_val);
+                    }
+    
+                    // Set up any args
+                    for arg in previous
+                        .find_symbol_values("arg")
+                    {
+                        event!(Level::TRACE, "Setting arg {arg}");
+                        command_task.arg(arg);
+                    }
+                    }, 
+                    _ => {}
                 }
 
                 // Set current directory if work_dir is set
