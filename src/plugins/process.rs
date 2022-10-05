@@ -30,31 +30,31 @@ impl Plugin for Process {
 
     fn compile(parser: &mut AttributeParser) {
         // Enable .env to declare environment variables
-        parser.add_custom(CustomAttribute::new_with("env", |p, value| {
+        parser.add_custom_with("env", |p, value| {
             let var_name = p.symbol().expect("Requires a var name").to_string();
 
             let last = p.last_child_entity().expect("should have added an entity for the process");
 
             p.define_child(last, "env", Value::Symbol(var_name.to_string()));
             p.define_child(last, var_name, Value::Symbol(value));
-        }));
+        });
 
          // Enable .arg to declare arguments
-         parser.add_custom(CustomAttribute::new_with("arg", |p, value| {
+         parser.add_custom_with("arg", |p, value| {
             let last = p.last_child_entity().expect("should have added an entity for the process");
 
             p.define_child(last, "arg", Value::Symbol(value.to_string()));
-        }));
+        });
 
         // Enable .flag to declare arguments
         // This will split by spaces and trim
-        parser.add_custom(CustomAttribute::new_with("flag", |p, value| {
+        parser.add_custom_with("flag", |p, value| {
             let last = p.last_child_entity().expect("should have added an entity for the process"); 
 
             for arg in value.split(" ") {
                 p.define_child(last, "arg", Value::Symbol(arg.trim().to_string()));
             }
-        }));
+        });
 
         // Enable .inherit, will inherit arg/env from previous state
         parser.add_custom_with("inherit", |p, value| {
@@ -73,6 +73,22 @@ impl Plugin for Process {
             
             if value.is_empty() {
                 p.define_child(last, "copy_previous", true);
+            }
+        });
+
+        // Enables .cd, setting the current_directory for the process
+        parser.add_custom_with("cd", |p, value| {
+            let last = p.last_child_entity().expect("should have added an entity for the process"); 
+            
+            match PathBuf::from(value).canonicalize() {
+                Ok(path) => {
+                    event!(Level::DEBUG, "Setting current_directory for process entity {}, {:?}", last.id(), path);
+
+                    p.define_child(last, "current_directory", Value::Symbol(path.to_str().expect("should be a string").to_string()));
+                },
+                Err(err) => {
+                    event!(Level::ERROR, "Could not set current_directory for process entity {}, {err}", last.id());
+                },
             }
         })
     }
