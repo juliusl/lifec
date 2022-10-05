@@ -84,6 +84,12 @@ pub struct Engine {
 }
 
 impl Engine {
+    /// Creates a new engine component w/ start,
+    /// 
+    pub fn new(start: Entity) -> Self {
+        Self { start: Some(start) }
+    }
+
     /// Starts an engine,
     /// 
     pub fn start(&self) -> Option<Entity> {
