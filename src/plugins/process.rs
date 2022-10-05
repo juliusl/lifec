@@ -66,12 +66,21 @@ impl Plugin for Process {
 
             // todo, could parse and only take the value as a complex
         });
+
+        // Enable .copy_previous, will copy previous state
+        parser.add_custom_with("copy_previous", |p, value| {
+            let last = p.last_child_entity().expect("should have added an entity for the process"); 
+            
+            if value.is_empty() {
+                p.define_child(last, "copy_previous", true);
+            }
+        })
     }
 
     fn call(context: &super::ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
         let clone = context.clone();
         clone.clone().task(|cancel_source| {
-            let tc = context.clone();
+            let mut tc = context.clone();
             async move {
                 let command = tc
                     .state()
@@ -194,6 +203,10 @@ impl Plugin for Process {
                    _ = cancel_source => {
                         tc.update_progress(format!("# cancelling"), 0.0).await;
                    }
+                }
+
+                if tc.is_enabled("copy_previous") {
+                    tc.copy_previous();
                 }
 
                 Some(tc)
