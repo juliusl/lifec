@@ -498,6 +498,18 @@ impl Into<World> for Host {
     }
 }
 
+impl AsRef<World> for Host {
+    fn as_ref(&self) -> &World {
+        self.world()
+    }
+}
+
+impl AsMut<World> for Host {
+    fn as_mut(&mut self) -> &mut World {
+        self.world_mut()
+    }
+}
+
 mod test {
     struct Test;
 

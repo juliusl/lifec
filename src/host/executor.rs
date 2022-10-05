@@ -1,17 +1,16 @@
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::Duration;
-
 use crate::AttributeGraph;
 use crate::AttributeIndex;
 use crate::Event;
 use crate::Host;
 use crate::Operation;
+use crate::Sequence;
 use crate::Thunk;
 use crate::ThunkContext;
 use crate::Value;
 use crate::WorldExt;
 use specs::Entity;
+use specs::World;
 use tokio::sync::oneshot;
 use tokio::sync::oneshot::Sender;
 use tokio::task::JoinHandle;
@@ -25,37 +24,35 @@ pub trait Executor {
     /// Looks for a `sequence` property in thunk context which is a list of plugin call entities,
     ///
     fn execute(&mut self, thunk_context: &ThunkContext) -> (JoinHandle<ThunkContext>, Sender<()>);
-}
 
-impl Executor for Host {
-    fn execute(&mut self, thunk_context: &ThunkContext) -> (JoinHandle<ThunkContext>, Sender<()>){
+    /// Executes a events from a sequence,
+    ///
+    fn execute_sequence(
+        &mut self,
+        thunk_context: &ThunkContext,
+        calls: Sequence,
+    ) -> (JoinHandle<ThunkContext>, Sender<()>)
+    where
+        Self: AsRef<World>,
+    {
         let thunk_context = thunk_context.commit();
 
         let handle = thunk_context.handle().expect("should be a handle").clone();
 
-        let entities = self.world().entities();
-        let calls = thunk_context
-            .state()
-            .find_values("sequence")
-            .iter()
-            .filter_map(|v| {
-                if let Value::Int(i) = v {
-                    Some(entities.entity(*i as u32))
-                } else {
-                    None
-                }
-            }).collect::<Vec<_>>();
-
-        let event_components = self.world().read_component::<Event>();
-        let graph_components = self.world().read_component::<AttributeGraph>();
+        let event_components = self.as_ref().read_component::<Event>();
+        let graph_components = self.as_ref().read_component::<AttributeGraph>();
         let mut events = HashMap::<Entity, Event>::default();
         let mut graphs = HashMap::<Entity, AttributeGraph>::default();
-        for call in calls.iter() {
-            let event = event_components.get(*call).expect("should exist").duplicate();
-            let graph = graph_components.get(*call).expect("should exist").clone();
 
-            events.insert(*call, event);
-            graphs.insert(*call, graph);
+        for call in calls.iter_entities() {
+            let event = event_components
+                .get(call)
+                .expect("should exist")
+                .duplicate();
+            let graph = graph_components.get(call).expect("should exist").clone();
+
+            events.insert(call, event);
+            graphs.insert(call, graph);
         }
 
         let (tx, rx) = oneshot::channel::<()>();
@@ -64,8 +61,7 @@ impl Executor for Host {
             let mut thunk_context = thunk_context.clone();
             let handle = thunk_context.handle().expect("should be a handle");
             let _rx = rx;
-            for e in calls
-            {
+            for e in calls.iter_entities() {
                 // TODO -- link this with above
                 let (_tx, rx) = oneshot::channel::<()>();
 
@@ -91,5 +87,29 @@ impl Executor for Host {
         });
 
         (task, tx)
+    }
+}
+
+impl Executor for Host {
+    fn execute(&mut self, thunk_context: &ThunkContext) -> (JoinHandle<ThunkContext>, Sender<()>) {
+        let mut sequence = Sequence::default();
+        {
+            let entities = self.world().entities();
+            for call in thunk_context
+                .state()
+                .find_values("sequence")
+                .iter()
+                .filter_map(|v| {
+                    if let Value::Int(i) = v {
+                        Some(entities.entity(*i as u32))
+                    } else {
+                        None
+                    }
+                }) {
+                    sequence.add(call);
+                }
+        }
+
+       self.execute_sequence(thunk_context, sequence)
     }
 }
