@@ -59,12 +59,14 @@ impl Host {
     {
         match self.command() {
             Some(Commands::Start(Start { id: Some(id), .. })) => {
+                event!(Level::DEBUG, "Starting engine by id {id}");
                 self.start::<P>(*id, None);
             }
             Some(Commands::Start(Start {
                 engine_name: Some(engine_name),
                 ..
             })) => {
+                event!(Level::DEBUG, "Starting engine by name {engine_name}");
                 self.start_with::<P>(engine_name.clone());
             }
             _ => {
