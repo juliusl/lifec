@@ -1,6 +1,6 @@
 pub use atlier::system::{combine, combine_default};
 pub use atlier::system::{App, Extension, Value};
-pub use plugins::{AsyncContext, Config, Install, Plugin, Process, Thunk, ThunkContext, Timer};
+pub use plugins::{AsyncContext, SecureClient, Config, Install, Plugin, Process, Thunk, ThunkContext, Timer};
 pub use specs::{
     storage::BTreeStorage, Component, DefaultVecStorage, DenseVecStorage, DispatcherBuilder,
     Entities, Entity, HashMapStorage, Join, ReadStorage, System, World, WorldExt, WriteStorage,

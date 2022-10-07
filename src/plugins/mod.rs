@@ -21,6 +21,7 @@ pub use thunks::ErrorContext;
 pub use thunks::StatusUpdate;
 pub use thunks::Thunk;
 pub use thunks::ThunkContext;
+pub use thunks::SecureClient;
 
 mod testing;
 pub use testing::Test;
