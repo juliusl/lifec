@@ -23,12 +23,12 @@ pub trait Executor {
     ///
     /// Looks for a `sequence` property in thunk context which is a list of plugin call entities,
     ///
-    fn execute(&mut self, thunk_context: &ThunkContext) -> (JoinHandle<ThunkContext>, Sender<()>);
+    fn execute(&self, thunk_context: &ThunkContext) -> (JoinHandle<ThunkContext>, Sender<()>);
 
     /// Executes a events from a sequence,
     ///
     fn execute_sequence(
-        &mut self,
+        &self,
         thunk_context: &ThunkContext,
         calls: Sequence,
     ) -> (JoinHandle<ThunkContext>, Sender<()>)
@@ -91,7 +91,7 @@ pub trait Executor {
 }
 
 impl Executor for Host {
-    fn execute(&mut self, thunk_context: &ThunkContext) -> (JoinHandle<ThunkContext>, Sender<()>) {
+    fn execute(&self, thunk_context: &ThunkContext) -> (JoinHandle<ThunkContext>, Sender<()>) {
         let mut sequence = Sequence::default();
         {
             let entities = self.world().entities();
