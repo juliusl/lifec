@@ -130,13 +130,15 @@ pub trait Plugin {
 
                 parser.define("sequence", Value::Int(child.id() as i32));
                 parser.define_child(child.clone(), Self::symbol(), Value::Symbol(content));
-                // TODO - This gets crowded if added by default 
-                // if !Self::description().is_empty() {
-                //     parser.define_child(child.clone(), "description", Self::description());
-                // }
-                // if !Self::caveats().is_empty() {                    
-                //     parser.define_child(child.clone(), "caveats", Self::caveats());
-                // }
+                parser.define_child(child.clone(), "plugin_symbol", Self::symbol());
+                
+                if !Self::description().is_empty() {
+                    parser.define_child(child.clone(), "description", Self::description());
+                }
+                if !Self::caveats().is_empty() {                    
+                    parser.define_child(child.clone(), "caveats", Self::caveats());
+                }
+
                 Self::compile(parser);
             }
         })

@@ -31,6 +31,14 @@ impl AttributeGraph {
         Self { index, child: None }
     }
 
+    /// Adds a control value to the underlying graph,
+    /// 
+    /// A control value will be available to every plugin that consumes this graph.
+    /// 
+    pub fn add_control(&mut self, name: impl AsRef<str>, value: impl Into<Value>) {
+        self.index.add_control(name, value);
+    } 
+
     /// Returns the current hash_code of the graph
     /// 
     pub fn hash_code(&self) -> u64 {
