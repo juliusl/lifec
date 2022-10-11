@@ -7,6 +7,7 @@
 ``` test_block1
 + .engine
 : .event test
+: .event test2
 : .fork test_block2, azure
 ```
 
@@ -14,6 +15,12 @@
 + .runtime
 : .println test_block1
  ```
+
+``` test2 test_block1
++ .runtime
+: .println test2 test_block1
+: .println test3 test_block2
+```
 ## Testing out repeat lifecycle option
 - repeat will loop back to the start of the engine and decrement a specified counter
 - there is also a loop option, but that is not covered in this file 
@@ -41,6 +48,7 @@
 ``` test azure
 + .runtime
 : .println testing
+: .println testing two
 ```
 
 ## Testing out exit lifecycle option

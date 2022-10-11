@@ -145,7 +145,9 @@ pub trait Plugin {
     }
 }
 
-type PluginTask = fn(&ThunkContext) -> Option<AsyncContext>;
+/// Function signature for the plugin trait's call() fn
+/// 
+pub type Call = fn(&ThunkContext) -> Option<AsyncContext>;
 
 /// Combine plugins
 /// Example "Copy" plugin:
@@ -158,7 +160,7 @@ type PluginTask = fn(&ThunkContext) -> Option<AsyncContext>;
 /// runtime.install::<Call, (OpenFile, WriteFile)>();
 ///
 /// ```
-pub fn combine<A, B>() -> PluginTask
+pub fn combine<A, B>() -> Call
 where
     A: Plugin + Default + Send,
     B: Plugin + Default + Send,

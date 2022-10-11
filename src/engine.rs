@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 use crate::{AttributeParser, Block, BlockProperty, Interpreter, SpecialAttribute};
 use specs::{Component, Entity, VecStorage, World, WorldExt};

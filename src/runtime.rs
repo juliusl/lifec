@@ -59,7 +59,7 @@ impl Runtime {
         // Register event sources
         self.plugins.insert(
             format!("{}::{}", &event_name, P::symbol()),  
-            EventSource::new::<P>(self.clone(), &event_name)
+            EventSource::new::<P>(&event_name)
         );
     }
 

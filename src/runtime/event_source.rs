@@ -9,22 +9,18 @@ use tracing::{event, Level};
 pub struct EventSource {
     /// The event struct component this source returns 
     /// 
-    event: Event, 
-    /// The runtime that created this event source 
-    /// 
-    runtime: Runtime, 
+    event: Event,
 }
 
 impl EventSource {
     /// Returns a new event source,
     /// 
-    pub fn new<P>(runtime: Runtime, event_name: impl AsRef<str>) -> Self 
+    pub fn new<P>(event_name: impl AsRef<str>) -> Self 
     where 
         P: Plugin + Default + Send
     {
         EventSource {
             event: Event::from_plugin::<P>(event_name),
-            runtime,
         }
     }
 
@@ -61,8 +57,7 @@ impl EventSource {
 impl Clone for EventSource {
     fn clone(&self) -> Self {
         Self { 
-            event: self.event.duplicate(), 
-            runtime: self.runtime.clone(),
+            event: self.event.duplicate(),
         }
     }
 }

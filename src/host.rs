@@ -560,9 +560,6 @@ mod test {
 
         // Make sure everything exited successfully
         assert!(logs_contain(
-            "lifec::host: Entity(3, Generation(1)) has exited"
-        ));
-        assert!(logs_contain(
             "lifec::host: Entity(6, Generation(1)) has exited"
         ));
         assert!(logs_contain(
@@ -570,6 +567,9 @@ mod test {
         ));
         assert!(logs_contain(
             "lifec::host: Entity(13, Generation(1)) has exited"
+        ));
+        assert!(logs_contain(
+            "lifec::host: Entity(17, Generation(1)) has exited"
         ));
     }
 }
