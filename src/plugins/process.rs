@@ -1,6 +1,7 @@
 use std::{str::from_utf8, path::PathBuf};
 
 use atlier::system::Value;
+use reality::Documentation;
 use crate::{AttributeParser, BlockObject, BlockProperties, CustomAttribute};
 use specs::{Component, DenseVecStorage};
 use tokio::{select, task::JoinHandle};
@@ -238,6 +239,49 @@ impl BlockObject for Process {
             .optional("current_dir")
             .optional("env")
             .optional("arg")
+            .optional("flag")
+    }
+
+    fn documentation(&self, _property: impl AsRef<str>) -> Option<reality::Documentation> {
+        let documentation = match _property.as_ref() {
+            "process" => {
+                Documentation::summary("Command to execute on the current operating system")
+                    .custom_attr()
+                    .required()
+                    .input()
+                    .symbol("This should be the program name and arguments, ex: echo hello world")
+            }
+            "current_dir" => {
+                Documentation::summary("Setting this will execute the command in the context of a specific directory as the root")
+                    .custom_attr()
+                    .input()
+                    .symbol("This should be a file path to the directory.")
+            }
+            "env" => {
+                Documentation::summary("Can be used to set environment variables for the process. Example usage should be, `: ENV_NAME .env value`")
+                    .custom_attr()
+                    .list()
+                    .input()
+                    .symbol("This should be the value of the environment variable")
+            }
+            "arg" => {
+                Documentation::summary("Can be used to set the arguments for the process's program")
+                    .custom_attr()
+                    .input()    
+                    .list()
+                    .symbol("This should be a single argument w/ no spaces")
+            }
+            "flag" => {
+                Documentation::summary("Can be used to format a flag/value pair")
+                    .custom_attr()
+                    .input()    
+                    .list()
+                    .symbol("This should be the flag followed by a space and then value, `ex. --flag value`")
+            }
+            _ => Documentation::default()
+        };
+
+        Some(documentation)
     }
 
     fn parser(&self) -> Option<CustomAttribute> {
