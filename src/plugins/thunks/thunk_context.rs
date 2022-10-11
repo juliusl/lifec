@@ -40,7 +40,7 @@ use super::{SecureClient, StatusUpdate, CancelSource, CancelToken, ErrorContext}
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
     /// Block data
-    block: Option<Block>,
+    block: Block,
     /// Error graph recorded if the previous plugin call encountered an error
     error_graph: Option<AttributeGraph>,
     /// Previous graph used w/ this context
@@ -82,7 +82,7 @@ impl ThunkContext {
     /// 
     /// Typically using this directly is advanced, it's more likely that state/state_mut are used to get state data,
     /// 
-    pub fn block(&self) -> Option<Block> {
+    pub fn block(&self) -> Block {
         self.block.clone()
     }
 
@@ -94,7 +94,7 @@ impl ThunkContext {
 
     /// Returns a mutable reference to the underlying state,
     /// 
-    pub fn state_mut(&mut self) -> &mut impl AttributeIndex {
+    pub fn state_mut(&mut self) -> &mut (impl AttributeIndex + Clone) {
         &mut self.graph
     }
 
@@ -136,7 +136,7 @@ impl ThunkContext {
     /// 
     pub fn with_block(&self, block: &Block) -> Self {
         let mut context = self.clone();
-        context.block = Some(block.clone());
+        context.block = block.clone();
         context
     }
 
