@@ -196,6 +196,9 @@ impl Interpreter for Engine {
                     sequence.add(plugin);
                 }
 
+                // Note that .next() will mutate the sequence before we insert it as a component
+                // That is because the parent will be executed first, and afterwards the next entity in the 
+                // sequence should be the next call
                 if let Some(parent) = sequence.next() {
                     world
                         .write_component()
