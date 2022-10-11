@@ -1,6 +1,9 @@
 use crate::editor::*;
+use crate::engine::Connection;
 use crate::plugins::*;
+use crate::DenseVecStorage;
 use crate::*;
+use atlier::system::WindowEvent;
 use imgui::MenuItem;
 use imgui::TableFlags;
 use imgui::TreeNodeFlags;
@@ -8,10 +11,10 @@ use imgui::Ui;
 
 /// List-layout widget for thunk_context's
 #[derive(Component)]
-#[storage(DefaultVecStorage)]
+#[storage(DenseVecStorage)]
 pub struct List<Item>(
     /// Layout fn
-    fn(&mut ThunkContext, &mut Item, &World, &Ui),
+    fn(&mut AttributeGraph, &mut Item, &World, &Ui),
     /// Sequence to follow
     Option<Sequence>,
     /// Title
@@ -48,63 +51,61 @@ where
     }
 
     /// Returns a simple view for the thunk context, w/ editing
-    /// off by default. 
-    /// 
+    /// off by default.
+    ///
     /// If there is a "form to fill out" for a plugin, then by enabling
     /// `edit_form`, transient attributes w/ a symbol transient will add editing for the attribute named by that symbol
-    /// 
-    /// For example, 
-    /// 
+    ///
+    /// For example,
+    ///
     /// ```no_run
     /// ``` test example
     /// define edit_name example .symbol name
-    /// 
+    ///
     /// add name .text Cool Name  
     /// ```
     /// ```
-    /// 
+    ///
     /// Would display a single input for editing the `name` attribute. The underlying plugin does not need to add any special
-    /// logic in order to use this feature. 
-    /// 
+    /// logic in order to use this feature.
+    ///
     /// Note: If trying to edit a transient attribute instead of a stable one, then the format of the attribute name is
     /// {name}::{symbol}, so for example to edit edit_name defined above, the symbol value would need to be `edit_name::example`
-    /// 
+    ///
     pub fn simple(show_all: bool) -> Self {
         List::<Item>(
-            |context, item, world, ui| {
-                let thunk_symbol = context
-                    .as_ref()
-                    .find_text("thunk_symbol")
+            |graph, item, world, ui| {
+                let plugin_symbol = graph
+                    .find_symbol("plugin_symbol")
                     .unwrap_or("entity".to_string());
 
                 ui.text(format!(
-                    "{} {} - {}:",
-                    thunk_symbol,
-                    context.block.name.unwrap(),
-                    context.as_ref().hash_code()
+                    "{} - {}:",
+                    plugin_symbol,
+                    graph.hash_code()
                 ));
 
-                if let Some(description) = context.as_ref().find_text("description") {
+                if let Some(description) = graph.find_symbol("description") {
                     ui.new_line();
                     ui.text_wrapped(description);
-                    if let Some(caveats) = context.as_ref().find_text("caveats") {
+                    if let Some(caveats) = graph.find_symbol("caveats") {
                         if ui.is_item_hovered() {
                             ui.tooltip_text(caveats);
                         }
                     }
                 }
 
-                let entity = context.as_ref().entity();
-                let clone = context.clone();
-                if clone.as_ref().is_enabled("edit_form").unwrap_or_default() {
-                    for (_, value) in context.as_ref().iter_transient_values() {
-                        if let Value::Symbol(symbol) = value {
-                            if let Some(attr) = context.as_mut().find_attr_mut(&symbol) {
-                                attr.edit_value(format!("{symbol} {}", entity), ui);
-                            }
-                        }
-                    }
-                }
+                // let entity = .entity_id();
+                // let clone = context.clone();
+                // if clone.is_enabled("edit_form") {
+                //     for (_, value) in context.state().() {
+                //         if let Value::Symbol(symbol) = value {
+                //             if let Some(attr) = context.as_mut().find_attr_mut(&symbol) {
+                //                 attr.edit_value(format!("{symbol} {}", entity), ui);
+                //             }
+                //         }
+                //     }
+                // }
 
                 item.on_ui(world, ui);
                 ui.separator();
@@ -114,151 +115,6 @@ where
             None,
             show_all,
         )
-    }
-
-    pub fn edit_attr_short_table() -> Self {
-        List::<Item>(
-            |context, item, world, ui| {
-                context.as_mut().edit_attr_short_table(ui);
-                item.on_ui(world, ui);
-            },
-            None,
-            None,
-            None,
-            true
-        )
-    }
-
-    pub fn edit_attr_table() -> Self {
-        List::<Item>(
-            |context, item, world, ui| {
-                context.as_mut().edit_attr_table(ui);
-                item.on_ui(world, ui);
-            },
-            None,
-            None,
-            None,
-            true
-        )
-    }
-
-    pub fn edit_block_view(sequence: Option<Sequence>) -> Self {
-        List::<Item>(
-            |context, item, world, ui| {
-                let thunk_symbol = context
-                    .block
-                    .as_ref()
-                    .find_text("thunk_symbol")
-                    .unwrap_or("entity".to_string());
-                let item_index = context
-                    .as_ref()
-                    .find_attr("item::index")
-                    .and_then(|h| h.transient())
-                    .and_then(|(_, v)| match v {
-                        Value::Int(v) => Some(*v),
-                        _ => None,
-                    })
-                    .unwrap_or_default();
-
-                let mut flags = TreeNodeFlags::empty();
-                if item_index == 0 
-                || context.as_ref().is_enabled("last_item").unwrap_or_default() 
-                || context.as_ref().is_enabled("default_open").unwrap_or_default() {
-                    flags |= TreeNodeFlags::DEFAULT_OPEN;
-                }
-
-                let edit_transient = context.as_ref().is_enabled("edit_transient").unwrap_or_default();
-                if ui.collapsing_header(
-                    format!(
-                        "{} {} - {}",
-                        thunk_symbol,
-                        context.block.block_name,
-                        context.as_ref().hash_code()
-                    ),
-                    flags,
-                ) {
-                    ui.input_text(
-                        format!("name {}", context.as_ref().entity()),
-                        &mut context.block.block_name,
-                    )
-                    .build();
-                    let mut current_id = context.as_ref().entity();
-
-                    let clone = context.as_ref().clone();
-                    for attr in context.as_mut().iter_mut_attributes() {
-                        if current_id != attr.id() {
-                            ui.new_line();
-                            if let Some(next_block) = clone.find_imported_graph(attr.id()) {
-                                let thunk_symbol =
-                                    next_block.find_text("thunk_symbol").unwrap_or_default();
-                                let block_symbol =
-                                    next_block.find_text("block_symbol").unwrap_or_default();
-                                ui.text(format!("{} - {}", thunk_symbol, block_symbol));
-                            }
-                            current_id = attr.id();
-                        }
-
-                        if attr.is_stable() {
-                            attr.edit_value(
-                                format!("{} {}:{:#04x}", attr.name(), attr.id(), item_index as u16),
-                                ui,
-                            );
-                        } else if edit_transient {
-                            attr.edit_ui(ui);
-                        }
-                    }
-                    item.on_ui(world, ui);
-                    ui.text(format!("stable: {}", context.as_ref().is_stable()));
-                    ui.separator();
-                }
-            },
-            sequence,
-            None,
-            None,
-            true,
-        )
-    }
-
-    pub fn edit_attr_form() -> Self {
-        List::<Item>(
-            |context, item, world, ui| {
-                let thunk_symbol = context
-                    .block
-                    .as_ref()
-                    .find_text("thunk_symbol")
-                    .unwrap_or("entity".to_string());
-
-                if ui.collapsing_header(
-                    format!(
-                        "{} {} - {}",
-                        thunk_symbol,
-                        context.block.block_name,
-                        context.as_ref().hash_code()
-                    ),
-                    TreeNodeFlags::DEFAULT_OPEN,
-                ) {
-                    for attr in context.as_mut().iter_mut_attributes() {
-                        attr.edit_value(format!("{} {}", attr.name(), attr.id()), ui);
-                    }
-                    item.on_ui(world, ui);
-                    ui.text(format!("stable: {}", context.as_ref().is_stable()));
-                    ui.separator();
-                }
-            },
-            None,
-            None,
-            None,
-            true,
-        )
-    }
-}
-
-impl<Item> Default for List<Item>
-where
-    Item: Extension + Component,
-{
-    fn default() -> Self {
-        Self::edit_attr_form()
     }
 }
 
@@ -288,7 +144,7 @@ where
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
-        let mut contexts = app_world.write_component::<ThunkContext>();
+        let mut graphs = app_world.write_component::<AttributeGraph>();
         let connections = app_world.read_component::<Connection>();
         let mut items = app_world.write_component::<Item>();
 
@@ -299,59 +155,15 @@ where
         let mut layout = || {
             let List(_, sequence, ..) = self;
             if let Some(sequence) = sequence {
-                let last = sequence.iter_entities().last();
                 for entity in sequence.iter_entities() {
-                    let row = (contexts.get_mut(entity), items.get_mut(entity));
+                    let row = (graphs.get_mut(entity), items.get_mut(entity));
                     if let (Some(context), Some(item)) = row {
                         let List(layout, ..) = self;
-                        context
-                            .as_mut()
-                            .define("item", "index")
-                            .edit_as(Value::Int(item_index));
-                        context
-                            .as_mut()
-                            .add_bool_attr("last_item", last == Some(entity));
 
                         (layout)(context, item, app_world, ui);
 
                         item_index += 1;
-
-                        ui.menu_bar(|| {
-                            ui.menu("Menu", || {
-                                if let Some(transpiled) = Project::from(context.as_ref().clone())
-                                    .transpile_blocks()
-                                    .ok()
-                                {
-                                    if !transpiled.trim().is_empty() {
-                                        if MenuItem::new(format!(
-                                            "Write {} output to console",
-                                            context.block.block_name
-                                        ))
-                                        .build(ui)
-                                        {
-                                            println!("{}", transpiled);
-                                        }
-                                    }
-                                }
-                            });
-                        });
                     }
-                }
-            } else {
-                for (context, item, connection) in (&mut contexts, &mut items, connections.maybe()).join() {
-                    if !self.4 && connection.is_none() && !context.as_ref().is_enabled("always_show").unwrap_or_default() {
-                        continue
-                    }
-
-                    let List(layout, ..) = self;
-                    context
-                        .as_mut()
-                        .define("item", "index")
-                        .edit_as(Value::Int(item_index));
-
-                    (layout)(context, item, app_world, ui);
-
-                    item_index += 1;
                 }
             }
         };

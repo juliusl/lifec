@@ -1,13 +1,16 @@
 use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
-use specs::{DispatcherBuilder, Entity, Join, World, WorldExt, WriteStorage, Dispatcher};
+use specs::{Dispatcher, DispatcherBuilder, Entity, Join, World, WorldExt, WriteStorage};
 use std::{error::Error, fmt::Debug, path::PathBuf, str::from_utf8, sync::Arc};
 use tracing::{event, Level};
 
 use crate::{
     plugins::{CancelThunk, EventRuntime},
-    project::{CompletedPluginListener, ErrorContextListener, OperationListener, RunmdListener, StartCommandListener},
+    project::{
+        CompletedPluginListener, ErrorContextListener, OperationListener, RunmdListener,
+        StartCommandListener,
+    },
     Engine, Event, LifecycleOptions, Project, ThunkContext,
 };
 
@@ -29,23 +32,33 @@ pub use sequencer::Sequencer;
 mod executor;
 pub use executor::Executor;
 
-/// Struct for starting engines compiled from a
-/// project type,
+mod editor;
+pub use editor::Editor;
+
+/// Struct for initializing and hosting the runtime as well as parsing CLI arguments,
+///
+/// Used with a type that implements the Project trait.
 ///
 #[derive(Default, Args)]
 #[clap(arg_required_else_help = true)]
 pub struct Host {
-    /// URL to runmd to use when configuring this mirror engine
+    /// URL to .runmd file used to configure this host,
+    ///
     #[clap(long)]
-    url: Option<String>,
-    /// Path to runmd file used to configure the mirror engine
-    /// Defaults to .runmd
+    pub url: Option<String>,
+    /// Path to runmd file used to configure this host,
+    /// Defaults to .runmd,
+    ///
     #[clap(long)]
-    runmd_path: Option<String>,
+    pub runmd_path: Option<String>,
+    /// The command to execute w/ this host,
+    ///
     #[clap(subcommand)]
-    commands: Option<Commands>,
+    pub command: Option<Commands>,
+    /// The compiled specs World,
+    ///
     #[clap(skip)]
-    world: Option<World>,
+    pub world: Option<World>,
 }
 
 /// CLI functions
@@ -78,13 +91,13 @@ impl Host {
     /// Returns the current command,
     ///
     pub fn command(&self) -> Option<&Commands> {
-        self.commands.as_ref()
+        self.command.as_ref()
     }
 
     /// Sets the command argument,
     ///
     pub fn set_command(&mut self, command: Commands) {
-        self.commands = Some(command);
+        self.command = Some(command);
     }
 
     /// Sets the runmd path argument, if None defaults to ./.runmd
@@ -111,7 +124,7 @@ impl Host {
         match self {
             Self { url: Some(url), .. } => match Host::get::<P>(url).await {
                 Ok(mut host) => {
-                    host.commands = command;
+                    host.command = command;
                     return Some(host);
                 }
                 Err(err) => {
@@ -130,7 +143,7 @@ impl Host {
 
                 match Host::open::<P>(runmd_path).await {
                     Ok(mut host) => {
-                        host.commands = command;
+                        host.command = command;
                         Some(host)
                     }
                     Err(err) => {
@@ -141,7 +154,7 @@ impl Host {
             }
             _ => match Host::runmd::<P>().await {
                 Ok(mut host) => {
-                    host.commands = command;
+                    host.command = command;
                     Some(host)
                 }
                 Err(err) => {
@@ -156,6 +169,8 @@ impl Host {
     }
 }
 
+/// ECS configuration,
+///
 impl Host {
     /// Returns a new dispatcher builder with core
     /// systems included.
@@ -274,7 +289,7 @@ impl Host {
     }
 
     /// Get a reference to the world,
-    /// 
+    ///
     pub fn world_ref(&self) -> Arc<&World> {
         Arc::new(self.world.as_ref().expect("should exist"))
     }
@@ -358,7 +373,7 @@ impl Host {
         let mut host = Self {
             runmd_path: None,
             url: None,
-            commands: None,
+            command: None,
             world: Some(P::compile(content)),
         };
 
@@ -444,13 +459,13 @@ impl Host {
 
         // Waits for event runtime to exit
         self.wait_for_exit(&mut dispatcher);
-        
+
         // Exits by shutting down the inner tokio runtime
         self.exit();
     }
 
     /// Waits for the host systems to exit,
-    /// 
+    ///
     pub fn wait_for_exit<'a, 'b>(&mut self, dispatcher: &mut Dispatcher<'a, 'b>) {
         // Waits for the event runtime to complete
         while !self.should_exit() {

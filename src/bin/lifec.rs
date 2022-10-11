@@ -1,7 +1,6 @@
-
-use lifec::{Host, Inspector, Project, Start};
-use tracing_subscriber::EnvFilter;
 use clap::{Parser, Subcommand};
+use lifec::{Host, Inspector, Project, Start, Editor};
+use tracing_subscriber::EnvFilter;
 
 /// Simple program for parsing runmd into a World
 ///
@@ -56,6 +55,17 @@ async fn main() {
                         .remove::<tokio::runtime::Runtime>()
                         .expect("should remove tokio runtime");
                     host_rutime.shutdown_background();
+                }
+                Commands::Host(Host {
+                    command: Some(lifec::Commands::Open),
+                    ..
+                }) => {
+                    let host = host
+                        .create_host::<Lifec>()
+                        .await
+                        .expect("Should be able to create host");
+
+                    host.open_runtime_editor();
                 }
                 Commands::Host(host) => {
                     let mut host = host

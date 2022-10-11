@@ -58,12 +58,16 @@ pub use host::Commands;
 pub use host::Inspector;
 pub use host::Sequencer;
 pub use host::Executor;
+pub use host::Editor;
 
 mod project;
 pub use project::Project;
 pub use project::Source;
 pub use project::default_runtime;
 pub use project::default_parser;
+
+mod editor;
+pub use editor::RuntimeEditor;
 
 /// This function is provided by types that implement the Engine trait
 pub type SetupFn = fn(&World) -> Entity;

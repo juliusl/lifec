@@ -31,7 +31,7 @@ impl Extension for ProgressStatusBar {
 
         if *progress > 0.0 {
             imgui::ProgressBar::new(*progress)
-                .overlay_text(format!("{:.4} %", progress * 100.0))
+                .overlay_text(format!("{:.4} %", *progress * 100.0))
                 .build(ui);
         }
 

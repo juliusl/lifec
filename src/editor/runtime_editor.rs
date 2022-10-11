@@ -1,127 +1,45 @@
-use super::{unique_title, Call, Fix, List, Task};
-use crate::plugins::*;
+use super::{List, Task};
 use crate::*;
+use crate::{engine::Connection, plugins::*};
 
 use atlier::system::WindowEvent;
 use imgui::{Condition, Slider, StyleVar, Ui, Window};
-use specs::{Join, World, WorldExt};
+use specs::{Join, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
-/// Listener function, called when a thunk completes
-type RuntimeEditorListener = fn(&mut RuntimeEditor, world: &World);
-
 /// This struct is an environment and extension point for a lifec Runtime
+///
 pub struct RuntimeEditor {
-    runtime: Runtime,
-    listeners: Vec<RuntimeEditorListener>,
+    /// Increase or decrease font-scaling of tool windows
+    /// 
     font_scale: f32,
     enable_complex: bool,
     show_all_engines: bool,
     task_window_size: [f32; 2],
 }
 
-/// Allows runtime editor to use `crate::start` method
-impl AsRef<Runtime> for RuntimeEditor {
-    fn as_ref(&self) -> &Runtime {
-        &self.runtime
-    }
-}
-
-impl RuntimeEditor {
-    pub fn new(runtime: Runtime) -> Self {
-        let mut new = Self::default();
-        new.runtime = runtime;
-        new
-    }
-    /// Returns a mutable version of the current project
-    pub fn project_mut(&mut self) -> &mut Project {
-        &mut self.runtime.project
-    }
-
-    /// Returns a ref to the current project
-    pub fn project(&self) -> &Project {
-        &self.runtime.project
-    }
-
-    /// Returns a ref to the current runtime
-    pub fn runtime(&self) -> &Runtime {
-        &self.runtime
-    }
-
-    /// Returns a mutable version of the current runtime
-    pub fn runtime_mut(&mut self) -> &mut Runtime {
-        &mut self.runtime
-    }
-
-    /// Listen for thunk contexts from thunks that have completed their task
-    pub fn listen(&mut self, listen: RuntimeEditorListener) {
-        self.listeners.push(listen);
-        event!(
-            Level::TRACE,
-            "Current runtime editor listeners {}",
-            self.listeners.len()
-        );
-    }
-
-    /// Loads a project from a file
-    pub fn load_project(&mut self, file_path: impl AsRef<str>) -> Option<()> {
-        if let Some(file) = AttributeGraph::load_from_file(file_path) {
-            *self.project_mut().as_mut() = file;
-            *self.project_mut() = self.project_mut().reload_source();
-            Some(())
-        } else {
-            None
-        }
-    }
-
-    /// Creates the engine from a dropped_dir path
-    pub fn create_default(&self, app_world: &World) -> Option<Entity> {
-        self.runtime()
-            .create_engine_group::<Call>(
-                app_world,
-                vec!["default".to_string()],
-            )
-            .get(0)
-            .and_then(|e| Some(*e))
-    }
-}
-
 impl Default for RuntimeEditor {
     fn default() -> Self {
-        let mut default = Self {
-            runtime: Default::default(),
-            listeners: vec![],
+        Self {
             font_scale: 1.0,
-            show_all_engines: false,
             enable_complex: false,
+            show_all_engines: false,
             task_window_size: [580.0, 700.0],
-        };
-        default.runtime.install::<Call, Timer>();
-        // default.runtime.install::<Call, Remote>();
-        default.runtime.install::<Call, Process>();
-        // default.runtime.install::<Call, OpenDir>();
-        // default.runtime.install::<Call, OpenFile>();
-        default.runtime.install::<Call, WriteFile>();
-       // default.runtime.install::<Call, Runtime>();
-        default.runtime.install::<Call, Println>();
-        default.runtime.install::<Call, Expect>();
-       //  default.runtime.install::<Fix, Missing>();
-        default.runtime.install::<Call, Redirect>();
-        default
+        }
     }
 }
 
 impl Extension for RuntimeEditor {
     fn configure_app_world(world: &mut specs::World) {
         List::<Task>::configure_app_world(world);
-        Task::configure_app_world(world);
+        EventRuntime::configure_app_world(world);
         world.register::<Connection>();
         world.register::<Sequence>();
-        world.register::<Fix>();
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
-        Task::configure_app_systems(dispatcher);
+        List::<Task>::configure_app_systems(dispatcher);
+        EventRuntime::configure_app_systems(dispatcher);
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {
@@ -143,21 +61,18 @@ impl Extension for RuntimeEditor {
         });
 
         if self.enable_complex {
-            self.task_window(app_world, &mut List::<Task>::edit_block_view(None), ui);
+            // self.task_window(app_world, &mut List::<Task>::edit_block_view(None), ui);
         } else {
             self.task_window(app_world, &mut List::<Task>::simple(false), ui);
         }
 
-        if self.show_all_engines {
-            // These are each active engines
-            let mut sequence_lists = app_world.write_component::<List<Task>>();
-            for sequence in (&mut sequence_lists).join() {
-                self.task_window(app_world, sequence, ui);
-            }
-        }
-
-        // self.runtime.edit_ui(ui);
-        // self.runtime.display_ui(ui);
+        // if self.show_all_engines {
+        //     // These are each active engines
+        //     let mut sequence_lists = app_world.write_component::<List<Task>>();
+        //     for sequence in (&mut sequence_lists).join() {
+        //         self.task_window(app_world, sequence, ui);
+        //     }
+        // }
     }
 
     fn on_window_event(
@@ -196,151 +111,7 @@ impl Extension for RuntimeEditor {
 
     fn on_run(&'_ mut self, world: &specs::World) {
         // This drives status and progress updates of running tasks
-        List::<Task>::default().on_run(world);
-
-        // TODO -- useful
-        let mut rx = world.write_resource::<tokio::sync::mpsc::Receiver<AttributeGraph>>();
-        if let Some(graph) = rx.try_recv().ok() {
-            let project = Project::from(graph);
-            for (block_name, config_block) in project.iter_block() {
-                for (symbol, config) in config_block.to_blocks() {
-                    if let Some(project_src) = config.find_text("project_src") {
-                        event!(
-                            Level::DEBUG, 
-                            "got dispatch w/ {project_src}"
-                        );
-                        if let Some(project) = Project::load_file(project_src) {
-                            event!(
-                                Level::DEBUG,
-                                "setting active project, {}", project.as_ref().hash_code()
-                            );
-                            *self.project_mut() = project;
-                            if let Some(engine) = self
-                                .runtime()
-                                .create_engine::<Call>(world, config_block.block_name.to_string())
-                            {
-                                event!(
-                                    Level::INFO, 
-                                    "created engine {}", engine.id()
-                                );
-                            }
-                        }
-                    } else if let Some(installed_plugin) = self.runtime.find_plugin::<Call>(&symbol) {
-                        let auto_mode = config.is_enabled("auto").unwrap_or_default();
-
-                        if let Some(created) = self.runtime().find_config_block_and_create(
-                            world,
-                            block_name,
-                            BlockContext::from(config.clone()),
-                            installed_plugin,
-                        ) {
-                            event!(
-                                Level::INFO,
-                                "Received dispatch for `{block_name} {symbol}`, created {:?}",
-                                created
-                            );
-
-                            if let Some(true) = config.is_enabled("enable_connection") {
-                                world
-                                    .write_component::<Connection>()
-                                    .insert(created, Connection::default())
-                                    .ok();
-                                world
-                                    .write_component::<Sequence>()
-                                    .insert(created, Sequence::default())
-                                    .ok();
-                            }
-
-                            if auto_mode {
-                                if let Some(context) =
-                                    world.read_component::<ThunkContext>().get(created)
-                                {
-                                    if let Some(event) =
-                                        world.write_component::<Event>().get_mut(created)
-                                    {
-                                        event.fire(context.clone());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // TODO -- Useful
-        let mut rx = world.write_resource::<tokio::sync::mpsc::Receiver<ErrorContext>>();
-        if let Some(error) = rx.try_recv().ok() {
-            for (name, problem) in error.errors() {
-                if let Some(block) = self.project().find_block(&name) {
-                    if let Some(mut fix_config) = block.get_block(&problem) {
-                        if let Some(previous_attempt) = error.previous_attempt() {
-                            fix_config.merge(&previous_attempt);
-                        }
-
-                        let auto_mode = fix_config.is_enabled("auto").unwrap_or_default();
-
-                        if let Some(installed_plugin) = self.runtime.find_plugin::<Fix>(&problem) {
-                            if let Some(created) = self.runtime().find_config_block_and_create(
-                                world,
-                                &name,
-                                BlockContext::from(fix_config.clone()),
-                                installed_plugin,
-                            ) {
-                                event!(
-                                    Level::INFO,
-                                    "Received error dispatch for `{name} {problem}`, created {:?}",
-                                    created
-                                );
-
-                                if let Some(stopped) = error.stopped() {
-                                    world
-                                        .write_component::<ErrorContext>()
-                                        .insert(stopped, error.set_fix_entity(created))
-                                        .ok();
-
-                                    let created_id = created.id();
-                                    let stopped_id = stopped.id();
-                                    event!(
-                                        Level::INFO, 
-                                        "Setting fix cursor to stopped entity {created_id} -> {stopped_id}"
-                                    );
-                                    let mut seq = Sequence::default();
-                                    seq.set_cursor(stopped);
-
-                                    if let Some(stopped) =
-                                        world.write_component::<Sequence>().get(stopped)
-                                    {
-                                        let connection = seq.connect(stopped);
-                                        world
-                                            .write_component::<Connection>()
-                                            .insert(created, connection)
-                                            .ok();
-                                    }
-
-                                    world
-                                        .write_component::<Sequence>()
-                                        .insert(created, seq)
-                                        .ok();
-                                }
-
-                                if auto_mode {
-                                    if let Some(context) =
-                                        world.read_component::<ThunkContext>().get(created)
-                                    {
-                                        if let Some(event) =
-                                            world.write_component::<Event>().get_mut(created)
-                                        {
-                                            event.fire(context.clone());
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        //  List::<Task>::default().on_run(world);
     }
 }
 
@@ -478,14 +249,13 @@ impl RuntimeEditor {
                         self.edit_event_menu(app_world, ui);
                         ui.separator();
 
-                        self.runtime.menu(ui);
+                        // self.runtime.menu(ui);
                         ui.separator();
                         frame_padding.end();
                     });
                 });
 
                 let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
-
                 let window_padding = ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
                 ui.set_window_font_scale(self.font_scale);
                 task_list.on_ui(app_world, ui);

@@ -1,6 +1,7 @@
 use specs::{Entities, WriteStorage, ReadStorage, Join};
 
 use super::{ProgressStatusBar, StartButton};
+use crate::engine::Connection;
 use crate::plugins::*;
 use crate::*;
 
@@ -23,6 +24,8 @@ pub struct Task(
 );
 
 impl Task {
+    /// Disables the start button on the task,
+    /// 
     pub fn disable(&mut self) {
         self.4 = true;
     }
@@ -72,6 +75,8 @@ impl Extension for Task {
     }
 }
 
+/// This system drives the task view, 
+/// 
 struct TaskSystem;
 
 impl<'a> System<'a> for TaskSystem {

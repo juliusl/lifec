@@ -8,7 +8,10 @@ use crate::Start;
 pub enum Commands {
     /// Starts the host by id or engine name
     /// 
-    Start(Start), 
+    Start(Start),
+    /// Opens the editor for the host,
+    /// 
+    Open,
 }
 
 impl Commands {
