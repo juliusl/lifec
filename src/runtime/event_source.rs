@@ -6,10 +6,18 @@ use tracing::{event, Level};
 
 /// Event source returned by a runtime, that can be used to schedule events w/ a world
 /// 
+/// Catalogs aspects of the underlying plugin driving the event's thunk.
+/// 
 pub struct EventSource {
-    /// The event struct component this source returns 
+    /// The event struct component this source returns,
     /// 
     event: Event,
+    /// Description of the plugin,
+    /// 
+    description: Option<String>, 
+    /// Caveats of the plugin,
+    /// 
+    caveats: Option<String>, 
 }
 
 impl EventSource {
@@ -21,6 +29,22 @@ impl EventSource {
     {
         EventSource {
             event: Event::from_plugin::<P>(event_name),
+            description: {
+                let description = P::description();
+                if description.is_empty() {
+                    None 
+                } else {
+                    Some(description.to_string())
+                }
+            },
+            caveats: {
+                let caveats = P::caveats();
+                if caveats.is_empty() {
+                    None 
+                } else {
+                    Some(caveats.to_string())
+                }
+            },
         }
     }
 
@@ -58,6 +82,8 @@ impl Clone for EventSource {
     fn clone(&self) -> Self {
         Self { 
             event: self.event.duplicate(),
+            description: self.description.clone(),
+            caveats: self.caveats.clone(),
         }
     }
 }

@@ -99,7 +99,9 @@ impl Event {
             .unwrap_or_default()
     }
 
-    /// Creates a duplicate of this event
+    /// Creates a duplicate of this event,
+    /// 
+    /// Does not include any transient state, such as context or join handle
     ///
     pub fn duplicate(&self) -> Self {
         Self(
