@@ -6,6 +6,8 @@ use specs::{DenseVecStorage, Entities, ReadStorage, System};
 use tokio::task::JoinHandle;
 use tracing::{event, Level};
 
+use crate::AttributeIndex;
+
 use super::{CancelThunk, ErrorContext, Event, EventRuntime, ThunkContext};
 
 mod proxy;
@@ -118,31 +120,26 @@ impl<'a> System<'a> for NetworkRuntime {
         &mut self,
         (entities, tokio_runtime, contexts, mut network_tasks, mut events): Self::SystemData,
     ) {
-        for (_entity, task) in (&entities, &mut network_tasks).join() {
+        for (entity, task) in (&entities, &mut network_tasks).join() {
             if task.is_ready() {
                 tokio_runtime.block_on(async {
                     if let Some(next) = task.handle().await {
                         match next {
-                            NetworkEvent::Proxied(upstream_id, _sent) => {
+                            NetworkEvent::Proxied(upstream_id, sent) => {
                                 let upstream = entities.entity(upstream_id);
                                 if let (Some(upstream_event), Some(upstream_context)) =
                                     (events.get_mut(upstream), contexts.get(upstream))
                                 {
-                                    // event!(
-                                    //     Level::TRACE,
-                                    //     "proxied message\n{sent} bytes\n{} -> {upstream_id}\n{}",
-                                    //     entity.id(),
-                                    //     upstream_context.block.block_name
-                                    // );
-
-                                    // By going through the proxy instead of receiving the message directly,
-                                    // the plugin can interpret the transient value to figure out what type of message
-                                    // it need's to process next.
-                                    let upstream_context = upstream_context.clone();
-                                    // upstream_context
-                                    //     .state()
-                                    //     .define("proxy", "received")
-                                    //     .edit_as(Value::Int(sent as i32));
+                                    event!(
+                                        Level::TRACE,
+                                        "proxied message\n{sent} bytes\n{} -> {upstream_id}\n{}",
+                                        entity.id(),
+                                        upstream_context.block().name()
+                                    );
+                                    let mut upstream_context = upstream_context.clone();
+                                    upstream_context
+                                        .state_mut()
+                                        .with_int("received", sent as i32);
                                     upstream_event.fire(upstream_context);
                                 }
                             }
