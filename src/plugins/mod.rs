@@ -37,6 +37,10 @@ pub use println::Println;
 
 mod timer;
 pub use timer::Timer;
+pub use timer::TimerSettings;
+
+mod watch;
+pub use watch::Watch;
 
 /// Struct to archive an entity
 /// 

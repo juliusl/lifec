@@ -130,14 +130,21 @@ impl SpecialAttribute for Operation {
 
 #[test]
 fn test_runner() {
+    use std::path::PathBuf;
+    use std::fs;
+    
+    let test_dir = PathBuf::from(".test").join("test-runner");
+
+    fs::create_dir_all(test_dir).expect("can create test directtory");
+
+    // Define test runmd files
     let runner = r#"
     # This is the main engine loop definition
-
     ``` runner
     + .engine
     : .event receive
     : .event execute
-    : .event print
+    : .event complete
     : .loop
 
     # Operations are defined in this block as well
@@ -152,6 +159,9 @@ fn test_runner() {
     ```
     
     ``` receive runner
+    : menu_file .symbol menu.runmd 
+    : menu_dir  .symbol .test
+
     + .runtime
     : .todo Publish the menu.runmd file
     : .todo Listen for a order.runmd file
@@ -172,15 +182,21 @@ fn test_runner() {
     let menu = r#"
     # This is received by the remote
     ``` send menu
+    : order_file .symbol order.runmd
+    : order_dir  .symbol .test/test-runner
+
     + .runtime
     : .todo Write to the order.runmd file
     ```
     "#;
 
-
     let order = r#"
     # This is received by the runner
+    
     ``` accept order
+    : task_file .symbol task.runmd
+    : task_dir  .symbol  .test
+
     + .runtime
     : .todo Write a task.runmd file
     : .todo Return this file to the sender
@@ -200,6 +216,4 @@ fn test_runner() {
     : .todo Signal the runner to cancel the task
     ```
     "#;
-
-
 }

@@ -84,8 +84,8 @@ impl BlockObject for Timer {
 /// Enumeration of timer settings
 ///
 #[derive(Logos, Debug, PartialEq)]
-enum TimerSettings {
-    /// Duration to wait, defaults to seconds
+pub enum TimerSettings {
+    /// Duration to wait, The value is always in seconds
     #[regex("[0-9]*", on_duration)]
     Duration(f32),
     #[token("s")]
@@ -121,5 +121,8 @@ fn on_duration(lexer: &mut Lexer<TimerSettings>) -> Option<f32> {
 #[test]
 fn test_timer_settings() {
     let mut lexer = TimerSettings::lexer("100 ms");
+    assert_eq!(lexer.next(), Some(TimerSettings::Duration(100.0 / 1000.0)));
+
+    let mut lexer = TimerSettings::lexer("100ms");
     assert_eq!(lexer.next(), Some(TimerSettings::Duration(100.0 / 1000.0)));
 }
