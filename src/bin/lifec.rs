@@ -49,12 +49,6 @@ async fn main() {
                         .await
                         .expect("Should be able to create host");
                     host.handle_start::<Lifec>();
-
-                    let host_rutime = host
-                        .world_mut()
-                        .remove::<tokio::runtime::Runtime>()
-                        .expect("should remove tokio runtime");
-                    host_rutime.shutdown_background();
                 }
                 Commands::Host(Host {
                     command: Some(lifec::Commands::Open),
@@ -73,12 +67,6 @@ async fn main() {
                         .await
                         .expect("Should be able to create host");
                     host.handle_start::<Lifec>();
-
-                    let host_rutime = host
-                        .world_mut()
-                        .remove::<tokio::runtime::Runtime>()
-                        .expect("should remove tokio runtime");
-                    host_rutime.shutdown_background();
                 }
                 Commands::PrintEngines => {
                     let mut host = host

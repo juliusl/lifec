@@ -88,7 +88,7 @@ impl ThunkContext {
 
     /// Returns the current state of this thunk context,
     /// 
-    pub fn state(&self) -> &impl AttributeIndex {
+    pub fn state(&self) -> &(impl AttributeIndex + Clone) {
        &self.graph
     }
 

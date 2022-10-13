@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, BTreeMap};
+use std::collections::{BTreeMap, BTreeSet};
 
 use atlier::system::{Attribute, Value};
 
@@ -12,17 +12,17 @@ pub trait AttributeIndex {
     fn entity_id(&self) -> u32;
 
     /// Returns the hash code of the current state
-    /// 
+    ///
     fn hash_code(&self) -> u64;
 
     /// Finds a value from the index, from an attribute with_name
-    /// 
+    ///
     /// This will always be the stable value from the attribute
     ///
     fn find_value(&self, with_name: impl AsRef<str>) -> Option<Value>;
-    
+
     /// Returns all values found with_name
-    /// 
+    ///
     fn find_values(&self, with_name: impl AsRef<str>) -> Vec<Value>;
 
     /// Adds an attribute to the index
@@ -34,36 +34,34 @@ pub trait AttributeIndex {
     fn replace_attribute(&mut self, attr: Attribute);
 
     /// Returns a map of indexed values,
-    /// 
+    ///
     fn values(&self) -> BTreeMap<String, Vec<Value>>;
 
-    /// Finds all text values with name, 
-    /// 
+    /// Finds all text values with name,
+    ///
     fn find_text_values(&self, with_name: impl AsRef<str>) -> Vec<String> {
-        self.find_values(with_name).iter().filter_map(|v| {
-            match v {
-                Value::TextBuffer(text) => {
-                    Some(text.to_string())
-                },
+        self.find_values(with_name)
+            .iter()
+            .filter_map(|v| match v {
+                Value::TextBuffer(text) => Some(text.to_string()),
                 _ => None,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
-    /// Finds all symbol values with name, 
-    /// 
+    /// Finds all symbol values with name,
+    ///
     fn find_symbol_values(&self, with_name: impl AsRef<str>) -> Vec<String> {
-        self.find_values(with_name).iter().filter_map(|v| {
-            match v {
-                Value::Symbol(symbol) => {
-                    Some(symbol.to_string())
-                },
+        self.find_values(with_name)
+            .iter()
+            .filter_map(|v| match v {
+                Value::Symbol(symbol) => Some(symbol.to_string()),
                 _ => None,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
-  /// Finds a text value from an attribute
+    /// Finds a text value from an attribute
     ///
     fn find_text(&self, with_name: impl AsRef<str>) -> Option<String> {
         if let Some(Value::TextBuffer(a)) = self.find_value(with_name) {
@@ -154,7 +152,7 @@ pub trait AttributeIndex {
     }
 
     /// Finds an attribute with binary value by name
-    /// 
+    ///
     fn find_binary(&self, with_name: impl AsRef<str>) -> Option<Vec<u8>> {
         if let Some(Value::BinaryVector(content)) = self.find_value(with_name) {
             Some(content.to_vec())
@@ -235,7 +233,7 @@ pub trait AttributeIndex {
         )
     }
 
-        /// Adds a reference attribute w/ init_value and w/ name to index for entity.
+    /// Adds a reference attribute w/ init_value and w/ name to index for entity.
     ///
     fn add_reference(&mut self, name: impl AsRef<str>, init_value: Value) {
         self.add_attribute(Attribute::new(
@@ -355,217 +353,179 @@ pub trait AttributeIndex {
         ));
     }
 
-    /// Adds a complex attribute 
-    /// 
-    /// A complex attribute is a set of identifiers. In the context of a reality block, 
+    /// Adds a complex attribute
+    ///
+    /// A complex attribute is a set of identifiers. In the context of a reality block,
     /// the identifiers are property map keys for a stable attribute that has a property map.
-    /// 
+    ///
     fn add_complex(&mut self, name: impl AsRef<str>, init_value: impl Into<BTreeSet<String>>) {
-        self.add_attribute(Attribute::new( 
-            self.entity_id(), 
-            name.as_ref().to_string(), 
-            Value::Complex(init_value.into()) 
+        self.add_attribute(Attribute::new(
+            self.entity_id(),
+            name.as_ref().to_string(),
+            Value::Complex(init_value.into()),
         ));
     }
 
     /// Replaces an float range attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_float_range_attr(&self, name: impl AsRef<str>, init_value: &[f32; 3]) -> Self 
-    where
-        Self: Clone
-    {        
-        let mut clone = self.clone();
-        clone.replace_attribute(Attribute::new(
+    fn replace_float_range_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) -> &mut Self
+    {
+        self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             Value::FloatRange(init_value[0], init_value[1], init_value[2]),
         ));
-
-        clone
+        self
     }
 
-    /// Replaces a complex attribute 
-    /// 
-    /// A complex attribute is a set of identifiers. In the context of a reality block, 
+    /// Replaces a complex attribute
+    ///
+    /// A complex attribute is a set of identifiers. In the context of a reality block,
     /// the identifiers are property map keys for a stable attribute that has a property map.
-    /// 
-    fn replace_complex(&self, name: impl AsRef<str>, init_value: impl Into<BTreeSet<String>>) -> Self 
-    where
-        Self: Clone
+    ///
+    fn replace_complex(
+        &mut self,
+        name: impl AsRef<str>,
+        init_value: impl Into<BTreeSet<String>>,
+    ) -> &mut Self
     {
-        let mut clone = self.clone();
-        clone.replace_attribute(Attribute::new( 
-            self.entity_id(), 
-            name.as_ref().to_string(), 
-            Value::Complex(init_value.into()) 
+        self.replace_attribute(Attribute::new(
+            self.entity_id(),
+            name.as_ref().to_string(),
+            Value::Complex(init_value.into()),
         ));
-        clone
+        self
     }
 
     /// Replaces a reference attribute w/ init_value and w/ name to index for entity.
     ///
-    fn replace_reference(&self, name: impl AsRef<str>, init_value: Value) -> Self 
-    where
-        Self: Clone
+    fn replace_reference(&mut self, name: impl AsRef<str>, init_value: Value) -> &mut Self
     {
-        let mut clone = self.clone();
-        clone.replace_attribute(Attribute::new(
+        self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             init_value.to_ref(),
         ));
-        clone
+        self
     }
 
     /// Replaces a symbol attribute w/ symbol and w/ name to index for entity.
     ///
-    fn replace_symbol(&self, name: impl AsRef<str>, symbol: impl AsRef<str>) -> Self 
-    where
-        Self: Clone
-    {
-        let mut clone = self.clone();
-        clone.replace_attribute(Attribute::new(
+    fn replace_symbol(&mut self, name: impl AsRef<str>, symbol: impl AsRef<str>) -> &mut Self {
+        self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             Value::Symbol(symbol.as_ref().to_string()),
         ));
-        clone
+        self
     }
 
     /// Replaces an empty attribute w/ name to index for entity.
     ///
-    fn replace_empty_attr(&self, name: impl AsRef<str>) -> Self 
-    where
-        Self: Clone
-    {   
-        let mut clone = self.clone();
-        clone.replace_attribute(Attribute::new(
+    fn replace_empty_attr(&mut self, name: impl AsRef<str>) -> &mut Self
+    {
+        self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             Value::Empty,
         ));
-        clone
+        self
     }
 
     /// Replaces a binary vector attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_binary_attr(&self, name: impl AsRef<str>, init_value: impl Into<Vec<u8>>) -> Self 
-    where
-        Self: Clone
+    fn replace_binary_attr(&mut self, name: impl AsRef<str>, init_value: impl Into<Vec<u8>>) -> &mut Self
     {
-        let mut clone = self.clone();
-        clone.replace_attribute(Attribute::new(
+        self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             Value::BinaryVector(init_value.into()),
         ));
-        clone
+        self
     }
 
     /// Replaces a text buffer attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_text_attr(&self, name: impl AsRef<str>, init_value: impl AsRef<str>) -> Self 
-    where
-        Self: Clone
+    fn replace_text_attr(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) -> &mut Self
     {
-        let mut clone = self.clone();
-        clone.replace_attribute(Attribute::new(
+        self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             Value::TextBuffer(init_value.as_ref().to_string()),
         ));
-        clone
+        self
     }
 
     /// Replaces an int attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_int_attr(&self, name: impl AsRef<str>, init_value: i32) -> Self 
-    where
-        Self: Clone
+    fn replace_int_attr(&mut self, name: impl AsRef<str>, init_value: i32) -> &mut Self
     {
-        let mut clone = self.clone();
-        clone.replace_attribute(Attribute::new(
+        self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             Value::Int(init_value),
         ));
-        clone
+        self
     }
 
     /// Replaces an float attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_float_attr(&self, name: impl AsRef<str>, init_value: f32) -> Self 
-    where
-        Self: Clone
+    fn replace_float_attr(&mut self, name: impl AsRef<str>, init_value: f32) -> &mut Self
     {
-        let mut clone = self.clone();
-        clone.add_attribute(Attribute::new(
+        self.add_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             Value::Float(init_value),
         ));
-        clone
+        self
     }
 
     /// Replaces a bool attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_bool_attr(&self, name: impl AsRef<str>, init_value: bool) -> Self 
-    where
-        Self: Clone
+    fn replace_bool_attr(&mut self, name: impl AsRef<str>, init_value: bool) -> &mut Self
     {
-        let mut clone = self.clone();
-        clone.add_attribute(Attribute::new(
+        self.add_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             Value::Bool(init_value),
         ));
-
-        clone
+        self
     }
 
     /// Replaces a float pair attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_float_pair_attr(&self, name: impl AsRef<str>, init_value: &[f32; 2]) -> Self 
-    where
-        Self: Clone 
+    fn replace_float_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) -> &mut Self
     {
-        let mut clone = self.clone();
-        clone.replace_attribute(Attribute::new(
+        self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             Value::FloatPair(init_value[0], init_value[1]),
         ));
-        clone
+        self
     }
 
     /// Replaces an int pair attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_int_pair_attr(&self, name: impl AsRef<str>, init_value: &[i32; 2]) -> Self 
-    where
-        Self: Clone
+    fn replace_int_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) -> &mut Self
     {
-        let mut clone = self.clone();
-        clone.replace_attribute(Attribute::new(
+        self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             Value::IntPair(init_value[0], init_value[1]),
         ));
-        clone
+        self
     }
 
     /// Replaces an int range attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_int_range_attr(&self, name: impl AsRef<str>, init_value: &[i32; 3]) -> Self 
-    where
-        Self: Clone
+    fn replace_int_range_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) -> &mut Self 
     {
-        let mut clone = self.clone();
-        clone.replace_attribute(Attribute::new(
+        self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
             Value::IntRange(init_value[0], init_value[1], init_value[2]),
         ));
-        clone
+        self
     }
 
     /// Updates the index
@@ -597,9 +557,9 @@ pub trait AttributeIndex {
 
     /// Creates a clone, and replaces a named value, returning self
     ///
-    fn replace(&self, name: impl AsRef<str>, value: Value) -> Self 
+    fn replace(&mut self, name: impl AsRef<str>, value: Value) -> &mut Self
     where
-        Self: Clone
+        Self: Clone,
     {
         match value {
             Value::Empty => self.replace_empty_attr(name),
@@ -610,8 +570,12 @@ pub trait AttributeIndex {
             Value::Bool(init_value) => self.replace_bool_attr(name, init_value),
             Value::IntPair(e0, e1) => self.replace_int_pair_attr(name, &[e0, e1]),
             Value::FloatPair(e0, e1) => self.replace_float_pair_attr(name, &[e0, e1]),
-            Value::FloatRange(value, min, max) => self.replace_float_range_attr(name, &[value, min, max]),
-            Value::IntRange(value, min, max) => self.replace_int_range_attr(name, &[value, min, max]),
+            Value::FloatRange(value, min, max) => {
+                self.replace_float_range_attr(name, &[value, min, max])
+            }
+            Value::IntRange(value, min, max) => {
+                self.replace_int_range_attr(name, &[value, min, max])
+            }
             Value::BinaryVector(init_value) => self.replace_binary_attr(name, init_value),
             Value::Reference(_) => self.replace_reference(name, value),
             Value::Complex(init_value) => self.replace_complex(name, init_value),

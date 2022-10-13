@@ -1,0 +1,22 @@
+
+``` test 
++ .engine 
+: .event read-line
+: .event read-line-to-prop
+: .exit
+```
+
+``` read-line test
++ .runtime
+: .readln
+: .prompt Testing readln>
+```
+
+``` read-line-to-prop test 
++ .runtime
+: .readln
+: name .prompt Enter a name >
+: age  .prompt Enter age    >
+: .println Hello {name}! Age: {age} <todo: add formatting feature to println>
+: .fmt name, age
+```
