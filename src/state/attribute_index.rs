@@ -61,6 +61,18 @@ pub trait AttributeIndex {
             .collect()
     }
 
+    /// Finds all symbol values with name,
+    ///
+    fn find_binary_values<'a>(&'a self, with_name: impl AsRef<str>) -> Vec<Vec<u8>> {
+        self.find_values(with_name)
+            .iter()
+            .filter_map(|v| match v {
+                Value::BinaryVector(bin) => Some(bin.to_vec()),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Finds a text value from an attribute
     ///
     fn find_text(&self, with_name: impl AsRef<str>) -> Option<String> {

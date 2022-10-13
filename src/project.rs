@@ -4,7 +4,7 @@ use specs::{Join, World, WorldExt};
 use tracing::event;
 use tracing::Level;
 
-use crate::prelude::Readln;
+use crate::prelude::{Readln, Watch};
 use crate::{LifecycleOptions, Operation, ThunkContext, Start};
 use crate::engine::{Loop, Activity};
 use crate::plugins::{StatusUpdate, ErrorContext};
@@ -174,6 +174,7 @@ pub fn default_runtime() -> Runtime {
     runtime.install_with_custom::<Install>("");
     runtime.install_with_custom::<Timer>("");
     runtime.install_with_custom::<Readln>("");
+    runtime.install_with_custom::<Watch>("");
     runtime
 }
 

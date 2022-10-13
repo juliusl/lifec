@@ -397,7 +397,6 @@ impl Host {
                     true
                 }
                 _ => {
-                    event!(Level::TRACE, "{:?} is alive", entity);
                     false
                 }
             },

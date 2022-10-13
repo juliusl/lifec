@@ -1,4 +1,6 @@
 use std::{
+    collections::{hash_map::DefaultHasher, HashSet},
+    hash::{Hash, Hasher},
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
@@ -16,7 +18,13 @@ use tracing::{event, Level};
 
 use crate::{AttributeIndex, Plugin};
 
+use self::{access::Access, create::Create, modify::Modify, remove::Remove};
+
 use super::TimerSettings;
+mod access;
+mod create;
+mod modify;
+mod remove;
 
 /// This plugin can watch for a file event, and then return
 ///
@@ -30,10 +38,7 @@ use super::TimerSettings;
 /// # Configure what events to watch for. Corresponds with notify's event kind hierarchy,
 /// # Defaults to any if none of these attributes are used,
 ///
-/// # TODO : .access <leave empty or read | open | close>
-/// # TODO : .create <leave empty or file | folder>
-/// # TODO : .modify <leave empty or data | data size | data content | metadata | name>
-/// # TODO : .remove <leave empty or file | folder>
+/// : .create file
 ///
 /// # Optional `notify` specific attributes
 /// : .poll_interval 1 sec
@@ -43,6 +48,7 @@ use super::TimerSettings;
 /// # TODO
 /// - Support 3rd tier of enum types,
 ///
+#[derive(Default)]
 pub struct Watch;
 
 impl Plugin for Watch {
@@ -60,7 +66,7 @@ impl Plugin for Watch {
 
     fn call(context: &crate::ThunkContext) -> Option<crate::AsyncContext> {
         context.task(|cancel_source| {
-            let mut tc = context.clone();
+            let tc = context.clone();
             async {
                 // TODO -- Should I use a sync::watch instead?
                 let (tx, mut rx) = tokio::sync::mpsc::channel(1);
@@ -76,56 +82,54 @@ impl Plugin for Watch {
                     config = config.with_poll_interval(duration);
                 }
 
+                let mut event_set = HashSet::<u64>::default();
+                for event_def in tc.find_binary_values("event_kind") {
+                    let mut be_bytes = [0; 8];
+                    be_bytes.copy_from_slice(event_def.as_slice());
+                    event_set.insert(u64::from_be_bytes(be_bytes));
+                }
+
+                let response_context = tc.clone();
                 let event_handler = move |e| match e {
                     Ok(event) => match event {
-                        Event { kind, paths, .. } => {
-                            // match kind {
-                            //     notify::EventKind::Any => todo!(),
-                            //     notify::EventKind::Access(k) => {
-                            //         match k {
-                            //             notify::event::AccessKind::Any => todo!(),
-                            //             notify::event::AccessKind::Read => todo!(),
-                            //             notify::event::AccessKind::Open(_) => todo!(),
-                            //             notify::event::AccessKind::Close(_) => todo!(),
-                            //             notify::event::AccessKind::Other => todo!(),
-                            //         }
-                            //     },
-                            //     notify::EventKind::Create(c) => {
-                            //         match c {
-                            //             notify::event::CreateKind::Any => todo!(),
-                            //             notify::event::CreateKind::File => todo!(),
-                            //             notify::event::CreateKind::Folder => todo!(),
-                            //             notify::event::CreateKind::Other => todo!(),
-                            //         }
-                            //     },
-                            //     notify::EventKind::Modify(m) => {
-                            //         match m {
-                            //             notify::event::ModifyKind::Any => todo!(),
-                            //             notify::event::ModifyKind::Data(_) => todo!(),
-                            //             notify::event::ModifyKind::Metadata(_) => todo!(),
-                            //             notify::event::ModifyKind::Name(_) => todo!(),
-                            //             notify::event::ModifyKind::Other => todo!(),
-                            //         }
-                            //     },
-                            //     notify::EventKind::Remove(r) => {
-                            //         match r {
-                            //             notify::event::RemoveKind::Any => todo!(),
-                            //             notify::event::RemoveKind::File => todo!(),
-                            //             notify::event::RemoveKind::Folder => todo!(),
-                            //             notify::event::RemoveKind::Other => todo!(),
-                            //         }
-                            //     },
-                            //     notify::EventKind::Other => todo!(),
-                            // }
+                        Event { kind, paths, attrs } => {
+                            let mut hasher = DefaultHasher::default();
+                            kind.hash(&mut hasher);
+                            let hash_code = hasher.finish();
 
-                            event!(Level::DEBUG, "File event found, {:?}", kind);
-                            match tx.try_send(paths) {
-                                Ok(_) => {
-                                    event!(Level::TRACE, "Sent watch event");
+                            if event_set.contains(&hash_code) {
+                                event!(Level::DEBUG, "File event found, {:?}", kind);
+                                let mut tc = response_context.clone();
+                                
+                                if let Some(info) = attrs.info() {
+                                    tc.with_symbol("info", info);
                                 }
-                                Err(err) => {
-                                    event!(Level::ERROR, "Could not propagate watch event {err}");
+
+                                for path in paths {
+                                    tc.with_symbol(
+                                        "paths",
+                                        path.join(",")
+                                            .to_str()
+                                            .expect("should be a string")
+                                            .trim_end_matches(","),
+                                    );
                                 }
+
+                                tc.with_symbol("found_event_kind", format!("{:?}", kind));
+
+                                match tx.try_send(tc) {
+                                    Ok(_) => {
+                                        event!(Level::TRACE, "Sent watch event");
+                                    }
+                                    Err(err) => {
+                                        event!(
+                                            Level::ERROR,
+                                            "Could not propagate watch event {err}"
+                                        );
+                                    }
+                                }
+                            } else {
+                                event!(Level::TRACE, "File event skipped {:?}", kind);
                             }
                         }
                     },
@@ -151,26 +155,23 @@ impl Plugin for Watch {
                     tc.is_enabled("use_fallback"),
                 ) {
                     (Ok(_), watcher) => {
-                        event!(Level::INFO, "Started listening to file, {file}");
+                        let file = PathBuf::from(file)
+                            .canonicalize()
+                            .expect("should exist if we're able to watch");
+                        event!(Level::INFO, "Started listening to, {:?}", file);
                         watcher
                     }
                     (Err(err), watcher) => {
-                        event!(Level::ERROR, "Could not watch file {file}, {err}");
+                        event!(Level::ERROR, "Could not watch {file}, {err}");
                         watcher
                     }
                 };
 
                 select! {
-                    paths = rx.recv() => {
-                        match paths {
-                            Some(paths) => {
-                                for path in paths {
-                                    tc.state_mut()
-                                        .with_symbol(
-                                            "path",
-                                            path.to_str().expect("should be a string").to_string()
-                                        );
-                                }
+                    context = rx.recv() => {
+                        match context {
+                            Some(context) => {
+                                return Some(context);
                             },
                             None => {
                                 event!(Level::ERROR, "Did not receive any paths");
@@ -182,6 +183,7 @@ impl Plugin for Watch {
                     }
                 }
 
+                // TODO - handle error
                 Some(tc)
             }
         })
@@ -221,7 +223,14 @@ impl Plugin for Watch {
         parser.add_custom_with("compare_contents", |p, _| {
             let child_entity = p.last_child_entity().expect("should have a child entity");
             p.define_child(child_entity, "compare_contents", true);
-        })
+        });
+
+        // Add custom attributes to define events to look for
+        parser
+            .with_custom::<Create>()
+            .with_custom::<Modify>()
+            .with_custom::<Access>()
+            .with_custom::<Remove>();
     }
 }
 

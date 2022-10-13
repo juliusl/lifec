@@ -3,6 +3,7 @@
 + .engine 
 : .event read-line
 : .event read-line-to-prop
+: .event watch-file
 : .exit
 ```
 
@@ -19,4 +20,19 @@
 : age  .prompt Enter age    >
 : .println Hello {name}! Age: {age} <todo: add formatting feature to println>
 : .fmt name, age
+```
+
+``` watch-file test
++ .runtime
+: .watch .
+: .create file
+: .remove file
+. .modify name
+: .println File created {paths}
+: .fmt paths
+: .watch test.txt
+: .modify size
+: .modify content
+: .println File modified {info}
+: .fmt info
 ```
