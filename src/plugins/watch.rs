@@ -102,20 +102,18 @@ impl Plugin for Watch {
                             if event_set.contains(&hash_code) {
                                 event!(Level::DEBUG, "File event found, {:?}", kind);
                                 let mut tc = response_context.clone();
-                                
+
                                 if let Some(info) = attrs.info() {
                                     tc.with_symbol("info", info);
                                 }
-
-                                for path in paths {
-                                    tc.with_symbol(
-                                        "paths",
-                                        path.join(",")
-                                            .to_str()
-                                            .expect("should be a string")
-                                            .trim_end_matches(","),
-                                    );
-                                }
+                                tc.with_symbol(
+                                    "paths",
+                                    paths
+                                        .iter()
+                                        .filter_map(|p| p.to_str())
+                                        .collect::<Vec<_>>()
+                                        .join(",")
+                                );
 
                                 tc.with_symbol("found_event_kind", format!("{:?}", kind));
 
@@ -128,6 +126,7 @@ impl Plugin for Watch {
                                             Level::ERROR,
                                             "Could not propagate watch event {err}"
                                         );
+                                        // TODO -- handle errors
                                     }
                                 }
                             } else {
