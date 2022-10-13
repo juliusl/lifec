@@ -27,7 +27,7 @@
 : .watch .
 : .create file
 : .remove file
-. .modify name
+: .modify name
 : .println File created {paths}
 : .fmt paths
 : .watch test.txt

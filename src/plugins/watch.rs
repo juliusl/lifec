@@ -86,7 +86,9 @@ impl Plugin for Watch {
                 for event_def in tc.find_binary_values("event_kind") {
                     let mut be_bytes = [0; 8];
                     be_bytes.copy_from_slice(event_def.as_slice());
-                    event_set.insert(u64::from_be_bytes(be_bytes));
+                    let code = u64::from_be_bytes(be_bytes);
+                    event_set.insert(code);
+                    event!(Level::TRACE, "Looking for event_kind with hash {code}");
                 }
 
                 let response_context = tc.clone();
@@ -129,7 +131,7 @@ impl Plugin for Watch {
                                     }
                                 }
                             } else {
-                                event!(Level::TRACE, "File event skipped {:?}", kind);
+                                event!(Level::TRACE, "File event skipped {:?} - {hash_code}", kind);
                             }
                         }
                     },
