@@ -132,7 +132,7 @@ impl SpecialAttribute for Operation {
 fn test_runner() {
     use std::path::PathBuf;
     use std::fs;
-    
+
     let test_dir = PathBuf::from(".test").join("test-runner");
 
     fs::create_dir_all(test_dir).expect("can create test directtory");
@@ -163,8 +163,8 @@ fn test_runner() {
     : menu_dir  .symbol .test
 
     + .runtime
-    : .todo Publish the menu.runmd file
-    : .todo Listen for a order.runmd file
+    : .publish  menu.runmd
+    : .watch    order.runmd
     ```
 
     ``` execute runner
@@ -192,14 +192,14 @@ fn test_runner() {
 
     let order = r#"
     # This is received by the runner
-    
     ``` accept order
     : task_file .symbol task.runmd
     : task_dir  .symbol  .test
 
     + .runtime
-    : .todo Write a task.runmd file
-    : .todo Return this file to the sender
+    : .todo Write/Publish a task.runmd file
+    : .watch task.runmd
+    : .remove
     ``` 
     "#;
 
