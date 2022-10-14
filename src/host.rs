@@ -442,18 +442,28 @@ impl Host {
         }
     }
 
+    /// Prepares the host to start by creating a new dispatcher,
+    /// 
+    pub fn prepare<'a, 'b, P>(&mut self, context: Option<ThunkContext>) -> Dispatcher<'a, 'b> 
+    where
+        P: Project,
+    {
+        let mut dispatcher = {
+            let mut dispatcher = Host::dispatcher_builder();
+            P::configure_dispatcher(&mut dispatcher, context);
+            dispatcher.build()
+        };
+        dispatcher.setup(self.world_mut());
+        dispatcher
+    }
+
     /// Starts an event entity,
     ///
     pub fn start<P>(&mut self, event_entity: u32, thunk_context: Option<ThunkContext>)
     where
         P: Project,
     {
-        let mut dispatcher = {
-            let mut dispatcher = Host::dispatcher_builder();
-            P::configure_dispatcher(&mut dispatcher, thunk_context);
-            dispatcher.build()
-        };
-        dispatcher.setup(self.world_mut());
+        let mut dispatcher = self.prepare::<P>(thunk_context);
 
         // Starts an event
         let event = self.world().entities().entity(event_entity);

@@ -1,11 +1,11 @@
-use std::{net::SocketAddr, sync::Arc, future::Future};
+use std::{future::Future, net::SocketAddr, sync::Arc};
 
-use crate::{ AttributeGraph, Operation, AttributeIndex, plugins::network::BlockAddress, Start};
+use crate::{plugins::network::BlockAddress, AttributeGraph, AttributeIndex, Operation, Start};
 
 use reality::Block;
 use specs::{Component, DenseVecStorage, Entity};
 use tokio::{
-    io::{self, AsyncBufReadExt, BufReader},
+    io::{AsyncBufReadExt, BufReader},
     net::{TcpListener, UdpSocket},
     runtime::Handle,
     select,
@@ -21,7 +21,7 @@ use tracing::Level;
 
 pub mod thunk_context_ext;
 
-use super::{SecureClient, StatusUpdate, CancelSource, CancelToken, ErrorContext};
+use super::{CancelSource, CancelToken, ErrorContext, SecureClient, StatusUpdate};
 
 /// Thunk context is the major component for thunks,
 ///
@@ -79,41 +79,41 @@ pub struct ThunkContext {
 /// This block has all the async related features
 impl ThunkContext {
     /// Returns a clone of the block that originated this context,
-    /// 
+    ///
     /// Typically using this directly is advanced, it's more likely that state/state_mut are used to get state data,
-    /// 
+    ///
     pub fn block(&self) -> Block {
         self.block.clone()
     }
 
     /// Returns the current state of this thunk context,
-    /// 
+    ///
     pub fn state(&self) -> &(impl AttributeIndex + Clone) {
-       &self.graph
+        &self.graph
     }
 
     /// Returns a mutable reference to the underlying state,
-    /// 
+    ///
     pub fn state_mut(&mut self) -> &mut (impl AttributeIndex + Clone) {
         &mut self.graph
     }
 
     /// Returns an immutable reference to the previous state,
-    /// 
+    ///
     pub fn previous(&self) -> Option<&impl AttributeIndex> {
         self.previous_graph.as_ref()
     }
 
     /// Returns an attribute index that checks both current and previous states for values,
-    /// 
+    ///
     pub fn search(&self) -> &impl AttributeIndex {
         self
     }
 
-    /// Copies previous state to the current state, 
-    /// 
-    /// This is so that previous values can move forward to the next plugin, when .commit() gets called. 
-    /// 
+    /// Copies previous state to the current state,
+    ///
+    /// This is so that previous values can move forward to the next plugin, when .commit() gets called.
+    ///
     pub fn copy_previous(&mut self) {
         if let Some(previous) = self.previous() {
             for (name, value) in previous.values() {
@@ -124,25 +124,25 @@ impl ThunkContext {
         }
     }
 
-    /// Returns a new context with state, 
-    /// 
+    /// Returns a new context with state,
+    ///
     pub fn with_state(&self, state: impl Into<AttributeGraph>) -> Self {
         let mut context = self.clone();
         context.graph = state.into();
         context
     }
 
-    /// Returns a new context with state, 
-    /// 
+    /// Returns a new context with state,
+    ///
     pub fn with_block(&self, block: &Block) -> Self {
         let mut context = self.clone();
         context.block = block.clone();
         context
     }
 
-    /// Returns a new context with the current state committed to the 
-    /// previous field, 
-    /// 
+    /// Returns a new context with the current state committed to the
+    /// previous field,
+    ///
     pub fn commit(&self) -> Self {
         let mut clone = self.clone();
         clone.previous_graph = Some(clone.graph.clone());
@@ -150,7 +150,7 @@ impl ThunkContext {
     }
 
     /// Returns true if the property is some boolean
-    /// 
+    ///
     pub fn is_enabled(&self, property: impl AsRef<str>) -> bool {
         self.graph.find_bool(property).unwrap_or_default()
     }
@@ -227,7 +227,7 @@ impl ThunkContext {
     }
 
     /// Returns a context w/ the start command dispatcher enabled
-    /// 
+    ///
     pub fn enable_start_command_dispatcher(
         &mut self,
         start_commands: Sender<Start>,
@@ -254,39 +254,31 @@ impl ThunkContext {
     pub async fn enable_listener(
         &self,
         cancel_source: &mut oneshot::Receiver<()>,
-    ) -> Option<io::Lines<BufReader<tokio::net::TcpStream>>> {
-        if let Some(_) = self.dispatcher {
-            let address = self
-                .state()
-                .find_symbol("address")
-                .unwrap_or("127.0.0.1:0".to_string());
+    ) -> Option<(tokio::net::TcpStream, SocketAddr)> {
+        let address = self
+            .search()
+            .find_symbol("address")
+            .unwrap_or("127.0.0.1:0".to_string());
 
-            let listener = TcpListener::bind(address)
-                .await
-                .expect("needs to be able to bind to an address");
-            let local_addr = listener.local_addr().expect("was just created").to_string();
+        let listener = TcpListener::bind(address)
+            .await
+            .expect("needs to be able to bind to an address");
+        let local_addr = listener.local_addr().expect("was just created").to_string();
 
-            event!(Level::DEBUG, "Thunk context is listening on {local_addr}");
-            self.update_status_only(format!("Lisenting on {local_addr}"))
-                .await;
+        event!(
+            Level::INFO,
+            "Entity {} Listening on {local_addr}",
+            self.entity.expect("should have an entity").id()
+        );
 
-            select! {
-                Ok((stream, address)) = listener.accept() => {
-                    event!(Level::DEBUG, "{address} is connecting");
-
-                    Some(BufReader::new(stream).lines())
-                },
-                _ = cancel_source => {
-                    event!(Level::WARN, "{local_addr} is being cancelled");
-                    None
-                }
+        select! {
+            Ok((stream, address)) = listener.accept() => {
+                Some((stream, address))
+            },
+            _ = cancel_source => {
+                event!(Level::WARN, "{local_addr} is being cancelled");
+                None
             }
-        } else {
-            event!(
-                Level::ERROR,
-                "Did not have a dispatcher to enable this w/ the runtime "
-            );
-            None
         }
     }
 
@@ -321,17 +313,13 @@ impl ThunkContext {
     /// Sends a character to a the char_device if it exists
     ///
     /// Caveat: If `enable_output`/`enable_async` haven't been called this is a no-op
-    /// 
+    ///
     pub async fn send_char(&self, c: u8) {
         if let Some(entity) = self.entity {
             if let Some(char_device) = &self.char_device {
                 match char_device.send((entity.id(), c)).await {
                     Ok(_) => event!(Level::TRACE, "sent char for {:?}", entity),
-                    Err(err) => event!(
-                        Level::ERROR,
-                        "error sending char, {err}, {:?}",
-                        entity
-                    ),
+                    Err(err) => event!(Level::ERROR, "error sending char, {err}, {:?}", entity),
                 }
             }
         }
@@ -370,7 +358,7 @@ impl ThunkContext {
     }
 
     /// Dispatches a start command,
-    /// 
+    ///
     pub async fn dispatch_start_command(&self, start_command: Start) {
         if let Some(dispatcher) = &self.start_command_dispatcher {
             dispatcher.send(start_command).await.ok();
@@ -387,7 +375,7 @@ impl ThunkContext {
     ///
     /// Caveat: async must be enabled for this api to work, otherwise it will result in a
     /// no-op
-    /// 
+    ///
     pub fn task<F>(
         &self,
         task: impl FnOnce(CancelSource) -> F,
@@ -489,6 +477,34 @@ impl ThunkContext {
         } else {
             None
         }
+    }
+
+    /// Reads lines from a stream and returns the result,
+    ///
+    pub async fn readln_stream(&self) -> String {
+        use std::fmt::Write;
+
+        let address = self
+            .search()
+            .find_symbol("address")
+            .expect("should have an address");
+
+        let stream = tokio::net::TcpStream::connect(address)
+            .await
+            .expect("Should be able to connect");
+        event!(Level::DEBUG, "Connecting to stream");
+
+        stream.readable().await.ok();
+
+        event!(Level::DEBUG, "Reading from stream");
+        let mut lines = BufReader::new(stream).lines();
+
+        let mut received = String::new();
+
+        while let Ok(Some(line)) = lines.next_line().await {
+            writeln!(received, "{line}").ok();
+        }
+        received
     }
 }
 
