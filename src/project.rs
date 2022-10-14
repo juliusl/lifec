@@ -64,6 +64,24 @@ pub trait Project {
         world
     }
 
+    /// When compiling in the context of a project directory, the file name is taken into consideration when parsing 
+    /// runmd. The file name becomes the implicit symbol w/in the context of the file.
+    /// 
+    /// In this context the root block can only be defined within in the .runmd file in the directory.
+    /// 
+    fn compile_project_dir(files: Vec<RunmdFile>) -> World {
+        let parser = Self::parser();
+
+        for file in files {
+            /*
+            1) Load the file and compile,
+            2) Create a new parser w/ World,
+            */
+        }
+
+        todo!()
+    }
+
     /// Compiles runmd into blocks, interprets those blocks,
     /// and returns the World,
     ///
@@ -71,14 +89,17 @@ pub trait Project {
     /// 
     /// Override with care as this adds critical components for the event runtime,
     ///
-    fn compile(runmd: impl AsRef<str>) -> World {
-        let parser = Self::parser()
+    fn compile(runmd: impl AsRef<str>, parser: Option<Parser>, is_single_src: bool) -> World {
+        let parser = parser.unwrap_or(Self::parser())
             .parse(runmd.as_ref());
         
         let mut world = parser.commit();
 
-        // Save source to world
-        world.insert(Source(runmd.as_ref().to_string()));
+        // If this is loading just one file, then a Source can be inserted
+        if is_single_src {
+            // Save source to world
+            world.insert(Source(runmd.as_ref().to_string()));
+        }
 
         let engine = &mut Engine::default();
         engine.initialize(&mut world);

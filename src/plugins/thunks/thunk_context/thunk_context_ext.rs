@@ -1,9 +1,9 @@
 use crate::{AttributeIndex, ThunkContext};
 
 /// Attribute Index interface for thunk context,
-/// 
+///
 /// Find values will also search previous state, if current state is missing the value
-/// 
+///
 impl AttributeIndex for ThunkContext {
     fn entity_id(&self) -> u32 {
         self.state().entity_id()
@@ -16,7 +16,10 @@ impl AttributeIndex for ThunkContext {
     fn find_value(&self, with_name: impl AsRef<str>) -> Option<atlier::system::Value> {
         if let Some(value) = self.state().find_value(with_name.as_ref()) {
             Some(value)
-        } else if let Some(value) = self.previous().and_then(|p| p.find_value(with_name.as_ref())) {
+        } else if let Some(value) = self
+            .previous()
+            .and_then(|p| p.find_value(with_name.as_ref()))
+        {
             Some(value)
         } else {
             None
@@ -27,10 +30,8 @@ impl AttributeIndex for ThunkContext {
         let values = self.state().find_values(with_name.as_ref());
 
         match self.previous() {
-            Some(previous) if values.is_empty() => {
-                previous.find_values(with_name.as_ref())
-            },
-            _ => values
+            Some(previous) if values.is_empty() => previous.find_values(with_name.as_ref()),
+            _ => values,
         }
     }
 
@@ -46,3 +47,4 @@ impl AttributeIndex for ThunkContext {
         self.state().values()
     }
 }
+

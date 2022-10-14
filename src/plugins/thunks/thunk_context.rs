@@ -263,13 +263,19 @@ impl ThunkContext {
         let listener = TcpListener::bind(address)
             .await
             .expect("needs to be able to bind to an address");
-        let local_addr = listener.local_addr().expect("was just created").to_string();
 
+        let local_addr = listener.local_addr().expect("was just created").to_string();
         event!(
             Level::INFO,
             "Entity {} Listening on {local_addr}",
             self.entity.expect("should have an entity").id()
         );
+
+        let name = self.block.name();
+        let symbol = self.block.symbol();
+        let hash_code = self.hash_code();
+
+        // TODO: Assign test.publish.
 
         select! {
             Ok((stream, address)) = listener.accept() => {
@@ -517,4 +523,54 @@ impl ThunkContext {
         record(&mut error_graph);
         self.error_graph = Some(error_graph);
     }
+}
+
+#[test]
+fn test_security() {
+    use rsa::{
+        pss::VerifyingKey,
+        RsaPrivateKey,
+    };
+    use rsa::pss::BlindedSigningKey;
+    use rsa::pkcs8::EncodePublicKey;
+    use sha2::Sha256;
+    // use std::str::from_utf8;
+    // use rsa::pkcs8::DecodePrivateKey;
+    // use rsa::pkcs1::EncodeRsaPublicKey;
+    // use pkcs8::EncodePrivateKey;
+
+    use signature::{RandomizedSigner, Signature, Verifier};
+    let mut rng = rand::thread_rng();
+
+    let bits = 2048;
+    let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+
+    // private_key.to_pkcs8_encrypted_der(&mut rng, "test1234");
+
+    let signing_key = BlindedSigningKey::<Sha256>::new(private_key);
+    let verifying_key: VerifyingKey<_> = (&signing_key).into();
+
+    // Sign
+    let data = b"hello world";
+    let signature = signing_key.sign_with_rng(&mut rng, data);
+    assert_ne!(signature.as_bytes(), data);
+
+    // Verify
+    verifying_key
+        .verify(data, &signature)
+        .expect("failed to verify");
+
+    match verifying_key.to_public_key_der() {
+        Ok(_document) => {}
+        Err(_) => todo!(),
+    }
+
+    // let mut stdin = std::io::stdin().lock();
+    // let mut pass = vec![];
+    // rpassword::prompt_password_from_bufread(&mut stdin, &mut pass, "Password for key:").expect("should have a value");
+
+    // RsaPrivateKey::from_pkcs8_encrypted_pem(
+    //     "",
+    //     from_utf8(pass.as_slice()).expect("should be a string"),
+    // ).ok();
 }

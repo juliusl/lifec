@@ -66,6 +66,7 @@ impl BlockObject for Publish {
 }
 
 mod tests {
+
     use crate::Project;
 
     struct Test;
@@ -77,6 +78,7 @@ mod tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_publish() {
+        use std::path::PathBuf;
         use crate::{AttributeIndex, Host, ThunkContext};
         use specs::WorldExt;
 
@@ -132,6 +134,11 @@ mod tests {
             .expect("should be able to read");
 
         assert_eq!(received.trim(), tocompare.trim());
+
+        let program = std::env::args().next().expect("should always be the program");
+        let program = PathBuf::from(program);
+        let program = program.file_name().expect("should be the name of the binary");
+        eprintln!("{:?}", program);
 
         // Clean up nested runtime
         host.exit();

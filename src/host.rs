@@ -38,6 +38,9 @@ pub use editor::Editor;
 mod runner;
 pub use runner::Runner;
 
+mod control_key;
+pub use control_key::ControlKey;
+
 /// Struct for initializing and hosting the runtime as well as parsing CLI arguments,
 ///
 /// Used with a type that implements the Project trait.
@@ -377,7 +380,7 @@ impl Host {
             runmd_path: None,
             url: None,
             command: None,
-            world: Some(P::compile(content)),
+            world: Some(P::compile(content, None, true)),
         };
 
         host.link_sequences();
