@@ -50,6 +50,8 @@ pub use engine::Event;
 pub use engine::Exit;
 pub use engine::LifecycleOptions;
 pub use engine::Sequence;
+pub use engine::Connection;
+pub use engine::Cursor;
 
 mod host;
 pub use host::Host;

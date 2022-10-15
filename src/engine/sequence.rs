@@ -5,6 +5,9 @@ use specs::{Component, Entity};
 
 use super::Connection;
 
+mod cursor;
+pub use cursor::Cursor;
+
 /// Struct for a collection of event entities,
 /// 
 /// The event runtime uses this component to determine if it should 
@@ -15,7 +18,7 @@ pub struct Sequence(
     /// sequence, a list of entities w/ events that are called in sequence
     Vec<Entity>,
     /// cursor, if set, this entity will be called after the sequence completes
-    Option<Entity>,
+    Option<Cursor>,
 );
 
 impl Display for Sequence {
@@ -107,7 +110,8 @@ impl Sequence {
         Connection::from(link)
     }
 
-    /// Resets thre cursor
+    /// Resets the cursor
+    /// 
     pub fn disconnect(&self) -> Self {
         let mut clone = self.clone();
 
@@ -115,27 +119,53 @@ impl Sequence {
         clone
     }
 
+    /// Removes an entity from the cursor, 
+    /// 
+    pub fn disconnect_by(&self, entity: Entity) -> Self {
+        let mut clone = self.clone();
+
+        match &self.1 {
+            Some(cursor) => match cursor {
+                Cursor::Next(next) => {
+                    if *next == entity {
+                        clone.1 = None;
+                        clone 
+                    } else {
+                        clone
+                    }
+                },
+                Cursor::Fork(forks) => {
+                    let forks = forks.iter().filter(|f| **f != entity).cloned().collect::<Vec<_>>();
+                    clone.1 = Some(Cursor::Fork(forks));
+                    clone
+                },
+            },
+            None => clone,
+        }
+    }
+
     /// Returns the entity that should be called at the end of the sequence.
-    pub fn cursor(&self) -> Option<Entity> {
-        self.1
+    pub fn cursor(&self) -> Option<&Cursor> {
+        self.1.as_ref()
     }
 
     /// Sets the entity to dispatch at the end of the sequence,
     /// if pointing to an entity in this sequence, setting the cursor will create a loop.
     pub fn set_cursor(&mut self, cursor: Entity) {
-        self.1 = Some(cursor);
-    }
-
-    /// Takes the next event and returns a sequence with only that event
-    pub fn fork(&self) -> Option<Sequence> {
-        let mut clone = self.clone();
-
-        if let Some(next) = clone.next() {
-            let mut fork = Sequence::default();
-            fork.add(next);
-            Some(fork)
-        } else {
-            None
+        match self.1.as_mut() {
+            Some(c) => match c {
+                Cursor::Next(next) => {
+                    self.1 = Some(Cursor::Fork(vec![*next, cursor]))
+                },
+                Cursor::Fork(forks) => {
+                    let mut forks = forks.clone();
+                    forks.push(cursor);
+                    self.1 = Some(Cursor::Fork(forks));
+                },
+            },
+            None => {
+                self.1 = Some(Cursor::Next(cursor));
+            },
         }
     }
 

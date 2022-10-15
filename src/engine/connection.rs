@@ -26,8 +26,17 @@ impl Connection {
     /// Returns a tuple view of this connection,
     /// 
     pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
-        let Self(sequence, ..) = self; 
-        (sequence.last(), sequence.cursor())
+        let Self(sequence, ..) = self;
+        
+        (sequence.last(), match sequence.cursor() {
+            Some(c) => match c {
+                super::sequence::Cursor::Next(cursor) => {
+                    Some(*cursor)
+                },
+                super::sequence::Cursor::Fork(_) => None,
+            },
+            None => None,
+        })
     }
 
     /// Returns true if this connection is active,

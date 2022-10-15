@@ -9,6 +9,7 @@ pub use event::Event;
 
 mod sequence;
 pub use sequence::Sequence;
+pub use sequence::Cursor;
 
 mod connection;
 pub use connection::Connection;

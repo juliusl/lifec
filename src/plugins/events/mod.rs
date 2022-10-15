@@ -370,8 +370,17 @@ impl<'a> System<'a> for EventRuntime {
                                     } else {
                                         event!(Level::DEBUG, "seqeunce, completed");
                                         if let Some(cursor) = sequence.cursor() {
-                                            event!(Level::DEBUG, "found cursor {}", cursor.id());
-                                            dispatch_queue.push((cursor, thunk_context));
+                                            event!(Level::DEBUG, "found cursor {:?}", cursor);
+                                            match cursor {
+                                                crate::Cursor::Next(cursor) => {
+                                                    dispatch_queue.push((*cursor, thunk_context));
+                                                },
+                                                crate::Cursor::Fork(forks) => {
+                                                    for cursor in forks {
+                                                        dispatch_queue.push((*cursor, thunk_context.clone()));
+                                                    }
+                                                },
+                                            }
                                         } else {
                                             // Since there isn't a cursor, the lifecycle option decides what should happen next
                                             // Finds the start of an engine

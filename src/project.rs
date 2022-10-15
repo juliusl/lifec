@@ -35,6 +35,10 @@ pub use source::RunmdFile;
 /// Trait to facilitate
 ///
 pub trait Project {
+    /// Override to initialize the world,
+    /// 
+    fn initialize(_world: &mut World) {}
+
     /// Interpret a compiled block, this will run after the Engine
     /// has a chance to interpret.
     ///
@@ -119,6 +123,8 @@ pub trait Project {
 
         let r#loop = Loop::default();
         r#loop.initialize(&mut world);
+
+        Self::initialize(&mut world);
 
         // Setup graphs for all plugin entities
         for (entity, block_index, event) in
