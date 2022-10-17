@@ -33,7 +33,7 @@ impl Connection {
                 super::sequence::Cursor::Next(cursor) => {
                     Some(*cursor)
                 },
-                super::sequence::Cursor::Fork(_) => None,
+                _ => None // This will always be a Next cursor
             },
             None => None,
         })

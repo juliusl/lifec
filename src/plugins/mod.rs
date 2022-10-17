@@ -3,25 +3,25 @@ use tokio::select;
 use tokio::sync::oneshot;
 
 mod network;
+pub use network::BlockAddress;
 pub use network::NetworkEvent;
 pub use network::NetworkRuntime;
 pub use network::NetworkTask;
 pub use network::ProxiedMessage;
 pub use network::Proxy;
-pub use network::BlockAddress;
 
 mod events;
-pub use events::EventRuntime;
 pub use events::EventListener;
+pub use events::EventRuntime;
 
 mod thunks;
 pub use thunks::CancelThunk;
 pub use thunks::Config;
 pub use thunks::ErrorContext;
+pub use thunks::SecureClient;
 pub use thunks::StatusUpdate;
 pub use thunks::Thunk;
 pub use thunks::ThunkContext;
-pub use thunks::SecureClient;
 
 mod testing;
 pub use testing::Test;
@@ -49,14 +49,14 @@ mod watch;
 pub use watch::Watch;
 
 /// Struct to archive an entity
-/// 
+///
 #[derive(Component, Default)]
 #[storage(DefaultVecStorage)]
 pub struct Archive(Option<Entity>);
 
 impl Archive {
     /// Returns the archived entity
-    /// 
+    ///
     pub fn archived(&self) -> Option<Entity> {
         self.0
     }
@@ -82,45 +82,47 @@ where
 }
 
 /// Implement this trait to extend the events that the runtime can create
-/// 
+///
 pub trait Plugin {
     /// Returns the symbol name representing this plugin
-    /// 
+    ///
     fn symbol() -> &'static str;
 
     /// Implement to execute logic over this thunk context w/ the runtime event system,
-    /// 
+    ///
     fn call(context: &ThunkContext) -> Option<AsyncContext>;
 
     /// Returns a short string description for this plugin
-    /// 
+    ///
     fn description() -> &'static str {
         ""
     }
 
     /// Returns any caveats for this plugin
-    /// 
+    ///
     fn caveats() -> &'static str {
         ""
     }
 
     /// Optionally, implement to customize the attribute parser,
-    /// 
+    ///
     /// Only used if this type is being used as a CustomAttribute.
-    /// 
-    fn compile(_parser: &mut AttributeParser) {
-    }
+    ///
+    fn compile(_parser: &mut AttributeParser) {}
 
     /// Optionally, implement to execute a setup operation before the event is called
-    /// 
+    ///
     fn setup_operation(context: &mut ThunkContext) -> Operation {
-        Operation { context: context.clone(), task: None }
+        Operation {
+            context: context.clone(),
+            task: None,
+        }
     }
 
-    /// Returns this plugin as a custom attribute, 
-    /// 
+    /// Returns this plugin as a custom attribute,
+    ///
     /// This allows the runmd parser to use this plugin as an attribute type,
-    /// 
+    ///
     fn as_custom_attr() -> CustomAttribute {
         CustomAttribute::new_with(Self::symbol(), |parser, content| {
             if let Some(world) = parser.world() {
@@ -133,19 +135,24 @@ pub trait Plugin {
                 if let Value::Symbol(e) = parser.value() {
                     event_name = e;
                 }
-                world.write_component().insert(
-                    child, 
-                    Event::from_plugin::<Self>(event_name)
-                ).ok();
+                world
+                    .write_component()
+                    .insert(child, Event::from_plugin::<Self>(event_name))
+                    .ok();
+                
+                world
+                    .write_component()
+                    .insert(child, Thunk::from_plugin::<Self>())
+                    .expect("should be able to insert thunk component");
 
                 parser.define("sequence", Value::Int(child.id() as i32));
                 parser.define_child(child.clone(), Self::symbol(), Value::Symbol(content));
                 parser.define_child(child.clone(), "plugin_symbol", Self::symbol());
-                
+
                 if !Self::description().is_empty() {
                     parser.define_child(child.clone(), "description", Self::description());
                 }
-                if !Self::caveats().is_empty() {                    
+                if !Self::caveats().is_empty() {
                     parser.define_child(child.clone(), "caveats", Self::caveats());
                 }
 
@@ -156,7 +163,7 @@ pub trait Plugin {
 }
 
 /// Function signature for the plugin trait's call() fn
-/// 
+///
 pub type Call = fn(&ThunkContext) -> Option<AsyncContext>;
 
 /// Combine plugins

@@ -74,7 +74,7 @@ impl Inspector for Host {
                             for (e, props) in index.iter_children() {
                                 let event = entities.entity(*e);
                                 let event = events.get(event).expect("should be an event");
-                                let plugin = event.1 .0;
+                                let plugin = event.thunk().0;
                                 println!(
                                     "    {e}: {} {:?}",
                                     plugin,

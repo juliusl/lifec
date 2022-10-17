@@ -252,6 +252,9 @@ impl<'a> System<'a> for EventRuntime {
             let event_ref = Arc::new(event.duplicate());
 
             let Event(_, thunk, _, initial_context, task) = event;
+
+            let thunk = thunk.get(0).expect("should have a thunk");
+
             if let Some(current_task) = task.take() {
                 if current_task.is_finished() {
                     if let Some(thunk_context) = runtime.block_on(async { current_task.await.ok() })
@@ -380,6 +383,9 @@ impl<'a> System<'a> for EventRuntime {
                                                         dispatch_queue.push((*cursor, thunk_context.clone()));
                                                     }
                                                 },
+                                                crate::Cursor::Select(_) => {
+                                                    todo!()
+                                                }
                                             }
                                         } else {
                                             // Since there isn't a cursor, the lifecycle option decides what should happen next
@@ -555,7 +561,9 @@ impl<'a> System<'a> for EventRuntime {
                 if let Some((handle, cancel_token)) = thunk(&mut context) {
                     match cancel_tokens.insert(entity, CancelThunk::from(cancel_token)) {
                         Ok(existing) => {
-                            // If an existing cancel token existed, send a message now
+
+                            // If an existing cancel token existed cancel now
+                            // TODO: Handle different start modes
                             if let Some(CancelThunk(cancel)) = existing {
                                 event!(Level::TRACE, "swapping cancel token for: {:?}", entity);
                                 cancel.send(()).ok();
@@ -606,7 +614,9 @@ impl<'a> System<'a> for EventRuntime {
 
                             contexts.insert(entity, started).ok();
                         }
-                        Err(_) => {}
+                        Err(err) => {
+                            event!(Level::ERROR, "Error inserting cancel token, {err}")
+                        }
                     }
                 } else {
                     event!(

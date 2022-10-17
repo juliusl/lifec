@@ -91,6 +91,12 @@ impl Plugin for Process {
                     event!(Level::ERROR, "Could not set current_directory for process entity {}, {err}", last.id());
                 },
             }
+        });
+
+        parser.add_custom_with("redirect",|p, content| {
+            let entity = p.last_child_entity().expect("should have a child entity");
+            // TODO: can ensure the file,
+            p.define_child(entity, "redirect", Value::Symbol(content));
         })
     }
 
@@ -186,6 +192,8 @@ impl Plugin for Process {
                                 let stdout = output.stdout.clone();
                                 match from_utf8(stdout.as_slice()) {
                                     Ok(stdout) => {
+                                        // TODO: Write to all redirects
+                                        let redirects = tc.search().find_symbol_values("redirect");
                                         for line in stdout.lines() {
                                             println!("{}", line);
                                         }

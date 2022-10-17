@@ -70,15 +70,18 @@ pub trait Executor {
 
                     thunk_context = thunk_context.enable_async(e, handle.clone());
 
-                    let Event(event_name, Thunk(plugin_name, call, ..), ..) =
+                    let Event(event_name, thunks, ..) =
                         events.get(&e).expect("should exist");
+
+                    let Thunk(plugin_symbol, thunk, ..) = thunks.get(0).expect("should have a thunk");
+
                     let graph = graphs.get(&e).expect("should exist");
 
-                    event!(Level::DEBUG, "Starting {event_name} {plugin_name}");
+                    event!(Level::DEBUG, "Starting {event_name} {plugin_symbol}");
 
                     let mut operation = Operation {
                         context: thunk_context.clone(),
-                        task: call(&thunk_context.with_state(graph.clone())),
+                        task: (thunk)(&thunk_context.with_state(graph.clone())),
                     };
 
                     {

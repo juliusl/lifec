@@ -47,19 +47,6 @@ impl Interpreter for Next {
                     .and_then(BlockProperty::symbol)
                     .and_then(|p| Engine::find_block(world, p))
                 {
-                    
-                    // TODO - Is this a better way?
-                    // if let Some(next) =  world.read_component::<reality::Block>().get(next).and_then(|b| {
-                    //     if b.is_root_block() {
-                    //         None
-                    //     } else if b.is_control_block() {
-                    //         Some(next)
-                    //     } else {
-                    //         Engine::find_block(world, b.symbol())
-                    //     }
-                    // }) {
-                    // }
-
                     let entity = world.entities().entity(block.entity());
                     world
                         .write_component()

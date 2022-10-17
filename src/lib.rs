@@ -65,6 +65,7 @@ pub use host::Editor;
 mod project;
 pub use project::Project;
 pub use project::Source;
+pub use project::Workspace;
 pub use project::default_runtime;
 pub use project::default_parser;
 

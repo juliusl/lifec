@@ -1,5 +1,6 @@
 use crate::{plugins::{StatusUpdate, ErrorContext}, Start};
 use tokio::sync::mpsc::Receiver;
+use tokio::sync::broadcast::Receiver as BroadcastReceiver;
 use specs::prelude::*;
 use crate::Operation;
 
@@ -14,6 +15,6 @@ pub struct EventListener<'a> {
     pub operations: Write<'a, Receiver<Operation>, EventRuntime>,
     pub error_contexts: Write<'a, Receiver<ErrorContext>, EventRuntime>,
     pub start_commands: Write<'a, Receiver<Start>, EventRuntime>,
-    pub completed_plugins: Write<'a, tokio::sync::broadcast::Receiver<Entity>, EventRuntime>,
+    pub completed_plugins: Write<'a, BroadcastReceiver<Entity>, EventRuntime>,
 }
 

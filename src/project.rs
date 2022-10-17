@@ -32,6 +32,9 @@ mod source;
 pub use source::Source;
 pub use source::RunmdFile;
 
+mod workspace;
+pub use workspace::Workspace;
+
 /// Trait to facilitate
 ///
 pub trait Project {
@@ -115,9 +118,6 @@ pub trait Project {
         let next = Next::default();
         next.initialize(&mut world);
 
-        let repeat = Repeat::default();
-        repeat.initialize(&mut world);
-
         let exit = Exit::default();
         exit.initialize(&mut world);
 
@@ -148,7 +148,6 @@ pub trait Project {
 
         for block in world.read_component::<Block>().join() {
             engine.interpret(&world, block);
-            repeat.interpret(&world, block);
             fork.interpret(&world, block);
             next.interpret(&world, block);
             exit.interpret(&world, block);

@@ -1,6 +1,6 @@
 use specs::{World, Entity, WorldExt};
 
-use crate::{Event, Runtime, Config, Thunk, Plugin};
+use crate::{Event, Config, Thunk, Plugin};
 
 use tracing::{event, Level};
 

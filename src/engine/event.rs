@@ -14,13 +14,13 @@ use tracing::Level;
 pub struct Event(
     /// Name of this event
     pub String,
-    /// Thunk that is being executed
-    pub Thunk,
-    /// Config for the thunk context before being executed
+    /// Thunks that are being executed, 
+    pub Vec<Thunk>,
+    /// Config for the thunk context before being executed,
     pub Option<Config>,
-    /// Initial context that starts this event
+    /// Initial context that starts this event,
     pub Option<ThunkContext>,
-    /// This is the task that
+    /// This join handle for the thunk task, 
     pub Option<JoinHandle<ThunkContext>>,
 );
 
@@ -34,7 +34,7 @@ impl Event {
     /// Returns the a clone of the inner thunk
     ///
     pub fn thunk(&self) -> Thunk {
-        self.1.clone()
+        self.1.get(0).expect("should have a thunk").clone()
     }
 
     /// Creates an event component, with a task created with on_event
@@ -45,7 +45,7 @@ impl Event {
     {
         Self(
             event_name.as_ref().to_string(),
-            Thunk::from_plugin::<P>(),
+            vec![Thunk::from_plugin::<P>()],
             None,
             None,
             None,
@@ -76,7 +76,7 @@ impl Event {
                 Level::TRACE,
                 "detected config '{name}' for event: {} {}",
                 self.symbol(),
-                self.1.symbol()
+                self.thunk().symbol()
             );
             config(thunk_context);
         }
@@ -117,7 +117,7 @@ impl Event {
 impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} ", self.0)?;
-        write!(f, "{}", self.1 .0)?;
+        write!(f, "{}", self.thunk() .0)?;
         Ok(())
     }
 }

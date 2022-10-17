@@ -1,6 +1,6 @@
 use std::{future::Future, net::SocketAddr, sync::Arc};
 
-use crate::{plugins::network::BlockAddress, AttributeGraph, AttributeIndex, Operation, Start};
+use crate::{plugins::network::BlockAddress, AttributeGraph, AttributeIndex, Operation, Start, Workspace};
 
 use reality::Block;
 use specs::{Component, DenseVecStorage, Entity};
@@ -39,22 +39,31 @@ use super::{CancelSource, CancelToken, ErrorContext, SecureClient, StatusUpdate}
 #[derive(Debug, Component, Default, Clone)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
-    /// Block data
+    /// # State Properties
+
+    /// Compiled block that sourced the thunk,
     block: Block,
     /// Error graph recorded if the previous plugin call encountered an error
     error_graph: Option<AttributeGraph>,
-    /// Previous graph used w/ this context
+    /// Previous graph used w/ this context, set by calling .commit()
     previous_graph: Option<AttributeGraph>,
-    /// Underlying state for this thunk,
+    /// Current state of this context,
     graph: AttributeGraph,
+
     /// Entity that owns this context
     entity: Option<Entity>,
     /// Tokio runtime handle, to spawn additional tasks
     handle: Option<Handle>,
-    /// Sender for status updates for the thunk
-    status_updates: Option<Sender<StatusUpdate>>,
     /// Client for sending secure http requests
     client: Option<SecureClient>,
+    /// Workspace for this context, if enabled the work_dir from the workspace will be used
+    workspace: Option<Workspace>,
+
+    /// # I/O Utilities,
+    /// Project-type implements handling the listener side,     
+
+    /// Sender for status updates for the thunk
+    status_updates: Option<Sender<StatusUpdate>>,
     /// Dispatcher for runmd
     dispatcher: Option<Sender<String>>,
     /// Dispatcher for operations
@@ -63,6 +72,7 @@ pub struct ThunkContext {
     start_command_dispatcher: Option<Sender<Start>>,
     /// Channel to send bytes to a listening char_device
     char_device: Option<Sender<(u32, u8)>>,
+
     /// UDP socket,
     ///
     /// Notes: Since UDP is connectionless, it can be shared, cloned, and stored in the
@@ -246,6 +256,12 @@ impl ThunkContext {
         self.char_device = Some(tx);
     }
 
+    /// Enable a workspace for this context,
+    /// 
+    pub fn enable_workspace(&mut self, workspace: Workspace) {
+        self.workspace = Some(workspace);
+    }
+
     /// Enables a tcp listener for this context to listen to. accepts the first listener, creates a connection
     /// and then exits after the connection is dropped.
     ///
@@ -271,10 +287,9 @@ impl ThunkContext {
             self.entity.expect("should have an entity").id()
         );
 
-        let name = self.block.name();
-        let symbol = self.block.symbol();
-        let hash_code = self.hash_code();
-
+        // let name = self.block.name();
+        // let symbol = self.block.symbol();
+        // let hash_code = self.hash_code();
         // TODO: Assign test.publish.
 
         select! {
@@ -485,7 +500,7 @@ impl ThunkContext {
         }
     }
 
-    /// Reads lines from a stream and returns the result,
+    /// Read lines from a stream and returns the result,
     ///
     pub async fn readln_stream(&self) -> String {
         use std::fmt::Write;
@@ -514,6 +529,80 @@ impl ThunkContext {
     }
 }
 
+/// Cryptography related functions, Private Key side
+///
+impl ThunkContext {
+    /// Create a signature using the assigned signature key,
+    ///
+    pub fn sign(&self) {
+        /*
+            1) Get assigned identity of the current block,
+            - The prefix should be {block.name()}.{block.symbol()}.
+            - or, {block.symbol()}.control.
+            2) Lookup the private-key with the assigned identity
+
+            After a listener starts and is bound to an address,
+            I need to be able to assign the address to a name.
+
+            receive.runner.{host}/{path}
+
+            receive.runner.obddemo.azurecr.io/demo/library/redis/6.2.1
+
+            1) look up host
+            2) look up path
+            3) look up block name/symbol
+
+            4) What private key to use?
+            {host}
+                -> {block}
+                    -> {key}
+
+        Name File:
+        {
+            "data": {
+                // Settings from Project struct
+                "host": "",
+                "container": "",
+                "path": "",
+
+                // Full entity name
+                "name": "",
+                "symbol": "",
+                "local_addr": "",
+
+                "signatures": {
+                    "host": "", // Find this in .world/{host}/
+                    "container": "" // Find this in .world/{host}/{container}/
+                    "path": "", // Find this in .world/{host}/{container}/{path}/
+                    
+                    "name": "",
+                    "symbol": "",
+                    "local_addr": "",
+                },
+            },
+            "signature": ""
+        }
+
+        */
+    }
+
+    /// Decrypt some bytes using the assigned decryption key,
+    ///
+    pub fn decrypt(&self) {}
+}
+
+/// Cryptography related functions, Public Key side
+///
+impl ThunkContext {
+    /// Verify the signature of some bytes using the assigned verifying key,
+    ///
+    pub fn verify(&self) {}
+
+    /// Encrypt some bytes using the assigned encryption key
+    ///
+    pub fn encrypt(&self) {}
+}
+
 /// Some utility methods
 ///
 impl ThunkContext {
@@ -527,12 +616,9 @@ impl ThunkContext {
 
 #[test]
 fn test_security() {
-    use rsa::{
-        pss::VerifyingKey,
-        RsaPrivateKey,
-    };
-    use rsa::pss::BlindedSigningKey;
     use rsa::pkcs8::EncodePublicKey;
+    use rsa::pss::BlindedSigningKey;
+    use rsa::{pss::VerifyingKey, RsaPrivateKey};
     use sha2::Sha256;
     // use std::str::from_utf8;
     // use rsa::pkcs8::DecodePrivateKey;
@@ -548,6 +634,7 @@ fn test_security() {
     // private_key.to_pkcs8_encrypted_der(&mut rng, "test1234");
 
     let signing_key = BlindedSigningKey::<Sha256>::new(private_key);
+    // signing_key.to_pkcs8_encrypted_der(rng, "test").unwrap().write_der_file(path);
     let verifying_key: VerifyingKey<_> = (&signing_key).into();
 
     // Sign
