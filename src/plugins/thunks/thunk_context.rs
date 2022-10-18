@@ -1,12 +1,14 @@
 use std::{future::Future, net::SocketAddr, sync::Arc};
 
-use crate::{plugins::network::BlockAddress, AttributeGraph, AttributeIndex, Operation, Start, Workspace};
+use crate::{
+    plugins::network::BlockAddress, AttributeGraph, AttributeIndex, Operation, Start, Workspace,
+};
 
 use reality::Block;
 use specs::{Component, DenseVecStorage, Entity};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
-    net::{TcpListener, UdpSocket},
+    net::{TcpListener, TcpSocket, UdpSocket},
     runtime::Handle,
     select,
     sync::{
@@ -58,6 +60,10 @@ pub struct ThunkContext {
     client: Option<SecureClient>,
     /// Workspace for this context, if enabled the work_dir from the workspace will be used
     workspace: Option<Workspace>,
+    /// Local tcp socket address,
+    local_tcp_addr: Option<SocketAddr>,
+    /// Local udp socket address,
+    local_udp_addr: Option<SocketAddr>,
 
     /// # I/O Utilities,
     /// Project-type implements handling the listener side,     
@@ -257,7 +263,7 @@ impl ThunkContext {
     }
 
     /// Enable a workspace for this context,
-    /// 
+    ///
     pub fn enable_workspace(&mut self, workspace: Workspace) {
         self.workspace = Some(workspace);
     }
@@ -327,6 +333,58 @@ impl ThunkContext {
             Err(err) => {
                 event!(Level::ERROR, "could not enable socket {err}");
                 None
+            }
+        }
+    }
+
+    /// Assigns an address to this context by trying to bind to the address
+    ///
+    pub async fn assign_address(&mut self) {
+        let udp = self
+            .search()
+            .find_symbol("udp")
+            .unwrap_or(String::from("127.0.0.1:0"));
+        match UdpSocket::bind(&udp).await {
+            Ok(socket) => match socket.local_addr() {
+                Ok(addr) => {
+                    self.local_udp_addr = Some(addr);
+                }
+                Err(err) => {
+                    event!(
+                        Level::ERROR,
+                        "Could not get local socket address for udp socket, {udp} {err}"
+                    );
+                }
+            },
+            Err(err) => {
+                event!(
+                    Level::ERROR,
+                    "Could not assign address for udp socket, {udp} {err}"
+                );
+            }
+        }
+
+        let tcp = self
+            .search()
+            .find_symbol("tcp")
+            .unwrap_or(String::from("127.0.0.1:0"));
+        match TcpListener::bind(&tcp).await {
+            Ok(listener) => match listener.local_addr() {
+                Ok(addr) => {
+                    self.local_tcp_addr = Some(addr);
+                }
+                Err(err) => {
+                    event!(
+                        Level::ERROR,
+                        "Could not get local address for tcp listener, {tcp} {err}"
+                    );
+                }
+            },
+            Err(err) => {
+                event!(
+                    Level::ERROR,
+                    "Could not assign address for tcp listener, {tcp} {err}"
+                );
             }
         }
     }
@@ -574,7 +632,7 @@ impl ThunkContext {
                     "host": "", // Find this in .world/{host}/
                     "container": "" // Find this in .world/{host}/{container}/
                     "path": "", // Find this in .world/{host}/{container}/{path}/
-                    
+
                     "name": "",
                     "symbol": "",
                     "local_addr": "",

@@ -1,6 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{path::PathBuf, net::SocketAddr, collections::HashMap};
 
 use reality::Block;
+use specs::{Component, VecStorage};
 use tracing::{event, Level};
 
 mod create;
@@ -30,7 +31,8 @@ pub use create::Create;
 ///     * A Host is the owner of the path hosts within it's directory
 ///     * To tell that a path was added by a container, the container will sign a file that authenticates each path host
 ///
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Component)]
+#[storage(VecStorage)]
 pub struct Workspace {
     /// Work directory for this workspace context,
     work_dir: PathBuf,
@@ -40,8 +42,12 @@ pub struct Workspace {
     container: Option<String>,
     /// Name of the path,
     path: Option<String>,
-    /// Map of public keys,
-    public_keys: HashMap<String, rsa::RsaPublicKey>,
+}
+
+/// Index of names and their socket addresses, 
+/// 
+pub struct NameIndex {
+    names: HashMap<String, SocketAddr>,
 }
 
 impl Workspace {
@@ -54,7 +60,6 @@ impl Workspace {
             host: host.as_ref().to_string(),
             container: None,
             path: None,
-            public_keys: HashMap::default(),
         }
     }
 
@@ -100,7 +105,6 @@ impl Workspace {
             host: self.host.to_string(),
             container: Some(container.as_ref().to_string()),
             path: None,
-            public_keys: self.public_keys.clone(),
         }
     }
 
@@ -118,7 +122,6 @@ impl Workspace {
                 host: self.host.to_string(),
                 container: Some(container.to_string()),
                 path: Some(path.as_ref().to_string()),
-                public_keys: self.public_keys.clone(),
             })
         } else {
             event!(
