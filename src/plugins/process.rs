@@ -93,11 +93,12 @@ impl Plugin for Process {
             }
         });
 
+        // Enables redirecting stdout to a file, 
         parser.add_custom_with("redirect",|p, content| {
             let entity = p.last_child_entity().expect("should have a child entity");
             // TODO: can ensure the file,
             p.define_child(entity, "redirect", Value::Symbol(content));
-        })
+        });
     }
 
     fn call(context: &super::ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
@@ -188,15 +189,33 @@ impl Plugin for Process {
                 let mut reader = BufReader::new(stdout).lines();
                 let mut stderr_reader = BufReader::new(stderr).lines();
 
+                let reader_context = tc.clone();
                 let reader_task = tc.handle().unwrap().spawn(async move {
                     event!(Level::DEBUG, "starting to listen to stdout");
+                    
+                    let mut stdout = String::new();
+
                     while let Ok(line) = reader.next_line().await {
                         match line {
                             Some(line) => {
+                                use std::fmt::Write;
+                                
                                 println!("{}", line);
+                                writeln!(&mut stdout, "{}", line).expect("should be able to write");
                             },
                             None => {
                                 break;
+                            },
+                        }
+                    }
+
+                    for redirect in reader_context.search().find_symbol_values("redirect") {
+                        match tokio::fs::write(&redirect, &stdout).await {
+                            Ok(_) => {
+                                event!(Level::DEBUG, "Redirected output to {redirect}");
+                            },
+                            Err(err) => {
+                                event!(Level::ERROR, "Could not write to {redirect}, {err}");
                             },
                         }
                     }
