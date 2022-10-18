@@ -5,7 +5,7 @@ use tracing::event;
 use tracing::Level;
 
 use crate::prelude::{Readln, Watch, Publish};
-use crate::{LifecycleOptions, Operation, ThunkContext, Start};
+use crate::{LifecycleOptions, Operation, ThunkContext, Start, Sequence, Thunk};
 use crate::engine::{Loop, Activity};
 use crate::plugins::{StatusUpdate, ErrorContext};
 use crate::{plugins::Println, AttributeGraph, Engine, Event, Install, Process, Runtime, Timer, engine::{Fork, Next, Repeat, LifecycleResolver}, Exit};
@@ -223,6 +223,9 @@ pub fn default_world() -> World {
     world.register::<LifecycleOptions>();
     world.register::<ThunkContext>();
     world.register::<Activity>();
+    world.register::<Sequence>();
+    world.register::<Thunk>();
+    world.register::<Repeat>();
     world
 }
 

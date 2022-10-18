@@ -113,17 +113,11 @@ impl Sequence {
         let from = self.last();
         let to = other.peek();
 
-        let mut link = Sequence::default();
-
-        if let Some(from) = from {
-            link.add(from);
+        Connection {
+            from,
+            to,
+            tracker: None,
         }
-
-        if let Some(to) = to {
-            link.set_cursor(to);
-        }
-
-        Connection::from(link)
     }
 
     /// Resets the cursor,

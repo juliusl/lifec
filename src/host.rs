@@ -35,6 +35,8 @@ pub use editor::Editor;
 mod runner;
 pub use runner::Runner;
 
+pub mod async_ext;
+
 mod control_key;
 pub use control_key::ControlKey;
 
@@ -396,9 +398,7 @@ impl Host {
                     event!(Level::TRACE, "{:?} has exited", entity);
                     true
                 }
-                _ => {
-                    false
-                }
+                _ => false,
             },
         ) {
             true
@@ -443,8 +443,8 @@ impl Host {
     }
 
     /// Prepares the host to start by creating a new dispatcher,
-    /// 
-    pub fn prepare<'a, 'b, P>(&mut self, context: Option<ThunkContext>) -> Dispatcher<'a, 'b> 
+    ///
+    pub fn prepare<'a, 'b, P>(&mut self, context: Option<ThunkContext>) -> Dispatcher<'a, 'b>
     where
         P: Project,
     {
@@ -492,6 +492,7 @@ impl Host {
         if let Some(event) = self.world().write_component::<Event>().get_mut(event) {
             event.fire(thunk_context);
         }
+
         self.world_mut().maintain();
     }
 

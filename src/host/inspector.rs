@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use reality::Block;
 use specs::{Entities, Entity, Join, Read, ReadStorage};
 
-use crate::{Engine, Event, Host, LifecycleOptions, Sequence};
+use crate::{Engine, Host, LifecycleOptions, Sequence, Thunk};
 
 /// Extension methods for inspecting World state after the world is done building,
 ///
@@ -43,12 +43,12 @@ impl Inspector for Host {
 
     fn print_engine_event_graph(&mut self) {
         self.world_mut().exec(
-            |(entities, blocks, engines, sequences, events): (
+            |(entities, blocks, engines, sequences, thunks): (
                 Entities,
                 ReadStorage<Block>,
                 ReadStorage<Engine>,
                 ReadStorage<Sequence>,
-                ReadStorage<Event>,
+                ReadStorage<Thunk>,
             )| {
                 for (block, _, sequence) in (&blocks, &engines, &sequences).join() {
                     println!("{}: {}", block.entity(), block.symbol());
@@ -73,18 +73,18 @@ impl Inspector for Host {
                         {
                             for (e, props) in index.iter_children() {
                                 let event = entities.entity(*e);
-                                let event = events.get(event).expect("should be an event");
-                                let plugin = event.thunk().0;
+                                let thunk = thunks.get(event).expect("should be an event");
+                                let thunk = thunk.0;
                                 println!(
                                     "    {e}: {} {:?}",
-                                    plugin,
+                                    thunk,
                                     props
-                                        .property(plugin)
+                                        .property(thunk)
                                         .expect("should be a symbol")
                                         .symbol()
                                         .unwrap()
                                 );
-                                for (name, prop) in props.iter_properties().filter(|p| p.0 != plugin) {
+                                for (name, prop) in props.iter_properties().filter(|p| p.0 != thunk) {
                                     println!("      {name} {:?}", prop);
                                 }
                                 println!();

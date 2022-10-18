@@ -27,9 +27,9 @@ impl Sequencer for Host {
                 WriteStorage<LifecycleOptions>,
             )| {
                 let mut control_atlas = HashMap::<Entity, Vec<(Entity, Option<Entity>)>>::default();
-                
+
                 let mut event_engines = Vec::<(Entity, Entity, Engine, Option<Engine>)>::default();
-                
+
                 for (block, _, sequence) in (&blocks, &engines, &sequences).join() {
                     let control_entity = entities.entity(block.entity());
                     let mut atlas = vec![];
@@ -47,8 +47,12 @@ impl Sequencer for Host {
                                 let plugin_entity = entities.entity(*entity);
                                 let engine = Engine::new(plugin_entity);
 
-                                if let Some((last_control_entity, _, _, connection)) = event_engines.last_mut() {
-                                    if connection.is_none() && *last_control_entity == control_entity {
+                                if let Some((last_control_entity, _, _, connection)) =
+                                    event_engines.last_mut()
+                                {
+                                    if connection.is_none()
+                                        && *last_control_entity == control_entity
+                                    {
                                         let _ = connection.insert(engine.clone());
                                     }
                                 }
@@ -121,16 +125,22 @@ impl Sequencer for Host {
                             .expect("Should be able to insert");
                     }
                 }
-            
-            
+
                 for (_, event_entity, engine, next) in event_engines.iter() {
                     if let Some(next) = next {
                         let from = engine.start().expect("should have a start");
-                        let seq = sequences.get_mut(from).expect("should have a sequence"); 
-                        let to = next.start().expect("should have a start");
+                        if let Some(seq) = sequences.get_mut(from) {
+                            let to = next.start().expect("should have a start");
 
-                        event!(Level::DEBUG, "Setting cursor for event entity {}: {} -> {}", event_entity.id(), from.id(), to.id());
-                        seq.set_cursor(to);
+                            event!(
+                                Level::DEBUG,
+                                "Setting cursor for event entity {}: {} -> {}",
+                                event_entity.id(),
+                                from.id(),
+                                to.id()
+                            );
+                            seq.set_cursor(to);
+                        }
                     }
                 }
             },

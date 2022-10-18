@@ -8,8 +8,8 @@ mod event;
 pub use event::Event;
 
 mod sequence;
-pub use sequence::Sequence;
 pub use sequence::Cursor;
+pub use sequence::Sequence;
 
 mod connection;
 pub use connection::Connection;
@@ -38,7 +38,6 @@ pub use lifecycle::LifecycleResolver;
 
 mod activity;
 pub use activity::Activity;
-
 
 /// An engine is a sequence of events, this component manages
 /// sequences of events
@@ -81,25 +80,25 @@ pub use activity::Activity;
 #[storage(VecStorage)]
 pub struct Engine {
     /// Pointer to the start of the engine sequence
-    /// 
+    ///
     start: Option<Entity>,
 }
 
 impl Engine {
     /// Creates a new engine component w/ start,
-    /// 
+    ///
     pub fn new(start: Entity) -> Self {
         Self { start: Some(start) }
     }
 
     /// Starts an engine,
-    /// 
+    ///
     pub fn start(&self) -> Option<Entity> {
         self.start.clone()
     }
 
     /// Sets the start entity for this engine,
-    /// 
+    ///
     pub fn set_start(&mut self, start: Entity) {
         self.start = Some(start);
     }
@@ -109,7 +108,11 @@ impl Engine {
     pub fn find_block(world: &World, expression: impl AsRef<str>) -> Option<Entity> {
         let block_list = world.read_resource::<HashMap<String, Entity>>();
 
-        tracing::event!(tracing::Level::DEBUG, "Looking for block ``` {}", expression.as_ref());
+        tracing::event!(
+            tracing::Level::DEBUG,
+            "Looking for block ``` {}",
+            expression.as_ref()
+        );
 
         block_list.get(expression.as_ref()).cloned()
     }
@@ -180,31 +183,15 @@ impl Interpreter for Engine {
             return;
         }
 
-        for index in block
-            .index()
-            .iter()
-            .filter(|i| i.root().name() == "runtime")
-        {
-            if let Some(plugins) = index
-                .properties()
-                .property("sequence")
-                .and_then(BlockProperty::int_vec)
-            {
-                let mut sequence = Sequence::default();
-
-                for plugin in plugins.iter().map(|p| *p) {
-                    let plugin = world.entities().entity(*plugin as u32);
-                    sequence.add(plugin);
-                }
-
-                // Note that .next() will mutate the sequence before we insert it as a component
-                // That is because the parent will be executed first, and afterwards the next entity in the 
-                // sequence should be the next call
-                if let Some(parent) = sequence.next() {
-                    world
-                        .write_component()
-                        .insert(parent, sequence)
-                        .expect("Should be able to insert");
+        if !block.is_root_block() && !block.is_control_block() {
+            let block_entity = world.entities().entity(block.entity());
+            let mut sequences = world.write_component::<Sequence>();
+            if let Some(sequence) = sequences.get(block_entity) {
+                let mut sequence = sequence.clone();
+                if let Some(next) = sequence.next() {
+                    sequences
+                        .insert(next, sequence)
+                        .expect("should be able to insert sequnce");
                 }
             }
         }

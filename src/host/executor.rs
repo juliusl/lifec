@@ -6,9 +6,7 @@ use crate::Operation;
 use crate::Sequence;
 use crate::Thunk;
 use crate::ThunkContext;
-use crate::Value;
 use crate::WorldExt;
-use crate::engine::Activity;
 use specs::Entity;
 use specs::World;
 use std::collections::HashMap;
@@ -20,7 +18,10 @@ use tracing::{event, Level};
 
 /// Trait for executing a sequence of events,
 ///
-pub trait Executor {
+pub trait Executor
+where
+    Self: AsRef<World>,
+{
     /// Executes a sequence of events,
     ///
     /// Looks for a `sequence` property in thunk context which is a list of plugin call entities,
@@ -33,10 +34,7 @@ pub trait Executor {
         &self,
         thunk_context: &ThunkContext,
         calls: Sequence,
-    ) -> (JoinHandle<ThunkContext>, Sender<()>)
-    where
-        Self: AsRef<World>,
-    {
+    ) -> (JoinHandle<ThunkContext>, Sender<()>) {
         let thunk_context = thunk_context.commit();
 
         let handle = thunk_context.handle().expect("should be a handle").clone();
@@ -70,10 +68,10 @@ pub trait Executor {
 
                     thunk_context = thunk_context.enable_async(e, handle.clone());
 
-                    let Event(event_name, thunks, ..) =
-                        events.get(&e).expect("should exist");
+                    let Event(event_name, thunks, ..) = events.get(&e).expect("should exist");
 
-                    let Thunk(plugin_symbol, thunk, ..) = thunks.get(0).expect("should have a thunk");
+                    let Thunk(plugin_symbol, thunk, ..) =
+                        thunks.get(0).expect("should have a thunk");
 
                     let graph = graphs.get(&e).expect("should exist");
 
@@ -100,7 +98,7 @@ pub trait Executor {
                             }
                         }
                     }
-                   
+
                     cancel_source = Some(_rx);
                 } else {
                     break;
@@ -116,25 +114,21 @@ pub trait Executor {
 
 impl Executor for Host {
     fn execute(&self, thunk_context: &ThunkContext) -> (JoinHandle<ThunkContext>, Sender<()>) {
-        let mut sequence = Sequence::default();
-        {
-            let entities = self.world().entities();
-            for call in thunk_context
-                .state()
-                .find_values("sequence")
-                .iter()
-                .filter_map(|v| {
-                    if let Value::Int(i) = v {
-                        Some(entities.entity(*i as u32))
-                    } else {
-                        None
-                    }
-                })
-            {
-                sequence.add(call);
-            }
-        }
+        let entities = self.as_ref().entities();
 
-        self.execute_sequence(thunk_context, sequence)
+        let event = thunk_context
+            .search()
+            .find_int("event_id")
+            .and_then(|i| Some(entities.entity(i as u32)))
+            .expect("should have been registered with an event id");
+
+        let sequence = self
+            .as_ref()
+            .read_component::<Sequence>();
+        let sequence = sequence
+            .get(event)
+            .expect("should have a sequence");
+
+        self.execute_sequence(thunk_context, sequence.clone())
     }
 }

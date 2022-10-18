@@ -126,7 +126,20 @@ pub trait Plugin {
     fn as_custom_attr() -> CustomAttribute {
         CustomAttribute::new_with(Self::symbol(), |parser, content| {
             if let Some(world) = parser.world() {
+                let entity = parser.entity().expect("should have an entity");
                 let child = world.entities().create();
+
+                {
+                    let mut sequences = world.write_component::<Sequence>();
+                    if let Some(sequence) = sequences.get_mut(entity) {
+                        sequence.add(entity);
+                    } else {
+                        let sequence = Sequence::from(vec![entity]);
+                        sequences
+                            .insert(entity, sequence)
+                            .expect("should be able to insert");
+                    }
+                }
 
                 // This is used after .runtime
                 // If the consumer writes an ident afterwards, than that will
@@ -135,20 +148,20 @@ pub trait Plugin {
                 if let Value::Symbol(e) = parser.value() {
                     event_name = e;
                 }
+                
                 world
                     .write_component()
                     .insert(child, Event::from_plugin::<Self>(event_name))
                     .ok();
-                
+
                 world
                     .write_component()
                     .insert(child, Thunk::from_plugin::<Self>())
                     .expect("should be able to insert thunk component");
 
-                parser.define("sequence", Value::Int(child.id() as i32));
-                parser.define_child(child.clone(), Self::symbol(), Value::Symbol(content));
-                parser.define_child(child.clone(), "plugin_symbol", Self::symbol());
-
+                parser.define_child(child, Self::symbol(), Value::Symbol(content));
+                parser.define_child(child, "plugin_symbol", Self::symbol());
+                parser.define_child(child, "event_id", entity.id() as usize);
                 if !Self::description().is_empty() {
                     parser.define_child(child.clone(), "description", Self::description());
                 }

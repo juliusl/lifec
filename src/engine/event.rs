@@ -52,6 +52,19 @@ impl Event {
         )
     }
 
+    /// Creates an event component from a thunk,
+    /// 
+    pub fn from_thunk(event_name: impl AsRef<str>, thunk: Thunk) -> Self
+    {
+        Self(
+            event_name.as_ref().to_string(),
+            vec![thunk],
+            None,
+            None,
+            None,
+        )
+    }
+
     /// Sets the config to use w/ this event
     pub fn set_config(&mut self, config: Config) {
         self.2 = Some(config);

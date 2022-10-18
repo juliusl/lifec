@@ -2,59 +2,39 @@ use std::fmt::Display;
 
 use specs::{Entity, Component, DefaultVecStorage};
 
-use super::Sequence;
-
 /// This component configures the Sequence cursor to point at the sequence it is connected to
+/// 
 #[derive(Component, Debug, Default, Clone)]
 #[storage(DefaultVecStorage)]
-pub struct Connection(
-    /// Entities that are connected
-    Sequence,
-    /// This entity is a third-party of the connection the consumes this connection state,
-    /// 
-    /// This is to make garbage collection consumers easier
-    Option<Entity>,
-);
+pub struct Connection {
+    pub from: Option<Entity>, 
+    pub to: Option<Entity>, 
+    pub tracker: Option<Entity>,
+}
 
 impl Connection {
     /// Sets the owner of this connection, 
     /// 
     pub fn set_owner(&mut self, owner: Entity) {
-        self.1 = Some(owner);
+        self.tracker = Some(owner);
     }
 
     /// Returns a tuple view of this connection,
     /// 
     pub fn connection(&self) -> (Option<Entity>, Option<Entity>) {
-        let Self(sequence, ..) = self;
-        
-        (sequence.last(), match sequence.cursor() {
-            Some(c) => match c {
-                super::sequence::Cursor::Next(cursor) => {
-                    Some(*cursor)
-                },
-                _ => None // This will always be a Next cursor
-            },
-            None => None,
-        })
+        (self.from, self.to)
     }
 
     /// Returns true if this connection is active,
     /// 
     pub fn is_connected(&self) -> bool {
-        !self.0.is_empty()
+        self.from.is_some() && self.to.is_some()
     }
 
     /// Returns the "owner" of this connection,
     /// 
     pub fn owner(&self) -> Option<Entity> {
-        self.1
-    }
-}
-
-impl From<Sequence> for Connection {
-    fn from(s: Sequence) -> Self {
-        Connection(s, None)
+        self.tracker
     }
 }
 
