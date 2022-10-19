@@ -18,6 +18,11 @@ pub use proxy::ProxyRuntime;
 mod address;
 pub use address::BlockAddress;
 
+mod udp;
+pub use udp::UDP;
+
+mod tcp;
+pub use tcp::TCP;
 
 /// Network runtime is similar to the event runtime, but instead fires events
 /// when a network task has completed

@@ -4,11 +4,15 @@ use specs::{Join, World, WorldExt};
 use tracing::event;
 use tracing::Level;
 
-use crate::prelude::{Readln, Watch, Publish};
-use crate::{LifecycleOptions, Operation, ThunkContext, Start, Sequence, Thunk};
-use crate::engine::{Loop, Activity};
-use crate::plugins::{StatusUpdate, ErrorContext};
-use crate::{plugins::Println, AttributeGraph, Engine, Event, Install, Process, Runtime, Timer, engine::{Fork, Next, Repeat, LifecycleResolver}, Exit};
+use crate::engine::{Activity, Loop};
+use crate::plugins::{ErrorContext, StatusUpdate};
+use crate::prelude::{Publish, Readln, Watch};
+use crate::{
+    engine::{Fork, LifecycleResolver, Next, Repeat},
+    plugins::Println,
+    AttributeGraph, Engine, Event, Exit, Install, Process, Runtime, Timer,
+};
+use crate::{LifecycleOptions, Operation, Sequence, Start, Thunk, ThunkContext};
 
 mod runmd_listener;
 pub use runmd_listener::RunmdListener;
@@ -29,8 +33,8 @@ mod start_command_listener;
 pub use start_command_listener::StartCommandListener;
 
 mod source;
-pub use source::Source;
 pub use source::RunmdFile;
+pub use source::Source;
 
 mod workspace;
 pub use workspace::Workspace;
@@ -39,7 +43,7 @@ pub use workspace::Workspace;
 ///
 pub trait Project {
     /// Override to initialize the world,
-    /// 
+    ///
     fn initialize(_world: &mut World) {}
 
     /// Interpret a compiled block, this will run after the Engine
@@ -48,8 +52,12 @@ pub trait Project {
     fn interpret(world: &World, block: &Block);
 
     /// Override to customize the dispatcher,
-    /// 
-    fn configure_dispatcher(_dispatcher_builder: &mut DispatcherBuilder, _context: Option<ThunkContext>) {}
+    ///
+    fn configure_dispatcher(
+        _dispatcher_builder: &mut DispatcherBuilder,
+        _context: Option<ThunkContext>,
+    ) {
+    }
 
     /// Override to provide a custom Runtime,
     ///
@@ -58,7 +66,7 @@ pub trait Project {
     }
 
     /// Override to provide a custom Parser,
-    /// 
+    ///
     fn parser() -> Parser {
         default_parser(Self::world())
     }
@@ -71,35 +79,52 @@ pub trait Project {
         world
     }
 
-    /// When compiling in the context of a project directory, the file name is taken into consideration when parsing 
+    /// When compiling in the context of a project directory, the file name is taken into consideration when parsing
     /// runmd. The file name becomes the implicit symbol w/in the context of the file.
-    /// 
+    ///
     /// In this context the root block can only be defined within in the .runmd file in the directory.
-    /// 
-    fn compile_project_dir(files: Vec<RunmdFile>) -> World {
-        let parser = Self::parser();
+    ///
+    fn compile_workspace(workspace: Workspace, files: Vec<RunmdFile>) -> World {
+        let mut parser = Self::parser();
 
-        for file in files {
-            /*
-            1) Load the file and compile,
-            2) Create a new parser w/ World,
-            */
+        for RunmdFile { symbol } in files {
+            parser.set_implicit_symbol(&symbol);
+
+            let file = workspace.work_dir().join(format!("{symbol}.runmd"));
+            match  std::fs::read_to_string(&file) {
+                Ok(runmd) => {
+                    parser = parser.parse(runmd);
+                },
+                Err(err) => {
+                    event!(Level::ERROR, "Could not read file {:?} {err}", file);
+                },
+            }
         }
 
-        todo!()
+        // Parse the root file without the implicit symbol set
+        parser.unset_implicit_symbol();
+
+        let root = workspace.work_dir().join(".runmd");
+        match std::fs::read_to_string(&root) {
+            Ok(runmd) => {
+                return Self::compile(runmd, Some(parser), false);
+            }
+            Err(err) => {
+                panic!("Could not compile workspace, root .runmd file required, {err}");
+            },
+        }
     }
 
     /// Compiles runmd into blocks, interprets those blocks,
     /// and returns the World,
     ///
     /// In addition, sets up attribute graphs for each entity with a plugin.
-    /// 
+    ///
     /// Override with care as this adds critical components for the event runtime,
     ///
     fn compile(runmd: impl AsRef<str>, parser: Option<Parser>, is_single_src: bool) -> World {
-        let parser = parser.unwrap_or(Self::parser())
-            .parse(runmd.as_ref());
-        
+        let parser = parser.unwrap_or(Self::parser()).parse(runmd.as_ref());
+
         let mut world = parser.commit();
 
         // If this is loading just one file, then a Source can be inserted
@@ -127,8 +152,12 @@ pub trait Project {
         Self::initialize(&mut world);
 
         // Setup graphs for all plugin entities
-        for (entity, block_index, event) in
-            (&world.entities(), &world.read_component::<BlockIndex>(), world.read_component::<Event>().maybe()).join()
+        for (entity, block_index, event) in (
+            &world.entities(),
+            &world.read_component::<BlockIndex>(),
+            world.read_component::<Event>().maybe(),
+        )
+            .join()
         {
             let mut graph = AttributeGraph::new(block_index.clone());
             if entity.id() != block_index.root().id() {
@@ -140,7 +169,8 @@ pub trait Project {
                 .expect("Should be able to insert graph for entity");
 
             if let Some(_) = event {
-                world.write_component()
+                world
+                    .write_component()
                     .insert(entity, Activity::default())
                     .expect("Should be able to insert an activity");
             }
@@ -153,7 +183,12 @@ pub trait Project {
             exit.interpret(&world, block);
             r#loop.interpret(&world, block);
             Self::interpret(&world, block);
-            event!(Level::TRACE, "Interpreted block {} {}", block.name(), block.symbol());
+            event!(
+                Level::TRACE,
+                "Interpreted block {} {}",
+                block.name(),
+                block.symbol()
+            );
         }
 
         // Resolve lifecycle settings before returning
@@ -165,29 +200,29 @@ pub trait Project {
 
         world
     }
-    
+
     /// Override to receive/handle runmd
-    /// 
+    ///
     fn on_runmd(&mut self, _runmd: String) {}
 
     /// Override to receive/handle status updates
-    /// 
+    ///
     fn on_status_update(&mut self, _status_update: StatusUpdate) {}
 
     /// Override to receive/handle operations
-    /// 
+    ///
     fn on_operation(&mut self, _operation: Operation) {}
 
     /// Override to receive/handle errors
-    /// 
+    ///
     fn on_error_context(&mut self, _error: ErrorContext) {}
 
     /// Override to receive/handle the entity when a plugin call completes
-    /// 
+    ///
     fn on_completed_plugin_call(&mut self, _entity: Entity) {}
 
     /// Override to receive/handle start commands,
-    /// 
+    ///
     fn on_start_command(&mut self, _start_command: Start) {}
 }
 
@@ -205,9 +240,8 @@ pub fn default_runtime() -> Runtime {
     runtime
 }
 
-
 /// Returns a basic reality parser,
-/// 
+///
 pub fn default_parser(world: World) -> Parser {
     Parser::new_with(world)
         .with_special_attr::<Runtime>()
@@ -228,4 +262,3 @@ pub fn default_world() -> World {
     world.register::<Repeat>();
     world
 }
-

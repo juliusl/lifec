@@ -9,6 +9,8 @@ pub use network::NetworkRuntime;
 pub use network::NetworkTask;
 pub use network::ProxiedMessage;
 pub use network::Proxy;
+pub use network::TCP;
+pub use network::UDP;
 
 mod events;
 pub use events::EventListener;
@@ -47,6 +49,9 @@ pub use timer::TimerSettings;
 
 mod watch;
 pub use watch::Watch;
+
+// mod enable_networking;
+// use enable_networking::EnableNetworking;
 
 /// Struct to archive an entity
 ///
@@ -112,10 +117,21 @@ pub trait Plugin {
 
     /// Optionally, implement to execute a setup operation before the event is called
     ///
-    fn setup_operation(context: &mut ThunkContext) -> Operation {
+    fn setup_operation(context: &ThunkContext) -> Operation {
         Operation {
             context: context.clone(),
             task: None,
+        //     task: {
+        //         if (context.search().find_symbol("tcp").is_some()
+        //             && context.local_tcp_addr().is_none())
+        //             || (context.search().find_symbol("udp").is_some()
+        //                 && context.local_udp_addr().is_none())
+        //         {
+        //             EnableNetworking::call(&context)
+        //         } else {
+        //             None
+        //         }
+        //     },
         }
     }
 
@@ -148,14 +164,12 @@ pub trait Plugin {
                 if let Value::Symbol(e) = parser.value() {
                     event_name = e;
                 }
-                
-                world
-                    .write_component()
+
+                world.write_component()
                     .insert(child, Event::from_plugin::<Self>(event_name))
                     .ok();
-
-                world
-                    .write_component()
+                
+                world.write_component()
                     .insert(child, Thunk::from_plugin::<Self>())
                     .expect("should be able to insert thunk component");
 

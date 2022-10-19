@@ -23,7 +23,7 @@ pub struct Thunk(
     // thunk fn
     pub fn(&ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
     /// setup thunk fn
-    pub fn(&mut ThunkContext) -> Operation,
+    pub fn(&ThunkContext) -> Operation,
 );
 
 /// Config for a thunk context

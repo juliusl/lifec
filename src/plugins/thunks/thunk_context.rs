@@ -277,114 +277,112 @@ impl ThunkContext {
         &self,
         cancel_source: &mut oneshot::Receiver<()>,
     ) -> Option<(tokio::net::TcpStream, SocketAddr)> {
-        let address = self
-            .search()
-            .find_symbol("address")
-            .unwrap_or("127.0.0.1:0".to_string());
+        if let Some(address) = self.local_tcp_addr {
+            let listener = TcpListener::bind(address)
+                .await
+                .expect("needs to be able to bind to an address");
 
-        let listener = TcpListener::bind(address)
-            .await
-            .expect("needs to be able to bind to an address");
+            let local_addr = listener.local_addr().expect("was just created").to_string();
+            event!(
+                Level::INFO,
+                "Entity {} Listening on {local_addr}",
+                self.entity.expect("should have an entity").id()
+            );
 
-        let local_addr = listener.local_addr().expect("was just created").to_string();
-        event!(
-            Level::INFO,
-            "Entity {} Listening on {local_addr}",
-            self.entity.expect("should have an entity").id()
-        );
+            // let name = self.block.name();
+            // let symbol = self.block.symbol();
+            // let hash_code = self.hash_code();
+            // TODO: Assign test.publish.
 
-        // let name = self.block.name();
-        // let symbol = self.block.symbol();
-        // let hash_code = self.hash_code();
-        // TODO: Assign test.publish.
-
-        select! {
-            Ok((stream, address)) = listener.accept() => {
-                Some((stream, address))
-            },
-            _ = cancel_source => {
-                event!(Level::WARN, "{local_addr} is being cancelled");
-                None
+            select! {
+                Ok((stream, address)) = listener.accept() => {
+                    Some((stream, address))
+                },
+                _ = cancel_source => {
+                    event!(Level::WARN, "{local_addr} is being cancelled");
+                    None
+                }
             }
+        } else {
+            event!(Level::ERROR, "No local address assigned to context");
+            None
         }
     }
 
     /// Creates a UDP socket for this context, and saves the address to the underlying graph
     ///
     pub async fn enable_socket(&mut self) -> Option<Arc<UdpSocket>> {
-        let address = self
-            .state()
-            .find_symbol("address")
-            .unwrap_or("127.0.0.1:0".to_string());
+        if let Some(address) = self.local_udp_addr {
+            match UdpSocket::bind(address).await {
+                Ok(socket) => {
+                    if let Some(address) =
+                        socket.local_addr().ok().and_then(|a| Some(a.to_string()))
+                    {
+                        event!(Level::DEBUG, "created socket at {address}");
 
-        match UdpSocket::bind(address).await {
-            Ok(socket) => {
-                if let Some(address) = socket.local_addr().ok().and_then(|a| Some(a.to_string())) {
-                    event!(Level::DEBUG, "created socket at {address}");
+                        // Add the socket address as a transient value
+                        // self.define("socket", "address")
+                        //     .edit_as(Value::TextBuffer(address));
+                        self.udp_socket = Some(Arc::new(socket));
+                    }
 
-                    // Add the socket address as a transient value
-                    // self.define("socket", "address")
-                    //     .edit_as(Value::TextBuffer(address));
-                    self.udp_socket = Some(Arc::new(socket));
+                    self.udp_socket.clone()
                 }
-
-                self.udp_socket.clone()
+                Err(err) => {
+                    event!(Level::ERROR, "could not enable socket {err}");
+                    None
+                }
             }
-            Err(err) => {
-                event!(Level::ERROR, "could not enable socket {err}");
-                None
-            }
+        } else {
+            event!(Level::ERROR, "No local address assigned to context");
+            None
         }
     }
 
-    /// Assigns an address to this context by trying to bind to the address
+    /// Assigns addresses to the context by trying to bind to the address,
     ///
-    pub async fn assign_address(&mut self) {
-        let udp = self
-            .search()
-            .find_symbol("udp")
-            .unwrap_or(String::from("127.0.0.1:0"));
-        match UdpSocket::bind(&udp).await {
-            Ok(socket) => match socket.local_addr() {
-                Ok(addr) => {
-                    self.local_udp_addr = Some(addr);
-                }
+    pub async fn assign_addresses(&mut self) {
+        if let Some(udp) = self.search().find_symbol("udp") {
+            match UdpSocket::bind(&udp).await {
+                Ok(socket) => match socket.local_addr() {
+                    Ok(addr) => {
+                        self.local_udp_addr = Some(addr);
+                    }
+                    Err(err) => {
+                        event!(
+                            Level::ERROR,
+                            "Could not get local socket address for udp socket, {udp} {err}"
+                        );
+                    }
+                },
                 Err(err) => {
                     event!(
                         Level::ERROR,
-                        "Could not get local socket address for udp socket, {udp} {err}"
+                        "Could not assign address for udp socket, {udp} {err}"
                     );
                 }
-            },
-            Err(err) => {
-                event!(
-                    Level::ERROR,
-                    "Could not assign address for udp socket, {udp} {err}"
-                );
             }
         }
 
-        let tcp = self
-            .search()
-            .find_symbol("tcp")
-            .unwrap_or(String::from("127.0.0.1:0"));
-        match TcpListener::bind(&tcp).await {
-            Ok(listener) => match listener.local_addr() {
-                Ok(addr) => {
-                    self.local_tcp_addr = Some(addr);
-                }
+        if let Some(tcp) = self.search().find_symbol("tcp") {
+            match TcpListener::bind(&tcp).await {
+                Ok(listener) => match listener.local_addr() {
+                    Ok(addr) => {
+                        self.local_tcp_addr = Some(addr);
+                    }
+                    Err(err) => {
+                        event!(
+                            Level::ERROR,
+                            "Could not get local address for tcp listener, {tcp} {err}"
+                        );
+                    }
+                },
                 Err(err) => {
                     event!(
                         Level::ERROR,
-                        "Could not get local address for tcp listener, {tcp} {err}"
+                        "Could not assign address for tcp listener, {tcp} {err}"
                     );
                 }
-            },
-            Err(err) => {
-                event!(
-                    Level::ERROR,
-                    "Could not assign address for tcp listener, {tcp} {err}"
-                );
             }
         }
     }
@@ -584,6 +582,18 @@ impl ThunkContext {
             writeln!(received, "{line}").ok();
         }
         received
+    }
+
+    /// Returns the local tcp addr,
+    /// 
+    pub fn local_tcp_addr(&self) -> Option<SocketAddr> {
+        self.local_tcp_addr
+    }
+
+    /// Returns the local udp addr, 
+    /// 
+    pub fn local_udp_addr(&self) -> Option<SocketAddr> {
+        self.local_udp_addr
     }
 }
 

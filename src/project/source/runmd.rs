@@ -34,9 +34,6 @@ pub struct RunmdFile {
     /// If a block has both a name and a symbol, it will be ignored when this struct is consumed into Source,
     /// and then compiled into a block.
     /// 
-    symbol: String,
-    /// This is the parent directory or container name for this file.
-    /// 
-    parent: String,
+    pub symbol: String,
 }
 

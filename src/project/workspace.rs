@@ -44,12 +44,6 @@ pub struct Workspace {
     path: Option<String>,
 }
 
-/// Index of names and their socket addresses, 
-/// 
-pub struct NameIndex {
-    names: HashMap<String, SocketAddr>,
-}
-
 impl Workspace {
     /// Returns a new workspace for host,
     ///
