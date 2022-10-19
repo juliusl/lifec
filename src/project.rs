@@ -107,7 +107,15 @@ pub trait Project {
         let root = workspace.work_dir().join(".runmd");
         match std::fs::read_to_string(&root) {
             Ok(runmd) => {
-                return Self::compile(runmd, Some(parser), false);
+                let world = Self::compile(runmd, Some(parser), false);
+                
+                // Enable workspace on any thunk context in the World
+                // TODO: Pivot thunk context build to Event
+                for tc in world.write_component::<ThunkContext>().as_mut_slice() {
+                    tc.enable_workspace(workspace.clone());
+                }
+                
+                return world;
             }
             Err(err) => {
                 panic!("Could not compile workspace, root .runmd file required, {err}");
