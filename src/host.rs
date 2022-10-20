@@ -11,7 +11,7 @@ use crate::{
         CompletedPluginListener, ErrorContextListener, OperationListener, RunmdListener,
         StartCommandListener,
     },
-    Engine, Event, LifecycleOptions, Project, ThunkContext,
+    Engine, Event, LifecycleOptions, Project, ThunkContext, Workspace,
 };
 
 mod inspector;
@@ -56,6 +56,15 @@ pub struct Host {
     ///
     #[clap(long)]
     pub runmd_path: Option<String>,
+    /// Uri for a workspace, 
+    /// 
+    /// A workspace directory is a directory of .runmd files that are compiled together. A valid workspace directory requires a root
+    /// .runmd file, followed by named runmd files (ex. test.runmd). Named files will be parsed w/ the file name used as the implicit block
+    /// symbol. All named files will be parsed first and the root .runmd file will be parsed last. When this mode is used, the workspace feature
+    /// will be enabled with thunk contexts, so all plugins will execute in the context of the same work_dir. 
+    /// 
+    #[clap(short, long)]
+    pub workspace: Option<String>,
     /// The command to execute w/ this host,
     ///
     #[clap(subcommand)]
@@ -379,11 +388,34 @@ impl Host {
             runmd_path: None,
             url: None,
             command: None,
+            workspace: None,
             world: Some(P::compile(content, None, true)),
         };
 
         host.link_sequences();
         host
+    }
+
+    /// Returns a host with a world compiled from a workspace,
+    ///
+    pub fn load_workspace<P>(host: impl AsRef<str>, tenant: impl AsRef<str>, path: Option<impl AsRef<str>>) -> Self
+    where
+        P: Project,
+    {
+        // Workspace URI:
+        // {tenant}.{host}/{path}
+
+        // let mut host = Self {
+        //     workspace_path: None,
+        //     runmd_path: None,
+        //     url: None,
+        //     command: None,
+        //     world: Some(P::compile_workspace(workspace, vec![])),
+        // };
+
+        // host.link_sequences();
+        // host
+        todo!()
     }
 
     /// Returns true if the host should exit,
