@@ -36,6 +36,8 @@ pub use create::Create;
 pub struct Workspace {
     /// Work directory for this workspace context,
     work_dir: PathBuf,
+    /// Root directory
+    root: Option<PathBuf>,
     /// Name of the host,
     host: String,
     /// Name of the tenant,
@@ -47,10 +49,16 @@ pub struct Workspace {
 impl Workspace {
     /// Returns a new workspace for host,
     ///
-    pub fn new(host: impl AsRef<str>) -> Self {
-        let work_dir = PathBuf::from(".world").join(host.as_ref());
+    pub fn new(host: impl AsRef<str>, root: Option<PathBuf>) -> Self {
+        let work_dir = root
+            .clone()
+            .unwrap_or(PathBuf::from("."))
+            .join(".world")
+            .join(host.as_ref());
+
         Self {
-            work_dir,
+            work_dir: work_dir.to_path_buf(),
+            root,
             host: host.as_ref().to_string(),
             tenant: None,
             path: None,
@@ -58,13 +66,9 @@ impl Workspace {
     }
 
     /// Returns the identity uri for the current workspace context for a block,
-    /// 
+    ///
     pub fn identity_uri(&self, block: &Block) -> Option<String> {
-        match (
-            self.host.as_str(),
-            self.tenant.as_ref(),
-            self.path.as_ref(),
-        ) {
+        match (self.host.as_str(), self.tenant.as_ref(), self.path.as_ref()) {
             (host, Some(tenant), None) if !block.name().is_empty() => Some(format!(
                 "{}.{}.{tenant}.{host}",
                 block.name(),
@@ -79,10 +83,9 @@ impl Workspace {
                 block.symbol()
             )),
 
-            (host, Some(tenant), Some(path)) if block.name().is_empty() => Some(format!(
-                "{}.control.{tenant}.{host}/{path}",
-                block.symbol()
-            )),
+            (host, Some(tenant), Some(path)) if block.name().is_empty() => {
+                Some(format!("{}.control.{tenant}.{host}/{path}", block.symbol()))
+            }
             _ => None,
         }
     }
@@ -90,12 +93,17 @@ impl Workspace {
     /// Get a tenant from the workspace,
     ///
     pub fn tenant(&self, tenant: impl AsRef<str>) -> Self {
-        let work_dir = PathBuf::from(".world")
+        let work_dir = self
+            .root
+            .clone()
+            .unwrap_or(PathBuf::from("."))
+            .join(".world")
             .join(self.host.as_str())
             .join(tenant.as_ref());
 
         Self {
             work_dir,
+            root: self.root.clone(),
             host: self.host.to_string(),
             tenant: Some(tenant.as_ref().to_string()),
             path: None,
@@ -106,22 +114,24 @@ impl Workspace {
     ///
     pub fn path(&self, path: impl AsRef<str>) -> Option<Self> {
         if let Some(tenant) = self.tenant.as_ref() {
-            let work_dir = PathBuf::from(".world")
+            let work_dir = self
+                .root
+                .clone()
+                .unwrap_or(PathBuf::from("."))
+                .join(".world")
                 .join(self.host.as_str())
                 .join(tenant.as_str())
                 .join(path.as_ref());
 
             Some(Self {
                 work_dir,
+                root: self.root.clone(),
                 host: self.host.to_string(),
                 tenant: Some(tenant.to_string()),
                 path: Some(path.as_ref().to_string()),
             })
         } else {
-            event!(
-                Level::ERROR,
-                "Trying to create a path without a tenant"
-            );
+            event!(Level::ERROR, "Trying to create a path without a tenant");
             None
         }
     }
@@ -147,7 +157,7 @@ fn test_workspace_paths() {
     "#,
     );
 
-    let workspace = Workspace::new("lifec.io");
+    let workspace = Workspace::new("lifec.io", None);
 
     assert_eq!(&PathBuf::from(".world/lifec.io"), workspace.work_dir());
 

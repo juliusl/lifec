@@ -15,7 +15,7 @@ use crate::{
     plugins::{CancelThunk, EventRuntime},
     project::{
         CompletedPluginListener, ErrorContextListener, OperationListener, RunmdListener,
-        StartCommandListener,
+        StartCommandListener, RunmdFile,
     },
     Engine, Event, LifecycleOptions, Project, ThunkContext, Workspace,
 };
@@ -53,6 +53,10 @@ pub use control_key::ControlKey;
 #[derive(Default, Args)]
 #[clap(arg_required_else_help = true)]
 pub struct Host {
+    /// Root directory, defaults to current directory
+    /// 
+    #[clap(long)]
+    pub root: Option<PathBuf>,
     /// URL to .runmd file used to configure this host,
     ///
     #[clap(long)]
@@ -142,6 +146,38 @@ impl Host {
     {
         let command = self.command().cloned();
         match self {
+            Self {
+                root,
+                workspace: Some(workspace),
+                ..
+            } => match Uri::from_str(workspace) {
+                Ok(uri) => {
+                    if let Some((tenant, host)) =
+                        uri.host().expect("should have a host").split_once(".")
+                    {
+                        let root = root.clone();
+                        let mut host = Host::load_workspace::<P>(
+                            root,
+                            host,
+                            tenant,
+                            if uri.path().is_empty() {
+                                None
+                            } else {
+                                Some(uri.path())
+                            },
+                        );
+                        host.command = command;
+                        Some(host)
+                    } else {
+                        event!(Level::ERROR, "Tenant and host are required");
+                        None 
+                    }
+                }
+                Err(err) => {
+                    event!(Level::ERROR, "Could not parser workspace uri, {err}");
+                    None
+                }
+            }
             Self { url: Some(url), .. } => match Host::get::<P>(url).await {
                 Ok(mut host) => {
                     host.command = command;
@@ -172,35 +208,6 @@ impl Host {
                     }
                 }
             }
-            Self {
-                workspace: Some(workspace),
-                ..
-            } => match Uri::from_str(workspace) {
-                Ok(uri) => {
-                    if let Some((tenant, host)) =
-                        uri.host().expect("should have a host").split_once(".")
-                    {
-                        let mut host = Host::load_workspace::<P>(
-                            host,
-                            tenant,
-                            if uri.path().is_empty() {
-                                None
-                            } else {
-                                Some(uri.path())
-                            },
-                        );
-                        host.command = command;
-                        Some(host)
-                    } else {
-                        event!(Level::ERROR, "Tenant and host are required");
-                        None 
-                    }
-                }
-                Err(err) => {
-                    event!(Level::ERROR, "Could not parser workspace uri, {err}");
-                    None
-                }
-            },
             _ => match Host::runmd::<P>().await {
                 Ok(mut host) => {
                     host.command = command;
@@ -420,6 +427,7 @@ impl Host {
         P: Project,
     {
         let mut host = Self {
+            root: None,
             runmd_path: None,
             url: None,
             command: None,
@@ -434,6 +442,7 @@ impl Host {
     /// Returns a host with a world compiled from a workspace,
     ///
     pub fn load_workspace<P>(
+        root: Option<PathBuf>,
         host: impl AsRef<str>,
         tenant: impl AsRef<str>,
         path: Option<impl AsRef<str>>,
@@ -441,17 +450,51 @@ impl Host {
     where
         P: Project,
     {
-        // let mut host = Self {
-        //     workspace: None,
-        //     runmd_path: None,
-        //     url: None,
-        //     command: None,
-        //     world: Some(P::compile_workspace(workspace, vec![])),
-        // };
+        let workspace = Workspace::new(host.as_ref(), root); 
+        let mut workspace = workspace.tenant(tenant.as_ref());
 
-        // host.link_sequences();
-        // host
-        todo!()
+        if let Some(path) = path {
+            if let Some(w) = workspace.path(path.as_ref()) {
+                workspace = w;
+            }
+        }
+
+        let mut files = vec![];
+        match std::fs::read_dir(workspace.work_dir()) {
+            Ok(readdir) => {
+                for entry in readdir.filter_map(|e| match e {
+                    Ok(entry) => {
+                        match entry.path().extension() {
+                            Some(ext)  if ext == "runmd" && !entry.file_name().is_empty() => {
+                                Some(entry.file_name().to_str().expect("should be a string").trim_end_matches(".runmd").to_string())
+                            },
+                            _ => None
+                        }
+                    },
+                    Err(err) => {
+                        event!(Level::ERROR, "Could not get entry {err}");
+                        None
+                    },
+                }) {
+                    files.push(RunmdFile { symbol: entry });
+                }
+            },
+            Err(err) => {
+                event!(Level::ERROR, "Error reading work directory {err}");
+            },
+        }
+
+        let mut host = Self {
+            root: None,
+            workspace: None,
+            runmd_path: None,
+            url: None,
+            command: None,
+            world: Some(P::compile_workspace(workspace, files)),
+        };
+
+        host.link_sequences();
+        host
     }
 
     /// Returns true if the host should exit,
