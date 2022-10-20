@@ -2,7 +2,13 @@ use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use specs::{Dispatcher, DispatcherBuilder, Entity, Join, World, WorldExt, WriteStorage};
-use std::{error::Error, fmt::Debug, path::PathBuf, str::from_utf8, sync::Arc};
+use std::{
+    error::Error,
+    fmt::Debug,
+    path::PathBuf,
+    str::{from_utf8, FromStr},
+    sync::Arc,
+};
 use tracing::{event, Level};
 
 use crate::{
@@ -56,13 +62,13 @@ pub struct Host {
     ///
     #[clap(long)]
     pub runmd_path: Option<String>,
-    /// Uri for a workspace, 
-    /// 
+    /// Uri for a workspace,
+    ///
     /// A workspace directory is a directory of .runmd files that are compiled together. A valid workspace directory requires a root
     /// .runmd file, followed by named runmd files (ex. test.runmd). Named files will be parsed w/ the file name used as the implicit block
     /// symbol. All named files will be parsed first and the root .runmd file will be parsed last. When this mode is used, the workspace feature
-    /// will be enabled with thunk contexts, so all plugins will execute in the context of the same work_dir. 
-    /// 
+    /// will be enabled with thunk contexts, so all plugins will execute in the context of the same work_dir.
+    ///
     #[clap(short, long)]
     pub workspace: Option<String>,
     /// The command to execute w/ this host,
@@ -166,6 +172,35 @@ impl Host {
                     }
                 }
             }
+            Self {
+                workspace: Some(workspace),
+                ..
+            } => match Uri::from_str(workspace) {
+                Ok(uri) => {
+                    if let Some((tenant, host)) =
+                        uri.host().expect("should have a host").split_once(".")
+                    {
+                        let mut host = Host::load_workspace::<P>(
+                            host,
+                            tenant,
+                            if uri.path().is_empty() {
+                                None
+                            } else {
+                                Some(uri.path())
+                            },
+                        );
+                        host.command = command;
+                        Some(host)
+                    } else {
+                        event!(Level::ERROR, "Tenant and host are required");
+                        None 
+                    }
+                }
+                Err(err) => {
+                    event!(Level::ERROR, "Could not parser workspace uri, {err}");
+                    None
+                }
+            },
             _ => match Host::runmd::<P>().await {
                 Ok(mut host) => {
                     host.command = command;
@@ -398,15 +433,16 @@ impl Host {
 
     /// Returns a host with a world compiled from a workspace,
     ///
-    pub fn load_workspace<P>(host: impl AsRef<str>, tenant: impl AsRef<str>, path: Option<impl AsRef<str>>) -> Self
+    pub fn load_workspace<P>(
+        host: impl AsRef<str>,
+        tenant: impl AsRef<str>,
+        path: Option<impl AsRef<str>>,
+    ) -> Self
     where
         P: Project,
     {
-        // Workspace URI:
-        // {tenant}.{host}/{path}
-
         // let mut host = Self {
-        //     workspace_path: None,
+        //     workspace: None,
         //     runmd_path: None,
         //     url: None,
         //     command: None,
@@ -611,6 +647,12 @@ mod test {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_example() {
+        use hyper::http::Uri;
+
+        let uri = Uri::from_static("test.example.com");
+
+        eprintln!("{:?}", uri.host().unwrap().split_once("."));
+
         use crate::{Commands, Host};
         let mut host = Host::open::<Test>("examples/hello_runmd/.runmd")
             .await
