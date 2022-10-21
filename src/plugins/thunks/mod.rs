@@ -23,8 +23,6 @@ pub struct Thunk(
     pub &'static str,
     // thunk fn
     pub fn(&ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
-    /// setup thunk fn
-    pub fn(&ThunkContext) -> Operation,
 );
 
 /// Config for a thunk context
@@ -66,7 +64,7 @@ impl Thunk {
     where
         P: Plugin + ?Sized,
     {
-        Self(P::symbol(), P::call, P::setup_operation)
+        Self(P::symbol(), P::call)
     }
 }
 

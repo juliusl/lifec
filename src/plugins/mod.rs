@@ -115,26 +115,6 @@ pub trait Plugin {
     ///
     fn compile(_parser: &mut AttributeParser) {}
 
-    /// Optionally, implement to execute a setup operation before the event is called
-    ///
-    fn setup_operation(context: &ThunkContext) -> Operation {
-        Operation {
-            context: context.clone(),
-            task: None,
-        //     task: {
-        //         if (context.search().find_symbol("tcp").is_some()
-        //             && context.local_tcp_addr().is_none())
-        //             || (context.search().find_symbol("udp").is_some()
-        //                 && context.local_udp_addr().is_none())
-        //         {
-        //             EnableNetworking::call(&context)
-        //         } else {
-        //             None
-        //         }
-        //     },
-        }
-    }
-
     /// Returns this plugin as a custom attribute,
     ///
     /// This allows the runmd parser to use this plugin as an attribute type,
@@ -144,7 +124,6 @@ pub trait Plugin {
             if let Some(world) = parser.world() {
                 let entity = parser.entity().expect("should have an entity");
                 let child = world.entities().create();
-
                 {
                     event!(Level::TRACE, "Adding plugin {} to event {}", child.id(), entity.id());
                     let mut sequences = world.write_component::<Sequence>();
