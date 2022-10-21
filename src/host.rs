@@ -38,13 +38,7 @@ pub use executor::Executor;
 mod editor;
 pub use editor::Editor;
 
-mod runner;
-pub use runner::Runner;
-
 pub mod async_ext;
-
-mod control_key;
-pub use control_key::ControlKey;
 
 /// Struct for initializing and hosting the runtime as well as parsing CLI arguments,
 ///

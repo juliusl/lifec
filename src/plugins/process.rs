@@ -164,15 +164,15 @@ impl Plugin for Process {
                     _ => {}
                 }
 
-                // Set current directory if work_dir is set
-                if let Some(work_dir) = tc.state().find_symbol("current_dir") {
-                    let path = PathBuf::from(&work_dir);
+                // Set current directory if current_dir is set
+                if let Some(current_dir) = tc.state().find_symbol("current_dir") {
+                    let path = PathBuf::from(&current_dir);
                     match path.canonicalize() {
-                        Ok(work_dir) => {
-                            command_task.current_dir(work_dir);
+                        Ok(current_dir) => {
+                            command_task.current_dir(current_dir);
                         },
                         Err(err) => {
-                            panic!("Could not canonicalize path {work_dir}, {err}");
+                            panic!("Could not canonicalize path {current_dir}, {err}");
                         },
                     }
                 }

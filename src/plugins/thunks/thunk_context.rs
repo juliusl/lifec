@@ -1,4 +1,4 @@
-use std::{future::Future, net::SocketAddr, sync::Arc};
+use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use crate::{
     plugins::network::BlockAddress, AttributeGraph, AttributeIndex, Operation, Start, Workspace,
@@ -58,7 +58,7 @@ pub struct ThunkContext {
     handle: Option<Handle>,
     /// Client for sending secure http requests
     client: Option<SecureClient>,
-    /// Workspace for this context, if enabled the work_dir from the workspace will be used
+    /// Workspace for this context, if enabled the work_dir from the workspace can be used
     workspace: Option<Workspace>,
     /// Local tcp socket address,
     local_tcp_addr: Option<SocketAddr>,
@@ -124,6 +124,18 @@ impl ThunkContext {
     ///
     pub fn search(&self) -> &impl AttributeIndex {
         self
+    }
+
+    /// Returns the work directory to use,
+    ///
+    pub fn work_dir(&self) -> Option<PathBuf> {
+        match &self.workspace {
+            Some(workspace) => Some(workspace.work_dir().clone()),
+            None => self
+                .search()
+                .find_symbol("work_dir")
+                .and_then(|d| Some(PathBuf::from(d))),
+        }
     }
 
     /// Copies previous state to the current state,
@@ -585,13 +597,13 @@ impl ThunkContext {
     }
 
     /// Returns the local tcp addr,
-    /// 
+    ///
     pub fn local_tcp_addr(&self) -> Option<SocketAddr> {
         self.local_tcp_addr
     }
 
-    /// Returns the local udp addr, 
-    /// 
+    /// Returns the local udp addr,
+    ///
     pub fn local_udp_addr(&self) -> Option<SocketAddr> {
         self.local_udp_addr
     }
