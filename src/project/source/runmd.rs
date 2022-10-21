@@ -35,5 +35,8 @@ pub struct RunmdFile {
     /// and then compiled into a block.
     /// 
     pub symbol: String,
+    /// Content of the runmd file,
+    /// 
+    pub source: Option<String>,
 }
 

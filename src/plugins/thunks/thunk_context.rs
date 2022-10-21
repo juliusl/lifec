@@ -8,7 +8,7 @@ use reality::Block;
 use specs::{Component, DenseVecStorage, Entity};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
-    net::{TcpListener, TcpSocket, UdpSocket},
+    net::{TcpListener, UdpSocket},
     runtime::Handle,
     select,
     sync::{

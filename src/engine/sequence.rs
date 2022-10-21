@@ -8,8 +8,8 @@ use super::Connection;
 mod cursor;
 pub use cursor::Cursor;
 
-mod start_mode;
-pub use start_mode::StartMode;
+mod transition;
+pub use transition::Transition;
 
 /// A component for a collection of entities that are processed in sequence,
 /// 
@@ -153,15 +153,6 @@ impl Sequence {
                     clone.1 = Some(Cursor::Fork(forks));
                     clone
                 }
-                Cursor::Select(selects) => {
-                    let selects = selects
-                        .iter()
-                        .filter(|f| **f != entity)
-                        .cloned()
-                        .collect::<Vec<_>>();
-                    clone.1 = Some(Cursor::Select(selects));
-                    clone
-                }
             },
             None => clone,
         }
@@ -185,7 +176,6 @@ impl Sequence {
                     forks.push(cursor);
                     self.1 = Some(Cursor::Fork(forks));
                 }
-                Cursor::Select(_) => todo!(),
             },
             None => {
                 self.1 = Some(Cursor::Next(cursor));

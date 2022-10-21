@@ -146,11 +146,12 @@ pub trait Plugin {
                 let child = world.entities().create();
 
                 {
+                    event!(Level::TRACE, "Adding plugin {} to event {}", child.id(), entity.id());
                     let mut sequences = world.write_component::<Sequence>();
                     if let Some(sequence) = sequences.get_mut(entity) {
-                        sequence.add(entity);
+                        sequence.add(child);
                     } else {
-                        let sequence = Sequence::from(vec![entity]);
+                        let sequence = Sequence::from(vec![child]);
                         sequences
                             .insert(entity, sequence)
                             .expect("should be able to insert");

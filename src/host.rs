@@ -14,8 +14,8 @@ use tracing::{event, Level};
 use crate::{
     plugins::{CancelThunk, EventRuntime},
     project::{
-        CompletedPluginListener, ErrorContextListener, OperationListener, RunmdListener,
-        StartCommandListener, RunmdFile,
+        CompletedPluginListener, ErrorContextListener, OperationListener, RunmdFile, RunmdListener,
+        StartCommandListener,
     },
     Engine, Event, LifecycleOptions, Project, ThunkContext, Workspace,
 };
@@ -48,7 +48,7 @@ pub mod async_ext;
 #[clap(arg_required_else_help = true)]
 pub struct Host {
     /// Root directory, defaults to current directory
-    /// 
+    ///
     #[clap(long)]
     pub root: Option<PathBuf>,
     /// URL to .runmd file used to configure this host,
@@ -164,14 +164,14 @@ impl Host {
                         Some(host)
                     } else {
                         event!(Level::ERROR, "Tenant and host are required");
-                        None 
+                        None
                     }
                 }
                 Err(err) => {
                     event!(Level::ERROR, "Could not parser workspace uri, {err}");
                     None
                 }
-            }
+            },
             Self { url: Some(url), .. } => match Host::get::<P>(url).await {
                 Ok(mut host) => {
                     host.command = command;
@@ -444,7 +444,7 @@ impl Host {
     where
         P: Project,
     {
-        let workspace = Workspace::new(host.as_ref(), root); 
+        let workspace = Workspace::new(host.as_ref(), root);
         let mut workspace = workspace.tenant(tenant.as_ref());
 
         if let Some(path) = path {
@@ -457,25 +457,31 @@ impl Host {
         match std::fs::read_dir(workspace.work_dir()) {
             Ok(readdir) => {
                 for entry in readdir.filter_map(|e| match e {
-                    Ok(entry) => {
-                        match entry.path().extension() {
-                            Some(ext)  if ext == "runmd" && !entry.file_name().is_empty() => {
-                                Some(entry.file_name().to_str().expect("should be a string").trim_end_matches(".runmd").to_string())
-                            },
-                            _ => None
-                        }
+                    Ok(entry) => match entry.path().extension() {
+                        Some(ext) if ext == "runmd" && !entry.file_name().is_empty() => Some(
+                            entry
+                                .file_name()
+                                .to_str()
+                                .expect("should be a string")
+                                .trim_end_matches(".runmd")
+                                .to_string(),
+                        ),
+                        _ => None,
                     },
                     Err(err) => {
                         event!(Level::ERROR, "Could not get entry {err}");
                         None
-                    },
+                    }
                 }) {
-                    files.push(RunmdFile { symbol: entry });
+                    files.push(RunmdFile {
+                        symbol: entry,
+                        source: None,
+                    });
                 }
-            },
+            }
             Err(err) => {
                 event!(Level::ERROR, "Error reading work directory {err}");
-            },
+            }
         }
 
         let mut host = Self {
@@ -484,7 +490,7 @@ impl Host {
             runmd_path: None,
             url: None,
             command: None,
-            world: Some(P::compile_workspace(workspace, files)),
+            world: Some(P::compile_workspace(&workspace, files.iter())),
         };
 
         host.link_sequences();

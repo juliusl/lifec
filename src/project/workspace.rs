@@ -7,6 +7,9 @@ use tracing::{event, Level};
 mod create;
 pub use create::Create;
 
+mod config;
+pub use config::Config as WorkspaceConfig;
+
 /// Struct for managing a complex runmd project,
 ///
 /// For small projects consisting of a single runmd file, the default Host is good enough.
@@ -38,6 +41,10 @@ pub struct Workspace {
     work_dir: PathBuf,
     /// Root directory
     root: Option<PathBuf>,
+    /// Content of the root runmd file of the workspace,
+    root_runmd: Option<String>,
+    /// Use this list of tags when generating an engine
+    use_tags: Option<Vec<String>>,
     /// Name of the host,
     host: String,
     /// Name of the tenant,
@@ -52,17 +59,39 @@ impl Workspace {
     pub fn new(host: impl AsRef<str>, root: Option<PathBuf>) -> Self {
         let work_dir = root
             .clone()
-            .unwrap_or(PathBuf::from("."))
+            .unwrap_or(PathBuf::from(""))
             .join(".world")
             .join(host.as_ref());
 
         Self {
             work_dir: work_dir.to_path_buf(),
             root,
+            root_runmd: None,
+            use_tags: None,
             host: host.as_ref().to_string(),
             tenant: None,
             path: None,
         }
+    }
+
+    /// Sets the root runmd content for this workspace,
+    ///
+    pub fn set_root_runmd(&mut self, runmd: impl AsRef<str>) {
+        self.root_runmd = Some(runmd.as_ref().to_string());
+    }
+
+    /// Returns the root runmd to use for this workspace,
+    ///
+    pub fn root_runmd(&self) -> Option<String> {
+        self.root_runmd.clone()
+    }
+
+    /// Returns a clone with tags,
+    ///
+    pub fn use_tags(&self, tags: Vec<impl AsRef<str>>) -> Self {
+        let mut clone = self.clone();
+        clone.use_tags = Some(tags.iter().map(|t| t.as_ref().to_string()).collect());
+        clone
     }
 
     /// Returns the identity uri for the current workspace context for a block,
@@ -75,7 +104,7 @@ impl Workspace {
                 block.symbol()
             )),
             (host, Some(tenant), None) if block.name().is_empty() => {
-                Some(format!("{}.control.{tenant}.{host}", block.symbol()))
+                Some(format!("{}.{tenant}.{host}", block.symbol()))
             }
             (host, Some(tenant), Some(path)) if !block.name().is_empty() => Some(format!(
                 "{}.{}.{tenant}.{host}/{path}",
@@ -84,7 +113,7 @@ impl Workspace {
             )),
 
             (host, Some(tenant), Some(path)) if block.name().is_empty() => {
-                Some(format!("{}.control.{tenant}.{host}/{path}", block.symbol()))
+                Some(format!("{}.{tenant}.{host}/{path}", block.symbol()))
             }
             _ => None,
         }
@@ -96,7 +125,7 @@ impl Workspace {
         let work_dir = self
             .root
             .clone()
-            .unwrap_or(PathBuf::from("."))
+            .unwrap_or(PathBuf::from(""))
             .join(".world")
             .join(self.host.as_str())
             .join(tenant.as_ref());
@@ -104,6 +133,8 @@ impl Workspace {
         Self {
             work_dir,
             root: self.root.clone(),
+            root_runmd: None,
+            use_tags: None,
             host: self.host.to_string(),
             tenant: Some(tenant.as_ref().to_string()),
             path: None,
@@ -117,7 +148,7 @@ impl Workspace {
             let work_dir = self
                 .root
                 .clone()
-                .unwrap_or(PathBuf::from("."))
+                .unwrap_or(PathBuf::from(""))
                 .join(".world")
                 .join(self.host.as_str())
                 .join(tenant.as_str())
@@ -126,6 +157,8 @@ impl Workspace {
             Some(Self {
                 work_dir,
                 root: self.root.clone(),
+                root_runmd: None,
+                use_tags: None,
                 host: self.host.to_string(),
                 tenant: Some(tenant.to_string()),
                 path: Some(path.as_ref().to_string()),
@@ -164,7 +197,7 @@ fn test_workspace_paths() {
     let tenant = workspace.tenant("test");
     assert_eq!(&PathBuf::from(".world/lifec.io/test"), tenant.work_dir());
     assert_eq!(
-        Some("workspace.control.test.lifec.io".to_string()),
+        Some("workspace.test.lifec.io".to_string()),
         tenant.identity_uri(parser.get_block("", "workspace"))
     );
 
@@ -179,4 +212,102 @@ fn test_workspace_paths() {
         Some("try.workspace.test.lifec.io/tester".to_string()),
         path.identity_uri(parser.get_block("try", "workspace"))
     );
+}
+
+mod tests {
+    use crate::Project;
+
+    struct Test;
+
+    impl Project for Test {
+        fn interpret(_: &specs::World, _: &reality::Block) {
+            // no-op
+        }
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn test_compile_workspace() {
+        use crate::{project::RunmdFile, Workspace};
+        use atlier::system::{Attribute, Value};
+        use reality::Block;
+        use reality::BlockProperty;
+        use specs::WorldExt;
+
+        let mut workspace = Workspace::new("test.io", None);
+        workspace.set_root_runmd(
+            r#"
+        ```
+        # Test that the default name is Test
+        + .config print.test
+        : name .symbol Test
+
+        # Test that the tagged version is Test2
+        + test .config print.test
+        : name .symbol Test2
+        ```
+        "#,
+        );
+
+        let test_engine = RunmdFile {
+            symbol: String::from("test"),
+            source: Some(String::from(
+                r#"
+            ```
+            + .engine
+            : .event    print
+            : .once     setup
+            : .start    receive, cancel
+            : .select   execute
+            : .exit
+            ```
+
+            ``` print
+            + .runtime
+            : .println hello world and {name}
+            : .fmt name
+            ```
+            "#,
+            )),
+        };
+
+        let files = vec![test_engine];
+
+        // Test with no tags
+        let world = Test::compile_workspace(&workspace, files.iter());
+
+        let root_ent = world.entities().entity(0);
+        let root = world.read_component::<Block>();
+        let root = root.get(root_ent).expect("should have a root block");
+
+        let indexes = root.index();
+
+        let default = indexes.get(0).expect("should have index");
+        assert_eq!(
+            default.root(),
+            &Attribute::new(0, "config", Value::Symbol("print.test".to_string()))
+        );
+        assert_eq!(
+            default.find_property("name"),
+            Some(BlockProperty::Single(Value::Symbol("Test".to_string())))
+        );
+
+        let default = indexes.get(1).expect("should have index");
+        assert_eq!(
+            default.root(),
+            &Attribute::new(0, "test.config", Value::Symbol("print.test".to_string()))
+        );
+        assert_eq!(
+            default.find_property("name"),
+            Some(BlockProperty::Single(Value::Symbol("Test2".to_string())))
+        );
+
+        // Test with tags
+        let world = Test::compile_workspace(
+            &workspace.use_tags(vec!["test"]), 
+            files.iter()
+        );
+        // TODO: Add asserts
+        // 
+    }
 }

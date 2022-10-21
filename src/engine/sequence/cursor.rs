@@ -1,19 +1,14 @@
-use specs::Entity;
-
+use specs::{Entity, Component, DenseVecStorage};
 
 /// Enumeration of cursor types for a sequence,
 /// 
-#[derive(Debug, Clone)]
+#[derive(Component, Debug, Clone)]
+#[storage(DenseVecStorage)]
 pub enum Cursor {
-    /// Cursor that creates only 1 branch,
+    /// Cursor that points to one other entity,
     /// 
     Next(Entity),
-    /// Cursor that points to many branches, 
+    /// Cursor that points to many entities, 
     /// 
     Fork(Vec<Entity>),
-    /// Cursor that starts multiple branches that share a cancel token, 
-    /// 
-    /// The first branch to complete will cancel the other branches,
-    /// 
-    Select(Vec<Entity>),
 }

@@ -13,6 +13,7 @@ pub use thunk_context::ThunkContext;
 
 use super::Plugin;
 use tokio::task::JoinHandle;
+use std::fmt::Debug;
 
 /// Thunk is a function that can be passed around for the system to call later
 #[derive(Component, Clone)]
@@ -35,6 +36,18 @@ pub struct Config(
     /// config fn
     pub fn(&mut ThunkContext),
 );
+
+impl Debug for Thunk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Thunk").field(&self.0).finish()
+    }
+}
+
+impl Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Config").field(&self.0).finish()
+    }
+}
 
 impl AsRef<Config> for Config {
     fn as_ref(&self) -> &Config {

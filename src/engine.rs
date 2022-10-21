@@ -38,6 +38,9 @@ pub use lifecycle::LifecycleResolver;
 
 mod activity;
 pub use activity::Activity;
+use tracing::Level;
+
+use self::sequence::Transition;
 
 /// An engine is a sequence of events, this component manages
 /// sequences of events
@@ -82,13 +85,16 @@ pub struct Engine {
     /// Pointer to the start of the engine sequence
     ///
     start: Option<Entity>,
+    /// Vector of transitions
+    /// 
+    transitions: Vec<(Transition, Vec<String>)>,
 }
 
 impl Engine {
     /// Creates a new engine component w/ start,
     ///
     pub fn new(start: Entity) -> Self {
-        Self { start: Some(start) }
+        Self { start: Some(start), transitions: vec![] }
     }
 
     /// Starts an engine,
@@ -124,15 +130,68 @@ impl SpecialAttribute for Engine {
     }
 
     fn parse(parser: &mut AttributeParser, _todo: impl AsRef<str>) {
-        // Event types
-        parser.with_custom::<Event>();
-        parser.with_custom::<Once>();
-        // Lifecycle options
-        parser.with_custom::<Exit>();
-        parser.with_custom::<Next>();
-        parser.with_custom::<Fork>();
-        parser.with_custom::<Repeat>();
-        parser.with_custom::<Loop>();
+        if let Some(entity) = parser.entity() {
+            // Event types
+            parser.with_custom::<Event>();
+
+            let world = parser.world().expect("should have a world");
+            world
+                .write_component()
+                .insert(entity, Engine::default())
+                .expect("should be able to insert");
+
+            parser.add_custom_with("once", |p, events| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world"); 
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+                
+                engine.transitions.push((Transition::Once, Self::parse_idents(events)));
+            });
+
+            parser.add_custom_with("start", |p, events| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world"); 
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+                
+                engine.transitions.push((Transition::Start, Self::parse_idents(events)));
+            });
+
+            parser.add_custom_with("select", |p, events| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world"); 
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+                
+                engine.transitions.push((Transition::Select, Self::parse_idents(events)));
+            });
+
+            parser.add_custom_with("spawn", |p, events| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world"); 
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+                
+                engine.transitions.push((Transition::Spawn, Self::parse_idents(events)));
+            });
+
+            parser.add_custom_with("buffer", |p, events| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world"); 
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+                
+                engine.transitions.push((Transition::Buffer, Self::parse_idents(events)));
+            });
+
+            // Lifecycle options
+            parser.with_custom::<Exit>();
+            parser.with_custom::<Next>();
+            parser.with_custom::<Fork>();
+            parser.with_custom::<Repeat>();
+            parser.with_custom::<Loop>();
+        }
     }
 }
 
@@ -153,6 +212,11 @@ impl Interpreter for Engine {
 
         if block.is_control_block() {
             let block_entity = world.entities().entity(block.entity());
+
+            if let Some(engine) = world.read_component::<Engine>().get(block_entity) {
+                tracing::event!(Level::TRACE, "{:#?}", engine);
+            }
+
             world
                 .write_component()
                 .insert(block_entity, self.clone())

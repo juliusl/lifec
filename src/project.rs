@@ -38,6 +38,7 @@ pub use source::Source;
 
 mod workspace;
 pub use workspace::Workspace;
+use workspace::WorkspaceConfig;
 
 /// Trait to facilitate
 ///
@@ -84,43 +85,52 @@ pub trait Project {
     ///
     /// In this context the root block can only be defined within in the .runmd file in the directory.
     ///
-    fn compile_workspace(workspace: Workspace, files: Vec<RunmdFile>) -> World {
-        let mut parser = Self::parser();
+    fn compile_workspace<'a>(
+        workspace: &Workspace,
+        files: impl Iterator<Item = &'a RunmdFile>,
+    ) -> World {
+        let mut parser = Self::parser().with_special_attr::<WorkspaceConfig>();
 
-        for RunmdFile { symbol } in files {
+        for RunmdFile { symbol, source } in files {
             parser.set_implicit_symbol(&symbol);
 
-            let file = workspace.work_dir().join(format!("{symbol}.runmd"));
-            match  std::fs::read_to_string(&file) {
-                Ok(runmd) => {
-                    parser = parser.parse(runmd);
-                },
-                Err(err) => {
-                    event!(Level::ERROR, "Could not read file {:?} {err}", file);
-                },
+            if let Some(runmd) = source {
+                parser = parser.parse(runmd);
+            } else {
+                let file = workspace.work_dir().join(format!("{symbol}.runmd"));
+                match std::fs::read_to_string(&file) {
+                    Ok(runmd) => {
+                        parser = parser.parse(runmd);
+                    }
+                    Err(err) => {
+                        event!(Level::ERROR, "Could not read file {:?} {err}", file);
+                    }
+                }
             }
         }
 
         // Parse the root file without the implicit symbol set
         parser.unset_implicit_symbol();
 
-        let root = workspace.work_dir().join(".runmd");
-        match std::fs::read_to_string(&root) {
-            Ok(runmd) => {
-                let world = Self::compile(runmd, Some(parser), false);
-                
-                // Enable workspace on any thunk context in the World
-                // TODO: Pivot thunk context build to Event
-                for tc in world.write_component::<ThunkContext>().as_mut_slice() {
-                    tc.enable_workspace(workspace.clone());
+        let world = if let Some(root_runmd) = workspace.root_runmd() {
+            Self::compile(root_runmd, Some(parser), false)
+        } else {
+            let root = workspace.work_dir().join(".runmd");
+            match std::fs::read_to_string(&root) {
+                Ok(runmd) => Self::compile(runmd, Some(parser), false),
+                Err(err) => {
+                    panic!("Could not compile workspace, root .runmd file required, {err}");
                 }
-                
-                return world;
             }
-            Err(err) => {
-                panic!("Could not compile workspace, root .runmd file required, {err}");
-            },
+        };
+
+        // Enable workspace on any thunk context in the World
+        // TODO: Pivot thunk context build to Event
+        for tc in world.write_component::<ThunkContext>().as_mut_slice() {
+            tc.enable_workspace(workspace.clone());
         }
+
+        return world;
     }
 
     /// Compiles runmd into blocks, interprets those blocks,
@@ -206,6 +216,7 @@ pub trait Project {
             world.insert(settings);
         }
 
+        world.maintain();
         world
     }
 

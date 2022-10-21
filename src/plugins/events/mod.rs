@@ -383,9 +383,6 @@ impl<'a> System<'a> for EventRuntime {
                                                         dispatch_queue.push((*cursor, thunk_context.clone()));
                                                     }
                                                 },
-                                                crate::Cursor::Select(_) => {
-                                                    todo!()
-                                                }
                                             }
                                         } else {
                                             // Since there isn't a cursor, the lifecycle option decides what should happen next
