@@ -1,8 +1,7 @@
 use super::{List, Task};
-use crate::*;
-use crate::{engine::Connection, plugins::*};
+use crate::prelude::*;
 
-use atlier::system::WindowEvent;
+use atlier::system::{WindowEvent, Extension};
 use imgui::{Condition, Slider, StyleVar, Ui, Window};
 use specs::{Join, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};

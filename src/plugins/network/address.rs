@@ -1,19 +1,10 @@
 use bytemuck::cast;
-use specs::Component;
-use specs::DenseVecStorage;
-use specs::World;
-use specs::WorldExt;
 use std::hash::Hash;
 use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::net::Ipv6Addr;
 use std::net::SocketAddr;
-use tracing::event;
-use tracing::Level;
-
-use crate::AttributeIndex;
-use crate::plugins::Proxy;
-use crate::plugins::ThunkContext;
+use crate::prelude::*;
 
 /// Address component, that compacts a connection between two blocks
 ///
@@ -579,7 +570,7 @@ impl BlockAddress {
 
 #[test]
 fn test_block_address() {
-    use crate::AttributeGraph;
+    use crate::state::AttributeGraph;
     
     let graph = AttributeGraph::default();
     let mut addr = BlockAddress::new(&graph);
@@ -624,7 +615,7 @@ fn test_block_address() {
 
 #[test]
 fn test_block_connection() {
-    use crate::AttributeGraph;
+    use crate::state::AttributeGraph;
     let ip_v4_a = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 50871);
     let ip_v4_b = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 58237);
     let ip_v6_a = SocketAddr::new(

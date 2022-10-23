@@ -1,6 +1,6 @@
 use specs::{System, ReadStorage, DispatcherBuilder};
 
-use crate::Engine;
+use crate::prelude::*;
 use super::Events;
 
 pub fn install(dispatcher_builder: &mut DispatcherBuilder) {

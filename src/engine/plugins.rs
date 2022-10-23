@@ -2,52 +2,37 @@ use std::{collections::HashMap, ops::Deref};
 
 use reality::Block;
 use specs::{prelude::*, Entities, Entity, Read, ReadStorage, SystemData};
-use tokio::{
-    runtime::Handle,
-    select,
-    sync::{mpsc::Sender, oneshot},
-};
+use tokio::{runtime::Handle, select, sync::oneshot};
 
-use crate::{
-    prelude::{EventRuntime, StatusUpdate},
-    AttributeGraph, Operation, SecureClient, Sequence, Start, Thunk, ThunkContext, Workspace, project::RunmdFile,
-};
+use crate::prelude::*;
+
+mod listener;
+pub use listener::Listener as PluginListener;
+
+mod broker;
+pub use broker::Broker as PluginBroker;
 
 /// System data with plugin feature resources,
-/// 
+///
 #[derive(SystemData)]
 pub struct PluginFeatures<'a>(
     Read<'a, Option<Workspace>>,
     Read<'a, tokio::runtime::Runtime, EventRuntime>,
     Read<'a, SecureClient, EventRuntime>,
-    Read<'a, Sender<StatusUpdate>, EventRuntime>,
-    Read<'a, Sender<RunmdFile>, EventRuntime>,
-    Read<'a, Sender<Operation>, EventRuntime>,
-    Read<'a, Sender<Start>, EventRuntime>,
+    PluginBroker<'a>,
 );
 
 impl<'a> PluginFeatures<'a> {
     /// Enables features on a thunk context,
-    /// 
+    ///
     pub fn enable(&self, entity: Entity, context: &ThunkContext) -> ThunkContext {
-        let PluginFeatures(
-            workspace,
-            runtime,
-            client,
-            status_sender,
-            runmd_sender,
-            operation_sender,
-            start_sender,
-        ) = self;
+        let PluginFeatures(workspace, runtime, client, sender) = self;
 
         let mut context = context.enable_async(entity, runtime.handle().clone());
 
-        context
-            .enable_https_client(client.deref().clone())
-            .enable_dispatcher(runmd_sender.deref().clone())
-            .enable_operation_dispatcher(operation_sender.deref().clone())
-            .enable_status_updates(status_sender.deref().clone())
-            .enable_start_command_dispatcher(start_sender.deref().clone());
+        context.enable_https_client(client.deref().clone());
+
+        sender.enable(&mut context);
 
         if let Some(workspace) = workspace.as_ref() {
             context.enable_workspace(workspace.clone());

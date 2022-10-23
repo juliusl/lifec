@@ -1,7 +1,5 @@
-use reality::{BlockObject, BlockProperties};
-use tracing::{event, Level};
 
-use crate::{AttributeIndex, Plugin};
+use crate::prelude::*;
 
 /// Simple plugin that hosts a file and waits for a connection,
 ///
@@ -13,7 +11,7 @@ impl Plugin for Publish {
         "publish"
     }
 
-    fn call(context: &crate::ThunkContext) -> Option<crate::AsyncContext> {
+    fn call(context: &ThunkContext) -> Option<AsyncContext> {
         context.task(|mut cancel_source| {
             let tc = context.clone();
             async move {
@@ -66,8 +64,7 @@ impl BlockObject for Publish {
 }
 
 mod tests {
-
-    use crate::Project;
+    use crate::prelude::*;
 
     struct Test;
 
@@ -79,8 +76,6 @@ mod tests {
     #[tracing_test::traced_test]
     async fn test_publish() {
         use std::path::PathBuf;
-        use crate::{AttributeIndex, Host, ThunkContext};
-        use specs::WorldExt;
 
         // Define an engine that calls the plugin
         let mut host = Host::load_content::<Test>(

@@ -5,18 +5,13 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-
-use atlier::system::Value;
 use logos::Logos;
 use notify::{
     recommended_watcher, Config, ErrorKind, Event, EventHandler, PollWatcher, RecommendedWatcher,
     Watcher,
 };
-use reality::{BlockObject, BlockProperties};
-use tokio::select;
-use tracing::{event, Level};
 
-use crate::{AttributeIndex, Plugin};
+use crate::prelude::*;
 
 use self::{access::Access, create::Create, modify::Modify, remove::Remove};
 
@@ -64,7 +59,7 @@ impl Plugin for Watch {
         "`notify` is mostly cross plat, but might run into issues on emulated environments"
     }
 
-    fn call(context: &crate::ThunkContext) -> Option<crate::AsyncContext> {
+    fn call(context: &ThunkContext) -> Option<AsyncContext> {
         context.task(|cancel_source| {
             let tc = context.clone();
             async {

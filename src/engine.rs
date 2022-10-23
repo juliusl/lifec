@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-use std::fmt::Debug;
 
-use crate::{AttributeParser, Block, Interpreter, SpecialAttribute};
-use specs::{Component, Entity, VecStorage, World, WorldExt};
+use std::collections::HashMap;
+
+use crate::prelude::*;
 
 mod event;
 pub use event::Event;
@@ -375,8 +374,6 @@ impl Interpreter for Engine {
 
 #[test]
 fn test_engine() {
-    // TODO: Write assertions
-    use crate::*;
     use specs::WorldExt;
 
     let mut runtime = Runtime::default();

@@ -1,18 +1,8 @@
 use std::{path::PathBuf, process::Stdio};
-
-use atlier::system::Value;
 use reality::Documentation;
-use crate::{AttributeParser, BlockObject, BlockProperties, CustomAttribute};
-use specs::{Component, DenseVecStorage};
-use tokio::{select, task::JoinHandle, io::{BufReader, AsyncBufReadExt}};
+use tokio::{io::{BufReader, AsyncBufReadExt}, select};
 
-use crate::{
-    plugins::{thunks::CancelToken, Plugin, ThunkContext},
-    AttributeIndex,
-};
-
-use tracing::event;
-use tracing::Level;
+use crate::prelude::*;
 
 /// The process component executes a command and records the output
 /// 
@@ -101,7 +91,7 @@ impl Plugin for Process {
         });
     }
 
-    fn call(context: &super::ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
+    fn call(context: &super::ThunkContext) -> Option<AsyncContext> {
         let clone = context.clone();
         clone.clone().task(|cancel_source| {
             let mut tc = context.clone();

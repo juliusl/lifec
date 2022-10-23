@@ -6,7 +6,7 @@ use specs::{DenseVecStorage, Entities, ReadStorage, System};
 use tokio::task::JoinHandle;
 use tracing::{event, Level};
 
-use crate::AttributeIndex;
+use crate::prelude::*;
 
 use super::{CancelThunk, ErrorContext, Event, EventRuntime, ThunkContext};
 

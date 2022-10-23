@@ -1,8 +1,6 @@
 use std::io::BufRead;
 
-use crate::{AttributeIndex, Plugin};
-use atlier::system::Value;
-use reality::{BlockObject, BlockProperties};
+use crate::prelude::*;
 
 /// Plugin that reads a line from stdin,
 ///
@@ -14,7 +12,7 @@ impl Plugin for Readln {
         "readln"
     }
 
-    fn call(context: &crate::ThunkContext) -> Option<crate::AsyncContext> {
+    fn call(context: &ThunkContext) -> Option<AsyncContext> {
         context.task(|_| {
             let mut tc = context.clone();
             async {

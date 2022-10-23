@@ -3,7 +3,7 @@ use std::time::Duration;
 use specs::{Dispatcher, WorldExt};
 use tokio::time::Instant;
 
-use crate::Host;
+use crate::prelude::*;
 
 /// Async version of host fn's,
 ///

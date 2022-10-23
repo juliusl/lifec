@@ -1,14 +1,4 @@
-use std::collections::HashMap;
-
-use atlier::system::{App, Extension};
-use specs::{Entities, Join, ReadStorage, System, WorldExt, WriteStorage};
-
-use crate::{
-    editor::{ProgressStatusBar, StartButton, Task},
-    engine::Connection,
-    prelude::CancelThunk,
-    AttributeIndex, Event, Host, RuntimeEditor, ThunkContext, Events, Workspace,
-};
+use crate::{prelude::*, editor::{ProgressStatusBar, Task, StartButton}};
 
 /// Extension trait for Host, that provides functions for opening a GUI editor,
 ///

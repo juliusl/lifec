@@ -1,8 +1,7 @@
 use rust_embed::RustEmbed;
-use tracing::{event, Level};
 use std::path::PathBuf;
 
-use crate::{plugins::ThunkContext, AttributeIndex};
+use crate::prelude::*;
 
 /// Handles unpacking resources for a `RustEmbed` source
 /// 

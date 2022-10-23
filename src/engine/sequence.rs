@@ -3,9 +3,7 @@ use std::fmt::Display;
 use specs::storage::DefaultVecStorage;
 use specs::{Component, Entity};
 
-use crate::Cursor;
-
-use super::Connection;
+use crate::prelude::*;
 
 /// A component for a collection of entities that are processed in sequence,
 /// 

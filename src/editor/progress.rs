@@ -1,11 +1,10 @@
-use atlier::system::{App, Extension};
+use atlier::system::Extension;
 use specs::storage::HashMapStorage;
 use specs::{Component, WorldExt};
 use std::cmp::min;
 use std::fmt::Write;
 
-use crate::plugins::{EventRuntime, StatusUpdate};
-use crate::{AttributeGraph, AttributeIndex};
+use crate::plugins::StatusUpdate;
 
 #[derive(Component, Clone, Default)]
 #[storage(HashMapStorage)]

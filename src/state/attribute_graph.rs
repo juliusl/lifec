@@ -5,9 +5,7 @@ use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     hash::{Hash, Hasher},
 };
-use tracing::{event, Level};
-
-use crate::{BlockIndex, BlockProperty, AttributeIndex};
+use crate::prelude::*;
 
 /// Wrapper struct over a block index,
 /// 

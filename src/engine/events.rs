@@ -1,10 +1,6 @@
 use specs::{prelude::*, Entities, SystemData};
 
-use crate::{
-    prelude::ErrorContext, AttributeIndex, Connection, Cursor, Event, Operation, Sequence,
-    ThunkContext,
-};
-
+use crate::prelude::*;
 use super::{Limit, Plugins, Transition};
 
 use tracing::{event, Level};

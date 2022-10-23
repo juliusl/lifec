@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
-use lifec::{Host, Inspector, Project, Start, Editor};
+use lifec::prelude::*;
+
 use tracing_subscriber::EnvFilter;
 
 /// Simple program for parsing runmd into a World
@@ -43,7 +44,7 @@ async fn main() {
 
             match c {
                 Commands::Start(start) => {
-                    host.set_command(lifec::Commands::Start(start));
+                    host.set_command(lifec::host::Commands::Start(start));
                     let mut host = host
                         .create_host::<Lifec>()
                         .await
@@ -51,7 +52,7 @@ async fn main() {
                     host.handle_start::<Lifec>();
                 }
                 Commands::Host(Host {
-                    command: Some(lifec::Commands::Open),
+                    command: Some(lifec::host::Commands::Open),
                     ..
                 }) => {
                     let host = host
@@ -127,7 +128,7 @@ enum Commands {
 }
 
 impl Project for Lifec {
-    fn interpret(_world: &lifec::World, _block: &lifec::Block) {
+    fn interpret(_world: &World, _block: &Block) {
         // No-op
     }
 }

@@ -341,12 +341,7 @@ impl<'a> System<'a> for ProxyRuntime {
 
 #[test]
 fn test_proxy_runtime() {
-    use specs::World;
-    use specs::WorldExt;
-    use specs::DispatcherBuilder;
-    use atlier::system::Extension;
-    use crate::plugins::network::NetworkRuntime;
-    use crate::AttributeIndex;
+    use crate::prelude::*;
     
     let mut test_world = World::new();
     let test_world = &mut test_world;

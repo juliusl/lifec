@@ -1,12 +1,6 @@
 use std::time::Duration;
 
-use crate::{
-    plugins::{AsyncContext, ThunkContext},
-    Plugin, Thunk, AttributeIndex,
-};
-use specs::{Component, VecStorage};
-use tokio::{runtime::Handle, select, sync::oneshot::Receiver};
-use tracing::{event, Level};
+use crate::prelude::*;
 
 /// An operation encapsulates an async task and it's context
 /// Where the result of the task is the next version of the context.
@@ -131,7 +125,7 @@ impl Operation {
     ///
     /// **Note** If None is returned, that implies that self.context is the latest state
     ///
-    pub async fn task(&mut self, cancel_source: Receiver<()>) -> Option<ThunkContext> {
+    pub async fn task(&mut self, cancel_source: tokio::sync::oneshot::Receiver<()>) -> Option<ThunkContext> {
         if let Some((task, cancel)) = self.task.take() {
             select! {
                 r = task => {

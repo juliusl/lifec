@@ -1,4 +1,4 @@
-use crate::{AttributeIndex, ThunkContext};
+use crate::prelude::*;
 
 /// Attribute Index interface for thunk context,
 ///

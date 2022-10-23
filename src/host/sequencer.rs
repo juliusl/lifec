@@ -1,10 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::engine::Limit;
-use crate::{Connection, Cursor};
-use crate::{Engine, Event, Host, Sequence};
-use reality::Block;
-use specs::{Entities, Entity, Join, Read, ReadStorage, WriteStorage};
+use crate::prelude::*;
 
 /// Extension of Host to handle linking engine sequences together
 ///
@@ -133,7 +129,7 @@ impl Sequencer for Host {
 }
 
 mod test {
-    use crate::Project;
+    use crate::prelude::Project;
 
     struct Test;
     impl Project for Test {
@@ -145,7 +141,7 @@ mod test {
     #[test]
     #[tracing_test::traced_test]
     fn test_sequencer() {
-        let _ = crate::Host::load_content::<Test>(
+        let _ = crate::prelude::Host::load_content::<Test>(
             r#"
         ``` test
         + .engine

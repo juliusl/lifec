@@ -9,16 +9,7 @@ use std::{
     str::{from_utf8, FromStr},
     sync::Arc,
 };
-use tracing::{event, Level};
-
-use crate::{
-    plugins::{CancelThunk, EventRuntime},
-    project::{
-        CompletedPluginListener, ErrorContextListener, OperationListener, RunmdFile, RunmdListener,
-        StartCommandListener,
-    },
-    Engine, Event, Project, ThunkContext, Workspace,
-};
+use crate::prelude::*;
 
 mod inspector;
 pub use inspector::Inspector;
@@ -668,14 +659,14 @@ impl AsMut<World> for Host {
 mod test {
     struct Test;
 
-    impl crate::Project for Test {
+    impl crate::project::Project for Test {
         fn interpret(_world: &specs::World, _block: &reality::Block) {}
     }
 
     #[test]
     #[tracing_test::traced_test]
     fn test_host() {
-        use crate::{Commands, Host};
+        use crate::prelude::{Commands, Host};
         let mut host = Host::load_content::<Test>(
             r#"
         ``` repeat
@@ -710,7 +701,7 @@ mod test {
 
         eprintln!("{:?}", uri.host().unwrap().split_once("."));
 
-        use crate::{Commands, Host};
+        use crate::prelude::{Commands, Host};
         let mut host = Host::open::<Test>("examples/hello_runmd/.runmd")
             .await
             .expect("should load");

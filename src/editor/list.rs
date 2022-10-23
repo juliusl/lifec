@@ -1,13 +1,10 @@
-use crate::editor::*;
+
 use crate::engine::Connection;
 use crate::plugins::*;
-use crate::DenseVecStorage;
-use crate::*;
 use atlier::system::WindowEvent;
-use imgui::MenuItem;
 use imgui::TableFlags;
-use imgui::TreeNodeFlags;
 use imgui::Ui;
+use crate::prelude::*;
 
 /// List-layout widget for thunk_context's
 #[derive(Component)]
