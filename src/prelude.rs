@@ -7,6 +7,8 @@ pub use crate::engine::EventStatus;
 pub use crate::engine::Events;
 pub use crate::engine::Limit;
 pub use crate::engine::PluginFeatures;
+pub use crate::engine::PluginListener;
+pub use crate::engine::PluginBroker;
 pub use crate::engine::Plugins;
 pub use crate::engine::Sequence;
 pub use crate::engine::Activity;

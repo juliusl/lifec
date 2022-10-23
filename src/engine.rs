@@ -21,8 +21,10 @@ mod cursor;
 pub use cursor::Cursor;
 
 mod plugins;
-pub use plugins::Plugins;
 pub use plugins::PluginFeatures;
+pub use plugins::PluginListener;
+pub use plugins::PluginBroker;
+pub use plugins::Plugins;
 
 mod events;
 pub use events::EventStatus;
