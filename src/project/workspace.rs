@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use crate::prelude::*;
+use std::path::PathBuf;
 
 mod create;
 pub use create::Create;
@@ -212,7 +212,7 @@ fn test_workspace_paths() {
 }
 
 mod tests {
-    use crate::prelude::*;
+    use crate::{prelude::*, project::Listener};
     struct Test;
 
     impl Project for Test {
@@ -221,8 +221,30 @@ mod tests {
         }
     }
 
+    impl Listener for Test {
+        fn create(_: &World) -> Self {
+            Test {}
+        }
+
+        fn on_runmd(&mut self, _: &RunmdFile) {}
+
+        fn on_status_update(&mut self, status_update: &StatusUpdate) {
+            event!(Level::TRACE, "Received status_update {:?}", status_update);
+        }
+
+        fn on_operation(&mut self, _: &Operation) {}
+
+        fn on_error_context(&mut self, _: &ErrorContext) {}
+
+        fn on_completed_event(&mut self, e: &Entity) {
+            event!(Level::TRACE, "Completed event - {}", e.id());
+        }
+
+        fn on_start_command(&mut self, _: &Start) {}
+    }
+
     #[test]
-    // #[tracing_test::traced_test]
+    #[tracing_test::traced_test]
     fn test_compile_workspace() {
         use atlier::system::{Attribute, Value};
         use reality::Block;
@@ -345,10 +367,12 @@ mod tests {
         }
 
         let mut host = Host::from(world);
+        host.enable_listener::<Test>();
         host.link_sequences();
 
-        let _ = host.prepare::<Test>(None);
+        let mut dispatcher = host.prepare::<Test>();
         {
+
             let mut events = host.world().system_data::<Events>();
 
             let serialized_tick = |events: &mut Events| {
@@ -391,6 +415,19 @@ mod tests {
                 println!("{:?}, {:?}", connection_state, activity);
             }
         }
+
+        // Test project listener
+        {
+            let broker = host.world().system_data::<PluginBroker>();
+
+            broker.try_send_status_update((
+                host.world().entities().create(),
+                0.0,
+                String::from("test"),
+            )).ok();
+        }
+        dispatcher.dispatch(host.world());
+        dispatcher.dispatch(host.world());
 
         // Test with tags
         // let world = Test::compile_workspace(&workspace.use_tags(vec!["test"]), files.iter());

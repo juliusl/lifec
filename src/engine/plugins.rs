@@ -7,7 +7,7 @@ use tokio::{select, sync::oneshot};
 use crate::prelude::*;
 
 mod listener;
-pub use listener::Listener as PluginListener;
+pub use listener::PluginListener as PluginListener;
 
 mod broker;
 pub use broker::Broker as PluginBroker;

@@ -5,8 +5,12 @@ pub use source::RunmdFile;
 pub use source::Source;
 
 mod workspace;
-pub use workspace::Workspace;
 use workspace::WorkspaceConfig;
+pub use workspace::Workspace;
+
+mod listener;
+pub use listener::Listener;
+pub use listener::Messages;
 
 /// Trait to facilitate
 ///
@@ -23,8 +27,8 @@ pub trait Project {
     /// Override to customize the dispatcher,
     ///
     fn configure_dispatcher(
-        _dispatcher_builder: &mut DispatcherBuilder,
-        _context: Option<ThunkContext>,
+        _world: &World,
+        _dispatcher_builder: &mut DispatcherBuilder
     ) {
     }
 
@@ -157,40 +161,9 @@ pub trait Project {
             );
         }
 
-        // Resolve lifecycle settings before returning
-        // {
-        //     let lifecycle_resolver = world.system_data::<LifecycleResolver>();
-        //     let settings = lifecycle_resolver.resolve_lifecycle();
-        //     world.insert(settings);
-        // }
-
         world.maintain();
         world
     }
-
-    /// Override to receive/handle runmd
-    ///
-    fn on_runmd(&mut self, _runmd: RunmdFile) {}
-
-    /// Override to receive/handle status updates
-    ///
-    fn on_status_update(&mut self, _status_update: StatusUpdate) {}
-
-    /// Override to receive/handle operations
-    ///
-    fn on_operation(&mut self, _operation: Operation) {}
-
-    /// Override to receive/handle errors
-    ///
-    fn on_error_context(&mut self, _error: ErrorContext) {}
-
-    /// Override to receive/handle the entity when a plugin call completes
-    ///
-    fn on_completed_plugin_call(&mut self, _entity: Entity) {}
-
-    /// Override to receive/handle start commands,
-    ///
-    fn on_start_command(&mut self, _start_command: Start) {}
 }
 
 /// Returns a basic runtime with standard plugins,

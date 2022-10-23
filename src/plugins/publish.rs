@@ -96,7 +96,7 @@ mod tests {
         );
 
         // Start the engine w/ the publish plugin
-        let mut dispatcher = host.prepare::<Test>(None);
+        let mut dispatcher = host.prepare::<Test>();
 
         let engine = host.find_start("test").expect("should have a test block");
         host.start_event(engine);

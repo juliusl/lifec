@@ -1,3 +1,7 @@
+use crate::{
+    prelude::*,
+    project::Listener,
+};
 use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
@@ -9,7 +13,6 @@ use std::{
     str::{from_utf8, FromStr},
     sync::Arc,
 };
-use crate::prelude::*;
 
 mod inspector;
 pub use inspector::Inspector;
@@ -30,6 +33,9 @@ mod editor;
 pub use editor::Editor;
 
 pub mod async_ext;
+
+mod handler;
+use handler::ListenerSetup;
 
 /// Struct for initializing and hosting the runtime as well as parsing CLI arguments,
 ///
@@ -68,6 +74,8 @@ pub struct Host {
     ///
     #[clap(skip)]
     pub world: Option<World>,
+    #[clap(skip)]
+    listener_setup: Option<ListenerSetup>,
 }
 
 /// CLI functions
@@ -82,7 +90,7 @@ impl Host {
         match self.command() {
             Some(Commands::Start(Start { id: Some(id), .. })) => {
                 event!(Level::DEBUG, "Starting engine by id {id}");
-                self.start::<P>(*id, None);
+                self.start::<P>(*id);
             }
             Some(Commands::Start(Start {
                 engine_name: Some(engine_name),
@@ -227,6 +235,15 @@ impl Host {
         dispatcher_builder.with(EventRuntime::default(), "event_runtime", &[])
     }
 
+    /// Enables a project listener on the host when the dispatcher is prepared,
+    ///
+    pub fn enable_listener<L>(&mut self)
+    where
+        L: Listener,
+    {
+        self.listener_setup = Some(ListenerSetup::new::<L>());
+    }
+
     /// Get a reference to the world,
     ///
     pub fn world_ref(&self) -> Arc<&World> {
@@ -316,6 +333,7 @@ impl Host {
             command: None,
             workspace: None,
             world: Some(P::compile(content, None, true)),
+            listener_setup: None,
         };
 
         host.link_sequences();
@@ -380,6 +398,7 @@ impl Host {
             url: None,
             command: None,
             world: Some(P::compile_workspace(&workspace, files.iter())),
+            listener_setup: None,
         };
 
         host.link_sequences();
@@ -428,16 +447,7 @@ impl Host {
         let engine_name = engine_name.as_ref();
 
         if let Some(start) = self.find_start(engine_name) {
-            // If the starting entity has a thunk context, this will be passed to the configure_dispatcher method
-            // on the project. The project can use that context to initialize listeners
-            //
-            let tc = self
-                .world()
-                .read_component::<ThunkContext>()
-                .get(start)
-                .cloned();
-
-            self.start::<P>(start.clone().id(), tc);
+            self.start::<P>(start.clone().id());
         } else {
             panic!("Did not start {engine_name}");
         }
@@ -445,13 +455,20 @@ impl Host {
 
     /// Prepares the host to start by creating a new dispatcher,
     ///
-    pub fn prepare<'a, 'b, P>(&mut self, context: Option<ThunkContext>) -> Dispatcher<'a, 'b>
+    pub fn prepare<'a, 'b, P>(&mut self) -> Dispatcher<'a, 'b>
     where
         P: Project,
     {
         let mut dispatcher = {
             let mut dispatcher = Host::dispatcher_builder();
-            P::configure_dispatcher(&mut dispatcher, context);
+            P::configure_dispatcher(self.world(), &mut dispatcher);
+
+            if let Some(setup) = self.listener_setup.as_ref() {
+                let ListenerSetup(enable) = setup;
+
+                enable(self.world(), &mut dispatcher);
+            }
+
             dispatcher.build()
         };
         dispatcher.setup(self.world_mut());
@@ -460,11 +477,11 @@ impl Host {
 
     /// Starts an event entity,
     ///
-    pub fn start<P>(&mut self, event_entity: u32, thunk_context: Option<ThunkContext>)
+    pub fn start<P>(&mut self, event_entity: u32)
     where
         P: Project,
     {
-        let mut dispatcher = self.prepare::<P>(thunk_context);
+        let mut dispatcher = self.prepare::<P>();
 
         // Starts an event
         let event = self.world().entities().entity(event_entity);
@@ -538,6 +555,7 @@ impl From<World> for Host {
             workspace: None,
             command: None,
             world: Some(world),
+            listener_setup: None,
         }
     }
 }

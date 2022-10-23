@@ -9,6 +9,8 @@ use tracing::{event, Level};
 ///
 #[derive(SystemData)]
 pub struct Events<'a>(
+    Read<'a, tokio::sync::mpsc::Sender<ErrorContext>, EventRuntime>,
+    Read<'a, tokio::sync::broadcast::Sender<Entity>, EventRuntime>,
     Plugins<'a>,
     Entities<'a>,
     ReadStorage<'a, Sequence>,
@@ -48,7 +50,7 @@ impl<'a> Events<'a> {
     /// Scans event status and returns a vector of entites w/ their status,
     ///
     pub fn scan(&self) -> Vec<EventStatus> {
-        let Events(_, entities, .., events, _, operations) = self;
+        let Events(_, _, _, entities, .., events, _, operations) = self;
 
         let mut status = vec![];
 
@@ -94,9 +96,11 @@ impl<'a> Events<'a> {
                     for next in next_entities {
                         event!(Level::DEBUG, "{} -> {}", ready.id(), next.id());
                         if let Some(error) = result.as_ref().and_then(ThunkContext::get_errors) {
-                            self.set_error_connection_state(*ready, next, error);
+                            self.set_error_connection_state(*ready, next, error.clone());
+                            self.send_error_context(error);
                         } else {
                             self.set_completed_connection_state(*ready, next);
+                            self.send_completed_event(*ready);
                             if !self.activate(next) {
                                 event!(Level::DEBUG, "Repeating event");
                                 let Events(.., limits, _, _, _) = self;
@@ -135,7 +139,7 @@ impl<'a> Events<'a> {
     /// Returns next entities this event points to,
     ///
     pub fn get_next_entities(&mut self, event: Entity) -> Vec<Entity> {
-        let Events(_, _, _, cursors, ..) = self;
+        let Events(_, _, _, _, _, cursors, ..) = self;
         if let Some(cursor) = cursors.get(event) {
             match cursor {
                 Cursor::Next(next) => {
@@ -244,7 +248,7 @@ impl<'a> Events<'a> {
     /// Starts an event immediately, cancels any ongoing operations
     ///
     pub fn start(&mut self, event: Entity, previous: Option<&ThunkContext>) {
-        let Events(plugins, _, sequences, .., operations) = self;
+        let Events(_, _, plugins, _, sequences, .., operations) = self;
 
         let sequence = sequences.get(event).expect("should have a sequence");
 
@@ -276,7 +280,7 @@ impl<'a> Events<'a> {
     /// Selects an incoming event and cancels any others,
     ///
     pub fn select(&mut self, event: Entity, previous: &ThunkContext) {
-        let Events(_, entities, .., connections, _) = self;
+        let Events(_, _, _, entities, .., connections, _) = self;
 
         let selected = previous
             .state()
@@ -294,6 +298,26 @@ impl<'a> Events<'a> {
         {
             self.cancel(*from);
         }
+    }
+}
+
+/// Functions for sending messages, 
+/// 
+impl<'a> Events<'a> {
+    /// Tries to send an error context,
+    /// 
+    pub fn send_error_context(&self, error_context: ErrorContext) {
+        let Events(errors, ..)  = self;
+
+        errors.try_send(error_context).ok();
+    }
+
+    /// Returns the event entity that just completed,
+    /// 
+    pub fn send_completed_event(&self, event: Entity) {
+        let Events(_, completed, ..) = self;
+
+        completed.send(event).ok();
     }
 }
 
