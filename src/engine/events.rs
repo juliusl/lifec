@@ -5,7 +5,7 @@ use crate::{
     ThunkContext,
 };
 
-use super::{Plugins, Transition};
+use super::{Plugins, Transition, Limit};
 
 use tracing::{event, Level};
 
@@ -18,6 +18,7 @@ pub struct Events<'a>(
     ReadStorage<'a, Sequence>,
     ReadStorage<'a, Cursor>,
     ReadStorage<'a, Transition>,
+    WriteStorage<'a, Limit>,
     WriteStorage<'a, Event>,
     WriteStorage<'a, Connection>,
     WriteStorage<'a, Operation>,
@@ -98,7 +99,16 @@ impl<'a> Events<'a> {
                         if let Some(error) = result.as_ref().and_then(ThunkContext::get_errors) {
                             self.set_error_connection_state(*ready, next, error);
                         } else {
-                            self.activate(next);
+                            if !self.activate(next) {
+                                event!(Level::DEBUG, "Reentering event");
+                                let Events(.. , limits, _, _, _) = self;
+                                if let Some(limit) = limits.get_mut(next) {
+                                    if !limit.take_one() {
+                                        event!(Level::DEBUG, "Limit reached for {}", next.id());
+                                        return;
+                                    }
+                                }
+                            }
                             self.transition(result.as_ref(), next);
                         }
                     }
@@ -181,14 +191,14 @@ impl<'a> Events<'a> {
         }
     }
 
-    /// Activates an event,
+    /// Activates an event, returns true if this is the initial activation
     ///
-    pub fn activate(&mut self, event: Entity) {
+    pub fn activate(&mut self, event: Entity) -> bool {
         let Events(.., events, _, _) = self;
         if let Some(event) = events.get_mut(event) {
-            event.activate();
+            event.activate().is_some()
         } else {
-            event!(Level::DEBUG, "Skipped activating {}", event.id());
+            false
         }
     }
 
@@ -201,8 +211,8 @@ impl<'a> Events<'a> {
             self.set_scheduled_connection_state(event);
         }
 
-        let Events(.., transitions, _, _, _) = self;
-
+        let Events(.., transitions, _, _, _, _) = self;
+        
         let transition = transitions.get(event).unwrap_or(&Transition::Start);
         match transition {
             Transition::Start => {
@@ -212,8 +222,9 @@ impl<'a> Events<'a> {
                 if self.get_result(event).is_none() {
                     self.start(event, previous);
                 } else {
-                    // TODO - Hamdle an existing result
-                    todo!()
+                    for next in self.get_next_entities(event) {
+                        self.start(next, previous);
+                    }
                 }
             }
             Transition::Spawn => {
@@ -282,7 +293,7 @@ impl<'a> Events<'a> {
     /// Sets the scheduled connection state for the connections this event is connected to,
     ///
     pub fn set_scheduled_connection_state(&mut self, event: Entity) {
-        let Events(.., cursors, _, _, connections, _) = self;
+        let Events(.., cursors, _, _, _, connections, _) = self;
 
         if let Some(cursor) = &cursors.get(event) {
             match cursor {
@@ -305,7 +316,7 @@ impl<'a> Events<'a> {
     /// Sets the connection state to started for this event, on the connections it is connected to,
     ///
     pub fn set_started_connection_state(&mut self, event: Entity) {
-        let Events(.., cursors, _, _, connections, _) = self;
+        let Events(.., cursors, _, _, _, connections, _) = self;
 
         if let Some(cursor) = &cursors.get(event) {
             match cursor {

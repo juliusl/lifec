@@ -82,6 +82,9 @@ pub struct Engine {
     /// Pointer to the start of the engine sequence
     ///
     start: Option<Entity>,
+    /// Limit this engine can repeat
+    /// 
+    limit: Option<Limit>,
     /// Vector of transitions
     ///
     transitions: Vec<(Transition, Vec<String>)>,
@@ -96,6 +99,7 @@ impl Engine {
     pub fn new(start: Entity) -> Self {
         Self {
             start: Some(start),
+            limit: None,
             transitions: vec![],
             lifecycle: None,
         }
@@ -105,6 +109,12 @@ impl Engine {
     ///
     pub fn start(&self) -> Option<&Entity> {
         self.start.as_ref()
+    }
+
+    /// Returns the limit of this engine, if any
+    /// 
+    pub fn limit(&self) -> Option<&Limit> {
+        self.limit.as_ref()
     }
 
     /// Finds the entity for a block,
@@ -143,6 +153,10 @@ impl Engine {
     /// Sets a lifecycle action for this engine,
     ///
     pub fn set_lifecycle(&mut self, lifecycle: Lifecycle, engines: Option<Vec<String>>) {
+        if let Lifecycle::Repeat(limit) = lifecycle {
+            self.limit = Some(Limit(limit));
+        }
+
         self.lifecycle = Some((lifecycle, engines));
     }
 }
@@ -318,15 +332,8 @@ impl Interpreter for Engine {
                             }
                         }
                         (Lifecycle::Exit, _) => {}
-                        (Lifecycle::Loop, _) => {
+                        (Lifecycle::Loop, _) |  (Lifecycle::Repeat(_), _)  => {
                             sequence.set_cursor(block_entity);
-                        }
-                        (Lifecycle::Repeat(limit), _) => {
-                            sequence.set_cursor(block_entity);
-                            world
-                                .write_component()
-                                .insert(block_entity, Limit(*limit))
-                                .expect("should be able to insert a limit");
                         }
                         _ => {
                             tracing::event!(

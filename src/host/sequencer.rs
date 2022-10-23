@@ -22,8 +22,8 @@ impl Sequencer for Host {
                 entities,
                 blocks,
                 events,
-                limits,
                 engines,
+                mut limits,
                 mut sequences,
                 mut connections,
                 mut cursors,
@@ -32,8 +32,8 @@ impl Sequencer for Host {
                 Entities,
                 ReadStorage<Block>,
                 ReadStorage<Event>,
+                ReadStorage<Engine>,
                 WriteStorage<Limit>,
-                WriteStorage<Engine>,
                 WriteStorage<Sequence>,
                 WriteStorage<Connection>,
                 WriteStorage<Cursor>,
@@ -83,7 +83,7 @@ impl Sequencer for Host {
                 }
 
                 // Unpack lifecycle cursor to link engines
-                for (_, sequence) in (&engines, &sequences).join() {
+                for (engine, sequence) in (&engines, &sequences).join() {
                     if let Some(last) = sequence.last() {
                         if let Some(cursor) = sequence.cursor().cloned() {
                             // Translate cursor into events
@@ -93,24 +93,40 @@ impl Sequencer for Host {
                                     let start = engine.start().expect("should have a start");
                                     Cursor::Next(*start)
                                 }
-                                Cursor::Fork(forks) => {
-                                    Cursor::Fork(
-                                        forks
-                                            .iter()
-                                            .filter_map(|f| engines.get(*f))
-                                            .filter_map(|e| e.start())
-                                            .cloned()
-                                            .collect(),
-                                    )
-                                }
+                                Cursor::Fork(forks) => Cursor::Fork(
+                                    forks
+                                        .iter()
+                                        .filter_map(|f| engines.get(*f))
+                                        .filter_map(|e| e.start())
+                                        .cloned()
+                                        .collect(),
+                                ),
                             };
+
+                            if let Some(limit) = engine.limit() {
+                                match &cursor {
+                                    Cursor::Next(next) => {
+                                        limits
+                                            .insert(*next, limit.clone())
+                                            .expect("should be able to insert limit");
+                                    }
+                                    Cursor::Fork(forks) => {
+                                        for fork in forks {
+                                            limits
+                                                .insert(*fork, limit.clone())
+                                                .expect("should be able to insert limit");
+                                        }
+                                    }
+                                }
+                            }
+
                             cursors
                                 .insert(last, cursor)
                                 .expect("should be able to insert cursor");
                         }
                     }
                 }
-            // TODO - Handle limits
+                // TODO - Handle limits
             },
         );
     }

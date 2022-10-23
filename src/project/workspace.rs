@@ -215,6 +215,8 @@ fn test_workspace_paths() {
 }
 
 mod tests {
+    use tracing::Level;
+
     use crate::Project;
 
     struct Test;
@@ -437,13 +439,10 @@ mod tests {
         assert_eq!(event_state.get(0), Some(&EventStatus::New(event)));
         events.handle(event_state);
 
-        serialized_tick(&mut events);
-        serialized_tick(&mut events);
-        serialized_tick(&mut events);
-        serialized_tick(&mut events);
-        serialized_tick(&mut events);
-        serialized_tick(&mut events);
-        serialized_tick(&mut events);
+        for i in 0..8 {
+            tracing::event!(Level::DEBUG, "Tick {i}");
+            serialized_tick(&mut events);
+        }
 
         // Test with tags
         // let world = Test::compile_workspace(&workspace.use_tags(vec!["test"]), files.iter());
