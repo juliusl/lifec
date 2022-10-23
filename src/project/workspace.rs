@@ -226,20 +226,17 @@ mod tests {
             Test {}
         }
 
-        fn on_runmd(&mut self, _: &RunmdFile) {}
-
         fn on_status_update(&mut self, status_update: &StatusUpdate) {
             event!(Level::TRACE, "Received status_update {:?}", status_update);
         }
-
-        fn on_operation(&mut self, _: &Operation) {}
-
-        fn on_error_context(&mut self, _: &ErrorContext) {}
-
+        
         fn on_completed_event(&mut self, e: &Entity) {
             event!(Level::TRACE, "Completed event - {}", e.id());
         }
 
+        fn on_runmd(&mut self, _: &RunmdFile) {}
+        fn on_operation(&mut self, _: &Operation) {}
+        fn on_error_context(&mut self, _: &ErrorContext) {}
         fn on_start_command(&mut self, _: &Start) {}
     }
 
