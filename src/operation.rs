@@ -91,6 +91,33 @@ impl Operation {
         clone
     }
 
+    /// Replaces any ongoing task by cancelling the previous task, and setting a new one
+    /// 
+    pub fn replace(&mut self, Thunk(symbol, func): &Thunk, context: &ThunkContext) {
+        event!(Level::DEBUG, "Replacing operation for {symbol} for entity {}", context.state().entity_id());
+        self.cancel(); 
+
+        self.task = func(context);
+    }
+
+    /// Returns self with a new async context,
+    /// 
+    pub fn with_task(mut self, async_context: AsyncContext) -> Self {
+        self.cancel();
+        
+        self.task = Some(async_context);
+        self
+    }
+
+    /// Sets the async context in place, 
+    /// 
+    pub fn set_task(&mut self, async_context: impl Into<AsyncContext>) {
+        // Cancel any previous tasks that may have been running
+        self.cancel();
+
+        self.task = Some(async_context.into());
+    }
+
     /// **Destructive** - calling this method will take and handle resolving this task to completion,
     ///
     /// Returns some context if the task returned a context, also sets that context as the current context of the operation,
@@ -206,16 +233,35 @@ impl Operation {
         self.result.as_ref()
     }
 
-    /// Returns true if the task has completed,
+    /// Returns true if the operation has completed,
     ///
     pub fn is_completed(&self) -> bool {
-        self.task.is_none()
+        self.task.is_none() && self.result.is_some()
+    }
+
+    /// Returns true if the underlying is ready
+    /// 
+    pub fn is_ready(&self) -> bool {
+        if let Some(task) = self.task.as_ref() {
+            task.0.is_finished()
+        } else {
+            false
+        }
     }
 
     /// Returns true if this is an empty operation,
     ///
     pub fn is_empty(&self) -> bool {
         self.task.is_none() && self.result.is_none()
+    }
+
+    /// Cancels any ongoing task,
+    /// 
+    pub fn cancel(&mut self) {
+        if let Some((_, cancel)) = self.task.take() {
+            event!(Level::TRACE, "Cancelling task");
+            cancel.send(()).ok();
+        }
     }
 }
 
@@ -226,5 +272,11 @@ impl Clone for Operation {
             result: self.result.clone(),
             task: None,
         }
+    }
+}
+
+impl Into<AsyncContext> for Operation {
+    fn into(mut self) -> AsyncContext {
+        self.task.take().expect("should be an operation w/ a task to consume")
     }
 }

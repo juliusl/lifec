@@ -1,9 +1,9 @@
-use specs::{Entity, Component, DenseVecStorage};
+use specs::{Entity, Component, VecStorage};
 
 /// Enumeration of cursor types for a sequence,
 /// 
 #[derive(Component, Debug, Clone)]
-#[storage(DenseVecStorage)]
+#[storage(VecStorage)]
 pub enum Cursor {
     /// Cursor that points to one other entity,
     /// 

@@ -3,13 +3,9 @@ use std::fmt::Display;
 use specs::storage::DefaultVecStorage;
 use specs::{Component, Entity};
 
+use crate::Cursor;
+
 use super::Connection;
-
-mod cursor;
-pub use cursor::Cursor;
-
-mod transition;
-pub use transition::Transition;
 
 /// A component for a collection of entities that are processed in sequence,
 /// 
@@ -103,21 +99,6 @@ impl Sequence {
         let mut clone = self.clone();
         clone.0.reverse();
         clone.0.pop()
-    }
-
-    /// Connects the current cursor to the start of the other sequence,
-    /// by returning a sequence that contains the first entity as the the only
-    /// element in the sequence, and the next entity set as the cursor,
-    /// 
-    pub fn connect(&self, other: &Sequence) -> Connection {
-        let from = self.last();
-        let to = other.peek();
-
-        Connection {
-            from,
-            to,
-            tracker: None,
-        }
     }
 
     /// Resets the cursor,

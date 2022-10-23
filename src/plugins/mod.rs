@@ -124,15 +124,18 @@ pub trait Plugin {
             if let Some(world) = parser.world() {
                 let entity = parser.entity().expect("should have an entity");
                 let child = world.entities().create();
+                
+                // Adding the thunk to the event defines the function to call,
                 {
-                    event!(Level::TRACE, "Adding plugin {} to event {}", child.id(), entity.id());
-                    let mut sequences = world.write_component::<Sequence>();
-                    if let Some(sequence) = sequences.get_mut(entity) {
-                        sequence.add(child);
+                    event!(Level::TRACE, "Adding entity {}'s thunk to event entity {}", child.id(), entity.id());
+                    let mut events = world.write_component::<Event>();
+                    if let Some(event) = events.get_mut(entity) {
+                        event.add_thunk(Thunk::from_plugin::<Self>(), child);
                     } else {
-                        let sequence = Sequence::from(vec![child]);
-                        sequences
-                            .insert(entity, sequence)
+                        let mut event = Event::empty();
+                        event.add_thunk(Thunk::from_plugin::<Self>(), child);
+                        events
+                            .insert(entity, event)
                             .expect("should be able to insert");
                     }
                 }

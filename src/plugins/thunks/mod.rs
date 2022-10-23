@@ -1,8 +1,7 @@
 
-use crate::Operation;
 use hyper::client::HttpConnector;
-use specs::Component;
-use specs::{storage::DenseVecStorage, Entity};
+use reality::BlockProperties;
+use specs::{storage::DenseVecStorage, Entity, Component};
 
 mod error;
 pub use error::ErrorContext;
@@ -28,12 +27,7 @@ pub struct Thunk(
 /// Config for a thunk context
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
-pub struct Config(
-    /// config label
-    pub &'static str,
-    /// config fn
-    pub fn(&mut ThunkContext),
-);
+pub struct Config(BlockProperties);
 
 impl Debug for Thunk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -40,3 +40,13 @@ pub struct RunmdFile {
     pub source: Option<String>,
 }
 
+impl RunmdFile {
+    /// Returns a new runmd source file,
+    /// 
+    pub fn new_src(symbol: impl AsRef<str>, source: impl AsRef<str>) -> Self {
+        let symbol = symbol.as_ref().to_string();
+        let source = Some(source.as_ref().to_string());
+        Self { symbol, source }
+    }
+}
+

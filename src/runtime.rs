@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
+use crate::Event;
 use crate::{AttributeParser, BlockObject, CustomAttribute, SpecialAttribute, Plugin};
 use specs::{Component, DefaultVecStorage, WorldExt};
 use tracing::event;

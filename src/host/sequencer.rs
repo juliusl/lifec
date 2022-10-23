@@ -1,9 +1,9 @@
-use crate::LifecycleOptions;
+use std::collections::{HashMap, HashSet};
+
+use crate::{Connection, Cursor};
 use crate::{Engine, Event, Host, Sequence};
 use reality::Block;
-use specs::{Entities, Join, ReadStorage, WriteStorage};
-use tracing::event;
-use tracing::Level;
+use specs::{Entities, Entity, Join, Read, ReadStorage, WriteStorage};
 
 /// Extension of Host to handle linking engine sequences together
 ///
@@ -16,34 +16,69 @@ pub trait Sequencer {
 impl Sequencer for Host {
     fn link_sequences(&mut self) {
         self.world_mut().exec(
-            |(_entities, blocks, _events, engines, mut sequences, _lifecycle_options): (
+            |(
+                block_map,
+                entities,
+                blocks,
+                _events,
+                engines,
+                mut sequences,
+                mut connections,
+                mut cursors,
+            ): (
+                Read<HashMap<String, Entity>>,
                 Entities,
                 ReadStorage<Block>,
                 ReadStorage<Event>,
                 WriteStorage<Engine>,
                 WriteStorage<Sequence>,
-                WriteStorage<LifecycleOptions>,
+                WriteStorage<Connection>,
+                WriteStorage<Cursor>,
             )| {
-                let mut links = vec![];
-
                 // Process engines
-                for (_, _, sequence) in (&blocks, &engines, &sequences).join() {
-                    let events = sequence.iter_entities(); 
-                    for (from, to) in events.zip(sequence.iter_entities().skip(1)) {
-                        event!(Level::TRACE, "Linking event {} -> {}", from.id(), to.id());
-                        links.push((from, to));
+                for (block, engine) in (&blocks, &engines).join() {
+                    let transitions = engine.iter_transitions();
+
+                    for (from, to) in transitions.zip(engine.iter_transitions().skip(1)) {
+                        for t in
+                            to.1.iter()
+                                .filter_map(|f| block_map.get(&format!("{f} {}", block.symbol())))
+                        {
+                            let mut incoming = HashSet::<Entity>::default();
+
+                            for f in from
+                                .1
+                                .iter()
+                                .filter_map(|f| block_map.get(&format!("{f} {}", block.symbol())))
+                            {
+                                incoming.insert(*f);
+                            }
+                            let connection = Connection::new(incoming, *t);
+                            connections
+                                .insert(*t, connection)
+                                .expect("should be able to insert connection");
+                        }
                     }
                 }
 
-                for (from, to) in links {
-                    let peek = sequences.get(to).clone().and_then(|s| s.peek());
-
-                    match (sequences.get_mut(from), peek) {
-                        (Some(from), Some(to)) => {
-                            from.set_cursor(to);
-                        },
-                        _ => {
+                // Process cursors
+                for (_, connection) in (&entities, &connections).join() {
+                    for (from, to) in connection.connections() {
+                        if let Some(sequence) = sequences.get_mut(*from) {
+                            sequence.set_cursor(*to);
                         }
+                    }
+                }
+
+                // Unpack built cursors
+                for (entity, sequence) in (
+                    &entities,
+                    &sequences,
+                )
+                    .join()
+                {
+                    if let Some(cursor) = sequence.cursor() {
+                        cursors.insert(entity, cursor.clone()).expect("should be able to insert cursor");
                     }
                 }
             },
@@ -64,12 +99,13 @@ mod test {
     #[test]
     #[tracing_test::traced_test]
     fn test_sequencer() {
-        let _ = crate::Host::load_content::<Test>(r#"
+        let _ = crate::Host::load_content::<Test>(
+            r#"
         ``` test
         + .engine
-        : .event step1
-        : .event step2
-        : .event step3
+        : .start step1
+        : .start step2
+        : .start step3
         : .next test2
         ```
     
@@ -96,9 +132,9 @@ mod test {
 
         ``` test2
         + .engine
-        : .event step1
-        : .event step2
-        : .event step3
+        : .start step1
+        : .start step2
+        : .start step3
         : .exit
         ```
 
@@ -116,6 +152,7 @@ mod test {
         + .runtime
         : .println test2 test3
         ```
-        "#);
+        "#,
+        );
     }
 }

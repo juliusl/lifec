@@ -47,11 +47,11 @@ pub use runtime::Runtime;
 mod engine;
 pub use engine::Engine;
 pub use engine::Event;
-pub use engine::Exit;
-pub use engine::LifecycleOptions;
+pub use engine::Events;
 pub use engine::Sequence;
 pub use engine::Connection;
 pub use engine::Cursor;
+pub use engine::Plugins;
 
 mod host;
 pub use host::Host;

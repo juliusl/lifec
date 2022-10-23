@@ -17,7 +17,7 @@ use crate::{
         CompletedPluginListener, ErrorContextListener, OperationListener, RunmdFile, RunmdListener,
         StartCommandListener,
     },
-    Engine, Event, LifecycleOptions, Project, ThunkContext, Workspace,
+    Engine, Event, Project, ThunkContext, Workspace,
 };
 
 mod inspector;
@@ -500,22 +500,23 @@ impl Host {
     /// Returns true if the host should exit,
     ///
     pub fn should_exit(&self) -> bool {
-        let entities = self.world().entities();
-        let lifecycle_options = self.world().read_component::<LifecycleOptions>();
-        let events = self.world().read_component::<Event>();
-        if (&entities, &events, &lifecycle_options).join().all(
-            |(entity, event, lifecycle_option)| match (event, lifecycle_option) {
-                (Event(.., None), LifecycleOptions::Exit(None)) => {
-                    event!(Level::TRACE, "{:?} has exited", entity);
-                    true
-                }
-                _ => false,
-            },
-        ) {
-            true
-        } else {
-            false
-        }
+        // let entities = self.world().entities();
+        // let lifecycle_options = self.world().read_component::<LifecycleOptions>();
+        // let events = self.world().read_component::<Event>();
+        // if (&entities, &events, &lifecycle_options).join().all(
+        //     |(entity, event, lifecycle_option)| match (event, lifecycle_option) {
+        //         (Event(.., None), LifecycleOptions::Exit(None)) => {
+        //             event!(Level::TRACE, "{:?} has exited", entity);
+        //             true
+        //         }
+        //         _ => false,
+        //     },
+        // ) {
+        //     true
+        // } else {
+        //     false
+        // }
+        false
     }
 
     /// Finds the starting entity from some expression,
@@ -601,7 +602,7 @@ impl Host {
     ///
     pub fn start_event(&mut self, event: Entity, thunk_context: ThunkContext) {
         if let Some(event) = self.world().write_component::<Event>().get_mut(event) {
-            event.fire(thunk_context);
+            // event.fire(thunk_context);
         }
 
         self.world_mut().maintain();
@@ -636,6 +637,19 @@ impl Debug for Host {
 impl Into<World> for Host {
     fn into(self) -> World {
         self.world.unwrap()
+    }
+}
+
+impl From<World> for Host {
+    fn from(world: World) -> Self {
+        Host {
+            root: None,
+            url: None,
+            runmd_path: None,
+            workspace: None,
+            command: None,
+            world: Some(world),
+        }
     }
 }
 

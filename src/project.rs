@@ -4,15 +4,14 @@ use specs::{Join, World, WorldExt};
 use tracing::event;
 use tracing::Level;
 
-use crate::engine::{Activity, Loop};
+use crate::engine::{Activity, Transition};
 use crate::plugins::{ErrorContext, StatusUpdate};
 use crate::prelude::{Publish, Readln, Watch};
 use crate::{
-    engine::{Fork, LifecycleResolver, Next, Repeat},
     plugins::Println,
-    AttributeGraph, Engine, Event, Exit, Install, Process, Runtime, Timer,
+    AttributeGraph, Engine, Event, Install, Process, Runtime, Timer,
 };
-use crate::{LifecycleOptions, Operation, Sequence, Start, Thunk, ThunkContext};
+use crate::{Operation, Sequence, Start, Thunk, ThunkContext};
 
 mod runmd_listener;
 pub use runmd_listener::RunmdListener;
@@ -154,19 +153,6 @@ pub trait Project {
         let engine = &mut Engine::default();
         engine.initialize(&mut world);
 
-        // Engine lifecycle options
-        let fork = Fork::default();
-        fork.initialize(&mut world);
-
-        let next = Next::default();
-        next.initialize(&mut world);
-
-        let exit = Exit::default();
-        exit.initialize(&mut world);
-
-        let r#loop = Loop::default();
-        r#loop.initialize(&mut world);
-
         Self::initialize(&mut world);
 
         // Setup graphs for all plugin entities
@@ -196,10 +182,7 @@ pub trait Project {
 
         for block in world.read_component::<Block>().join() {
             engine.interpret(&world, block);
-            fork.interpret(&world, block);
-            next.interpret(&world, block);
-            exit.interpret(&world, block);
-            r#loop.interpret(&world, block);
+
             Self::interpret(&world, block);
             event!(
                 Level::TRACE,
@@ -210,11 +193,11 @@ pub trait Project {
         }
 
         // Resolve lifecycle settings before returning
-        {
-            let lifecycle_resolver = world.system_data::<LifecycleResolver>();
-            let settings = lifecycle_resolver.resolve_lifecycle();
-            world.insert(settings);
-        }
+        // {
+        //     let lifecycle_resolver = world.system_data::<LifecycleResolver>();
+        //     let settings = lifecycle_resolver.resolve_lifecycle();
+        //     world.insert(settings);
+        // }
 
         world.maintain();
         world
@@ -269,15 +252,14 @@ pub fn default_parser(world: World) -> Parser {
 
 pub fn default_world() -> World {
     let mut world = specs::World::new();
+    world.register::<Thunk>();
     world.register::<Event>();
     world.register::<Engine>();
     world.register::<Runtime>();
-    world.register::<AttributeGraph>();
-    world.register::<LifecycleOptions>();
-    world.register::<ThunkContext>();
-    world.register::<Activity>();
     world.register::<Sequence>();
-    world.register::<Thunk>();
-    world.register::<Repeat>();
+    world.register::<Activity>();
+    world.register::<Transition>();
+    world.register::<ThunkContext>();
+    world.register::<AttributeGraph>();
     world
 }

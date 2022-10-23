@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use reality::Block;
 use specs::{Entities, Entity, Join, Read, ReadStorage};
 
-use crate::{Engine, Host, LifecycleOptions, Sequence, Thunk};
+use crate::{Engine, Host, Sequence, Thunk};
 
 /// Extension methods for inspecting World state after the world is done building,
 ///
@@ -19,26 +19,26 @@ pub trait Inspector {
 
 impl Inspector for Host {
     fn print_lifecycle_graph(&mut self) {
-        self.world_mut().exec(
-            |(options, blocks): (Read<HashMap<Entity, LifecycleOptions>>, ReadStorage<Block>)| {
-                for (e, option) in options.iter() {
-                    if let Some(block) = blocks.get(*e) {
-                        let mut block_name = block.name().to_string();
-                        if block_name.is_empty() {
-                            block_name = "```".to_string();
-                        }
-                        println!(
-                            "Engine control block: {} {} @ {:?}",
-                            block_name,
-                            block.symbol(),
-                            e
-                        );
-                        println!("  {:?}", option);
-                        println!("");
-                    }
-                }
-            },
-        );
+        // self.world_mut().exec(
+        //     |blocks: ReadStorage<Block>| {
+        //         for (e, option) in options.iter() {
+        //             if let Some(block) = blocks.get(*e) {
+        //                 let mut block_name = block.name().to_string();
+        //                 if block_name.is_empty() {
+        //                     block_name = "```".to_string();
+        //                 }
+        //                 println!(
+        //                     "Engine control block: {} {} @ {:?}",
+        //                     block_name,
+        //                     block.symbol(),
+        //                     e
+        //                 );
+        //                 println!("  {:?}", option);
+        //                 println!("");
+        //             }
+        //         }
+        //     },
+        // );
     }
 
     fn print_engine_event_graph(&mut self) {

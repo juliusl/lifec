@@ -215,7 +215,7 @@ fn test_workspace_paths() {
 }
 
 mod tests {
-    use crate::Project;
+    use crate::{Engine, Project};
 
     struct Test;
 
@@ -228,10 +228,14 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn test_compile_workspace() {
-        use crate::{project::RunmdFile, Workspace};
+        use crate::{
+            engine::Transition, project::RunmdFile, Connection, Cursor, Event, Host, Sequence,
+            Sequencer, Workspace,
+        };
         use atlier::system::{Attribute, Value};
         use reality::Block;
         use reality::BlockProperty;
+        use specs::Join;
         use specs::WorldExt;
 
         let mut workspace = Workspace::new("test.io", None);
@@ -249,65 +253,164 @@ mod tests {
         "#,
         );
 
-        let test_engine = RunmdFile {
-            symbol: String::from("test"),
-            source: Some(String::from(
-                r#"
+        let test_engine = RunmdFile::new_src(
+            "test",
+            r#"
             ```
             + .engine
-            : .event    print
+            : .once     setup
+            : .start    receive, cancel
+            : .select   execute
+            : .next     test-2
+            ```
+
+            ``` setup
+            + .runtime
+            : .println hello setup
+            ```
+
+            ``` receive
+            + .runtime
+            : .println hello receive
+            ```
+
+            ``` cancel
+            + .runtime
+            : .println hello cancel
+            ```
+
+            ``` execute
+            + .runtime
+            : .println hello execute
+            ```
+            "#,
+        );
+
+        let test_engine2 = RunmdFile::new_src(
+            "test-2",
+            r#"
+            ```
+            + .engine
             : .once     setup
             : .start    receive, cancel
             : .select   execute
             : .exit
             ```
 
-            ``` print
+            ``` setup
             + .runtime
-            : .println hello world and {name}
-            : .fmt name
+            : .println hello setup
+            ```
+
+            ``` receive
+            + .runtime
+            : .println hello receive
+            ```
+
+            ``` cancel
+            + .runtime
+            : .println hello cancel
+            ```
+
+            ``` execute
+            + .runtime
+            : .println hello execute
             ```
             "#,
-            )),
-        };
+        );
 
-        let files = vec![test_engine];
+        let files = vec![test_engine, test_engine2];
 
         // Test with no tags
         let world = Test::compile_workspace(&workspace, files.iter());
 
-        let root_ent = world.entities().entity(0);
-        let root = world.read_component::<Block>();
-        let root = root.get(root_ent).expect("should have a root block");
+        {
+            let root_ent = world.entities().entity(0);
+            let root = world.read_component::<Block>();
+            let root = root.get(root_ent).expect("should have a root block");
 
-        let indexes = root.index();
+            let indexes = root.index();
 
-        let default = indexes.get(0).expect("should have index");
-        assert_eq!(
-            default.root(),
-            &Attribute::new(0, "config", Value::Symbol("print.test".to_string()))
-        );
-        assert_eq!(
-            default.find_property("name"),
-            Some(BlockProperty::Single(Value::Symbol("Test".to_string())))
-        );
+            let default = indexes.get(0).expect("should have index");
+            assert_eq!(
+                default.root(),
+                &Attribute::new(0, "config", Value::Symbol("print.test".to_string()))
+            );
+            assert_eq!(
+                default.find_property("name"),
+                Some(BlockProperty::Single(Value::Symbol("Test".to_string())))
+            );
 
-        let default = indexes.get(1).expect("should have index");
-        assert_eq!(
-            default.root(),
-            &Attribute::new(0, "test.config", Value::Symbol("print.test".to_string()))
-        );
-        assert_eq!(
-            default.find_property("name"),
-            Some(BlockProperty::Single(Value::Symbol("Test2".to_string())))
-        );
+            let default = indexes.get(1).expect("should have index");
+            assert_eq!(
+                default.root(),
+                &Attribute::new(0, "test.config", Value::Symbol("print.test".to_string()))
+            );
+            assert_eq!(
+                default.find_property("name"),
+                Some(BlockProperty::Single(Value::Symbol("Test2".to_string())))
+            );
+        }
+
+        {
+            for (entity, event, transition) in (
+                &world.entities(),
+                &world.read_component::<Event>(),
+                &world.read_component::<Transition>(),
+            )
+                .join()
+            {
+                println!("{:?} {:?} {:?}", entity, event, transition);
+            }
+        }
+
+        let mut host = Host::from(world);
+        host.link_sequences();
+
+        for (_, sequence) in (
+            &host.world().entities(),
+            &host.world().read_component::<Sequence>(),
+        )
+            .join()
+        {
+            println!("{:#?}", sequence);
+            //println!("{:#?}", connection);
+            println!();
+        }
+
+        for (_, cursor) in (
+            &host.world().entities(),
+            &host.world().read_component::<Cursor>(),
+        )
+            .join()
+        {
+            println!("{:#?}", cursor);
+            println!();
+        }
+
+        for (_, cursor) in (
+            &host.world().entities(),
+            &host.world().read_component::<Connection>(),
+        )
+            .join()
+        {
+            println!("{:#?}", cursor);
+            println!();
+        }
+
+        for (_, engine) in (
+            &host.world().entities(),
+            &host.world().read_component::<Engine>(),
+        )
+            .join()
+        {
+            println!("{:#?}", engine);
+            println!();
+        }
 
         // Test with tags
-        let world = Test::compile_workspace(
-            &workspace.use_tags(vec!["test"]), 
-            files.iter()
-        );
+        // let world = Test::compile_workspace(&workspace.use_tags(vec!["test"]), files.iter());
         // TODO: Add asserts
-        // 
+        //
     }
 }

@@ -6,7 +6,7 @@ use crate::prelude::ErrorContext;
 
 /// Component to track activity state changes,
 ///
-#[derive(Clone, Component)]
+#[derive(Debug, Clone, Component)]
 #[storage(DenseVecStorage)]
 pub enum Activity {
     /// Scheduled to run,

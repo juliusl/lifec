@@ -64,7 +64,7 @@ impl Extension for Task {
         }
 
         if let Task(.., Some(sequence), _) = self {
-            ui.text(format!("{}", sequence));
+            ui.text(format!("{:?}", sequence));
         }
     }
 
