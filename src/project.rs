@@ -201,7 +201,7 @@ pub trait Project {
 
     /// Override to receive/handle runmd
     ///
-    fn on_runmd(&mut self, _runmd: String) {}
+    fn on_runmd(&mut self, _runmd: RunmdFile) {}
 
     /// Override to receive/handle status updates
     ///

@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     engine::{Connection, Sequence, Activity},
-    AttributeGraph, Engine, Event, Extension, Operation, Runtime, Start,
+    AttributeGraph, Engine, Event, Extension, Operation, Runtime, Start, project::RunmdFile,
 };
 use hyper::Client;
 use hyper_tls::HttpsConnector;
@@ -88,18 +88,18 @@ impl SetupHandler<sync::broadcast::Sender<Entity>> for EventRuntime {
 }
 
 /// Setup for tokio-mulitple-producers single-consumer channel for status updates
-impl SetupHandler<sync::mpsc::Sender<String>> for EventRuntime {
+impl SetupHandler<sync::mpsc::Sender<RunmdFile>> for EventRuntime {
     fn setup(world: &mut specs::World) {
-        let (tx, rx) = mpsc::channel::<String>(10);
+        let (tx, rx) = mpsc::channel::<RunmdFile>(10);
         world.insert(tx);
         world.insert(rx);
     }
 }
 
 /// Setup for tokio-mulitple-producers single-consumer channel for status updates
-impl SetupHandler<sync::mpsc::Receiver<String>> for EventRuntime {
+impl SetupHandler<sync::mpsc::Receiver<RunmdFile>> for EventRuntime {
     fn setup(world: &mut specs::World) {
-        let (tx, rx) = mpsc::channel::<String>(10);
+        let (tx, rx) = mpsc::channel::<RunmdFile>(10);
         world.insert(tx);
         world.insert(rx);
     }
@@ -181,7 +181,7 @@ impl<'a> System<'a> for EventRuntime {
         Read<'a, tokio::runtime::Runtime, EventRuntime>,
         Read<'a, SecureClient, EventRuntime>,
         Read<'a, Sender<StatusUpdate>, EventRuntime>,
-        Read<'a, Sender<String>, EventRuntime>,
+        Read<'a, Sender<RunmdFile>, EventRuntime>,
         Read<'a, Sender<Operation>, EventRuntime>,
         Read<'a, Sender<ErrorContext>, EventRuntime>,
         Read<'a, Sender<Start>, EventRuntime>,

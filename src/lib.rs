@@ -53,6 +53,7 @@ pub use engine::Sequence;
 pub use engine::Connection;
 pub use engine::Cursor;
 pub use engine::Plugins;
+pub use engine::PluginFeatures;
 
 mod host;
 pub use host::Host;

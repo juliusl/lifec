@@ -103,6 +103,7 @@ impl Sequencer for Host {
                                 ),
                             };
 
+                            // Assign limits
                             if let Some(limit) = engine.limit() {
                                 match &cursor {
                                     Cursor::Next(next) => {
@@ -126,7 +127,6 @@ impl Sequencer for Host {
                         }
                     }
                 }
-                // TODO - Handle limits
             },
         );
     }

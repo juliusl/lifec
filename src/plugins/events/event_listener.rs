@@ -1,4 +1,4 @@
-use crate::{plugins::{StatusUpdate, ErrorContext}, Start};
+use crate::{plugins::{StatusUpdate, ErrorContext}, Start, project::RunmdFile};
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::broadcast::Receiver as BroadcastReceiver;
 use specs::prelude::*;
@@ -11,7 +11,7 @@ use super::EventRuntime;
 #[derive(SystemData)]
 pub struct EventListener<'a> {
     pub status_updates: Write<'a, Receiver<StatusUpdate>, EventRuntime>,
-    pub runmd: Write<'a, Receiver<String>, EventRuntime>,
+    pub runmd: Write<'a, Receiver<RunmdFile>, EventRuntime>,
     pub operations: Write<'a, Receiver<Operation>, EventRuntime>,
     pub error_contexts: Write<'a, Receiver<ErrorContext>, EventRuntime>,
     pub start_commands: Write<'a, Receiver<Start>, EventRuntime>,

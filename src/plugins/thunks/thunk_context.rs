@@ -1,7 +1,8 @@
 use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use crate::{
-    plugins::network::BlockAddress, AttributeGraph, AttributeIndex, Operation, Start, Workspace,
+    plugins::network::BlockAddress, project::RunmdFile, AttributeGraph, AttributeIndex, Operation,
+    Start, Workspace,
 };
 
 use reality::Block;
@@ -71,7 +72,7 @@ pub struct ThunkContext {
     /// Sender for status updates for the thunk
     status_updates: Option<Sender<StatusUpdate>>,
     /// Dispatcher for runmd
-    dispatcher: Option<Sender<String>>,
+    dispatcher: Option<Sender<RunmdFile>>,
     /// Dispatcher for operations
     operation_dispatcher: Option<Sender<Operation>>,
     /// Dispatcher for start commands
@@ -226,7 +227,7 @@ impl ThunkContext {
     /// Plugins using this context will be able to dispatch attribute graphs to the underlying
     /// runtime.
     ///
-    pub fn enable_dispatcher(&mut self, dispatcher: Sender<String>) -> &mut ThunkContext {
+    pub fn enable_dispatcher(&mut self, dispatcher: Sender<RunmdFile>) -> &mut ThunkContext {
         self.dispatcher = Some(dispatcher);
         self
     }
@@ -440,9 +441,12 @@ impl ThunkContext {
     /// For example, if running a runtime within a plugin that hosts a web api, you can use this method within
     /// request handlers to dispatch blocks to the hosting runtime.
     ///
-    pub async fn dispatch(&self, runmd: impl AsRef<str>) {
+    pub async fn dispatch(&self, symbol: impl AsRef<str>, source: impl AsRef<str>) {
         if let Some(dispatcher) = &self.dispatcher {
-            dispatcher.send(runmd.as_ref().to_string()).await.ok();
+            dispatcher
+                .send(RunmdFile::new_src(symbol, source.as_ref().to_string()))
+                .await
+                .ok();
         }
     }
 
@@ -456,7 +460,7 @@ impl ThunkContext {
 
     /// Returns the underlying dispatch transmitter
     ///
-    pub fn dispatcher(&self) -> Option<sync::mpsc::Sender<String>> {
+    pub fn dispatcher(&self) -> Option<sync::mpsc::Sender<RunmdFile>> {
         self.dispatcher.clone()
     }
 

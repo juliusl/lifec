@@ -23,6 +23,7 @@ pub use cursor::Cursor;
 
 mod plugins;
 pub use plugins::Plugins;
+pub use plugins::PluginFeatures;
 
 mod events;
 pub use events::EventStatus;

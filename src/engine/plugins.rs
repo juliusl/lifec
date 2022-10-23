@@ -1,22 +1,73 @@
-use std::{ops::Deref, collections::HashMap};
+use std::{collections::HashMap, ops::Deref};
 
 use reality::Block;
-use specs::{Read, Entities, ReadStorage, Entity, SystemData, prelude::*};
-use tokio::{sync::{mpsc::Sender, oneshot}, select};
+use specs::{prelude::*, Entities, Entity, Read, ReadStorage, SystemData};
+use tokio::{
+    runtime::Handle,
+    select,
+    sync::{mpsc::Sender, oneshot},
+};
 
-use crate::{prelude::{EventRuntime, StatusUpdate}, SecureClient, Operation, Start, Thunk, AttributeGraph, ThunkContext, Sequence, Workspace};
+use crate::{
+    prelude::{EventRuntime, StatusUpdate},
+    AttributeGraph, Operation, SecureClient, Sequence, Start, Thunk, ThunkContext, Workspace, project::RunmdFile,
+};
+
+/// System data with plugin feature resources,
+/// 
+#[derive(SystemData)]
+pub struct PluginFeatures<'a>(
+    Read<'a, Option<Workspace>>,
+    Read<'a, tokio::runtime::Runtime, EventRuntime>,
+    Read<'a, SecureClient, EventRuntime>,
+    Read<'a, Sender<StatusUpdate>, EventRuntime>,
+    Read<'a, Sender<RunmdFile>, EventRuntime>,
+    Read<'a, Sender<Operation>, EventRuntime>,
+    Read<'a, Sender<Start>, EventRuntime>,
+);
+
+impl<'a> PluginFeatures<'a> {
+    /// Enables features on a thunk context,
+    /// 
+    pub fn enable(&self, entity: Entity, context: &ThunkContext) -> ThunkContext {
+        let PluginFeatures(
+            workspace,
+            runtime,
+            client,
+            status_sender,
+            runmd_sender,
+            operation_sender,
+            start_sender,
+        ) = self;
+
+        let mut context = context.enable_async(entity, runtime.handle().clone());
+
+        context
+            .enable_https_client(client.deref().clone())
+            .enable_dispatcher(runmd_sender.deref().clone())
+            .enable_operation_dispatcher(operation_sender.deref().clone())
+            .enable_status_updates(status_sender.deref().clone())
+            .enable_start_command_dispatcher(start_sender.deref().clone());
+
+        if let Some(workspace) = workspace.as_ref() {
+            context.enable_workspace(workspace.clone());
+        }
+
+        context
+    }
+
+    /// Returns a tokio runtime handle,
+    ///
+    pub fn handle(&self) -> Handle {
+        self.1.handle().clone()
+    }
+}
 
 /// System data for plugins,
 ///
 #[derive(SystemData)]
 pub struct Plugins<'a>(
-    Read<'a, Option<Workspace>>,
-    Read<'a, tokio::runtime::Runtime, EventRuntime>,
-    Read<'a, SecureClient, EventRuntime>,
-    Read<'a, Sender<StatusUpdate>, EventRuntime>,
-    Read<'a, Sender<String>, EventRuntime>,
-    Read<'a, Sender<Operation>, EventRuntime>,
-    Read<'a, Sender<Start>, EventRuntime>,
+    PluginFeatures<'a>,
     Entities<'a>,
     ReadStorage<'a, Thunk>,
     ReadStorage<'a, Block>,
@@ -31,33 +82,10 @@ impl<'a> Plugins<'a> {
         entity: Entity,
         initial_context: Option<&ThunkContext>,
     ) -> ThunkContext {
-        let Plugins(
-            workspace,
-            runtime,
-            client,
-            status_sender,
-            graphs_sender,
-            operation_sender,
-            start_sender,
-            ..,
-            blocks,
-            graphs,
-        ) = self;
+        let Plugins(plugin_features, .., blocks, graphs) = self;
 
-        let mut context = initial_context
-            .unwrap_or(&ThunkContext::default())
-            .enable_async(entity, runtime.handle().clone());
-
-        context
-            .enable_https_client(client.deref().clone())
-            .enable_dispatcher(graphs_sender.deref().clone())
-            .enable_operation_dispatcher(operation_sender.deref().clone())
-            .enable_status_updates(status_sender.deref().clone())
-            .enable_start_command_dispatcher(start_sender.deref().clone());
-
-        if let Some(workspace) = workspace.as_ref() {
-            context.enable_workspace(workspace.clone());
-        }
+        let context =
+            plugin_features.enable(entity, initial_context.unwrap_or(&ThunkContext::default()));
 
         let block = blocks.get(entity).expect("should have a block");
         let graph = graphs.get(entity).expect("should have a graph");
@@ -66,23 +94,37 @@ impl<'a> Plugins<'a> {
     }
 
     /// Combines a sequence of plugin calls into an operation,
-    /// 
-    pub fn start_sequence(&self, sequence: &Sequence, initial_context: Option<&ThunkContext>) -> Operation {
-        let Plugins(_, runtime, .., thunk_components, block_components, graph_components) = self;
-        
+    ///
+    pub fn start_sequence(
+        &self,
+        sequence: &Sequence,
+        initial_context: Option<&ThunkContext>,
+    ) -> Operation {
+        let Plugins(plugin_features, .., thunk_components, block_components, graph_components) =
+            self;
+
         let sequence = sequence.clone();
-        let handle = runtime.handle();
+        let handle = plugin_features.handle();
         let entity = sequence.peek().expect("should have at least 1 entity");
 
         let thunk_context = self.initialize_context(entity, initial_context);
-        
+
         let mut thunks = HashMap::<Entity, Thunk>::default();
         let mut graphs = HashMap::<Entity, AttributeGraph>::default();
         let mut blocks = HashMap::<Entity, Block>::default();
         for call in sequence.iter_entities() {
-            let thunk = thunk_components.get(call).expect("should have a thunk").clone();
-            let graph = graph_components.get(call).expect("should have a graph").clone();
-            let block = block_components.get(call).expect("should have a block").clone();
+            let thunk = thunk_components
+                .get(call)
+                .expect("should have a thunk")
+                .clone();
+            let graph = graph_components
+                .get(call)
+                .expect("should have a graph")
+                .clone();
+            let block = block_components
+                .get(call)
+                .expect("should have a block")
+                .clone();
             thunks.insert(call, thunk);
             graphs.insert(call, graph);
             blocks.insert(call, block);

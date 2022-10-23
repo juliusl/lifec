@@ -223,13 +223,7 @@ impl<'a> Events<'a> {
                 self.start(event, previous);
             }
             Transition::Once => {
-                if self.get_result(event).is_none() {
-                    self.start(event, previous);
-                } else {
-                    for next in self.get_next_entities(event) {
-                        self.transition(previous, next);
-                    }
-                }
+               self.once(event, previous);
             }
             Transition::Select => {
                 if let Some(previous) = previous {
@@ -269,6 +263,18 @@ impl<'a> Events<'a> {
         }
 
         self.set_started_connection_state(event);
+    }
+
+    /// Skips if the event already has a result,
+    /// 
+    pub fn once(&mut self, event: Entity, previous: Option<&ThunkContext>) {
+        if self.get_result(event).is_none() {
+            self.start(event, previous);
+        } else {
+            for next in self.get_next_entities(event) {
+                self.transition(previous, next);
+            }
+        }
     }
 
     /// Selects an incoming event and cancels any others,
