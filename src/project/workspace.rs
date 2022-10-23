@@ -295,27 +295,27 @@ mod tests {
             : .once     setup
             : .start    receive, cancel
             : .select   execute
-            : .exit
+            : .repeat   1
             ```
 
             ``` setup
             + .runtime
-            : .println hello setup
+            : .println hello setup 2
             ```
 
             ``` receive
             + .runtime
-            : .println hello receive
+            : .println hello receive 2
             ```
 
             ``` cancel
             + .runtime
-            : .println hello cancel
+            : .println hello cancel 2
             ```
 
             ``` execute
             + .runtime
-            : .println hello execute
+            : .println hello execute 2
             ```
             "#,
         );
@@ -412,6 +412,19 @@ mod tests {
 
         let mut events = host.world().system_data::<Events>();
 
+        let serialized_tick = |events: &mut Events| {
+            let event_state = events.scan();
+            for event in event_state {
+                // println!("{:#?}", event);
+                if let EventStatus::InProgress(in_progress) = event {
+                    events.wait_for_ready(in_progress);
+                }
+            }
+    
+            let event_state = events.scan();
+            events.handle(event_state);
+        };
+
         // Test that initially everything is idle
         assert!(events.scan().is_empty());
 
@@ -424,45 +437,13 @@ mod tests {
         assert_eq!(event_state.get(0), Some(&EventStatus::New(event)));
         events.handle(event_state);
 
-        let event_state = events.scan();
-        if let EventStatus::InProgress(in_progress) = event_state.get(0).expect("should have an in progress event") {
-            events.wait_for_ready(*in_progress);
-        }
-
-        let event_state = events.scan();
-        events.handle(event_state);
-
-
-        let event_state = events.scan();
-        for event in event_state {
-            println!("{:#?}", event);
-            if let EventStatus::InProgress(in_progress) = event {
-                events.wait_for_ready(in_progress);
-            }
-        }
-
-        let event_state = events.scan();
-        events.handle(event_state);
-
-        let event_state = events.scan();
-        events.handle(event_state);
-
-        let event_state = events.scan();
-        for event in event_state {
-            println!("{:#?}", event);
-            if let EventStatus::InProgress(in_progress) = event {
-                events.wait_for_ready(in_progress);
-            }
-        }
-
-        let event_state = events.scan();
-        events.handle(event_state);
-
-        let event_state = events.scan();
-        for event in event_state.iter() {
-            println!("{:#?}", event);
-        }
-        events.handle(event_state);
+        serialized_tick(&mut events);
+        serialized_tick(&mut events);
+        serialized_tick(&mut events);
+        serialized_tick(&mut events);
+        serialized_tick(&mut events);
+        serialized_tick(&mut events);
+        serialized_tick(&mut events);
 
         // Test with tags
         // let world = Test::compile_workspace(&workspace.use_tags(vec!["test"]), files.iter());

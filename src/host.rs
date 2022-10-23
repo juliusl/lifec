@@ -526,7 +526,7 @@ impl Host {
             self.world()
                 .read_component::<Engine>()
                 .get(e)
-                .and_then(|e| e.start())
+                .and_then(|e| e.start().cloned())
         })
     }
 

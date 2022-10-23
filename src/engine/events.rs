@@ -94,6 +94,7 @@ impl<'a> Events<'a> {
                     let next_entities = self.get_next_entities(*ready);
 
                     for next in next_entities {
+                        event!(Level::DEBUG, "{} -> {}", ready.id(), next.id());
                         if let Some(error) = result.as_ref().and_then(ThunkContext::get_errors) {
                             self.set_error_connection_state(*ready, next, error);
                         } else {
@@ -103,13 +104,13 @@ impl<'a> Events<'a> {
                     }
                 }
                 EventStatus::InProgress(in_progress) => {
-                    event!(Level::DEBUG, "{} is in progress", in_progress.id());
+                    event!(Level::TRACE, "{} is in progress", in_progress.id());
                 }
                 EventStatus::Completed(completed) => {
-                    event!(Level::DEBUG, "{} is complete", completed.id());
+                    event!(Level::TRACE, "{} is complete", completed.id());
                 }
                 EventStatus::Cancelled(cancelled) => {
-                    event!(Level::DEBUG, "{} is cancelled", cancelled.id());
+                    event!(Level::TRACE, "{} is cancelled", cancelled.id());
                 }
             }
         }
@@ -186,6 +187,8 @@ impl<'a> Events<'a> {
         let Events(.., events, _, _) = self;
         if let Some(event) = events.get_mut(event) {
             event.activate();
+        } else {
+            event!(Level::DEBUG, "Skipped activating {}", event.id());
         }
     }
 
@@ -210,6 +213,7 @@ impl<'a> Events<'a> {
                     self.start(event, previous);
                 } else {
                     // TODO - Hamdle an existing result
+                    todo!()
                 }
             }
             Transition::Spawn => {

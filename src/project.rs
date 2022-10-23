@@ -4,14 +4,14 @@ use specs::{Join, World, WorldExt};
 use tracing::event;
 use tracing::Level;
 
-use crate::engine::{Activity, Transition};
+use crate::engine::{Activity, Transition, Limit};
 use crate::plugins::{ErrorContext, StatusUpdate};
 use crate::prelude::{Publish, Readln, Watch};
 use crate::{
     plugins::Println,
     AttributeGraph, Engine, Event, Install, Process, Runtime, Timer,
 };
-use crate::{Operation, Sequence, Start, Thunk, ThunkContext};
+use crate::{Operation, Sequence, Start, Thunk, ThunkContext, Cursor};
 
 mod runmd_listener;
 pub use runmd_listener::RunmdListener;
@@ -253,7 +253,9 @@ pub fn default_parser(world: World) -> Parser {
 pub fn default_world() -> World {
     let mut world = specs::World::new();
     world.register::<Thunk>();
+    world.register::<Limit>();
     world.register::<Event>();
+    world.register::<Cursor>();
     world.register::<Engine>();
     world.register::<Runtime>();
     world.register::<Sequence>();

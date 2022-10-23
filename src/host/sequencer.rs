@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::engine::Limit;
 use crate::{Connection, Cursor};
 use crate::{Engine, Event, Host, Sequence};
 use reality::Block;
@@ -20,7 +21,8 @@ impl Sequencer for Host {
                 block_map,
                 entities,
                 blocks,
-                _events,
+                events,
+                limits,
                 engines,
                 mut sequences,
                 mut connections,
@@ -30,6 +32,7 @@ impl Sequencer for Host {
                 Entities,
                 ReadStorage<Block>,
                 ReadStorage<Event>,
+                WriteStorage<Limit>,
                 WriteStorage<Engine>,
                 WriteStorage<Sequence>,
                 WriteStorage<Connection>,
@@ -71,16 +74,43 @@ impl Sequencer for Host {
                 }
 
                 // Unpack built cursors
-                for (entity, sequence) in (
-                    &entities,
-                    &sequences,
-                )
-                    .join()
-                {
+                for (entity, _, sequence) in (&entities, &events, &sequences).join() {
                     if let Some(cursor) = sequence.cursor() {
-                        cursors.insert(entity, cursor.clone()).expect("should be able to insert cursor");
+                        cursors
+                            .insert(entity, cursor.clone())
+                            .expect("should be able to insert cursor");
                     }
                 }
+
+                // Unpack lifecycle cursor to link engines
+                for (_, sequence) in (&engines, &sequences).join() {
+                    if let Some(last) = sequence.last() {
+                        if let Some(cursor) = sequence.cursor().cloned() {
+                            // Translate cursor into events
+                            let cursor = match cursor {
+                                Cursor::Next(next) => {
+                                    let engine = engines.get(next).expect("should have an engine");
+                                    let start = engine.start().expect("should have a start");
+                                    Cursor::Next(*start)
+                                }
+                                Cursor::Fork(forks) => {
+                                    Cursor::Fork(
+                                        forks
+                                            .iter()
+                                            .filter_map(|f| engines.get(*f))
+                                            .filter_map(|e| e.start())
+                                            .cloned()
+                                            .collect(),
+                                    )
+                                }
+                            };
+                            cursors
+                                .insert(last, cursor)
+                                .expect("should be able to insert cursor");
+                        }
+                    }
+                }
+            // TODO - Handle limits
             },
         );
     }

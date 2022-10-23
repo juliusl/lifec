@@ -25,14 +25,17 @@ mod plugins;
 pub use plugins::Plugins;
 
 mod events;
-pub use events::Events;
 pub use events::EventStatus;
+pub use events::Events;
 
 mod lifecycle;
 pub use lifecycle::Lifecycle;
 
 mod systems;
 pub use systems::install;
+
+mod limit;
+pub use limit::Limit;
 
 use tracing::Level;
 
@@ -98,16 +101,10 @@ impl Engine {
         }
     }
 
-    /// Starts an engine,
+    /// Returns the start of the engine,
     ///
-    pub fn start(&self) -> Option<Entity> {
-        self.start.clone()
-    }
-
-    /// Sets the start entity for this engine,
-    ///
-    pub fn set_start(&mut self, start: Entity) {
-        self.start = Some(start);
+    pub fn start(&self) -> Option<&Entity> {
+        self.start.as_ref()
     }
 
     /// Finds the entity for a block,
@@ -246,7 +243,7 @@ impl SpecialAttribute for Engine {
                 engine.set_lifecycle(Lifecycle::Next, Some(forks));
             });
 
-            parser.add_custom_with("loop", |p, e| {
+            parser.add_custom_with("repeat", |p, e| {
                 let entity = p.entity().expect("should have entity");
                 let world = p.world().expect("should have world");
                 let mut engines = world.write_component::<Engine>();
@@ -280,11 +277,13 @@ impl Interpreter for Engine {
         if block.is_control_block() {
             let block_entity = world.entities().entity(block.entity());
 
-            if let Some(engine) = world.read_component::<Engine>().get(block_entity) {
+            let mut sequence = Sequence::default();
+
+            if let Some(engine) = world.write_component::<Engine>().get_mut(block_entity) {
                 tracing::event!(Level::TRACE, "{:#?}", engine);
 
                 // Assign transitions to events
-                for (transition, events) in engine.iter_transitions() {
+                for (transition, events) in engine.clone().iter_transitions() {
                     for event in events.iter().filter_map(|e| {
                         Engine::find_block(world, format!("{e} {}", block.symbol()))
                     }) {
@@ -292,37 +291,43 @@ impl Interpreter for Engine {
                             .write_component()
                             .insert(event, transition.clone())
                             .expect("should be able to insert transition");
+
+                        sequence.add(event);
+                        engine.start.get_or_insert(event);
                     }
                 }
 
                 // Handle lifecycle settings
-                if let Some((lifecycle, engines)) = self.lifecycle.as_ref() {
+                if let Some((lifecycle, engines)) = engine.lifecycle.as_ref() {
                     match (lifecycle, engines) {
                         (Lifecycle::Next, Some(engines)) => {
                             if let Some(engine) = engines
                                 .iter()
-                                .filter_map(|e| {
-                                    Engine::find_block(world, format!("{e} {}", block.symbol()))
-                                })
-                                .take(1)
+                                .filter_map(|e| Engine::find_block(world, format!("{e}")))
                                 .next()
                             {
-
+                                sequence.set_cursor(engine);
                             }
                         }
                         (Lifecycle::Fork, Some(engines)) => {
                             for engine in engines
                                 .iter()
-                                .filter_map(|e| {
-                                    Engine::find_block(world, format!("{e} {}", block.symbol()))
-                                })
+                                .filter_map(|e| Engine::find_block(world, format!("{e}")))
                             {
-
+                                sequence.set_cursor(engine);
                             }
                         }
-                        (Lifecycle::Exit, _) => todo!(),
-                        (Lifecycle::Loop, _) => todo!(),
-                        (Lifecycle::Repeat(_), _) => todo!(),
+                        (Lifecycle::Exit, _) => {}
+                        (Lifecycle::Loop, _) => {
+                            sequence.set_cursor(block_entity);
+                        }
+                        (Lifecycle::Repeat(limit), _) => {
+                            sequence.set_cursor(block_entity);
+                            world
+                                .write_component()
+                                .insert(block_entity, Limit(*limit))
+                                .expect("should be able to insert a limit");
+                        }
                         _ => {
                             tracing::event!(
                                 Level::ERROR,
@@ -333,6 +338,12 @@ impl Interpreter for Engine {
                     }
                 }
             }
+
+            world
+                .write_component()
+                .insert(block_entity, sequence)
+                .expect("should have inserted a sequence");
+
             return;
         }
 
@@ -342,11 +353,15 @@ impl Interpreter for Engine {
             let mut events = world.write_component::<Event>();
             if let Some(event) = events.get_mut(block_entity) {
                 event.set_name(block.name());
-            
-                let sequence = event.sequence().expect("should have a sequence at compile-time");
+
+                let sequence = event
+                    .sequence()
+                    .expect("should have a sequence at compile-time");
 
                 let mut sequences = world.write_component::<Sequence>();
-                sequences.insert(block_entity, sequence.clone()).expect("should be able to insert component");
+                sequences
+                    .insert(block_entity, sequence.clone())
+                    .expect("should be able to insert component");
             }
         }
     }
