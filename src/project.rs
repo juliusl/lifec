@@ -111,7 +111,7 @@ pub trait Project {
         // Parse the root file without the implicit symbol set
         parser.unset_implicit_symbol();
 
-        let world = if let Some(root_runmd) = workspace.root_runmd() {
+        let mut world = if let Some(root_runmd) = workspace.root_runmd() {
             Self::compile(root_runmd, Some(parser), false)
         } else {
             let root = workspace.work_dir().join(".runmd");
@@ -122,12 +122,8 @@ pub trait Project {
                 }
             }
         };
-
-        // Enable workspace on any thunk context in the World
-        // TODO: Pivot thunk context build to Event
-        for tc in world.write_component::<ThunkContext>().as_mut_slice() {
-            tc.enable_workspace(workspace.clone());
-        }
+        
+        world.insert(Some(workspace.clone()));
 
         return world;
     }

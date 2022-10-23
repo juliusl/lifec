@@ -12,6 +12,9 @@ pub enum Activity {
     /// Scheduled to run,
     ///
     Scheduled(Instant),
+    /// Skipped
+    /// 
+    Skipped(Instant, Instant),
     /// Started to run,
     ///
     Started(Instant, Instant, usize),
@@ -40,6 +43,7 @@ impl Activity {
             Activity::Scheduled(scheduled) => {
                 Some(Activity::Started(*scheduled, Instant::now(), 1))
             }
+            Activity::Skipped(scheduled, _) => Some(Activity::Started(*scheduled, Instant::now(), 1)),
             Activity::Started(_, _, _) => None,
             Activity::Completed(scheduled, _, _, iterations) => Some(Activity::Started(
                 *scheduled,
@@ -61,7 +65,8 @@ impl Activity {
     ///
     pub fn complete(&self, error_context: Option<&ErrorContext>) -> Self {
         match &self {
-            Activity::Scheduled(_) => Activity::None,
+            Activity::Scheduled(scheduled) => Activity::Skipped(*scheduled, Instant::now()),
+            Activity::Skipped(..) => self.clone(),
             Activity::Started(scheduled, started, iterations) if error_context.is_some() => {
                 Activity::Error(*scheduled, *started, Instant::now(), *iterations)
             }

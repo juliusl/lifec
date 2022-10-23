@@ -215,9 +215,7 @@ fn test_workspace_paths() {
 }
 
 mod tests {
-    use tracing::Level;
-
-    use crate::Project;
+    use crate::{Project, Cursor};
 
     struct Test;
 
@@ -228,11 +226,10 @@ mod tests {
     }
 
     #[test]
-    #[tracing_test::traced_test]
+    // #[tracing_test::traced_test]
     fn test_compile_workspace() {
         use crate::{
-            Engine, Events, EventStatus,
-            engine::Transition, project::RunmdFile, Connection, Cursor, Event, Host, Sequence,
+            project::RunmdFile, Connection, EventStatus, Events, Host,
             Sequencer, Workspace,
         };
         use atlier::system::{Attribute, Value};
@@ -240,6 +237,7 @@ mod tests {
         use reality::BlockProperty;
         use specs::Join;
         use specs::WorldExt;
+        use tracing::Level;
 
         let mut workspace = Workspace::new("test.io", None);
         workspace.set_root_runmd(
@@ -326,7 +324,6 @@ mod tests {
 
         // Test with no tags
         let world = Test::compile_workspace(&workspace, files.iter());
-
         {
             let root_ent = world.entities().entity(0);
             let root = world.read_component::<Block>();
@@ -355,93 +352,52 @@ mod tests {
             );
         }
 
-        {
-            for (entity, event, transition) in (
-                &world.entities(),
-                &world.read_component::<Event>(),
-                &world.read_component::<Transition>(),
-            )
-                .join()
-            {
-                println!("{:?} {:?} {:?}", entity, event, transition);
-            }
-        }
-
         let mut host = Host::from(world);
         host.link_sequences();
 
-        for (_, sequence) in (
-            &host.world().entities(),
-            &host.world().read_component::<Sequence>(),
-        )
-            .join()
+        let _ = host.prepare::<Test>(None);
         {
-            println!("{:#?}", sequence);
-            println!();
+            let mut events = host.world().system_data::<Events>();
+
+            let serialized_tick = |events: &mut Events| {
+                let event_state = events.scan();
+                for event in event_state {
+                    if let EventStatus::InProgress(in_progress) = event {
+                        events.wait_for_ready(in_progress);
+                    }
+                }
+
+                let event_state = events.scan();
+                events.handle(event_state);
+            };
+
+            // Test that initially everything is idle
+            assert!(events.scan().is_empty());
+
+            // Test that activating an event gets picked up by .scan()
+            let event = host.world().entities().entity(2);
+            events.activate(event);
+
+            // TODO - add assertions
+            let event_state = events.scan();
+            assert_eq!(event_state.get(0), Some(&EventStatus::New(event)));
+            events.handle(event_state);
+
+            for i in 0..9 {
+                tracing::event!(Level::DEBUG, "Tick {i}");
+                serialized_tick(&mut events);
+            }
         }
 
-        for (_, cursor) in (
-            &host.world().entities(),
-            &host.world().read_component::<Cursor>(),
-        )
-            .join()
-        {
-            println!("{:#?}", cursor);
-            println!();
-        }
-
-        for (_, cursor) in (
+        for (_, connection) in (
             &host.world().entities(),
             &host.world().read_component::<Connection>(),
         )
             .join()
         {
-            println!("{:#?}", cursor);
-            println!();
-        }
-
-        for (_, engine) in (
-            &host.world().entities(),
-            &host.world().read_component::<Engine>(),
-        )
-            .join()
-        {
-            println!("{:#?}", engine);
-            println!();
-        }
-
-        let _ = host.prepare::<Test>(None);
-
-        let mut events = host.world().system_data::<Events>();
-
-        let serialized_tick = |events: &mut Events| {
-            let event_state = events.scan();
-            for event in event_state {
-                // println!("{:#?}", event);
-                if let EventStatus::InProgress(in_progress) = event {
-                    events.wait_for_ready(in_progress);
-                }
+            for (connection_state, activity) in connection.connection_state() {
+                println!("{:?}, {:?}", connection_state, activity);
             }
-    
-            let event_state = events.scan();
-            events.handle(event_state);
-        };
-
-        // Test that initially everything is idle
-        assert!(events.scan().is_empty());
-
-        // Test that activating an event gets picked up by .scan()
-        let event = host.world().entities().entity(2);
-        events.activate(event);
-
-        // TODO - add assertions
-        let event_state = events.scan();
-        assert_eq!(event_state.get(0), Some(&EventStatus::New(event)));
-        events.handle(event_state);
-
-        for i in 0..8 {
-            tracing::event!(Level::DEBUG, "Tick {i}");
-            serialized_tick(&mut events);
         }
 
         // Test with tags

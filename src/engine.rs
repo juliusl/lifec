@@ -294,8 +294,6 @@ impl Interpreter for Engine {
             let mut sequence = Sequence::default();
 
             if let Some(engine) = world.write_component::<Engine>().get_mut(block_entity) {
-                tracing::event!(Level::TRACE, "{:#?}", engine);
-
                 // Assign transitions to events
                 for (transition, events) in engine.clone().iter_transitions() {
                     for event in events.iter().filter_map(|e| {

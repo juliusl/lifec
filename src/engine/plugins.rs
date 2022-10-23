@@ -4,12 +4,13 @@ use reality::Block;
 use specs::{Read, Entities, ReadStorage, Entity, SystemData, prelude::*};
 use tokio::{sync::{mpsc::Sender, oneshot}, select};
 
-use crate::{prelude::{EventRuntime, StatusUpdate}, SecureClient, Operation, Start, Thunk, AttributeGraph, ThunkContext, Sequence};
+use crate::{prelude::{EventRuntime, StatusUpdate}, SecureClient, Operation, Start, Thunk, AttributeGraph, ThunkContext, Sequence, Workspace};
 
 /// System data for plugins,
 ///
 #[derive(SystemData)]
 pub struct Plugins<'a>(
+    Read<'a, Option<Workspace>>,
     Read<'a, tokio::runtime::Runtime, EventRuntime>,
     Read<'a, SecureClient, EventRuntime>,
     Read<'a, Sender<StatusUpdate>, EventRuntime>,
@@ -31,6 +32,7 @@ impl<'a> Plugins<'a> {
         initial_context: Option<&ThunkContext>,
     ) -> ThunkContext {
         let Plugins(
+            workspace,
             runtime,
             client,
             status_sender,
@@ -53,6 +55,10 @@ impl<'a> Plugins<'a> {
             .enable_status_updates(status_sender.deref().clone())
             .enable_start_command_dispatcher(start_sender.deref().clone());
 
+        if let Some(workspace) = workspace.as_ref() {
+            context.enable_workspace(workspace.clone());
+        }
+
         let block = blocks.get(entity).expect("should have a block");
         let graph = graphs.get(entity).expect("should have a graph");
 
@@ -62,7 +68,7 @@ impl<'a> Plugins<'a> {
     /// Combines a sequence of plugin calls into an operation,
     /// 
     pub fn start_sequence(&self, sequence: &Sequence, initial_context: Option<&ThunkContext>) -> Operation {
-        let Plugins(runtime, .., thunk_components, block_components, graph_components) = self;
+        let Plugins(_, runtime, .., thunk_components, block_components, graph_components) = self;
         
         let sequence = sequence.clone();
         let handle = runtime.handle();

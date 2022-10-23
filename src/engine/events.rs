@@ -5,7 +5,7 @@ use crate::{
     ThunkContext,
 };
 
-use super::{Plugins, Transition, Limit};
+use super::{Limit, Plugins, Transition};
 
 use tracing::{event, Level};
 
@@ -87,6 +87,7 @@ impl<'a> Events<'a> {
             match event {
                 EventStatus::Scheduled(e) | EventStatus::New(e) => {
                     event!(Level::DEBUG, "Starting event {}", e.id());
+                    self.set_scheduled_connection_state(*e);
                     self.transition(None, *e);
                 }
                 EventStatus::Ready(ready) => {
@@ -99,16 +100,25 @@ impl<'a> Events<'a> {
                         if let Some(error) = result.as_ref().and_then(ThunkContext::get_errors) {
                             self.set_error_connection_state(*ready, next, error);
                         } else {
+                            self.set_completed_connection_state(*ready, next);
                             if !self.activate(next) {
-                                event!(Level::DEBUG, "Reentering event");
-                                let Events(.. , limits, _, _, _) = self;
+                                event!(Level::DEBUG, "Repeating event");
+                                let Events(.., limits, _, _, _) = self;
                                 if let Some(limit) = limits.get_mut(next) {
                                     if !limit.take_one() {
                                         event!(Level::DEBUG, "Limit reached for {}", next.id());
+
+                                        for n in self.get_next_entities(next) {
+                                            self.set_completed_connection_state(next, n);
+                                        }
                                         return;
                                     }
                                 }
                             }
+
+                            // Signal to the events this event is connected to that this
+                            // event is being processed
+                            self.set_scheduled_connection_state(next);
                             self.transition(result.as_ref(), next);
                         }
                     }
@@ -205,14 +215,8 @@ impl<'a> Events<'a> {
     /// Handles the transition of an event,
     ///
     pub fn transition(&mut self, previous: Option<&ThunkContext>, event: Entity) {
-        {
-            // Signal to the events this event is connected to that this
-            // event is being processed
-            self.set_scheduled_connection_state(event);
-        }
-
         let Events(.., transitions, _, _, _, _) = self;
-        
+
         let transition = transitions.get(event).unwrap_or(&Transition::Start);
         match transition {
             Transition::Start => {
@@ -223,21 +227,22 @@ impl<'a> Events<'a> {
                     self.start(event, previous);
                 } else {
                     for next in self.get_next_entities(event) {
-                        self.start(next, previous);
+                        self.transition(previous, next);
                     }
                 }
-            }
-            Transition::Spawn => {
-                // TODO: Duplicates the current event data under a new entity
-                todo!()
             }
             Transition::Select => {
                 if let Some(previous) = previous {
                     event!(Level::TRACE, "Selecting {}", previous.state().entity_id());
                     self.select(event, previous);
+                    self.start(event, Some(previous));
                 } else {
-                    self.start(event, None);
+                    tracing::event!(Level::DEBUG, "Skipping");
                 }
+            }
+            Transition::Spawn => {
+                // TODO: Duplicates the current event data under a new entity
+                todo!()
             }
             Transition::Buffer => {
                 // TODO: Buffers incoming events
@@ -271,11 +276,14 @@ impl<'a> Events<'a> {
     pub fn select(&mut self, event: Entity, previous: &ThunkContext) {
         let Events(_, entities, .., connections, _) = self;
 
-        let selected = previous.state().find_int("event_id").expect("should have event id");
+        let selected = previous
+            .state()
+            .find_int("event_id")
+            .expect("should have event id");
         let selected = entities.entity(selected as u32);
 
         let connection = connections
-            .get_mut(event)
+            .get(event)
             .expect("should have a connection")
             .clone();
         for (from, _) in connection
