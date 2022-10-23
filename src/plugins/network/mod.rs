@@ -165,8 +165,6 @@ fn test_network_systems() {
     let test_world = &mut test_world;
     let mut test_dispatcher = DispatcherBuilder::new();
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
-    EventRuntime::configure_app_world(test_world);
-    EventRuntime::configure_app_systems(&mut test_dispatcher);
     NetworkRuntime::configure_app_world(test_world);
     NetworkRuntime::configure_app_systems(&mut test_dispatcher);
 

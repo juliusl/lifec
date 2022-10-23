@@ -13,7 +13,7 @@ mod broker;
 pub use broker::Broker as PluginBroker;
 
 mod features;
-pub use features::PluginFeatures;
+pub use features::Features as PluginFeatures;
 
 /// System data for plugins,
 ///

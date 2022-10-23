@@ -7,7 +7,7 @@ use hyper::Client;
 use hyper_tls::HttpsConnector;
 use reality::Block;
 use specs::{
-    shred::SetupHandler, Entities, Entity, Read, ReadStorage, System, World, WorldExt,
+    shred::SetupHandler, Entities, Entity, Read, ReadStorage, System, World, 
     WriteStorage,
 };
 use tokio::sync::{
@@ -15,28 +15,10 @@ use tokio::sync::{
     mpsc::{self, Sender},
 };
 
-mod event_listener;
-pub use event_listener::EventListener;
-
 /// Event runtime drives the tokio::Runtime and schedules/monitors/orchestrates plugin events
 ///
 #[derive(Default)]
 pub struct EventRuntime;
-
-impl Extension for EventRuntime {
-    fn configure_app_world(world: &mut specs::World) {
-        world.register::<Event>();
-        world.register::<ThunkContext>();
-        world.register::<CancelThunk>();
-        world.register::<ErrorContext>();
-        world.register::<Runtime>();
-        world.register::<Operation>();
-    }
-
-    fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
-        dispatcher.add(EventRuntime::default(), "event_runtime", &[]);
-    }
-}
 
 /// Setup for tokio runtime, (Not to be confused with crate::Runtime)
 impl SetupHandler<tokio::runtime::Runtime> for EventRuntime {

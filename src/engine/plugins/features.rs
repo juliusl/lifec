@@ -6,18 +6,18 @@ use crate::prelude::*;
 /// System data with plugin feature resources,
 ///
 #[derive(SystemData)]
-pub struct PluginFeatures<'a>(
+pub struct Features<'a>(
     Read<'a, Option<Workspace>>,
     Read<'a, tokio::runtime::Runtime, EventRuntime>,
     Read<'a, SecureClient, EventRuntime>,
     PluginBroker<'a>,
 );
 
-impl<'a> PluginFeatures<'a> {
+impl<'a> Features<'a> {
     /// Enables features on a thunk context,
     ///
     pub fn enable(&self, entity: Entity, context: &ThunkContext) -> ThunkContext {
-        let PluginFeatures(workspace, runtime, client, sender) = self;
+        let Features(workspace, runtime, client, sender) = self;
 
         let mut context = context.enable_async(entity, runtime.handle().clone());
 

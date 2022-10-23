@@ -13,7 +13,6 @@ pub use network::TCP;
 pub use network::UDP;
 
 mod events;
-pub use events::EventListener;
 pub use events::EventRuntime;
 
 mod thunks;

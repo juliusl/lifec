@@ -1,5 +1,3 @@
-
-
 mod attribute_index;
 pub use attribute_index::AttributeIndex;
 

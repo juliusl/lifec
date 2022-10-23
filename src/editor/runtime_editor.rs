@@ -31,14 +31,12 @@ impl Default for RuntimeEditor {
 impl Extension for RuntimeEditor {
     fn configure_app_world(world: &mut specs::World) {
         List::<Task>::configure_app_world(world);
-        EventRuntime::configure_app_world(world);
         world.register::<Connection>();
         world.register::<Sequence>();
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
         List::<Task>::configure_app_systems(dispatcher);
-        EventRuntime::configure_app_systems(dispatcher);
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {

@@ -33,7 +33,6 @@ impl Task {
 
 impl Extension for Task {
     fn configure_app_world(world: &mut World) {
-        EventRuntime::configure_app_world(world);
         StartButton::configure_app_world(world);
         world.register::<ProgressStatusBar>();
         world.register::<Task>();
