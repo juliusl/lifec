@@ -1,8 +1,8 @@
-use std::{collections::HashMap, ops::Deref};
+use std::collections::HashMap;
 
 use reality::Block;
-use specs::{prelude::*, Entities, Entity, Read, ReadStorage, SystemData};
-use tokio::{runtime::Handle, select, sync::oneshot};
+use specs::{prelude::*, Entities, Entity, ReadStorage, SystemData};
+use tokio::{select, sync::oneshot};
 
 use crate::prelude::*;
 
