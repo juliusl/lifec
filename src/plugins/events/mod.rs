@@ -1,25 +1,22 @@
 use super::{
     thunks::{CancelThunk, ErrorContext, SecureClient, StatusUpdate},
-    Archive, BlockAddress, Thunk, ThunkContext,
+    Archive, BlockAddress, ThunkContext,
 };
 use crate::{
     engine::{Connection, Sequence, Activity},
-    AttributeGraph, AttributeIndex, Engine, Event, Extension, Operation, Runtime, Start,
+    AttributeGraph, Engine, Event, Extension, Operation, Runtime, Start,
 };
 use hyper::Client;
 use hyper_tls::HttpsConnector;
 use reality::Block;
 use specs::{
-    shred::SetupHandler, Entities, Entity, Join, Read, ReadStorage, System, World, WorldExt,
+    shred::SetupHandler, Entities, Entity, Read, ReadStorage, System, World, WorldExt,
     WriteStorage,
 };
-use std::sync::Arc;
 use tokio::sync::{
     self, broadcast,
     mpsc::{self, Sender},
 };
-use tracing::event;
-use tracing::Level;
 
 mod event_listener;
 pub use event_listener::EventListener;
@@ -208,28 +205,28 @@ impl<'a> System<'a> for EventRuntime {
     fn run(
         &mut self,
         (
-            runtime,
-            https_client,
-            status_update_channel,
-            dispatcher,
-            operation_dispatcher,
-            error_dispatcher,
-            start_command_dispatcher,
-            thunk_complete_channel,
-            entities,
-            connections,
-            lifec_runtimes,
-            attribute_graphs,
-            engines,
-            blocks,
-            mut events,
-            mut contexts,
-            mut sequences,
-            mut cancel_tokens,
-            mut error_contexts,
-            mut archives,
-            mut block_addresses,
-            mut activities,
+            _runtime,
+            _https_client,
+            _status_update_channel,
+            _dispatcher,
+            _operation_dispatcher,
+            _error_dispatcher,
+            _start_command_dispatcher,
+            _thunk_complete_channel,
+            _entities,
+            _connections,
+            _lifec_runtimes,
+            _attribute_graphs,
+            _engines,
+            _blocks,
+            mut _events,
+            mut _contexts,
+            mut _sequences,
+            mut _cancel_tokens,
+            mut _error_contexts,
+            mut _archives,
+            mut _block_addresses,
+            mut _activities,
         ): Self::SystemData,
     ) {
         // let mut dispatch_queue = vec![];

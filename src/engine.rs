@@ -26,6 +26,7 @@ pub use plugins::Plugins;
 
 mod events;
 pub use events::Events;
+pub use events::EventStatus;
 
 mod lifecycle;
 pub use lifecycle::Lifecycle;

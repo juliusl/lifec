@@ -52,6 +52,8 @@ pub struct Operation {
     task: Option<AsyncContext>,
     /// Result returned from the task,
     result: Option<ThunkContext>,
+    /// True if cancelled,
+    cancelled: bool, 
 }
 
 impl Operation {
@@ -62,6 +64,7 @@ impl Operation {
             handle,
             task: None,
             result: None,
+            cancelled: false,
         }
     }
 
@@ -98,6 +101,7 @@ impl Operation {
         self.cancel(); 
 
         self.task = func(context);
+        self.cancelled = false;
     }
 
     /// Returns self with a new async context,
@@ -106,6 +110,7 @@ impl Operation {
         self.cancel();
         
         self.task = Some(async_context);
+        self.cancelled = false;
         self
     }
 
@@ -116,6 +121,7 @@ impl Operation {
         self.cancel();
 
         self.task = Some(async_context.into());
+        self.cancelled = false;
     }
 
     /// **Destructive** - calling this method will take and handle resolving this task to completion,
@@ -252,15 +258,23 @@ impl Operation {
     /// Returns true if this is an empty operation,
     ///
     pub fn is_empty(&self) -> bool {
-        self.task.is_none() && self.result.is_none()
+        self.task.is_none() && self.result.is_none() && !self.cancelled
+    }
+
+    /// Returns true if this event has been cancelled,
+    /// 
+    /// TODO: Try to handle this differently
+    /// 
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled
     }
 
     /// Cancels any ongoing task,
     /// 
     pub fn cancel(&mut self) {
         if let Some((_, cancel)) = self.task.take() {
-            event!(Level::TRACE, "Cancelling task");
             cancel.send(()).ok();
+            self.cancelled = true;
         }
     }
 }
@@ -271,6 +285,7 @@ impl Clone for Operation {
             handle: self.handle.clone(),
             result: self.result.clone(),
             task: None,
+            cancelled: self.cancelled,
         }
     }
 }

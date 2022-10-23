@@ -145,7 +145,7 @@ impl<'a> System<'a> for NetworkRuntime {
                                     upstream_context
                                         .state_mut()
                                         .with_int("received", sent as i32);
-                                   //  upstream_event.fire(upstream_context);
+                                    upstream_event.activate();
                                 }
                             }
                             _ => {}

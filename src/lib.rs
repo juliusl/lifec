@@ -48,6 +48,7 @@ mod engine;
 pub use engine::Engine;
 pub use engine::Event;
 pub use engine::Events;
+pub use engine::EventStatus;
 pub use engine::Sequence;
 pub use engine::Connection;
 pub use engine::Cursor;

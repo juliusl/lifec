@@ -215,7 +215,7 @@ fn test_workspace_paths() {
 }
 
 mod tests {
-    use crate::{Engine, Project};
+    use crate::Project;
 
     struct Test;
 
@@ -229,6 +229,7 @@ mod tests {
     #[tracing_test::traced_test]
     fn test_compile_workspace() {
         use crate::{
+            Engine, Events, EventStatus,
             engine::Transition, project::RunmdFile, Connection, Cursor, Event, Host, Sequence,
             Sequencer, Workspace,
         };
@@ -374,7 +375,6 @@ mod tests {
             .join()
         {
             println!("{:#?}", sequence);
-            //println!("{:#?}", connection);
             println!();
         }
 
@@ -407,6 +407,62 @@ mod tests {
             println!("{:#?}", engine);
             println!();
         }
+
+        let _ = host.prepare::<Test>(None);
+
+        let mut events = host.world().system_data::<Events>();
+
+        // Test that initially everything is idle
+        assert!(events.scan().is_empty());
+
+        // Test that activating an event gets picked up by .scan()
+        let event = host.world().entities().entity(2);
+        events.activate(event);
+
+        // TODO - add assertions
+        let event_state = events.scan();
+        assert_eq!(event_state.get(0), Some(&EventStatus::New(event)));
+        events.handle(event_state);
+
+        let event_state = events.scan();
+        if let EventStatus::InProgress(in_progress) = event_state.get(0).expect("should have an in progress event") {
+            events.wait_for_ready(*in_progress);
+        }
+
+        let event_state = events.scan();
+        events.handle(event_state);
+
+
+        let event_state = events.scan();
+        for event in event_state {
+            println!("{:#?}", event);
+            if let EventStatus::InProgress(in_progress) = event {
+                events.wait_for_ready(in_progress);
+            }
+        }
+
+        let event_state = events.scan();
+        events.handle(event_state);
+
+        let event_state = events.scan();
+        events.handle(event_state);
+
+        let event_state = events.scan();
+        for event in event_state {
+            println!("{:#?}", event);
+            if let EventStatus::InProgress(in_progress) = event {
+                events.wait_for_ready(in_progress);
+            }
+        }
+
+        let event_state = events.scan();
+        events.handle(event_state);
+
+        let event_state = events.scan();
+        for event in event_state.iter() {
+            println!("{:#?}", event);
+        }
+        events.handle(event_state);
 
         // Test with tags
         // let world = Test::compile_workspace(&workspace.use_tags(vec!["test"]), files.iter());

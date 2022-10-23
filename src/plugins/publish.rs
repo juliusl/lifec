@@ -104,7 +104,7 @@ mod tests {
         let mut dispatcher = host.prepare::<Test>(None);
 
         let engine = host.find_start("test").expect("should have a test block");
-        host.start_event(engine, ThunkContext::default());
+        host.start_event(engine);
 
         // Spawn a task to connect and read from the publish plugin
         let task = tokio::spawn(async {

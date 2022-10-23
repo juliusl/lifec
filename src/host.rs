@@ -579,7 +579,7 @@ impl Host {
 
         // Starts an event
         let event = self.world().entities().entity(event_entity);
-        self.start_event(event, ThunkContext::default());
+        self.start_event(event);
 
         // Waits for event runtime to exit
         self.wait_for_exit(&mut dispatcher);
@@ -600,9 +600,9 @@ impl Host {
 
     /// Starts an event,
     ///
-    pub fn start_event(&mut self, event: Entity, thunk_context: ThunkContext) {
+    pub fn start_event(&mut self, event: Entity) {
         if let Some(event) = self.world().write_component::<Event>().get_mut(event) {
-            // event.fire(thunk_context);
+            event.activate();
         }
 
         self.world_mut().maintain();

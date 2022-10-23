@@ -258,6 +258,7 @@ pub fn default_world() -> World {
     world.register::<Runtime>();
     world.register::<Sequence>();
     world.register::<Activity>();
+    world.register::<Operation>();
     world.register::<Transition>();
     world.register::<ThunkContext>();
     world.register::<AttributeGraph>();
