@@ -371,19 +371,6 @@ mod tests {
         {
 
             let mut events = host.world().system_data::<Events>();
-
-            let serialized_tick = |events: &mut Events| {
-                let event_state = events.scan();
-                for event in event_state {
-                    if let EventStatus::InProgress(in_progress) = event {
-                        events.wait_for_ready(in_progress);
-                    }
-                }
-
-                let event_state = events.scan();
-                events.handle(event_state);
-            };
-
             // Test that initially everything is idle
             assert!(events.scan().is_empty());
 
@@ -398,7 +385,7 @@ mod tests {
 
             for i in 0..9 {
                 tracing::event!(Level::DEBUG, "Tick {i}");
-                serialized_tick(&mut events);
+                events.serialized_tick();
             }
         }
 

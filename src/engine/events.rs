@@ -1,7 +1,7 @@
 use specs::{prelude::*, Entities, SystemData};
 
-use crate::prelude::*;
 use super::{Limit, Plugins, Transition};
+use crate::prelude::*;
 
 use tracing::{event, Level};
 
@@ -136,6 +136,27 @@ impl<'a> Events<'a> {
         }
     }
 
+    /// Performs a serialized tick, waiting for any events in-progress before returning,
+    /// 
+    pub fn serialized_tick(&mut self) {
+        let event_state = self.scan();
+        for event in event_state {
+            if let EventStatus::InProgress(in_progress) = event {
+                self.wait_for_ready(in_progress);
+            }
+        }
+
+        let event_state = self.scan();
+        self.handle(event_state);
+    }
+
+    /// Scans event data and handles any ready transitions, does not block,
+    /// 
+    pub fn tick(&mut self) {
+        let event_state = self.scan();
+        self.handle(event_state);
+    }
+
     /// Returns next entities this event points to,
     ///
     pub fn get_next_entities(&mut self, event: Entity) -> Vec<Entity> {
@@ -223,7 +244,7 @@ impl<'a> Events<'a> {
                 self.start(event, previous);
             }
             Transition::Once => {
-               self.once(event, previous);
+                self.once(event, previous);
             }
             Transition::Select => {
                 if let Some(previous) = previous {
@@ -266,7 +287,7 @@ impl<'a> Events<'a> {
     }
 
     /// Skips if the event already has a result,
-    /// 
+    ///
     pub fn once(&mut self, event: Entity, previous: Option<&ThunkContext>) {
         if self.get_result(event).is_none() {
             self.start(event, previous);
@@ -301,19 +322,19 @@ impl<'a> Events<'a> {
     }
 }
 
-/// Functions for sending messages, 
-/// 
+/// Functions for sending messages,
+///
 impl<'a> Events<'a> {
     /// Tries to send an error context,
-    /// 
+    ///
     pub fn send_error_context(&self, error_context: ErrorContext) {
-        let Events(errors, ..)  = self;
+        let Events(errors, ..) = self;
 
         errors.try_send(error_context).ok();
     }
 
     /// Returns the event entity that just completed,
-    /// 
+    ///
     pub fn send_completed_event(&self, event: Entity) {
         let Events(_, completed, ..) = self;
 
