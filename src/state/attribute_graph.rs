@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use atlier::system::{Attribute, Value};
 use reality::BlockProperties;
 use specs::{storage::HashMapStorage, Component};
@@ -5,40 +6,72 @@ use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     hash::{Hash, Hasher},
 };
-use crate::prelude::*;
 
 /// Wrapper struct over a block index,
-/// 
+///
 /// Implements AttributeIndex
 ///
 #[derive(Debug, Default, Component, Clone, Hash, Eq, PartialEq, PartialOrd)]
 #[storage(HashMapStorage)]
 pub struct AttributeGraph {
-    /// Block index 
-    /// 
+    /// Block index,
+    ///
     index: BlockIndex,
-    /// Scopes the graph to a child entity
+    /// Scopes the graph to a child entity,
     ///
     child: Option<u32>,
+    /// Optional config that will be applied to this graph,
+    ///
+    applied: Vec<BlockProperties>,
 }
 
 impl AttributeGraph {
     /// Creates an attribute graph over data found in a block,
     ///
     pub fn new(index: BlockIndex) -> Self {
-        Self { index, child: None }
+        Self {
+            index,
+            child: None,
+            applied: vec![],
+        }
+    }
+
+    /// Applies a config to the graph's control values,
+    ///
+    /// Stores the applied block properties,
+    /// 
+    pub fn apply(&mut self, config: BlockProperties) {
+        event!(Level::TRACE, "Applying config {:#?}", config);
+        for (name, property) in config.iter_properties() {
+            match property {
+                BlockProperty::Single(value) => {
+                    self.add_control(name, value.clone());
+                },
+                BlockProperty::List(values) => {
+                    // Control values can only have a single value, so apply the last value in the list
+                    // Since by default the indexer will convert a duplicate named attribute into a list property
+                    let last = values.last().expect("should have a last value");
+                    self.add_control(name, last.clone());
+                },
+                _ => {
+
+                }
+            }
+        }
+
+        self.applied.push(config);
     }
 
     /// Adds a control value to the underlying graph,
-    /// 
+    ///
     /// A control value will be available to every plugin that consumes this graph.
-    /// 
+    ///
     pub fn add_control(&mut self, name: impl AsRef<str>, value: impl Into<Value>) {
         self.index.add_control(name, value);
-    } 
+    }
 
     /// Returns the current hash_code of the graph
-    /// 
+    ///
     pub fn hash_code(&self) -> u64 {
         let mut hasher = DefaultHasher::default();
 
@@ -48,15 +81,15 @@ impl AttributeGraph {
     }
 
     /// Returns some bool if there is a matching name attribute with bool value
-    /// 
+    ///
     pub fn is_enabled(&self, with_name: impl AsRef<str>) -> bool {
         self.find_bool(with_name).unwrap_or_default()
     }
 
     /// Returns a new graph scoped at the child entity,
-    /// 
+    ///
     /// If the child is not a part of this graph, nothing is returned
-    /// 
+    ///
     pub fn scope(&self, child: u32) -> Option<AttributeGraph> {
         if let Some(_) = self.index.child_properties(child) {
             let mut clone = self.clone();
@@ -68,7 +101,7 @@ impl AttributeGraph {
     }
 
     /// Returns an unscoped graph,
-    /// 
+    ///
     pub fn unscope(&self) -> AttributeGraph {
         let mut clone = self.clone();
         clone.child = None;
@@ -76,7 +109,7 @@ impl AttributeGraph {
     }
 
     /// Resolves the properties to use within the current scope,
-    /// 
+    ///
     fn resolve_properties(&self) -> &BlockProperties {
         if let Some(child) = self
             .child
@@ -106,12 +139,12 @@ impl AttributeIndex for AttributeGraph {
             match property {
                 BlockProperty::Single(val) => {
                     property_values.push(val.clone());
-                },
+                }
                 BlockProperty::List(vals) => {
                     let mut vals = vals.iter().cloned().collect();
                     let vals = &mut vals;
                     property_values.append(vals);
-                },
+                }
                 _ => {
                     continue;
                 }
@@ -163,10 +196,14 @@ impl AttributeIndex for AttributeGraph {
         let properties = self.resolve_properties();
         match search(properties.property(with_name.as_ref()).cloned()) {
             Some(val) => Some(val),
-            None =>  {
-                event!(Level::TRACE, "Searching for `{}` from control values", with_name.as_ref());
+            None => {
+                event!(
+                    Level::TRACE,
+                    "Searching for `{}` from control values",
+                    with_name.as_ref()
+                );
                 self.index.control_values().get(with_name.as_ref()).cloned()
-            },
+            }
         }
     }
 
@@ -209,7 +246,11 @@ impl AttributeIndex for AttributeGraph {
         let mut output = search(properties.property(with_name.as_ref()).cloned());
 
         if output.is_empty() {
-            event!(Level::TRACE, "Searching for `{}` from control values", with_name.as_ref());
+            event!(
+                Level::TRACE,
+                "Searching for `{}` from control values",
+                with_name.as_ref()
+            );
             if let Some(val) = self.index.control_values().get(with_name.as_ref()) {
                 output.push(val.clone());
             }
@@ -229,7 +270,7 @@ impl AttributeIndex for AttributeGraph {
         };
 
         if attr.is_stable() {
-            // If added through this with/add functions, then the attribute should 
+            // If added through this with/add functions, then the attribute should
             // always be stable
             properties.add(attr.name, attr.value.clone());
         } else if let Some((name, value)) = attr.transient {
@@ -250,7 +291,7 @@ impl AttributeIndex for AttributeGraph {
         };
 
         if attr.is_stable() {
-            // If added through this with/add functions, then the attribute should 
+            // If added through this with/add functions, then the attribute should
             // always be stable
             properties.set(attr.name, BlockProperty::Single(attr.value.clone()));
         } else if let Some((name, value)) = attr.transient {

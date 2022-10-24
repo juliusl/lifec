@@ -331,10 +331,10 @@ impl Interpreter for Engine {
                                 sequence.set_cursor(engine);
                             }
                         }
-                        (Lifecycle::Exit, _) => {}
                         (Lifecycle::Loop, _) |  (Lifecycle::Repeat(_), _)  => {
                             sequence.set_cursor(block_entity);
                         }
+                        (Lifecycle::Exit, _) => { /* No-OP */}
                         _ => {
                             tracing::event!(
                                 Level::ERROR,

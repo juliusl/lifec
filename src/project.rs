@@ -5,8 +5,8 @@ pub use source::RunmdFile;
 pub use source::Source;
 
 mod workspace;
-use workspace::WorkspaceConfig;
 pub use workspace::Workspace;
+use workspace::WorkspaceConfig;
 
 mod listener;
 pub use listener::Listener;
@@ -26,11 +26,7 @@ pub trait Project {
 
     /// Override to customize the dispatcher,
     ///
-    fn configure_dispatcher(
-        _world: &World,
-        _dispatcher_builder: &mut DispatcherBuilder
-    ) {
-    }
+    fn configure_dispatcher(_world: &World, _dispatcher_builder: &mut DispatcherBuilder) {}
 
     /// Override to provide a custom Runtime,
     ///
@@ -79,6 +75,22 @@ pub trait Project {
                     }
                 }
             }
+
+            // Add source file for each engine
+            let entity = parser.get_block("", symbol).entity();
+            let entities = parser.as_ref().entities();
+            let entity = entities.entity(entity);
+            parser
+                .as_ref()
+                .write_component()
+                .insert(
+                    entity,
+                    RunmdFile {
+                        symbol: symbol.to_string(),
+                        source: source.clone(),
+                    },
+                )
+                .expect("should be able to insert");
         }
 
         // Parse the root file without the implicit symbol set
@@ -95,7 +107,28 @@ pub trait Project {
                 }
             }
         };
-        
+
+        // Apply config defined in root block
+        {
+            let mut config_data = world.system_data::<WorkspaceConfig>();
+            let configs = config_data.scan_root();
+
+            if let Some(config) = configs.iter().find(|c| c.root().name() == "config") {
+                config_data.find_apply(config);
+            }
+
+            for tag in workspace.iter_tags() {
+                for config in configs
+                    .clone()
+                    .iter()
+                    .filter(|c| c.root().name().starts_with(tag))
+                {
+                    config_data.find_apply(config);
+                }
+            }
+        }
+
+        // Finalize world
         world.insert(Some(workspace.clone()));
 
         return world;
@@ -125,12 +158,8 @@ pub trait Project {
         Self::initialize(&mut world);
 
         // Setup graphs for all plugin entities
-        for (entity, block_index, event) in (
-            &world.entities(),
-            &world.read_component::<BlockIndex>(),
-            world.read_component::<Event>().maybe(),
-        )
-            .join()
+        for (entity, block_index) in
+            (&world.entities(), &world.read_component::<BlockIndex>()).join()
         {
             let mut graph = AttributeGraph::new(block_index.clone());
             if entity.id() != block_index.root().id() {
@@ -140,13 +169,6 @@ pub trait Project {
                 .write_component()
                 .insert(entity, graph)
                 .expect("Should be able to insert graph for entity");
-
-            if let Some(_) = event {
-                world
-                    .write_component()
-                    .insert(entity, Activity::default())
-                    .expect("Should be able to insert an activity");
-            }
         }
 
         for block in world.read_component::<Block>().join() {
@@ -199,6 +221,7 @@ pub fn default_world() -> World {
     world.register::<Sequence>();
     world.register::<Activity>();
     world.register::<Operation>();
+    world.register::<RunmdFile>();
     world.register::<Transition>();
     world.register::<ThunkContext>();
     world.register::<AttributeGraph>();

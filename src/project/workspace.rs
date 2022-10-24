@@ -1,9 +1,6 @@
 use crate::prelude::*;
 use std::path::PathBuf;
 
-mod create;
-pub use create::Create;
-
 mod config;
 pub use config::Config as WorkspaceConfig;
 
@@ -166,6 +163,16 @@ impl Workspace {
         }
     }
 
+    /// Returns an iterator over tags,
+    /// 
+    pub fn iter_tags(&self) -> impl Iterator<Item = &String> {
+        if let Some(tags) = self.use_tags.as_ref() {
+            tags.iter()
+        } else {
+            [].iter()
+        }
+    }
+
     /// Returns a path buf to the work dir,
     ///
     pub fn work_dir(&self) -> &PathBuf {
@@ -241,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    #[tracing_test::traced_test]
+    // #[tracing_test::traced_test]
     fn test_compile_workspace() {
         use atlier::system::{Attribute, Value};
         use reality::Block;
@@ -254,11 +261,11 @@ mod tests {
             r#"
         ```
         # Test that the default name is Test
-        + .config print.test
+        + .config receive.test
         : name .symbol Test
 
         # Test that the tagged version is Test2
-        + test .config print.test
+        + test .config receive.test
         : name .symbol Test2
         ```
         "#,
@@ -284,7 +291,8 @@ mod tests {
 
             ``` receive
             + .runtime
-            : .println hello receive a
+            : .println hello receive a {name}
+            : .fmt name
             : .println hello receive b
             : .println hello receive c
             ```
@@ -352,7 +360,7 @@ mod tests {
             let default = indexes.get(0).expect("should have index");
             assert_eq!(
                 default.root(),
-                &Attribute::new(0, "config", Value::Symbol("print.test".to_string()))
+                &Attribute::new(0, "config", Value::Symbol("receive.test".to_string()))
             );
             assert_eq!(
                 default.find_property("name"),
@@ -362,7 +370,7 @@ mod tests {
             let default = indexes.get(1).expect("should have index");
             assert_eq!(
                 default.root(),
-                &Attribute::new(0, "test.config", Value::Symbol("print.test".to_string()))
+                &Attribute::new(0, "test.config", Value::Symbol("receive.test".to_string()))
             );
             assert_eq!(
                 default.find_property("name"),
@@ -406,12 +414,50 @@ mod tests {
                 String::from("test"),
             )).ok();
         }
+
         dispatcher.dispatch(host.world());
         dispatcher.dispatch(host.world());
 
         // Test with tags
-        // let world = Test::compile_workspace(&workspace.use_tags(vec!["test"]), files.iter());
-        // TODO: Add asserts
-        //
+        let world = Test::compile_workspace(&workspace.use_tags(vec!["test"]), files.iter());
+        let mut host = Host::from(world);
+        host.enable_listener::<Test>();
+        host.link_sequences();
+
+        let mut dispatcher = host.prepare::<Test>();
+        {
+
+            let mut events = host.world().system_data::<Events>();
+            // Test that initially everything is idle
+            assert!(events.scan().is_empty());
+
+            // Test that activating an event gets picked up by .scan()
+            let event = host.world().entities().entity(2);
+            events.activate(event);
+
+            // TODO - add assertions
+            let event_state = events.scan();
+            assert_eq!(event_state.get(0), Some(&EventStatus::New(event)));
+            events.handle(event_state);
+
+            for i in 0..9 {
+                tracing::event!(Level::DEBUG, "Tick {i}");
+                events.serialized_tick();
+            }
+        }
+
+        // Test project listener
+        {
+            let broker = host.world().system_data::<PluginBroker>();
+
+            broker.try_send_status_update((
+                host.world().entities().create(),
+                0.0,
+                String::from("test"),
+            )).ok();
+        }
+
+        dispatcher.dispatch(host.world());
+        dispatcher.dispatch(host.world());
     }
 }
