@@ -559,6 +559,7 @@ impl AsMut<World> for Host {
 }
 
 mod test {
+    #[derive(Default)]
     struct Test;
 
     impl crate::project::Project for Test {

@@ -15,7 +15,10 @@ pub use listener::Messages;
 
 /// Trait to facilitate
 ///
-pub trait Project {
+pub trait Project
+where
+    Self: Default + Send,
+{
     /// Override to initialize the world,
     ///
     fn initialize(_world: &mut World) {}
@@ -32,7 +35,9 @@ pub trait Project {
     /// Override to provide a custom Runtime,
     ///
     fn runtime() -> Runtime {
-        default_runtime()
+        let mut runtime = default_runtime();
+        runtime.install_with_custom::<Run<Self>>("");
+        runtime
     }
 
     /// Override to provide a custom Parser,
@@ -58,6 +63,8 @@ pub trait Project {
         workspace: &Workspace,
         files: impl Iterator<Item = &'a RunmdFile>,
     ) -> World {
+        let mut workspace = workspace.clone();
+
         let mut parser = Self::parser()
             .with_special_attr::<WorkspaceConfig>()
             .with_special_attr::<WorkspaceOperation>();
@@ -104,7 +111,10 @@ pub trait Project {
         } else {
             let root = workspace.work_dir().join(".runmd");
             match std::fs::read_to_string(&root) {
-                Ok(runmd) => Self::compile(runmd, Some(parser), false),
+                Ok(runmd) => {
+                    workspace.set_root_runmd(&runmd);
+                    Self::compile(runmd, Some(parser), false)
+                }
                 Err(err) => {
                     panic!("Could not compile workspace, root .runmd file required, {err}");
                 }

@@ -93,7 +93,7 @@ async fn main() {
 
 /// Struct for cli state,
 ///
-#[derive(Debug, Parser)]
+#[derive(Debug, Parser, Default)]
 #[clap(name = "lifec")]
 #[clap(arg_required_else_help = true)]
 #[clap(

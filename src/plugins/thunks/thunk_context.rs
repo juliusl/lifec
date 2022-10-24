@@ -37,7 +37,8 @@ use super::{CancelSource, CancelToken, ErrorContext, SecureClient, StatusUpdate}
 ///
 #[derive(Debug, Component, Default, Clone)]
 #[storage(DenseVecStorage)]
-pub struct ThunkContext {
+pub struct 
+ThunkContext {
     /// # State Properties
 
     /// Compiled block that sourced the thunk,
@@ -121,6 +122,12 @@ impl ThunkContext {
     ///
     pub fn search(&self) -> &impl AttributeIndex {
         self
+    }
+
+    /// Returns the workspace in use,
+    /// 
+    pub fn workspace(&self) -> Option<&Workspace> {
+        self.workspace.as_ref()
     }
 
     /// Returns the work directory to use,

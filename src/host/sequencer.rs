@@ -131,7 +131,9 @@ impl Sequencer for Host {
 mod test {
     use crate::prelude::Project;
 
+    #[derive(Default)]
     struct Test;
+    
     impl Project for Test {
         fn interpret(_: &specs::World, _: &reality::Block) {
             // no-op

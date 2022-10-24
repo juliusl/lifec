@@ -65,7 +65,8 @@ impl BlockObject for Publish {
 
 mod tests {
     use crate::prelude::*;
-
+    
+    #[derive(Default)]
     struct Test;
 
     impl Project for Test {

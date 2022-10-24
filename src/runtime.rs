@@ -10,7 +10,7 @@ pub use event_source::EventSource;
 
 /// Runtime provides access to the underlying project, and function tables for creating components
 ///
-#[derive(Component, Default, Clone)]
+#[derive(Component, Debug, Default, Clone)]
 #[storage(DefaultVecStorage)]
 pub struct Runtime {
     /// Table of functions for creating new event components

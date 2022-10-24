@@ -4,6 +4,7 @@ use crate::prelude::*;
 /// 
 /// Catalogs aspects of the underlying plugin driving the event's thunk.
 /// 
+#[derive(Debug)]
 pub struct EventSource {
     /// The event struct component this source returns,
     /// 

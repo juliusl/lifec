@@ -223,6 +223,7 @@ fn test_workspace_paths() {
 
 mod tests {
     use crate::{prelude::*, project::Listener};
+    #[derive(Default)]
     struct Test;
 
     impl Project for Test {
@@ -251,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    #[tracing_test::traced_test]
+    // #[tracing_test::traced_test]
     fn test_compile_workspace() {
         use atlier::system::{Attribute, Value};
         use reality::Block;
@@ -278,6 +279,10 @@ mod tests {
         + test .operation print
         : .println Hello Print Operation a 2
         : .println Hello Print Operation b 2
+
+        + .operation print-2
+        : .println Hello Print Operation c 3
+        : .println Hello Print Operation c 3
         ```
         "#,
         );
@@ -353,6 +358,7 @@ mod tests {
             ``` execute
             + .runtime
             : .println hello execute 2
+            : .run print-2
             ```
             "#,
         );
@@ -391,7 +397,7 @@ mod tests {
             let default = indexes.get(2).expect("should have index");
             assert_eq!(
                 default.root(),
-                &Attribute::new(29, "operation", Value::Empty)
+                &Attribute::new(30, "operation", Value::Empty)
             );
             assert_eq!(
                 default.find_property("name"),
