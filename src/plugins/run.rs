@@ -25,28 +25,45 @@ where
         "Runs an operation defined within the root of a workspace"
     }
 
+    fn caveats() -> &'static str {
+        "Will compile a short-lived host to execute the operation. The plugins available are based on the Project."
+    }
+
     fn call(context: &super::ThunkContext) -> Option<super::AsyncContext> {
         context.task(|cancel_source| {
             let tc = context.clone();
             async move {
                 if let Some(root) = tc.workspace() {
-                    let operation = tc
+                    let mut operation = tc
                         .search()
                         .find_symbol("run")
                         .expect("should have an operation name");
+
+                    if operation.ends_with("}") && operation.starts_with("{") {
+                        if let Some(formatted) = tc
+                            .search()
+                            .find_symbol(operation.trim_start_matches("{").trim_end_matches("}"))
+                        {
+                            operation = formatted;
+                        }
+                    }
+
                     let world = P::compile_workspace(root, [].iter());
                     let mut host = Host::from(world);
                     let _ = host.prepare::<P>();
 
+                    // TODO: This might need some polish
                     let tag = root.iter_tags().next();
 
                     let result = {
                         let mut workspace_oeprations =
                             host.world().system_data::<WorkspaceOperation>();
 
-                        if let Some(mut operation) = workspace_oeprations
-                            .execute_operation(operation, tag.cloned(), Some(&tc))
-                        {
+                        if let Some(mut operation) = workspace_oeprations.execute_operation(
+                            operation,
+                            tag.cloned(),
+                            Some(&tc),
+                        ) {
                             operation.task(cancel_source).await
                         } else {
                             None

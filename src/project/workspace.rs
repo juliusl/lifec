@@ -252,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    // #[tracing_test::traced_test]
+    //#[tracing_test::traced_test]
     fn test_compile_workspace() {
         use atlier::system::{Attribute, Value};
         use reality::Block;
@@ -271,6 +271,9 @@ mod tests {
         # Test that the tagged version is Test2
         + test .config receive.test
         : name .symbol Test2
+
+        + test .config execute.test-2
+        : opname .symbol print-2
         
         + .operation print
         : .println Hello Print Operation a
@@ -283,6 +286,11 @@ mod tests {
         + .operation print-2
         : .println Hello Print Operation c 3
         : .println Hello Print Operation c 3
+
+
+        + test .operation print-2
+        : .println Hello Print Operation c 4
+        : .println Hello Print Operation c 4
         ```
         "#,
         );
@@ -356,9 +364,12 @@ mod tests {
             ```
 
             ``` execute
+            : opname .symbol print
+
             + .runtime
             : .println hello execute 2
             : .run print-2
+            : .run {opname}
             ```
             "#,
         );
@@ -394,10 +405,10 @@ mod tests {
                 Some(BlockProperty::Single(Value::Symbol("Test2".to_string())))
             );
 
-            let default = indexes.get(2).expect("should have index");
+            let default = indexes.get(3).expect("should have index");
             assert_eq!(
                 default.root(),
-                &Attribute::new(30, "operation", Value::Empty)
+                &Attribute::new(31, "operation", Value::Empty)
             );
             assert_eq!(
                 default.find_property("name"),
