@@ -341,20 +341,13 @@ impl<'a> System<'a> for ProxyRuntime {
 
 #[test]
 fn test_proxy_runtime() {
-    use specs::World;
-    use specs::WorldExt;
-    use specs::DispatcherBuilder;
-    use atlier::system::Extension;
-    use crate::plugins::network::NetworkRuntime;
-    use crate::AttributeIndex;
+    use crate::prelude::*;
     
     let mut test_world = World::new();
     let test_world = &mut test_world;
     let mut test_dispatcher = DispatcherBuilder::new();
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
 
-    EventRuntime::configure_app_world(test_world);
-    EventRuntime::configure_app_systems(&mut test_dispatcher);
     NetworkRuntime::configure_app_world(test_world);
     NetworkRuntime::configure_app_systems(&mut test_dispatcher);
     

@@ -1,9 +1,9 @@
-use specs::{Entities, WriteStorage, ReadStorage, Join};
+use specs::storage::BTreeStorage;
+use specs::{Entities, WriteStorage, ReadStorage, Join, Component};
 
 use super::{ProgressStatusBar, StartButton};
 use crate::engine::Connection;
-use crate::plugins::*;
-use crate::*;
+use crate::prelude::*;
 
 /// This component drives visibility actions for running engines
 /// within the runtime
@@ -33,7 +33,6 @@ impl Task {
 
 impl Extension for Task {
     fn configure_app_world(world: &mut World) {
-        EventRuntime::configure_app_world(world);
         StartButton::configure_app_world(world);
         world.register::<ProgressStatusBar>();
         world.register::<Task>();
@@ -64,7 +63,7 @@ impl Extension for Task {
         }
 
         if let Task(.., Some(sequence), _) = self {
-            ui.text(format!("{}", sequence));
+            ui.text(format!("{:?}", sequence));
         }
     }
 

@@ -1,7 +1,6 @@
-use std::{future::Future, net::SocketAddr, sync::Arc};
+use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
 
-use crate::{plugins::network::BlockAddress, AttributeGraph, AttributeIndex, Operation, Start};
-
+use crate::prelude::*;
 use reality::Block;
 use specs::{Component, DenseVecStorage, Entity};
 use tokio::{
@@ -38,31 +37,46 @@ use super::{CancelSource, CancelToken, ErrorContext, SecureClient, StatusUpdate}
 ///
 #[derive(Debug, Component, Default, Clone)]
 #[storage(DenseVecStorage)]
-pub struct ThunkContext {
-    /// Block data
+pub struct 
+ThunkContext {
+    /// # State Properties
+
+    /// Compiled block that sourced the thunk,
     block: Block,
     /// Error graph recorded if the previous plugin call encountered an error
     error_graph: Option<AttributeGraph>,
-    /// Previous graph used w/ this context
+    /// Previous graph used w/ this context, set by calling .commit()
     previous_graph: Option<AttributeGraph>,
-    /// Underlying state for this thunk,
+    /// Current state of this context,
     graph: AttributeGraph,
+
     /// Entity that owns this context
     entity: Option<Entity>,
     /// Tokio runtime handle, to spawn additional tasks
     handle: Option<Handle>,
-    /// Sender for status updates for the thunk
-    status_updates: Option<Sender<StatusUpdate>>,
     /// Client for sending secure http requests
     client: Option<SecureClient>,
+    /// Workspace for this context, if enabled the work_dir from the workspace can be used
+    workspace: Option<Workspace>,
+    /// Local tcp socket address,
+    local_tcp_addr: Option<SocketAddr>,
+    /// Local udp socket address,
+    local_udp_addr: Option<SocketAddr>,
+
+    /// # I/O Utilities,
+    /// Project-type implements handling the listener side,     
+
+    /// Sender for status updates for the thunk
+    status_updates: Option<Sender<StatusUpdate>>,
     /// Dispatcher for runmd
-    dispatcher: Option<Sender<String>>,
+    dispatcher: Option<Sender<RunmdFile>>,
     /// Dispatcher for operations
     operation_dispatcher: Option<Sender<Operation>>,
     /// Dispatcher for start commands
     start_command_dispatcher: Option<Sender<Start>>,
     /// Channel to send bytes to a listening char_device
     char_device: Option<Sender<(u32, u8)>>,
+
     /// UDP socket,
     ///
     /// Notes: Since UDP is connectionless, it can be shared, cloned, and stored in the
@@ -108,6 +122,24 @@ impl ThunkContext {
     ///
     pub fn search(&self) -> &impl AttributeIndex {
         self
+    }
+
+    /// Returns the workspace in use,
+    /// 
+    pub fn workspace(&self) -> Option<&Workspace> {
+        self.workspace.as_ref()
+    }
+
+    /// Returns the work directory to use,
+    ///
+    pub fn work_dir(&self) -> Option<PathBuf> {
+        match &self.workspace {
+            Some(workspace) => Some(workspace.work_dir().clone()),
+            None => self
+                .search()
+                .find_symbol("work_dir")
+                .and_then(|d| Some(PathBuf::from(d))),
+        }
     }
 
     /// Copies previous state to the current state,
@@ -198,7 +230,7 @@ impl ThunkContext {
     /// Plugins using this context will be able to dispatch attribute graphs to the underlying
     /// runtime.
     ///
-    pub fn enable_dispatcher(&mut self, dispatcher: Sender<String>) -> &mut ThunkContext {
+    pub fn enable_dispatcher(&mut self, dispatcher: Sender<RunmdFile>) -> &mut ThunkContext {
         self.dispatcher = Some(dispatcher);
         self
     }
@@ -246,6 +278,12 @@ impl ThunkContext {
         self.char_device = Some(tx);
     }
 
+    /// Enable a workspace for this context,
+    ///
+    pub fn enable_workspace(&mut self, workspace: Workspace) {
+        self.workspace = Some(workspace);
+    }
+
     /// Enables a tcp listener for this context to listen to. accepts the first listener, creates a connection
     /// and then exits after the connection is dropped.
     ///
@@ -255,57 +293,112 @@ impl ThunkContext {
         &self,
         cancel_source: &mut oneshot::Receiver<()>,
     ) -> Option<(tokio::net::TcpStream, SocketAddr)> {
-        let address = self
-            .search()
-            .find_symbol("address")
-            .unwrap_or("127.0.0.1:0".to_string());
+        if let Some(address) = self.local_tcp_addr {
+            let listener = TcpListener::bind(address)
+                .await
+                .expect("needs to be able to bind to an address");
 
-        let listener = TcpListener::bind(address)
-            .await
-            .expect("needs to be able to bind to an address");
-        let local_addr = listener.local_addr().expect("was just created").to_string();
+            let local_addr = listener.local_addr().expect("was just created").to_string();
+            event!(
+                Level::INFO,
+                "Entity {} Listening on {local_addr}",
+                self.entity.expect("should have an entity").id()
+            );
 
-        event!(
-            Level::INFO,
-            "Entity {} Listening on {local_addr}",
-            self.entity.expect("should have an entity").id()
-        );
+            // let name = self.block.name();
+            // let symbol = self.block.symbol();
+            // let hash_code = self.hash_code();
+            // TODO: Assign test.publish.
 
-        select! {
-            Ok((stream, address)) = listener.accept() => {
-                Some((stream, address))
-            },
-            _ = cancel_source => {
-                event!(Level::WARN, "{local_addr} is being cancelled");
-                None
+            select! {
+                Ok((stream, address)) = listener.accept() => {
+                    Some((stream, address))
+                },
+                _ = cancel_source => {
+                    event!(Level::WARN, "{local_addr} is being cancelled");
+                    None
+                }
             }
+        } else {
+            event!(Level::ERROR, "No local address assigned to context");
+            None
         }
     }
 
     /// Creates a UDP socket for this context, and saves the address to the underlying graph
     ///
     pub async fn enable_socket(&mut self) -> Option<Arc<UdpSocket>> {
-        let address = self
-            .state()
-            .find_symbol("address")
-            .unwrap_or("127.0.0.1:0".to_string());
+        if let Some(address) = self.local_udp_addr {
+            match UdpSocket::bind(address).await {
+                Ok(socket) => {
+                    if let Some(address) =
+                        socket.local_addr().ok().and_then(|a| Some(a.to_string()))
+                    {
+                        event!(Level::DEBUG, "created socket at {address}");
 
-        match UdpSocket::bind(address).await {
-            Ok(socket) => {
-                if let Some(address) = socket.local_addr().ok().and_then(|a| Some(a.to_string())) {
-                    event!(Level::DEBUG, "created socket at {address}");
+                        // Add the socket address as a transient value
+                        // self.define("socket", "address")
+                        //     .edit_as(Value::TextBuffer(address));
+                        self.udp_socket = Some(Arc::new(socket));
+                    }
 
-                    // Add the socket address as a transient value
-                    // self.define("socket", "address")
-                    //     .edit_as(Value::TextBuffer(address));
-                    self.udp_socket = Some(Arc::new(socket));
+                    self.udp_socket.clone()
                 }
-
-                self.udp_socket.clone()
+                Err(err) => {
+                    event!(Level::ERROR, "could not enable socket {err}");
+                    None
+                }
             }
-            Err(err) => {
-                event!(Level::ERROR, "could not enable socket {err}");
-                None
+        } else {
+            event!(Level::ERROR, "No local address assigned to context");
+            None
+        }
+    }
+
+    /// Assigns addresses to the context by trying to bind to the address,
+    ///
+    pub async fn assign_addresses(&mut self) {
+        if let Some(udp) = self.search().find_symbol("udp") {
+            match UdpSocket::bind(&udp).await {
+                Ok(socket) => match socket.local_addr() {
+                    Ok(addr) => {
+                        self.local_udp_addr = Some(addr);
+                    }
+                    Err(err) => {
+                        event!(
+                            Level::ERROR,
+                            "Could not get local socket address for udp socket, {udp} {err}"
+                        );
+                    }
+                },
+                Err(err) => {
+                    event!(
+                        Level::ERROR,
+                        "Could not assign address for udp socket, {udp} {err}"
+                    );
+                }
+            }
+        }
+
+        if let Some(tcp) = self.search().find_symbol("tcp") {
+            match TcpListener::bind(&tcp).await {
+                Ok(listener) => match listener.local_addr() {
+                    Ok(addr) => {
+                        self.local_tcp_addr = Some(addr);
+                    }
+                    Err(err) => {
+                        event!(
+                            Level::ERROR,
+                            "Could not get local address for tcp listener, {tcp} {err}"
+                        );
+                    }
+                },
+                Err(err) => {
+                    event!(
+                        Level::ERROR,
+                        "Could not assign address for tcp listener, {tcp} {err}"
+                    );
+                }
             }
         }
     }
@@ -351,9 +444,12 @@ impl ThunkContext {
     /// For example, if running a runtime within a plugin that hosts a web api, you can use this method within
     /// request handlers to dispatch blocks to the hosting runtime.
     ///
-    pub async fn dispatch(&self, runmd: impl AsRef<str>) {
+    pub async fn dispatch(&self, symbol: impl AsRef<str>, source: impl AsRef<str>) {
         if let Some(dispatcher) = &self.dispatcher {
-            dispatcher.send(runmd.as_ref().to_string()).await.ok();
+            dispatcher
+                .send(RunmdFile::new_src(symbol, source.as_ref().to_string()))
+                .await
+                .ok();
         }
     }
 
@@ -367,7 +463,7 @@ impl ThunkContext {
 
     /// Returns the underlying dispatch transmitter
     ///
-    pub fn dispatcher(&self) -> Option<sync::mpsc::Sender<String>> {
+    pub fn dispatcher(&self) -> Option<sync::mpsc::Sender<RunmdFile>> {
         self.dispatcher.clone()
     }
 
@@ -479,7 +575,7 @@ impl ThunkContext {
         }
     }
 
-    /// Reads lines from a stream and returns the result,
+    /// Read lines from a stream and returns the result,
     ///
     pub async fn readln_stream(&self) -> String {
         use std::fmt::Write;
@@ -506,6 +602,92 @@ impl ThunkContext {
         }
         received
     }
+
+    /// Returns the local tcp addr,
+    ///
+    pub fn local_tcp_addr(&self) -> Option<SocketAddr> {
+        self.local_tcp_addr
+    }
+
+    /// Returns the local udp addr,
+    ///
+    pub fn local_udp_addr(&self) -> Option<SocketAddr> {
+        self.local_udp_addr
+    }
+}
+
+/// Cryptography related functions, Private Key side
+///
+impl ThunkContext {
+    /// Create a signature using the assigned signature key,
+    ///
+    pub fn sign(&self) {
+        /*
+            1) Get assigned identity of the current block,
+            - The prefix should be {block.name()}.{block.symbol()}.
+            - or, {block.symbol()}.control.
+            2) Lookup the private-key with the assigned identity
+
+            After a listener starts and is bound to an address,
+            I need to be able to assign the address to a name.
+
+            receive.runner.{host}/{path}
+
+            receive.runner.obddemo.azurecr.io/demo/library/redis/6.2.1
+
+            1) look up host
+            2) look up path
+            3) look up block name/symbol
+
+            4) What private key to use?
+            {host}
+                -> {block}
+                    -> {key}
+
+        Name File:
+        {
+            "data": {
+                // Settings from Project struct
+                "host": "",
+                "container": "",
+                "path": "",
+
+                // Full entity name
+                "name": "",
+                "symbol": "",
+                "local_addr": "",
+
+                "signatures": {
+                    "host": "", // Find this in .world/{host}/
+                    "container": "" // Find this in .world/{host}/{container}/
+                    "path": "", // Find this in .world/{host}/{container}/{path}/
+
+                    "name": "",
+                    "symbol": "",
+                    "local_addr": "",
+                },
+            },
+            "signature": ""
+        }
+
+        */
+    }
+
+    /// Decrypt some bytes using the assigned decryption key,
+    ///
+    pub fn decrypt(&self) {}
+}
+
+/// Cryptography related functions, Public Key side
+///
+impl ThunkContext {
+    /// Verify the signature of some bytes using the assigned verifying key,
+    ///
+    pub fn verify(&self) {}
+
+    /// Encrypt some bytes using the assigned encryption key
+    ///
+    pub fn encrypt(&self) {}
 }
 
 /// Some utility methods
@@ -517,4 +699,52 @@ impl ThunkContext {
         record(&mut error_graph);
         self.error_graph = Some(error_graph);
     }
+}
+
+#[test]
+fn test_security() {
+    use rsa::pkcs8::EncodePublicKey;
+    use rsa::pss::BlindedSigningKey;
+    use rsa::{pss::VerifyingKey, RsaPrivateKey};
+    use sha2::Sha256;
+    // use std::str::from_utf8;
+    // use rsa::pkcs8::DecodePrivateKey;
+    // use rsa::pkcs1::EncodeRsaPublicKey;
+    // use pkcs8::EncodePrivateKey;
+
+    use signature::{RandomizedSigner, Signature, Verifier};
+    let mut rng = rand::thread_rng();
+
+    let bits = 2048;
+    let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+
+    // private_key.to_pkcs8_encrypted_der(&mut rng, "test1234");
+
+    let signing_key = BlindedSigningKey::<Sha256>::new(private_key);
+    // signing_key.to_pkcs8_encrypted_der(rng, "test").unwrap().write_der_file(path);
+    let verifying_key: VerifyingKey<_> = (&signing_key).into();
+
+    // Sign
+    let data = b"hello world";
+    let signature = signing_key.sign_with_rng(&mut rng, data);
+    assert_ne!(signature.as_bytes(), data);
+
+    // Verify
+    verifying_key
+        .verify(data, &signature)
+        .expect("failed to verify");
+
+    match verifying_key.to_public_key_der() {
+        Ok(_document) => {}
+        Err(_) => todo!(),
+    }
+
+    // let mut stdin = std::io::stdin().lock();
+    // let mut pass = vec![];
+    // rpassword::prompt_password_from_bufread(&mut stdin, &mut pass, "Password for key:").expect("should have a value");
+
+    // RsaPrivateKey::from_pkcs8_encrypted_pem(
+    //     "",
+    //     from_utf8(pass.as_slice()).expect("should be a string"),
+    // ).ok();
 }

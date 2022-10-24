@@ -1,17 +1,17 @@
+use crate::{
+    prelude::*,
+    project::Listener,
+};
 use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use specs::{Dispatcher, DispatcherBuilder, Entity, Join, World, WorldExt, WriteStorage};
-use std::{error::Error, fmt::Debug, path::PathBuf, str::from_utf8, sync::Arc};
-use tracing::{event, Level};
-
-use crate::{
-    plugins::{CancelThunk, EventRuntime},
-    project::{
-        CompletedPluginListener, ErrorContextListener, OperationListener, RunmdListener,
-        StartCommandListener,
-    },
-    Engine, Event, LifecycleOptions, Project, ThunkContext,
+use std::{
+    error::Error,
+    fmt::Debug,
+    path::PathBuf,
+    str::{from_utf8, FromStr},
+    sync::Arc,
 };
 
 mod inspector;
@@ -32,8 +32,10 @@ pub use executor::Executor;
 mod editor;
 pub use editor::Editor;
 
-mod runner;
-pub use runner::Runner;
+pub mod async_ext;
+
+mod handler;
+use handler::ListenerSetup;
 
 /// Struct for initializing and hosting the runtime as well as parsing CLI arguments,
 ///
@@ -42,6 +44,10 @@ pub use runner::Runner;
 #[derive(Default, Args)]
 #[clap(arg_required_else_help = true)]
 pub struct Host {
+    /// Root directory, defaults to current directory
+    ///
+    #[clap(long)]
+    pub root: Option<PathBuf>,
     /// URL to .runmd file used to configure this host,
     ///
     #[clap(long)]
@@ -51,6 +57,15 @@ pub struct Host {
     ///
     #[clap(long)]
     pub runmd_path: Option<String>,
+    /// Uri for a workspace,
+    ///
+    /// A workspace directory is a directory of .runmd files that are compiled together. A valid workspace directory requires a root
+    /// .runmd file, followed by named runmd files (ex. test.runmd). Named files will be parsed w/ the file name used as the implicit block
+    /// symbol. All named files will be parsed first and the root .runmd file will be parsed last. When this mode is used, the workspace feature
+    /// will be enabled with thunk contexts, so all plugins will execute in the context of the same work_dir.
+    ///
+    #[clap(short, long)]
+    pub workspace: Option<String>,
     /// The command to execute w/ this host,
     ///
     #[clap(subcommand)]
@@ -59,6 +74,8 @@ pub struct Host {
     ///
     #[clap(skip)]
     pub world: Option<World>,
+    #[clap(skip)]
+    listener_setup: Option<ListenerSetup>,
 }
 
 /// CLI functions
@@ -73,7 +90,7 @@ impl Host {
         match self.command() {
             Some(Commands::Start(Start { id: Some(id), .. })) => {
                 event!(Level::DEBUG, "Starting engine by id {id}");
-                self.start::<P>(*id, None);
+                self.start::<P>(*id);
             }
             Some(Commands::Start(Start {
                 engine_name: Some(engine_name),
@@ -122,6 +139,38 @@ impl Host {
     {
         let command = self.command().cloned();
         match self {
+            Self {
+                root,
+                workspace: Some(workspace),
+                ..
+            } => match Uri::from_str(workspace) {
+                Ok(uri) => {
+                    if let Some((tenant, host)) =
+                        uri.host().expect("should have a host").split_once(".")
+                    {
+                        let root = root.clone();
+                        let mut host = Host::load_workspace::<P>(
+                            root,
+                            host,
+                            tenant,
+                            if uri.path().is_empty() {
+                                None
+                            } else {
+                                Some(uri.path())
+                            },
+                        );
+                        host.command = command;
+                        Some(host)
+                    } else {
+                        event!(Level::ERROR, "Tenant and host are required");
+                        None
+                    }
+                }
+                Err(err) => {
+                    event!(Level::ERROR, "Could not parser workspace uri, {err}");
+                    None
+                }
+            },
             Self { url: Some(url), .. } => match Host::get::<P>(url).await {
                 Ok(mut host) => {
                     host.command = command;
@@ -186,106 +235,13 @@ impl Host {
         dispatcher_builder.with(EventRuntime::default(), "event_runtime", &[])
     }
 
-    /// Add's a runmd listener to a dispatcher,
+    /// Enables a project listener on the host when the dispatcher is prepared,
     ///
-    /// The name of the system will be "runmd_listener"
-    ///
-    pub fn add_runmd_listener<'a, 'b, P>(
-        thunk_context: ThunkContext,
-        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
-    ) where
-        P: Project + From<ThunkContext> + Send + 'a,
+    pub fn enable_listener<L>(&mut self)
+    where
+        L: Listener,
     {
-        dispatcher_builder.add(
-            RunmdListener::<P>::from(thunk_context),
-            "runmd_listener",
-            &["event_runtime"],
-        );
-    }
-
-    /// Add's an operation listener to a dispatcher,
-    ///
-    /// The name of the system will be "operation_listener"
-    ///
-    pub fn add_operation_listener<'a, 'b, P>(
-        thunk_context: ThunkContext,
-        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
-    ) where
-        P: Project + From<ThunkContext> + Send + 'a,
-    {
-        dispatcher_builder.add(
-            OperationListener::<P>::from(thunk_context),
-            "operation_listener",
-            &["event_runtime"],
-        );
-    }
-
-    /// Add's an error context listener to a dispatcher
-    ///
-    /// The name of the system will be "error_context_listener"
-    ///
-    pub fn add_error_context_listener<'a, 'b, P>(
-        thunk_context: ThunkContext,
-        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
-    ) where
-        P: Project + From<ThunkContext> + Send + 'a,
-    {
-        dispatcher_builder.add(
-            ErrorContextListener::<P>::from(thunk_context),
-            "error_context_listener",
-            &["event_runtime"],
-        );
-    }
-
-    /// Add's an error context listener to a dispatcher,
-    ///
-    /// The name of the system will be "completed_plugin_listener"
-    ///
-    pub fn add_completed_plugin_listener<'a, 'b, P>(
-        thunk_context: ThunkContext,
-        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
-    ) where
-        P: Project + From<ThunkContext> + Send + 'a,
-    {
-        dispatcher_builder.add(
-            CompletedPluginListener::<P>::from(thunk_context),
-            "completed_plugin_listener",
-            &["event_runtime"],
-        );
-    }
-
-    /// Add's a status update listener to a dispatcher,
-    ///
-    /// The name of the system will be "status_update_listener"
-    ///
-    pub fn add_status_update_listener<'a, 'b, P>(
-        thunk_context: ThunkContext,
-        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
-    ) where
-        P: Project + From<ThunkContext> + Send + 'a,
-    {
-        dispatcher_builder.add(
-            CompletedPluginListener::<P>::from(thunk_context),
-            "status_update_listener",
-            &["event_runtime"],
-        );
-    }
-
-    /// Add's a status update listener to a dispatcher,
-    ///
-    /// The name of the system will be "status_update_listener"
-    ///
-    pub fn add_start_command_listener<'a, 'b, P>(
-        thunk_context: ThunkContext,
-        dispatcher_builder: &mut DispatcherBuilder<'a, 'b>,
-    ) where
-        P: Project + From<ThunkContext> + Send + 'a,
-    {
-        dispatcher_builder.add(
-            StartCommandListener::<P>::from(thunk_context),
-            "start_command_listener",
-            &["event_runtime"],
-        );
+        self.listener_setup = Some(ListenerSetup::new::<L>());
     }
 
     /// Get a reference to the world,
@@ -371,10 +327,78 @@ impl Host {
         P: Project,
     {
         let mut host = Self {
+            root: None,
             runmd_path: None,
             url: None,
             command: None,
-            world: Some(P::compile(content)),
+            workspace: None,
+            world: Some(P::compile(content, None, true)),
+            listener_setup: None,
+        };
+
+        host.link_sequences();
+        host
+    }
+
+    /// Returns a host with a world compiled from a workspace,
+    ///
+    pub fn load_workspace<P>(
+        root: Option<PathBuf>,
+        host: impl AsRef<str>,
+        tenant: impl AsRef<str>,
+        path: Option<impl AsRef<str>>,
+    ) -> Self
+    where
+        P: Project,
+    {
+        let workspace = Workspace::new(host.as_ref(), root);
+        let mut workspace = workspace.tenant(tenant.as_ref());
+
+        if let Some(path) = path {
+            if let Some(w) = workspace.path(path.as_ref()) {
+                workspace = w;
+            }
+        }
+
+        let mut files = vec![];
+        match std::fs::read_dir(workspace.work_dir()) {
+            Ok(readdir) => {
+                for entry in readdir.filter_map(|e| match e {
+                    Ok(entry) => match entry.path().extension() {
+                        Some(ext) if ext == "runmd" && !entry.file_name().is_empty() => Some(
+                            entry
+                                .file_name()
+                                .to_str()
+                                .expect("should be a string")
+                                .trim_end_matches(".runmd")
+                                .to_string(),
+                        ),
+                        _ => None,
+                    },
+                    Err(err) => {
+                        event!(Level::ERROR, "Could not get entry {err}");
+                        None
+                    }
+                }) {
+                    files.push(RunmdFile {
+                        symbol: entry,
+                        source: None,
+                    });
+                }
+            }
+            Err(err) => {
+                event!(Level::ERROR, "Error reading work directory {err}");
+            }
+        }
+
+        let mut host = Self {
+            root: None,
+            workspace: None,
+            runmd_path: None,
+            url: None,
+            command: None,
+            world: Some(P::compile_workspace(&workspace, files.iter())),
+            listener_setup: None,
         };
 
         host.link_sequences();
@@ -384,24 +408,9 @@ impl Host {
     /// Returns true if the host should exit,
     ///
     pub fn should_exit(&self) -> bool {
-        let entities = self.world().entities();
-        let lifecycle_options = self.world().read_component::<LifecycleOptions>();
-        let events = self.world().read_component::<Event>();
-        if (&entities, &events, &lifecycle_options).join().all(
-            |(entity, event, lifecycle_option)| match (event, lifecycle_option) {
-                (Event(.., None), LifecycleOptions::Exit(None)) => {
-                    event!(Level::TRACE, "{:?} has exited", entity);
-                    true
-                }
-                _ => {
-                    false
-                }
-            },
-        ) {
-            true
-        } else {
-            false
-        }
+        let events = self.world().system_data::<Events>();
+
+        events.should_exit()
     }
 
     /// Finds the starting entity from some expression,
@@ -411,7 +420,7 @@ impl Host {
             self.world()
                 .read_component::<Engine>()
                 .get(e)
-                .and_then(|e| e.start())
+                .and_then(|e| e.start().cloned())
         })
     }
 
@@ -424,30 +433,28 @@ impl Host {
         let engine_name = engine_name.as_ref();
 
         if let Some(start) = self.find_start(engine_name) {
-            // If the starting entity has a thunk context, this will be passed to the configure_dispatcher method
-            // on the project. The project can use that context to initialize listeners
-            //
-            let tc = self
-                .world()
-                .read_component::<ThunkContext>()
-                .get(start)
-                .cloned();
-
-            self.start::<P>(start.clone().id(), tc);
+            self.start::<P>(start.clone().id());
         } else {
             panic!("Did not start {engine_name}");
         }
     }
 
     /// Prepares the host to start by creating a new dispatcher,
-    /// 
-    pub fn prepare<'a, 'b, P>(&mut self, context: Option<ThunkContext>) -> Dispatcher<'a, 'b> 
+    ///
+    pub fn prepare<'a, 'b, P>(&mut self) -> Dispatcher<'a, 'b>
     where
         P: Project,
     {
         let mut dispatcher = {
             let mut dispatcher = Host::dispatcher_builder();
-            P::configure_dispatcher(&mut dispatcher, context);
+            P::configure_dispatcher(self.world(), &mut dispatcher);
+
+            if let Some(setup) = self.listener_setup.as_ref() {
+                let ListenerSetup(enable) = setup;
+
+                enable(self.world(), &mut dispatcher);
+            }
+
             dispatcher.build()
         };
         dispatcher.setup(self.world_mut());
@@ -456,15 +463,15 @@ impl Host {
 
     /// Starts an event entity,
     ///
-    pub fn start<P>(&mut self, event_entity: u32, thunk_context: Option<ThunkContext>)
+    pub fn start<P>(&mut self, event_entity: u32)
     where
         P: Project,
     {
-        let mut dispatcher = self.prepare::<P>(thunk_context);
+        let mut dispatcher = self.prepare::<P>();
 
         // Starts an event
         let event = self.world().entities().entity(event_entity);
-        self.start_event(event, ThunkContext::default());
+        self.start_event(event);
 
         // Waits for event runtime to exit
         self.wait_for_exit(&mut dispatcher);
@@ -485,10 +492,11 @@ impl Host {
 
     /// Starts an event,
     ///
-    pub fn start_event(&mut self, event: Entity, thunk_context: ThunkContext) {
+    pub fn start_event(&mut self, event: Entity) {
         if let Some(event) = self.world().write_component::<Event>().get_mut(event) {
-            event.fire(thunk_context);
+            event.activate();
         }
+
         self.world_mut().maintain();
     }
 
@@ -524,6 +532,20 @@ impl Into<World> for Host {
     }
 }
 
+impl From<World> for Host {
+    fn from(world: World) -> Self {
+        Host {
+            root: None,
+            url: None,
+            runmd_path: None,
+            workspace: None,
+            command: None,
+            world: Some(world),
+            listener_setup: None,
+        }
+    }
+}
+
 impl AsRef<World> for Host {
     fn as_ref(&self) -> &World {
         self.world()
@@ -537,16 +559,17 @@ impl AsMut<World> for Host {
 }
 
 mod test {
+    #[derive(Default)]
     struct Test;
 
-    impl crate::Project for Test {
+    impl crate::project::Project for Test {
         fn interpret(_world: &specs::World, _block: &reality::Block) {}
     }
 
     #[test]
     #[tracing_test::traced_test]
     fn test_host() {
-        use crate::{Commands, Host};
+        use crate::prelude::{Commands, Host};
         let mut host = Host::load_content::<Test>(
             r#"
         ``` repeat
@@ -575,7 +598,13 @@ mod test {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_example() {
-        use crate::{Commands, Host};
+        use hyper::http::Uri;
+
+        let uri = Uri::from_static("test.example.com");
+
+        eprintln!("{:?}", uri.host().unwrap().split_once("."));
+
+        use crate::prelude::{Commands, Host};
         let mut host = Host::open::<Test>("examples/hello_runmd/.runmd")
             .await
             .expect("should load");

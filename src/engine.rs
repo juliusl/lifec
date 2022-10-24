@@ -1,44 +1,45 @@
-use std::collections::HashMap;
-use std::fmt::Debug;
 
-use crate::{AttributeParser, Block, BlockProperty, Interpreter, SpecialAttribute};
-use specs::{Component, Entity, VecStorage, World, WorldExt};
+use std::collections::HashMap;
+
+use crate::prelude::*;
 
 mod event;
 pub use event::Event;
 
 mod sequence;
 pub use sequence::Sequence;
-pub use sequence::Cursor;
 
 mod connection;
 pub use connection::Connection;
 
-mod exit;
-pub use exit::Exit;
-
-mod r#loop;
-pub use r#loop::Loop;
-
-mod repeat;
-pub use repeat::Repeat;
-
-mod next;
-pub use next::Next;
-
-mod fork;
-pub use fork::Fork;
-
-mod once;
-pub use once::Once;
-
-mod lifecycle;
-pub use lifecycle::LifecycleOptions;
-pub use lifecycle::LifecycleResolver;
-
 mod activity;
 pub use activity::Activity;
+mod transition;
+pub use transition::Transition;
 
+mod cursor;
+pub use cursor::Cursor;
+
+mod plugins;
+pub use plugins::PluginFeatures;
+pub use plugins::PluginListener;
+pub use plugins::PluginBroker;
+pub use plugins::Plugins;
+
+mod events;
+pub use events::EventStatus;
+pub use events::Events;
+
+mod lifecycle;
+pub use lifecycle::Lifecycle;
+
+mod systems;
+pub use systems::install;
+
+mod limit;
+pub use limit::Limit;
+
+use tracing::Level;
 
 /// An engine is a sequence of events, this component manages
 /// sequences of events
@@ -81,27 +82,41 @@ pub use activity::Activity;
 #[storage(VecStorage)]
 pub struct Engine {
     /// Pointer to the start of the engine sequence
-    /// 
+    ///
     start: Option<Entity>,
+    /// Limit this engine can repeat
+    /// 
+    limit: Option<Limit>,
+    /// Vector of transitions
+    ///
+    transitions: Vec<(Transition, Vec<String>)>,
+    /// Lifecycle operation to use,
+    ///
+    lifecycle: Option<(Lifecycle, Option<Vec<String>>)>,
 }
 
 impl Engine {
     /// Creates a new engine component w/ start,
-    /// 
+    ///
     pub fn new(start: Entity) -> Self {
-        Self { start: Some(start) }
+        Self {
+            start: Some(start),
+            limit: None,
+            transitions: vec![],
+            lifecycle: None,
+        }
     }
 
-    /// Starts an engine,
-    /// 
-    pub fn start(&self) -> Option<Entity> {
-        self.start.clone()
+    /// Returns the start of the engine,
+    ///
+    pub fn start(&self) -> Option<&Entity> {
+        self.start.as_ref()
     }
 
-    /// Sets the start entity for this engine,
+    /// Returns the limit of this engine, if any
     /// 
-    pub fn set_start(&mut self, start: Entity) {
-        self.start = Some(start);
+    pub fn limit(&self) -> Option<&Limit> {
+        self.limit.as_ref()
     }
 
     /// Finds the entity for a block,
@@ -109,9 +124,42 @@ impl Engine {
     pub fn find_block(world: &World, expression: impl AsRef<str>) -> Option<Entity> {
         let block_list = world.read_resource::<HashMap<String, Entity>>();
 
-        tracing::event!(tracing::Level::DEBUG, "Looking for block ``` {}", expression.as_ref());
+        tracing::event!(
+            tracing::Level::DEBUG,
+            "Looking for block ``` {}",
+            expression.as_ref()
+        );
 
         block_list.get(expression.as_ref()).cloned()
+    }
+
+    /// Returns an iterator over transitions,
+    ///
+    pub fn iter_transitions(&self) -> impl Iterator<Item = &(Transition, Vec<String>)> {
+        self.transitions.iter()
+    }
+
+    /// Adds a transition to the engine,
+    ///
+    pub fn add_transition(&mut self, transition: Transition, events: Vec<String>) {
+        if self.lifecycle.is_none() {
+            self.transitions.push((transition, events));
+        } else {
+            tracing::event!(
+                Level::ERROR,
+                "Tried to add a transition, after a lifecycle action has been set"
+            );
+        }
+    }
+
+    /// Sets a lifecycle action for this engine,
+    ///
+    pub fn set_lifecycle(&mut self, lifecycle: Lifecycle, engines: Option<Vec<String>>) {
+        if let Lifecycle::Repeat(limit) = lifecycle {
+            self.limit = Some(Limit(limit));
+        }
+
+        self.lifecycle = Some((lifecycle, engines));
     }
 }
 
@@ -121,15 +169,109 @@ impl SpecialAttribute for Engine {
     }
 
     fn parse(parser: &mut AttributeParser, _todo: impl AsRef<str>) {
-        // Event types
-        parser.with_custom::<Event>();
-        parser.with_custom::<Once>();
-        // Lifecycle options
-        parser.with_custom::<Exit>();
-        parser.with_custom::<Next>();
-        parser.with_custom::<Fork>();
-        parser.with_custom::<Repeat>();
-        parser.with_custom::<Loop>();
+        if let Some(entity) = parser.entity() {
+            let world = parser.world().expect("should have a world");
+            world
+                .write_component()
+                .insert(entity, Engine::default())
+                .expect("should be able to insert");
+
+            parser.add_custom_with("once", |p, events| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world");
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+
+                engine.add_transition(Transition::Once, Self::parse_idents(events));
+            });
+
+            parser.add_custom_with("start", |p, events| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world");
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+
+                engine.add_transition(Transition::Start, Self::parse_idents(events));
+            });
+
+            parser.add_custom_with("select", |p, events| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world");
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+
+                engine.add_transition(Transition::Select, Self::parse_idents(events));
+            });
+
+            parser.add_custom_with("spawn", |p, events| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world");
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+
+                engine.add_transition(Transition::Spawn, Self::parse_idents(events));
+            });
+
+            parser.add_custom_with("buffer", |p, events| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world");
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+
+                engine.add_transition(Transition::Buffer, Self::parse_idents(events));
+            });
+
+            parser.add_custom_with("exit", |p, _| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world");
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+
+                engine.set_lifecycle(Lifecycle::Exit, None);
+            });
+
+            parser.add_custom_with("loop", |p, _| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world");
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+
+                engine.set_lifecycle(Lifecycle::Loop, None);
+            });
+
+            parser.add_custom_with("next", |p, e| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world");
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+
+                engine.set_lifecycle(Lifecycle::Next, Some(vec![e]));
+            });
+
+            parser.add_custom_with("fork", |p, e| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world");
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+
+                let forks = Self::parse_idents(e);
+
+                engine.set_lifecycle(Lifecycle::Fork, Some(forks));
+            });
+
+            parser.add_custom_with("repeat", |p, e| {
+                let entity = p.entity().expect("should have entity");
+                let world = p.world().expect("should have world");
+                let mut engines = world.write_component::<Engine>();
+                let engine = engines.get_mut(entity).expect("should have engine");
+
+                if let Some(count) = e.parse::<usize>().ok() {
+                    engine.set_lifecycle(Lifecycle::Repeat(count), None);
+                } else {
+                    tracing::event!(Level::ERROR, "Loop count must be a positive integer");
+                }
+            });
+        }
     }
 }
 
@@ -150,62 +292,83 @@ impl Interpreter for Engine {
 
         if block.is_control_block() {
             let block_entity = world.entities().entity(block.entity());
-            world
-                .write_component()
-                .insert(block_entity, self.clone())
-                .expect("should be able to insert engine component");
 
-            for engine in block.index().iter().filter(|b| b.root().name() == "engine") {
-                let events = engine
-                    .properties()
-                    .property("event")
-                    .and_then(BlockProperty::symbol_vec)
-                    .expect("events must be symbols");
+            let mut sequence = Sequence::default();
 
-                let mut engine_sequence = Sequence::default();
-                for event in events {
-                    let expression = format!("{} {}", event.trim(), block.symbol());
+            if let Some(engine) = world.write_component::<Engine>().get_mut(block_entity) {
+                // Assign transitions to events
+                for (transition, events) in engine.clone().iter_transitions() {
+                    for event in events.iter().filter_map(|e| {
+                        Engine::find_block(world, format!("{e} {}", block.symbol()))
+                    }) {
+                        world
+                            .write_component()
+                            .insert(event, transition.clone())
+                            .expect("should be able to insert transition");
 
-                    if let Some(event_entity) = Engine::find_block(world, expression.trim()) {
-                        engine_sequence.add(event_entity);
+                        sequence.add(event);
+                        engine.start.get_or_insert(event);
                     }
                 }
 
-                world
-                    .write_component()
-                    .insert(block_entity, engine_sequence)
-                    .expect("should be able to insert component");
+                // Handle lifecycle settings
+                if let Some((lifecycle, engines)) = engine.lifecycle.as_ref() {
+                    match (lifecycle, engines) {
+                        (Lifecycle::Next, Some(engines)) => {
+                            if let Some(engine) = engines
+                                .iter()
+                                .filter_map(|e| Engine::find_block(world, format!("{e}")))
+                                .next()
+                            {
+                                sequence.set_cursor(engine);
+                            }
+                        }
+                        (Lifecycle::Fork, Some(engines)) => {
+                            for engine in engines
+                                .iter()
+                                .filter_map(|e| Engine::find_block(world, format!("{e}")))
+                            {
+                                sequence.set_cursor(engine);
+                            }
+                        }
+                        (Lifecycle::Loop, _) |  (Lifecycle::Repeat(_), _)  => {
+                            sequence.set_cursor(block_entity);
+                        }
+                        (Lifecycle::Exit, _) => { /* No-OP */}
+                        _ => {
+                            tracing::event!(
+                                Level::ERROR,
+                                "Could not parse lifecycle for engine {}",
+                                block.symbol()
+                            );
+                        }
+                    }
+                }
             }
+
+            world
+                .write_component()
+                .insert(block_entity, sequence)
+                .expect("should have inserted a sequence");
 
             return;
         }
 
-        for index in block
-            .index()
-            .iter()
-            .filter(|i| i.root().name() == "runtime")
-        {
-            if let Some(plugins) = index
-                .properties()
-                .property("sequence")
-                .and_then(BlockProperty::int_vec)
-            {
-                let mut sequence = Sequence::default();
+        if !block.is_root_block() && !block.is_control_block() {
+            let block_entity = world.entities().entity(block.entity());
 
-                for plugin in plugins.iter().map(|p| *p) {
-                    let plugin = world.entities().entity(*plugin as u32);
-                    sequence.add(plugin);
-                }
+            let mut events = world.write_component::<Event>();
+            if let Some(event) = events.get_mut(block_entity) {
+                event.set_name(block.name());
 
-                // Note that .next() will mutate the sequence before we insert it as a component
-                // That is because the parent will be executed first, and afterwards the next entity in the 
-                // sequence should be the next call
-                if let Some(parent) = sequence.next() {
-                    world
-                        .write_component()
-                        .insert(parent, sequence)
-                        .expect("Should be able to insert");
-                }
+                let sequence = event
+                    .sequence()
+                    .expect("should have a sequence at compile-time");
+
+                let mut sequences = world.write_component::<Sequence>();
+                sequences
+                    .insert(block_entity, sequence.clone())
+                    .expect("should be able to insert component");
             }
         }
     }
@@ -213,8 +376,6 @@ impl Interpreter for Engine {
 
 #[test]
 fn test_engine() {
-    // TODO: Write assertions
-    use crate::*;
     use specs::WorldExt;
 
     let mut runtime = Runtime::default();

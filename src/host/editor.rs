@@ -1,12 +1,4 @@
-use atlier::system::{App, Extension};
-use specs::{Entities, Join, ReadStorage, System, WorldExt, WriteStorage};
-
-use crate::{
-    editor::{ProgressStatusBar, StartButton, Task},
-    engine::Connection,
-    prelude::CancelThunk,
-    AttributeIndex, Event, Host, LifecycleOptions, RuntimeEditor, ThunkContext,
-};
+use crate::{prelude::*, editor::{ProgressStatusBar, Task, StartButton}};
 
 /// Extension trait for Host, that provides functions for opening a GUI editor,
 ///
@@ -59,9 +51,7 @@ impl Editor for Host {
                     start_buttons
                         .insert(entity, StartButton::default())
                         .expect("should be able to insert start button");
-                    connections
-                        .insert(entity, Connection::default())
-                        .expect("should be able to insert connection");
+              
                     contexts
                         .insert(entity, ThunkContext::default())
                         .expect("should be able to insert a thunk context");
@@ -102,37 +92,37 @@ impl<'a> System<'a> for Host {
             (&entities, &contexts, &mut start_buttons, &mut events).join()
         {
             // Handle starting the event
-            if let Some(true) = start_button.0 {
-                if let Some(cancel) = _cancel_thunk.remove(entity) {
-                    cancel.0.send(()).ok();
-                } else {
-                    event.fire(context.clone());
-                }
+            // if let Some(true) = start_button.0 {
+            //     if let Some(cancel) = _cancel_thunk.remove(entity) {
+            //         cancel.0.send(()).ok();
+            //     } else {
+            //         event.fire(context.clone());
+            //     }
 
-                start_button.0 = Some(false);
-            }
+            //     start_button.0 = Some(false);
+            // }
 
-            // Handle setting the current status
-            if let Some(_) = start_button.0 {
-                if event.is_running() {
-                    start_button.1 = "Running".to_string();
-                } else {
-                    start_button.1 = context
-                        .state()
-                        .find_text("elapsed")
-                        .and_then(|e| Some(format!("Completed, elapsed: {}", e)))
-                        .unwrap_or("Completed".to_string());
-                }
-            }
+            // // Handle setting the current status
+            // if let Some(_) = start_button.0 {
+            //     if event.is_running() {
+            //         start_button.1 = "Running".to_string();
+            //     } else {
+            //         start_button.1 = context
+            //             .state()
+            //             .find_text("elapsed")
+            //             .and_then(|e| Some(format!("Completed, elapsed: {}", e)))
+            //             .unwrap_or("Completed".to_string());
+            //     }
+            // }
 
-            // Sets the label for this button
-            start_button.2 = {
-                if event.is_running() {
-                    format!("cancel {}", event.to_string())
-                } else {
-                    event.to_string()
-                }
-            };
+            // // Sets the label for this button
+            // start_button.2 = {
+            //     if event.is_running() {
+            //         format!("cancel {}", event.to_string())
+            //     } else {
+            //         event.to_string()
+            //     }
+            // };
 
             // Sets the owning entity
             start_button.3 = Some(entity);

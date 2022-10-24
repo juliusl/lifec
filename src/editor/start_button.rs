@@ -1,6 +1,4 @@
-use crate::*;
-use specs::storage::DenseVecStorage;
-use specs::{Component, Entity, World, WorldExt};
+use crate::prelude::*;
 
 /// This button is to start actions that take computation time
 #[derive(Component, Clone, Default, Debug)]

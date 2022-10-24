@@ -2,7 +2,7 @@ use specs::{Component, Entity};
 use specs::storage::HashMapStorage;
 use tracing::{event, Level};
 
-use crate::AttributeGraph;
+use crate::prelude::*;
 
 /// Component for handling errors
 /// 

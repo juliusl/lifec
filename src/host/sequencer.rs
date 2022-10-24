@@ -1,11 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::LifecycleOptions;
-use crate::{Engine, Event, Host, Sequence};
-use reality::Block;
-use specs::{Entities, Entity, Join, ReadStorage, WriteStorage};
-use tracing::event;
-use tracing::Level;
+use crate::prelude::*;
 
 /// Extension of Host to handle linking engine sequences together
 ///
@@ -18,122 +13,190 @@ pub trait Sequencer {
 impl Sequencer for Host {
     fn link_sequences(&mut self) {
         self.world_mut().exec(
-            |(entities, blocks, _events, mut engines, mut sequences, mut lifecycle_options): (
+            |(
+                block_map,
+                entities,
+                blocks,
+                events,
+                engines,
+                mut limits,
+                mut sequences,
+                mut connections,
+                mut cursors,
+            ): (
+                Read<HashMap<String, Entity>>,
                 Entities,
                 ReadStorage<Block>,
                 ReadStorage<Event>,
-                WriteStorage<Engine>,
+                ReadStorage<Engine>,
+                WriteStorage<Limit>,
                 WriteStorage<Sequence>,
-                WriteStorage<LifecycleOptions>,
+                WriteStorage<Connection>,
+                WriteStorage<Cursor>,
             )| {
-                let mut control_atlas = HashMap::<Entity, Vec<(Entity, Option<Entity>)>>::default();
-                
-                let mut event_engines = Vec::<(Entity, Entity, Engine, Option<Engine>)>::default();
-                
-                for (block, _, sequence) in (&blocks, &engines, &sequences).join() {
-                    let control_entity = entities.entity(block.entity());
-                    let mut atlas = vec![];
-                    let mut stack = vec![];
+                // Process engines
+                for (block, engine) in (&blocks, &engines).join() {
+                    let transitions = engine.iter_transitions();
 
-                    for event_entity in sequence.iter_entities() {
-                        let runtime_block = blocks.get(event_entity).expect("should exist");
-                        for index in runtime_block
-                            .index()
-                            .iter()
-                            .filter(|i| i.root().name() == "runtime")
+                    for (from, to) in transitions.zip(engine.iter_transitions().skip(1)) {
+                        for t in
+                            to.1.iter()
+                                .filter_map(|f| block_map.get(&format!("{f} {}", block.symbol())))
                         {
-                            let mut plugins = index.iter_children();
-                            if let Some((entity, _)) = plugins.next() {
-                                let plugin_entity = entities.entity(*entity);
-                                let engine = Engine::new(plugin_entity);
+                            let mut incoming = HashSet::<Entity>::default();
 
-                                if let Some((last_control_entity, _, _, connection)) = event_engines.last_mut() {
-                                    if connection.is_none() && *last_control_entity == control_entity {
-                                        let _ = connection.insert(engine.clone());
-                                    }
-                                }
-
-                                event_engines.push((control_entity, event_entity, engine, None));
+                            for f in from
+                                .1
+                                .iter()
+                                .filter_map(|f| block_map.get(&format!("{f} {}", block.symbol())))
+                            {
+                                incoming.insert(*f);
                             }
-
-                            let plugins = index.iter_children();
-                            for (plugin_entity, _) in plugins {
-                                let plugin_entity = entities.entity(*plugin_entity);
-                                if stack.is_empty() {
-                                    stack.push(plugin_entity);
-                                } else {
-                                    if let Some(popped) = stack.pop() {
-                                        atlas.push((popped, Some(plugin_entity)));
-                                        stack.push(plugin_entity);
-                                    }
-                                }
-                            }
+                            let connection = Connection::new(incoming, *t);
+                            connections
+                                .insert(*t, connection)
+                                .expect("should be able to insert connection");
                         }
                     }
-
-                    if let Some(popped) = stack.pop() {
-                        atlas.push((popped, None));
-                    }
-                    control_atlas.insert(control_entity, atlas);
                 }
 
-                for (control, atlas) in control_atlas.iter() {
-                    let mut start = None;
-                    if let Some((from, _)) = atlas.first() {
-                        if start.is_none() {
-                            start = Some(from);
+                // Process cursors
+                for (_, connection) in (&entities, &connections).join() {
+                    for (from, to) in connection.connections() {
+                        if let Some(sequence) = sequences.get_mut(*from) {
+                            sequence.set_cursor(*to);
                         }
                     }
+                }
 
-                    let start = start.take().expect("Should have a start");
-                    if let Some(engine) = engines.get_mut(*control) {
-                        engine.set_start(*start);
-                    }
-
-                    if atlas.is_empty() {
-                        continue;
-                    }
-
-                    let (from, to) = atlas.iter().last().expect("Should have a last entry");
-                    let lifecycle_option = lifecycle_options
-                        .get(*control)
-                        .expect("Should have a lifecycle option");
-
-                    if let Some(to) = to {
-                        event!(
-                            Level::DEBUG,
-                            "Setting lifecycle_option, {:?} -> {:?}",
-                            to,
-                            lifecycle_option
-                        );
-                        lifecycle_options
-                            .insert(*to, lifecycle_option.clone())
-                            .expect("Should be able to insert");
-                    } else {
-                        event!(
-                            Level::DEBUG,
-                            "Setting lifecycle_option, {:?} -> {:?}",
-                            from,
-                            lifecycle_option
-                        );
-                        lifecycle_options
-                            .insert(*from, lifecycle_option.clone())
-                            .expect("Should be able to insert");
+                // Unpack built cursors
+                for (entity, _, sequence) in (&entities, &events, &sequences).join() {
+                    if let Some(cursor) = sequence.cursor() {
+                        cursors
+                            .insert(entity, cursor.clone())
+                            .expect("should be able to insert cursor");
                     }
                 }
-            
-            
-                for (_, event_entity, engine, next) in event_engines.iter() {
-                    if let Some(next) = next {
-                        let from = engine.start().expect("should have a start");
-                        let seq = sequences.get_mut(from).expect("should have a sequence"); 
-                        let to = next.start().expect("should have a start");
 
-                        event!(Level::DEBUG, "Setting cursor for event entity {}: {} -> {}", event_entity.id(), from.id(), to.id());
-                        seq.set_cursor(to);
+                // Unpack lifecycle cursor to link engines
+                for (engine, sequence) in (&engines, &sequences).join() {
+                    if let Some(last) = sequence.last() {
+                        if let Some(cursor) = sequence.cursor().cloned() {
+                            // Translate cursor into events
+                            let cursor = match cursor {
+                                Cursor::Next(next) => {
+                                    let engine = engines.get(next).expect("should have an engine");
+                                    let start = engine.start().expect("should have a start");
+                                    Cursor::Next(*start)
+                                }
+                                Cursor::Fork(forks) => Cursor::Fork(
+                                    forks
+                                        .iter()
+                                        .filter_map(|f| engines.get(*f))
+                                        .filter_map(|e| e.start())
+                                        .cloned()
+                                        .collect(),
+                                ),
+                            };
+
+                            // Assign limits
+                            if let Some(limit) = engine.limit() {
+                                match &cursor {
+                                    Cursor::Next(next) => {
+                                        limits
+                                            .insert(*next, limit.clone())
+                                            .expect("should be able to insert limit");
+                                    }
+                                    Cursor::Fork(forks) => {
+                                        for fork in forks {
+                                            limits
+                                                .insert(*fork, limit.clone())
+                                                .expect("should be able to insert limit");
+                                        }
+                                    }
+                                }
+                            }
+
+                            cursors
+                                .insert(last, cursor)
+                                .expect("should be able to insert cursor");
+                        }
                     }
                 }
             },
+        );
+    }
+}
+
+mod test {
+    use crate::prelude::Project;
+
+    #[derive(Default)]
+    struct Test;
+    
+    impl Project for Test {
+        fn interpret(_: &specs::World, _: &reality::Block) {
+            // no-op
+        }
+    }
+
+    #[test]
+    #[tracing_test::traced_test]
+    fn test_sequencer() {
+        let _ = crate::prelude::Host::load_content::<Test>(
+            r#"
+        ``` test
+        + .engine
+        : .start step1
+        : .start step2
+        : .start step3
+        : .next test2
+        ```
+    
+        ``` step1 test 
+        + .runtime
+        : .println abc
+        : .println def
+        : .println ghi
+        ```
+    
+        ``` step2 test
+        + .runtime
+        : .println 2 abc
+        : .println 2 def
+        : .println 2 ghi
+        ```
+    
+        ``` step3 test
+        + .runtime
+        : .println 3 abc
+        : .println 3 def
+        : .println 3 ghi
+        ```
+
+        ``` test2
+        + .engine
+        : .start step1
+        : .start step2
+        : .start step3
+        : .exit
+        ```
+
+        ``` step1 test2
+        + .runtime
+        : .println test2 test
+        ```
+
+        ``` step2 test2
+        + .runtime
+        : .println test2 test2
+        ```
+
+        ``` step3 test2 
+        + .runtime
+        : .println test2 test3
+        ```
+        "#,
         );
     }
 }

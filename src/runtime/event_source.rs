@@ -1,13 +1,10 @@
-use specs::{World, Entity, WorldExt};
-
-use crate::{Event, Runtime, Config, Thunk, Plugin};
-
-use tracing::{event, Level};
+use crate::prelude::*;
 
 /// Event source returned by a runtime, that can be used to schedule events w/ a world
 /// 
 /// Catalogs aspects of the underlying plugin driving the event's thunk.
 /// 
+#[derive(Debug)]
 pub struct EventSource {
     /// The event struct component this source returns,
     /// 
@@ -48,40 +45,34 @@ impl EventSource {
         }
     }
 
-    /// Sets the config for the event,
-    /// 
-    pub fn set_config(&mut self, config: Config) {
-        self.event.set_config(config);
-    }
+    // /// Sets the config for the event,
+    // /// 
+    // pub fn set_config(&mut self, config: Config) {
+    //     self.event.set_config(config);
+    // }
 
-    /// Creates a new entity w/ the underlying event,
-    /// 
-    pub fn create_entity(&self, world: &World) -> Option<Entity> {
-        let entity = world.entities().create();
+    // /// Creates a new entity w/ the underlying event,
+    // /// 
+    // pub fn create_entity(&self, world: &World) -> Option<Entity> {
+    //     let entity = world.entities().create();
 
-        match world.write_component().insert(entity, self.event.duplicate()) {
-            Ok(_) => {
-                event!(Level::DEBUG, "Creating a new entity for event {}", self.event);
-                Some(entity)
-            },
-            Err(err) => {
-                event!(Level::ERROR, "Error inserting event, {err}");
-                None
-            },
-        }
-    }
-
-    /// Returns the event's plugin thunk
-    /// 
-    pub fn thunk(&self) -> Thunk {
-        self.event.thunk()
-    }
+    //     match world.write_component().insert(entity, self.event.duplicate()) {
+    //         Ok(_) => {
+    //             event!(Level::DEBUG, "Creating a new entity for event {}", self.event);
+    //             Some(entity)
+    //         },
+    //         Err(err) => {
+    //             event!(Level::ERROR, "Error inserting event, {err}");
+    //             None
+    //         },
+    //     }
+    // }
 }
 
 impl Clone for EventSource {
     fn clone(&self) -> Self {
         Self { 
-            event: self.event.duplicate(),
+            event: self.event.clone(),
             description: self.description.clone(),
             caveats: self.caveats.clone(),
         }

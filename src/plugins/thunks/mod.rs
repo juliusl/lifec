@@ -1,8 +1,7 @@
 
-use crate::Operation;
 use hyper::client::HttpConnector;
-use specs::Component;
-use specs::{storage::DenseVecStorage, Entity};
+use reality::BlockProperties;
+use specs::{storage::DenseVecStorage, Entity, Component};
 
 mod error;
 pub use error::ErrorContext;
@@ -13,6 +12,7 @@ pub use thunk_context::ThunkContext;
 
 use super::Plugin;
 use tokio::task::JoinHandle;
+use std::fmt::Debug;
 
 /// Thunk is a function that can be passed around for the system to call later
 #[derive(Component, Clone)]
@@ -22,19 +22,24 @@ pub struct Thunk(
     pub &'static str,
     // thunk fn
     pub fn(&ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
-    /// setup thunk fn
-    pub fn(&mut ThunkContext) -> Operation,
 );
 
 /// Config for a thunk context
 #[derive(Component, Clone)]
 #[storage(DenseVecStorage)]
-pub struct Config(
-    /// config label
-    pub &'static str,
-    /// config fn
-    pub fn(&mut ThunkContext),
-);
+pub struct Config(BlockProperties);
+
+impl Debug for Thunk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Thunk").field(&self.0).finish()
+    }
+}
+
+impl Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Config").field(&self.0).finish()
+    }
+}
 
 impl AsRef<Config> for Config {
     fn as_ref(&self) -> &Config {
@@ -53,7 +58,7 @@ impl Thunk {
     where
         P: Plugin + ?Sized,
     {
-        Self(P::symbol(), P::call, P::setup_operation)
+        Self(P::symbol(), P::call)
     }
 }
 

@@ -1,40 +1,78 @@
 use std::fmt::Display;
 
-use crate::{Config, Plugin, Thunk, ThunkContext, SpecialAttribute, AttributeParser};
-use atlier::system::Value;
-use specs::{Component, DenseVecStorage};
-use tokio::task::JoinHandle;
-use tracing::event;
-use tracing::Level;
+use crate::prelude::*;
+use reality::Block;
+use specs::{Component, DenseVecStorage, Entity};
+use tracing::{event, Level};
 
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
-/// 
-#[derive(Component)]
+///
+#[derive(Debug, Component, Clone)]
 #[storage(DenseVecStorage)]
 pub struct Event(
     /// Name of this event
     pub String,
-    /// Thunk that is being executed
-    pub Thunk,
-    /// Config for the thunk context before being executed
-    pub Option<Config>,
-    /// Initial context that starts this event
-    pub Option<ThunkContext>,
-    /// This is the task that
-    pub Option<JoinHandle<ThunkContext>>,
+    /// Thunks that will be executed,
+    pub Vec<Thunk>,
+    /// Sequence to execute,
+    pub Option<Sequence>,
 );
 
 impl Event {
+    /// Returns a new event component,
+    ///
+    pub fn new(block: &Block) -> Self {
+        Self(block.name().to_string(), vec![], Some(Sequence::default()))
+    }
+
+    /// Returns an empty event,
+    ///
+    pub fn empty() -> Self {
+        Self(String::default(), vec![], Some(Sequence::default()))
+    }
+
+    /// Sets the name for this event,
+    ///
+    pub fn set_name(&mut self, name: impl AsRef<str>) {
+        self.0 = name.as_ref().to_string();
+    }
+
+    /// Adds a thunk to this event and the entity w/ it's data,
+    ///
+    pub fn add_thunk(&mut self, thunk: Thunk, entity: Entity) {
+        if let Some(sequence) = self.2.as_mut() {
+            self.1.push(thunk);
+            sequence.add(entity);
+        } else {
+            event!(Level::WARN, "Cannot add thunk to an active event")
+        }
+    }
+
+    /// Activates the event by removing the underlying sequence so that no new thunks can be added,
+    ///
+    /// This indicates that the sequence component on the entity is final, and no further changes
+    /// will be made to it's event
+    ///
+    pub fn activate(&mut self) -> Option<Sequence> {
+        self.2.take()
+    }
+
+    /// Returns true if this event is active, that is, the owner of this component can expect no further changes,
+    ///
+    pub fn is_active(&self) -> bool {
+        self.sequence().is_none()
+    }
+
+    /// Returns the event's sequence,
+    ///
+    pub fn sequence(&self) -> Option<&Sequence> {
+        self.2.as_ref()
+    }
+
     /// Returns the event symbol
     ///
     pub fn symbol(&self) -> &String {
         &self.0
-    }
-
-    /// Returns the a clone of the inner thunk
-    ///
-    pub fn thunk(&self) -> Thunk {
-        self.1.clone()
     }
 
     /// Creates an event component, with a task created with on_event
@@ -45,101 +83,28 @@ impl Event {
     {
         Self(
             event_name.as_ref().to_string(),
-            Thunk::from_plugin::<P>(),
-            None,
-            None,
-            None,
+            vec![Thunk::from_plugin::<P>()],
+            Some(Sequence::default()),
         )
     }
 
-    /// Sets the config to use w/ this event
-    pub fn set_config(&mut self, config: Config) {
-        self.2 = Some(config);
-    }
-
-    /// Prepares an event for the event runtime to start, cancel any previous join_handle
+    /// Creates an event component from a thunk,
     ///
-    /// Caveats: If the event has a config set, it will configure the context, before setting it
-    ///
-    pub fn fire(&mut self, thunk_context: ThunkContext) {
-        self.3 = Some(thunk_context);
-
-        // cancel any current task
-        self.cancel();
-    }
-
-    /// If a config is set w/ this event, this will setup a thunk context
-    /// from that config. Otherwise, No-OP.
-    pub fn setup(&self, thunk_context: &mut ThunkContext) {
-        if let Some(Config(name, config)) = self.2 {
-            event!(
-                Level::TRACE,
-                "detected config '{name}' for event: {} {}",
-                self.symbol(),
-                self.1.symbol()
-            );
-            config(thunk_context);
-        }
-    }
-
-    /// Cancel the existing join handle, mainly used for housekeeping.
-    /// Thunks must manage their own cancellation by using the cancel_source.
-    pub fn cancel(&mut self) {
-        if let Some(task) = self.4.as_mut() {
-            task.abort();
-        }
-    }
-
-    /// returns true if task is running
-    ///
-    pub fn is_running(&self) -> bool {
-        self.4
-            .as_ref()
-            .and_then(|j| Some(!j.is_finished()))
-            .unwrap_or_default()
-    }
-
-    /// Creates a duplicate of this event,
-    /// 
-    /// Does not include any transient state, such as context or join handle
-    ///
-    pub fn duplicate(&self) -> Self {
+    pub fn from_thunk(event_name: impl AsRef<str>, thunk: Thunk) -> Self {
         Self(
-            self.0.to_string(),
-            self.1.clone(),
-            self.2.clone(),
-            None,
-            None,
+            event_name.as_ref().to_string(),
+            vec![thunk],
+            Some(Sequence::default()),
         )
     }
 }
 
 impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ", self.0)?;
-        write!(f, "{}", self.1 .0)?;
-        Ok(())
-    }
-}
-
-impl SpecialAttribute for Event {
-    fn ident() -> &'static str {
-        "event"
-    }
-
-    fn parse(parser: &mut AttributeParser, content: impl AsRef<str>) {
-        let idents = Event::parse_idents(content.as_ref());
-
-        match (idents.get(0), idents.get(1)) {
-            (Some(name), Some(symbol)) => {
-                parser.define("event", Value::Symbol(format!("{name} {symbol}")));
-            },
-            (Some(symbol), None) => {
-                parser.define("event", Value::Symbol(format!("{symbol}")));
-            },
-            _ => {
-                event!(Level::ERROR, "Invalid format idents state");
-            }
+        writeln!(f, "Event `{}`", self.0)?;
+        for thunk in self.1.iter() {
+            writeln!(f, "\t      `{}`", thunk.0)?;
         }
+        Ok(())
     }
 }

@@ -1,8 +1,7 @@
 use super::{List, Task};
-use crate::*;
-use crate::{engine::Connection, plugins::*};
+use crate::prelude::*;
 
-use atlier::system::WindowEvent;
+use atlier::system::{WindowEvent, Extension};
 use imgui::{Condition, Slider, StyleVar, Ui, Window};
 use specs::{Join, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
@@ -32,14 +31,12 @@ impl Default for RuntimeEditor {
 impl Extension for RuntimeEditor {
     fn configure_app_world(world: &mut specs::World) {
         List::<Task>::configure_app_world(world);
-        EventRuntime::configure_app_world(world);
         world.register::<Connection>();
         world.register::<Sequence>();
     }
 
     fn configure_app_systems(dispatcher: &mut specs::DispatcherBuilder) {
         List::<Task>::configure_app_systems(dispatcher);
-        EventRuntime::configure_app_systems(dispatcher);
     }
 
     fn on_ui(&'_ mut self, app_world: &specs::World, ui: &'_ imgui::Ui<'_>) {

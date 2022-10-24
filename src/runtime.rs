@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use crate::{AttributeParser, BlockObject, CustomAttribute, SpecialAttribute, Plugin};
+use crate::prelude::{AttributeParser, BlockObject, CustomAttribute, SpecialAttribute, Plugin};
 use specs::{Component, DefaultVecStorage, WorldExt};
 use tracing::event;
 use tracing::Level;
@@ -10,7 +10,7 @@ pub use event_source::EventSource;
 
 /// Runtime provides access to the underlying project, and function tables for creating components
 ///
-#[derive(Component, Default, Clone)]
+#[derive(Component, Debug, Default, Clone)]
 #[storage(DefaultVecStorage)]
 pub struct Runtime {
     /// Table of functions for creating new event components
@@ -87,7 +87,7 @@ impl Runtime {
 #[test]
 #[tracing_test::traced_test]
 fn test_runtime() {
-    use crate::*;
+    use crate::prelude::*;
     
     let mut runtime = Runtime::default();
     runtime.install_with_custom::<Process>("");

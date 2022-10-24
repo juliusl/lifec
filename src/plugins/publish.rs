@@ -1,7 +1,5 @@
-use reality::{BlockObject, BlockProperties};
-use tracing::{event, Level};
 
-use crate::{AttributeIndex, Plugin};
+use crate::prelude::*;
 
 /// Simple plugin that hosts a file and waits for a connection,
 ///
@@ -13,7 +11,7 @@ impl Plugin for Publish {
         "publish"
     }
 
-    fn call(context: &crate::ThunkContext) -> Option<crate::AsyncContext> {
+    fn call(context: &ThunkContext) -> Option<AsyncContext> {
         context.task(|mut cancel_source| {
             let tc = context.clone();
             async move {
@@ -66,8 +64,9 @@ impl BlockObject for Publish {
 }
 
 mod tests {
-    use crate::Project;
-
+    use crate::prelude::*;
+    
+    #[derive(Default)]
     struct Test;
 
     impl Project for Test {
@@ -77,8 +76,7 @@ mod tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_publish() {
-        use crate::{AttributeIndex, Host, ThunkContext};
-        use specs::WorldExt;
+        use std::path::PathBuf;
 
         // Define an engine that calls the plugin
         let mut host = Host::load_content::<Test>(
@@ -99,10 +97,10 @@ mod tests {
         );
 
         // Start the engine w/ the publish plugin
-        let mut dispatcher = host.prepare::<Test>(None);
+        let mut dispatcher = host.prepare::<Test>();
 
         let engine = host.find_start("test").expect("should have a test block");
-        host.start_event(engine, ThunkContext::default());
+        host.start_event(engine);
 
         // Spawn a task to connect and read from the publish plugin
         let task = tokio::spawn(async {
@@ -132,6 +130,11 @@ mod tests {
             .expect("should be able to read");
 
         assert_eq!(received.trim(), tocompare.trim());
+
+        let program = std::env::args().next().expect("should always be the program");
+        let program = PathBuf::from(program);
+        let program = program.file_name().expect("should be the name of the binary");
+        eprintln!("{:?}", program);
 
         // Clean up nested runtime
         host.exit();

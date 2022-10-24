@@ -1,7 +1,6 @@
 use std::time::Instant;
 
 use crate::plugins::*;
-use crate::{BlockObject, BlockProperties};
 use logos::{Lexer, Logos};
 use specs::storage::DenseVecStorage;
 use tokio::task::JoinHandle;

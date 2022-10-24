@@ -1,18 +1,8 @@
-use std::{str::from_utf8, path::PathBuf};
-
-use atlier::system::Value;
+use std::{path::PathBuf, process::Stdio};
 use reality::Documentation;
-use crate::{AttributeParser, BlockObject, BlockProperties, CustomAttribute};
-use specs::{Component, DenseVecStorage};
-use tokio::{select, task::JoinHandle};
+use tokio::{io::{BufReader, AsyncBufReadExt}, select};
 
-use crate::{
-    plugins::{thunks::CancelToken, Plugin, ThunkContext},
-    AttributeIndex,
-};
-
-use tracing::event;
-use tracing::Level;
+use crate::prelude::*;
 
 /// The process component executes a command and records the output
 /// 
@@ -91,10 +81,17 @@ impl Plugin for Process {
                     event!(Level::ERROR, "Could not set current_directory for process entity {}, {err}", last.id());
                 },
             }
-        })
+        });
+
+        // Enables redirecting stdout to a file, 
+        parser.add_custom_with("redirect",|p, content| {
+            let entity = p.last_child_entity().expect("should have a child entity");
+            // TODO: can ensure the file,
+            p.define_child(entity, "redirect", Value::Symbol(content));
+        });
     }
 
-    fn call(context: &super::ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
+    fn call(context: &super::ThunkContext) -> Option<AsyncContext> {
         let clone = context.clone();
         clone.clone().task(|cancel_source| {
             let mut tc = context.clone();
@@ -157,68 +154,90 @@ impl Plugin for Process {
                     _ => {}
                 }
 
-                // Set current directory if work_dir is set
-                if let Some(work_dir) = tc.state().find_symbol("current_dir") {
-                    let path = PathBuf::from(&work_dir);
+                // Set current directory if current_dir is set
+                if let Some(current_dir) = tc.state().find_symbol("current_dir") {
+                    let path = PathBuf::from(&current_dir);
                     match path.canonicalize() {
-                        Ok(work_dir) => {
-                            command_task.current_dir(work_dir);
+                        Ok(current_dir) => {
+                            command_task.current_dir(current_dir);
                         },
                         Err(err) => {
-                            panic!("Could not canonicalize path {work_dir}, {err}");
+                            panic!("Could not canonicalize path {current_dir}, {err}");
                         },
                     }
                 }
 
-                select! {
-                   output = command_task.output() => {
-                        match output {
-                            Ok(output) => {
+                command_task
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped());
+
+                let mut child = command_task.spawn().expect("should be able to spawn process");
+
+                let stdout = child.stdout.take().expect("should be able to take stdout");
+                let stderr = child.stderr.take().expect("should be able to take stderr");
+
+                let mut reader = BufReader::new(stdout).lines();
+                let mut stderr_reader = BufReader::new(stderr).lines();
+
+                let reader_context = tc.clone();
+                let reader_task = tc.handle().unwrap().spawn(async move {
+                    event!(Level::DEBUG, "starting to listen to stdout");
+                    
+                    let mut stdout = String::new();
+
+                    while let Ok(line) = reader.next_line().await {
+                        match line {
+                            Some(line) => {
+                                use std::fmt::Write;
                                 
-                                // TODO
-                                // for b in output.stdout.clone() {
-                                //     tc.send_char(b).await;
-                                // }
-                                // for b in output.stderr.clone() {
-                                //     tc.send_char(b).await;
-                                // }
+                                println!("{}", line);
+                                writeln!(&mut stdout, "{}", line).expect("should be able to write");
+                            },
+                            None => {
+                                break;
+                            },
+                        }
+                    }
 
-                                let stdout = output.stdout.clone();
-                                match from_utf8(stdout.as_slice()) {
-                                    Ok(stdout) => {
-                                        for line in stdout.lines() {
-                                            println!("{}", line);
-                                        }
-                                    },
-                                    Err(err) => {
-                                        event!(Level::ERROR, "Could not read stdout {err}")
-                                    },
-                                }
+                    for redirect in reader_context.search().find_symbol_values("redirect") {
+                        match tokio::fs::write(&redirect, &stdout).await {
+                            Ok(_) => {
+                                event!(Level::DEBUG, "Redirected output to {redirect}");
+                            },
+                            Err(err) => {
+                                event!(Level::ERROR, "Could not write to {redirect}, {err}");
+                            },
+                        }
+                    }
+                });
 
-                                let stderr = output.stderr.clone();
-                                match from_utf8(stderr.as_slice()) {
-                                    Ok(stderr) => {
-                                        for line in stderr.lines() {
-                                            eprintln!("{}", line);
-                                        }
-                                    },
-                                    Err(err) => {
-                                        event!(Level::ERROR, "Could not read stdout {err}")
-                                    },
-                                }
-                                // Completed process, publish result
-                                tc.update_progress("# Finished, recording output", 0.30).await;
-                                // Self::resolve_output(&mut tc, command, start_time, output);
+                let stderr_reader_task = tc.handle().unwrap().spawn(async move {
+                    event!(Level::DEBUG, "starting to listen to stderr");
+                    while let Ok(line) = stderr_reader.next_line().await {
+                        match line {
+                            Some(line) => {
+                                eprintln!("{}", line);
+                            },
+                            None => {
+                                break;
+                            },
+                        }
+                    }
+                });
+
+                select! {
+                   output = child.wait_with_output() => {
+                        match output {
+                            Ok(_) => {
+                                event!(Level::DEBUG, "Completed process");
                             }
                             Err(err) => {
-                                let path = std::env::current_dir().expect("should be able to get current dir");
-                                event!(Level::TRACE, "The current directory is {}", path.display());
-                                tc.update_progress(format!("# error {}", err), 0.0).await;
+                                event!(Level::ERROR, "Error waiting for process {err}");
                             }
                         }
                    }
                    _ = cancel_source => {
-                        tc.update_progress(format!("# cancelling"), 0.0).await;
+                        event!(Level::TRACE, "Task is being canclled");
                    }
                 }
 
@@ -226,6 +245,8 @@ impl Plugin for Process {
                     tc.copy_previous();
                 }
 
+                reader_task.abort();
+                stderr_reader_task.abort();
                 Some(tc)
             }
         })

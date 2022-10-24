@@ -6,7 +6,7 @@ use specs::{DenseVecStorage, Entities, ReadStorage, System};
 use tokio::task::JoinHandle;
 use tracing::{event, Level};
 
-use crate::AttributeIndex;
+use crate::prelude::*;
 
 use super::{CancelThunk, ErrorContext, Event, EventRuntime, ThunkContext};
 
@@ -18,6 +18,11 @@ pub use proxy::ProxyRuntime;
 mod address;
 pub use address::BlockAddress;
 
+mod udp;
+pub use udp::UDP;
+
+mod tcp;
+pub use tcp::TCP;
 
 /// Network runtime is similar to the event runtime, but instead fires events
 /// when a network task has completed
@@ -140,7 +145,7 @@ impl<'a> System<'a> for NetworkRuntime {
                                     upstream_context
                                         .state_mut()
                                         .with_int("received", sent as i32);
-                                    upstream_event.fire(upstream_context);
+                                    upstream_event.activate();
                                 }
                             }
                             _ => {}
@@ -160,8 +165,6 @@ fn test_network_systems() {
     let test_world = &mut test_world;
     let mut test_dispatcher = DispatcherBuilder::new();
     let tokio_runtime = tokio::runtime::Runtime::new().unwrap();
-    EventRuntime::configure_app_world(test_world);
-    EventRuntime::configure_app_systems(&mut test_dispatcher);
     NetworkRuntime::configure_app_world(test_world);
     NetworkRuntime::configure_app_systems(&mut test_dispatcher);
 
