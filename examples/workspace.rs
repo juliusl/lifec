@@ -1,32 +1,7 @@
 use lifec::prelude::*;
-#[derive(Default)]
-struct Test;
 
-impl Project for Test {
-    fn interpret(_: &specs::World, _: &reality::Block) {
-        // no-op
-    }
-}
-
-impl Listener for Test {
-    fn create(_: &World) -> Self {
-        Test {}
-    }
-
-    fn on_status_update(&mut self, status_update: &StatusUpdate) {
-        event!(Level::TRACE, "Received status_update {:?}", status_update);
-    }
-
-    fn on_completed_event(&mut self, e: &Entity) {
-        event!(Level::TRACE, "Completed event - {}", e.id());
-    }
-
-    fn on_runmd(&mut self, _: &RunmdFile) {}
-    fn on_operation(&mut self, _: &Operation) {}
-    fn on_error_context(&mut self, _: &ErrorContext) {}
-    fn on_start_command(&mut self, _: &Start) {}
-}
-
+/// Example showing opening an editor for a workspace,
+/// 
 fn main() {
     let mut workspace = Workspace::new("test.io", None);
     workspace.set_root_runmd(
@@ -144,11 +119,39 @@ fn main() {
 
     let files = vec![test_engine, test_engine2];
 
-    let world = Test::compile_workspace(&workspace, files.iter());
+    // Manually compile workspace since we don't need settings from the CLI --
+    let world = Test::compile_workspace(&workspace, files.iter(), None);
 
     let mut host = Host::from(world);
     host.enable_listener::<Test>();
     host.link_sequences();
-
     host.open_runtime_editor()
+}
+
+#[derive(Default)]
+struct Test;
+
+impl Project for Test {
+    fn interpret(_: &specs::World, _: &reality::Block) {
+        // no-op
+    }
+}
+
+impl Listener for Test {
+    fn create(_: &World) -> Self {
+        Test {}
+    }
+
+    fn on_status_update(&mut self, status_update: &StatusUpdate) {
+        event!(Level::TRACE, "Received status_update {:?}", status_update);
+    }
+
+    fn on_completed_event(&mut self, e: &Entity) {
+        event!(Level::TRACE, "Completed event - {}", e.id());
+    }
+
+    fn on_runmd(&mut self, _: &RunmdFile) {}
+    fn on_operation(&mut self, _: &Operation) {}
+    fn on_error_context(&mut self, _: &ErrorContext) {}
+    fn on_start_command(&mut self, _: &Start) {}
 }

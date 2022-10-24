@@ -3,6 +3,7 @@ use crate::prelude::*;
 mod source;
 pub use source::RunmdFile;
 pub use source::Source;
+pub use source::WorkspaceSource;
 
 mod workspace;
 pub use workspace::Workspace;
@@ -62,10 +63,11 @@ where
     fn compile_workspace<'a>(
         workspace: &Workspace,
         files: impl Iterator<Item = &'a RunmdFile>,
+        parser: Option<Parser>,
     ) -> World {
         let mut workspace = workspace.clone();
 
-        let mut parser = Self::parser()
+        let mut parser = parser.unwrap_or(Self::parser())
             .with_special_attr::<WorkspaceConfig>()
             .with_special_attr::<Operations>();
 

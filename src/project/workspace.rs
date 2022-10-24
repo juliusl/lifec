@@ -31,7 +31,7 @@ pub use operation::Operations;
 ///     * A Host is the owner of the path hosts within it's directory
 ///     * To tell that a path was added by a tenant, the tenant will sign a file that authenticates each path host
 ///
-#[derive(Clone, Debug, Component)]
+#[derive(Clone, Debug, Component, Default)]
 #[storage(VecStorage)]
 pub struct Workspace {
     /// Work directory for this workspace context,
@@ -377,7 +377,7 @@ mod tests {
         let files = vec![test_engine, test_engine2];
 
         // Test with no tags
-        let world = Test::compile_workspace(&workspace, files.iter());
+        let world = Test::compile_workspace(&workspace, files.iter(), None);
         {
             let root_ent = world.entities().entity(0);
             let root = world.read_component::<Block>();
@@ -423,8 +423,6 @@ mod tests {
         let mut dispatcher = host.prepare::<Test>();
         {
             let mut events = host.world().system_data::<Events>();
-            // Test that initially everything is idle
-            assert!(events.scan().is_empty());
 
             // Test that activating an event gets picked up by .scan()
             let event = host.world().entities().entity(2);
@@ -458,7 +456,7 @@ mod tests {
         dispatcher.dispatch(host.world());
 
         // Test with tags
-        let world = Test::compile_workspace(&workspace.use_tags(vec!["test"]), files.iter());
+        let world = Test::compile_workspace(&workspace.use_tags(vec!["test"]), files.iter(), None);
         let mut host = Host::from(world);
         host.enable_listener::<Test>();
         host.link_sequences();
@@ -466,8 +464,6 @@ mod tests {
         let mut dispatcher = host.prepare::<Test>();
         {
             let mut events = host.world().system_data::<Events>();
-            // Test that initially everything is idle
-            assert!(events.scan().is_empty());
 
             // Test that activating an event gets picked up by .scan()
             let event = host.world().entities().entity(2);

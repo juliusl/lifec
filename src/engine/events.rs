@@ -245,8 +245,10 @@ impl<'a> Events<'a> {
                         .insert(event_entity, sequence)
                         .expect("should be able to insert sequence");
                 }
+                true
+            } else {
+                false
             }
-            true
         } else {
             false
         }

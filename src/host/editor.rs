@@ -2,7 +2,7 @@ use imgui::Window;
 
 use crate::{
     editor::{ProgressStatusBar, StartButton, Task},
-    prelude::*,
+    prelude::*, project::WorkspaceSource,
 };
 
 /// Extension trait for Host, that provides functions for opening a GUI editor,
@@ -83,25 +83,30 @@ impl Editor for Host {
 /// 
 #[derive(Default)]
 pub struct HostEditor {
+    host: Option<Host>,
     event_status: Vec<EventStatus>,
     tick: Option<()>,
     activate: Option<Entity>,
 }
 
 impl<'a> System<'a> for HostEditor {
-    type SystemData = Events<'a>;
+    type SystemData = (Events<'a>, WorkspaceSource<'a>);
 
-    fn run(&mut self, mut data: Self::SystemData) {
-        self.event_status = data.scan();
+    fn run(&mut self, (mut events, workspace_source): Self::SystemData) {
+        self.event_status = events.scan();
         
         if let Some(_) = self.tick.take() {
-            data.serialized_tick();
+            events.serialized_tick();
         }
 
         if let Some(event) = self.activate.take() {
-            if data.activate(event) {
+            if events.activate(event) {
                 event!(Level::INFO, "Event {} is activating", event.id());
             }
+        }
+
+        if self.host.is_none() {
+            self.host = Some(workspace_source.new_host());
         }
     }
 }
@@ -113,6 +118,12 @@ impl App for HostEditor {
 
     fn edit_ui(&mut self, ui: &imgui::Ui) {
         Window::new("Event commands").build(ui, || {
+            if let Some(host) = self.host.as_mut() {
+                if ui.button("Print engine event graph") { 
+                    host.print_engine_event_graph();
+                }
+            }
+
             if ui.button("Tick") {
                 self.tick = Some(());
             }
@@ -124,13 +135,13 @@ impl App for HostEditor {
                 if ui.button(format!("Start {}", inactive.id())) {
                     self.activate = Some(inactive.clone());
                 }
-                // Need a way to distinguish between a workspace operation and a normal event
             }
         });
     }
 
     fn display_ui(&self, ui: &imgui::Ui) {
         Window::new("Event Status").build(ui, || {
+
             for status in self.event_status.iter() {
                 match status {
                     EventStatus::Scheduled(e) =>    ui.text(format!("scheduled,  event - {}", e.id())),

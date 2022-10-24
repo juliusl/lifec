@@ -401,7 +401,7 @@ impl Host {
             runmd_path: None,
             url: None,
             command: None,
-            world: Some(P::compile_workspace(&workspace, files.iter())),
+            world: Some(P::compile_workspace(&workspace, files.iter(), None)),
             listener_setup: None,
         };
 

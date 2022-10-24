@@ -31,7 +31,7 @@ use specs::{Component, VecStorage};
 /// This allows more complicated projects to split up abstractions into seperate files. When the project is compiled, these files can be concatenated 
 /// in a more predictable way, as if the file was defined in one document.
 /// 
-#[derive(Component)]
+#[derive(Component, PartialEq, Eq, Hash)]
 #[storage(VecStorage)]
 pub struct RunmdFile {
     /// This is the file name, and will be used as the implicit symbol for all blocks found in the file.

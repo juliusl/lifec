@@ -48,7 +48,7 @@ where
                         }
                     }
 
-                    let world = P::compile_workspace(root, [].iter());
+                    let world = P::compile_workspace(root, [].iter(), None);
                     let mut host = Host::from(world);
                     let _ = host.prepare::<P>();
 
