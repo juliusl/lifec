@@ -5,7 +5,7 @@ mod config;
 pub use config::Config as WorkspaceConfig;
 
 mod operation;
-pub use operation::Operation as WorkspaceOperation;
+pub use operation::Operations;
 
 /// Struct for managing a complex runmd project,
 ///
@@ -500,7 +500,7 @@ mod tests {
         dispatcher.dispatch(host.world());
         dispatcher.dispatch(host.world());
 
-        let mut operation_data = host.world().system_data::<WorkspaceOperation>();
+        let mut operation_data = host.world().system_data::<Operations>();
         let operation = operation_data.execute_operation("print", None, None);
         operation.expect("should have an operation").wait();
 

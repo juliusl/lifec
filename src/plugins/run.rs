@@ -4,7 +4,7 @@ use reality::{BlockObject, BlockProperties};
 
 use super::{AttributeIndex, Host, Plugin, Project};
 
-use crate::prelude::WorkspaceOperation;
+use crate::prelude::Operations;
 
 /// Plugin to execute an operation defined within the root runmd of a workspace
 ///
@@ -57,7 +57,7 @@ where
 
                     let result = {
                         let mut workspace_oeprations =
-                            host.world().system_data::<WorkspaceOperation>();
+                            host.world().system_data::<Operations>();
 
                         if let Some(mut operation) = workspace_oeprations.execute_operation(
                             operation,

@@ -7,18 +7,18 @@ use specs::{Entities, ReadStorage, SystemData, WorldExt};
 /// Special attribute to define an operation in the root block for the workspace,
 ///
 #[derive(SystemData)]
-pub struct Operation<'a>(
+pub struct Operations<'a>(
     Entities<'a>,
     ReadStorage<'a, Block>,
     ReadStorage<'a, Event>,
     Plugins<'a>,
 );
 
-impl<'a> Operation<'a> {
+impl<'a> Operations<'a> {
     /// Returns a map of operations and their
     ///
     pub fn scan_root(&self) -> Vec<(String, crate::prelude::Event)> {
-        let Operation(entities, blocks, events, ..) = self;
+        let Operations(entities, blocks, events, ..) = self;
 
         let mut operations = vec![];
 
@@ -63,7 +63,7 @@ impl<'a> Operation<'a> {
     ) -> Option<crate::prelude::Operation> {
         let operations = self.scan_root();
 
-        let Operation(.., plugins) = self;
+        let Operations(.., plugins) = self;
 
         if let Some(operation) = operations.iter().find(|(label, event)| {
             let matches_operation_name = event.0 == operation.as_ref();
@@ -82,7 +82,7 @@ impl<'a> Operation<'a> {
     }
 }
 
-impl<'a> SpecialAttribute for Operation<'a> {
+impl<'a> SpecialAttribute for Operations<'a> {
     fn ident() -> &'static str {
         "operation"
     }

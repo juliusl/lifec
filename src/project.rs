@@ -7,7 +7,7 @@ pub use source::Source;
 mod workspace;
 pub use workspace::Workspace;
 pub use workspace::WorkspaceConfig;
-pub use workspace::WorkspaceOperation;
+pub use workspace::Operations;
 
 mod listener;
 pub use listener::Listener;
@@ -67,7 +67,7 @@ where
 
         let mut parser = Self::parser()
             .with_special_attr::<WorkspaceConfig>()
-            .with_special_attr::<WorkspaceOperation>();
+            .with_special_attr::<Operations>();
 
         for RunmdFile { symbol, source } in files {
             parser.set_implicit_symbol(&symbol);
