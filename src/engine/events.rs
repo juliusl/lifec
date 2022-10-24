@@ -13,9 +13,9 @@ pub struct Events<'a>(
     Read<'a, tokio::sync::broadcast::Sender<Entity>, EventRuntime>,
     Plugins<'a>,
     Entities<'a>,
-    ReadStorage<'a, Sequence>,
     ReadStorage<'a, Cursor>,
     ReadStorage<'a, Transition>,
+    WriteStorage<'a, Sequence>,
     WriteStorage<'a, Limit>,
     WriteStorage<'a, Event>,
     WriteStorage<'a, Connection>,
@@ -171,7 +171,7 @@ impl<'a> Events<'a> {
     /// Returns next entities this event points to,
     ///
     pub fn get_next_entities(&mut self, event: Entity) -> Vec<Entity> {
-        let Events(_, _, _, _, _, cursors, ..) = self;
+        let Events(_, _, _, _, cursors, ..) = self;
         if let Some(cursor) = cursors.get(event) {
             match cursor {
                 Cursor::Next(next) => {
@@ -236,9 +236,17 @@ impl<'a> Events<'a> {
     /// Activates an event, returns true if this is the initial activation
     ///
     pub fn activate(&mut self, event: Entity) -> bool {
-        let Events(.., events, _, _) = self;
+        let event_entity = event;
+        let Events(.., sequences, _, events, _, _) = self;
         if let Some(event) = events.get_mut(event) {
-            event.activate().is_some()
+            if let Some(sequence) = event.activate() {
+                if !sequences.contains(event_entity) {
+                    sequences
+                        .insert(event_entity, sequence)
+                        .expect("should be able to insert sequence");
+                }
+            }
+            true
         } else {
             false
         }
@@ -247,7 +255,7 @@ impl<'a> Events<'a> {
     /// Handles the transition of an event,
     ///
     pub fn transition(&mut self, previous: Option<&ThunkContext>, event: Entity) {
-        let Events(.., transitions, _, _, _, _) = self;
+        let Events(.., transitions, _, _, _, _, _) = self;
 
         let transition = transitions.get(event).unwrap_or(&Transition::Start);
         match transition {
@@ -280,7 +288,7 @@ impl<'a> Events<'a> {
     /// Starts an event immediately, cancels any ongoing operations
     ///
     pub fn start(&mut self, event: Entity, previous: Option<&ThunkContext>) {
-        let Events(_, _, plugins, _, sequences, .., events, _, operations) = self;
+        let Events(_, _, plugins, _, _, _, sequences, .., events, _, operations) = self;
 
         let e = events.get(event).expect("should have an event");
         event!(Level::DEBUG, "\n\n\t{}\tstarted event {}\n", e, event.id());
@@ -375,7 +383,7 @@ impl<'a> Events<'a> {
     /// Sets the scheduled connection state for the connections this event is connected to,
     ///
     pub fn set_scheduled_connection_state(&mut self, event: Entity) {
-        let Events(.., cursors, _, _, _, connections, _) = self;
+        let Events(.., cursors, _, _, _, _, connections, _) = self;
 
         if let Some(cursor) = &cursors.get(event) {
             match cursor {
@@ -398,7 +406,7 @@ impl<'a> Events<'a> {
     /// Sets the connection state to started for this event, on the connections it is connected to,
     ///
     pub fn set_started_connection_state(&mut self, event: Entity) {
-        let Events(.., cursors, _, _, _, connections, _) = self;
+        let Events(.., cursors, _, _, _, _, connections, _) = self;
 
         if let Some(cursor) = &cursors.get(event) {
             match cursor {
