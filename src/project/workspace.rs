@@ -500,11 +500,13 @@ mod tests {
         dispatcher.dispatch(host.world());
         dispatcher.dispatch(host.world());
 
-        let mut operation_data = host.world().system_data::<Operations>();
-        let operation = operation_data.execute_operation("print", None, None);
-        operation.expect("should have an operation").wait();
-
-        let operation = operation_data.execute_operation("print", Some("test".to_string()), None);
-        operation.expect("should have an operation").wait();
+        {
+            let mut operation_data = host.world().system_data::<Operations>();
+            let operation = operation_data.execute_operation("print", None, None);
+            operation.expect("should have an operation").wait();
+    
+            let operation = operation_data.execute_operation("print", Some("test".to_string()), None);
+            operation.expect("should have an operation").wait();
+        }
     }
 }

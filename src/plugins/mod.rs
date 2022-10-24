@@ -16,7 +16,6 @@ mod events;
 pub use events::EventRuntime;
 
 mod thunks;
-pub use thunks::CancelThunk;
 pub use thunks::Config;
 pub use thunks::ErrorContext;
 pub use thunks::SecureClient;
@@ -150,10 +149,6 @@ pub trait Plugin {
                     event_name = e;
                 }
 
-                world.write_component()
-                    .insert(child, Event::from_plugin::<Self>(event_name))
-                    .ok();
-                
                 world.write_component()
                     .insert(child, Thunk::from_plugin::<Self>())
                     .expect("should be able to insert thunk component");

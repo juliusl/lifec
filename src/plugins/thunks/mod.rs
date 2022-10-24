@@ -81,15 +81,3 @@ pub type CancelSource = tokio::sync::oneshot::Receiver<()>;
 /// Secure client for making http requests
 pub type SecureClient = hyper::Client<hyper_tls::HttpsConnector<HttpConnector>>;
 
-#[derive(Component)]
-#[storage(DenseVecStorage)]
-pub struct CancelThunk(
-    // Oneshot channel that cancels the thunk
-    pub CancelToken
-);
-
-impl From<CancelToken> for CancelThunk {
-    fn from(token: CancelToken) -> Self {
-        Self(token)
-    }
-}

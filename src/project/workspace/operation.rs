@@ -8,17 +8,17 @@ use specs::{Entities, ReadStorage, SystemData, WorldExt};
 ///
 #[derive(SystemData)]
 pub struct Operations<'a>(
+    Plugins<'a>,
     Entities<'a>,
     ReadStorage<'a, Block>,
     ReadStorage<'a, Event>,
-    Plugins<'a>,
 );
 
 impl<'a> Operations<'a> {
     /// Returns a map of operations and their
     ///
     pub fn scan_root(&self) -> Vec<(String, crate::prelude::Event)> {
-        let Operations(entities, blocks, events, ..) = self;
+        let Operations(.., entities, blocks, events) = self;
 
         let mut operations = vec![];
 
@@ -63,7 +63,7 @@ impl<'a> Operations<'a> {
     ) -> Option<crate::prelude::Operation> {
         let operations = self.scan_root();
 
-        let Operations(.., plugins) = self;
+        let Operations(plugins, ..) = self;
 
         if let Some(operation) = operations.iter().find(|(label, event)| {
             let matches_operation_name = event.0 == operation.as_ref();

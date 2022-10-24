@@ -1,4 +1,9 @@
-use crate::{prelude::*, editor::{ProgressStatusBar, Task, StartButton}};
+use imgui::Window;
+
+use crate::{
+    editor::{ProgressStatusBar, StartButton, Task},
+    prelude::*,
+};
 
 /// Extension trait for Host, that provides functions for opening a GUI editor,
 ///
@@ -30,16 +35,12 @@ impl Editor for Host {
                 mut tasks,
                 mut progress_bars,
                 mut start_buttons,
-                mut connections,
-                mut contexts,
             ): (
                 Entities,
                 ReadStorage<Event>,
                 WriteStorage<Task>,
                 WriteStorage<ProgressStatusBar>,
                 WriteStorage<StartButton>,
-                WriteStorage<Connection>,
-                WriteStorage<ThunkContext>,
             )| {
                 for (entity, _) in (&entities, &events).join() {
                     tasks
@@ -51,15 +52,11 @@ impl Editor for Host {
                     start_buttons
                         .insert(entity, StartButton::default())
                         .expect("should be able to insert start button");
-              
-                    contexts
-                        .insert(entity, ThunkContext::default())
-                        .expect("should be able to insert a thunk context");
                 }
             },
         );
         self.world_mut().maintain();
-        
+
         self.open(1920.0, 1080.0, RuntimeEditor::default())
     }
 
@@ -71,75 +68,80 @@ impl Editor for Host {
         let world = self.world.take();
 
         // Open the window
-        atlier::prelude::open_window(Self::name(), width, height, self, extension, world);
+        atlier::prelude::open_window(
+            HostEditor::name(),
+            width,
+            height,
+            HostEditor::default(),
+            extension,
+            world,
+        );
     }
 }
 
-impl<'a> System<'a> for Host {
-    type SystemData = (
-        Entities<'a>,
-        ReadStorage<'a, ThunkContext>,
-        WriteStorage<'a, StartButton>,
-        WriteStorage<'a, Event>,
-        WriteStorage<'a, CancelThunk>,
-    );
+/// Tool for viewing and interacting with a host,
+/// 
+#[derive(Default)]
+pub struct HostEditor {
+    event_status: Vec<EventStatus>,
+    tick: Option<()>,
+    activate: Option<Entity>,
+}
 
-    fn run(
-        &mut self,
-        (entities, contexts, mut start_buttons, mut events, mut _cancel_thunk): Self::SystemData,
-    ) {
-        for (entity, context, start_button, event) in
-            (&entities, &contexts, &mut start_buttons, &mut events).join()
-        {
-            // Handle starting the event
-            // if let Some(true) = start_button.0 {
-            //     if let Some(cancel) = _cancel_thunk.remove(entity) {
-            //         cancel.0.send(()).ok();
-            //     } else {
-            //         event.fire(context.clone());
-            //     }
+impl<'a> System<'a> for HostEditor {
+    type SystemData = Events<'a>;
 
-            //     start_button.0 = Some(false);
-            // }
+    fn run(&mut self, mut data: Self::SystemData) {
+        self.event_status = data.scan();
+        
+        if let Some(_) = self.tick.take() {
+            data.serialized_tick();
+        }
 
-            // // Handle setting the current status
-            // if let Some(_) = start_button.0 {
-            //     if event.is_running() {
-            //         start_button.1 = "Running".to_string();
-            //     } else {
-            //         start_button.1 = context
-            //             .state()
-            //             .find_text("elapsed")
-            //             .and_then(|e| Some(format!("Completed, elapsed: {}", e)))
-            //             .unwrap_or("Completed".to_string());
-            //     }
-            // }
-
-            // // Sets the label for this button
-            // start_button.2 = {
-            //     if event.is_running() {
-            //         format!("cancel {}", event.to_string())
-            //     } else {
-            //         event.to_string()
-            //     }
-            // };
-
-            // Sets the owning entity
-            start_button.3 = Some(entity);
+        if let Some(event) = self.activate.take() {
+            if data.activate(event) {
+                event!(Level::INFO, "Event {} is activating", event.id());
+            }
         }
     }
 }
 
-impl App for Host {
+impl App for HostEditor {
     fn name() -> &'static str {
-        "Lifec - Runtime Editor"
+        "Lifec Editor v1"
     }
 
     fn edit_ui(&mut self, ui: &imgui::Ui) {
-        // No-op
+        Window::new("Event commands").build(ui, || {
+            if ui.button("Tick") {
+                self.tick = Some(());
+            }
+
+            for inactive in self.event_status.iter().filter_map(|s| match s {
+                EventStatus::Inactive(e) => Some(e),
+                _ => None
+            }) {
+                if ui.button(format!("Start {}", inactive.id())) {
+                    self.activate = Some(inactive.clone());
+                }
+                // Need a way to distinguish between a workspace operation and a normal event
+            }
+        });
     }
 
     fn display_ui(&self, ui: &imgui::Ui) {
-        // No-op
+        Window::new("Event Status").build(ui, || {
+            for status in self.event_status.iter() {
+                match status {
+                    EventStatus::Scheduled(e) =>    ui.text(format!("scheduled,  event - {}", e.id())),
+                    EventStatus::New(e) =>          ui.text(format!("new         event - {}", e.id())),
+                    EventStatus::InProgress(e) =>   ui.text(format!("in-progress event - {}", e.id())),
+                    EventStatus::Ready(e) =>        ui.text(format!("ready       event - {}", e.id())),
+                    EventStatus::Completed(e) =>    ui.text(format!("completed   event - {}", e.id())),
+                    EventStatus::Cancelled(e) =>    ui.text(format!("cancelled   event - {}", e.id())),
+                    _ => {}
+                }
+            }
+        });
     }
 }

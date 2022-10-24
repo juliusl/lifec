@@ -74,6 +74,8 @@ pub struct Host {
     ///
     #[clap(skip)]
     pub world: Option<World>,
+    /// Will setup a listener for the host
+    /// 
     #[clap(skip)]
     listener_setup: Option<ListenerSetup>,
 }
@@ -173,6 +175,7 @@ impl Host {
             },
             Self { url: Some(url), .. } => match Host::get::<P>(url).await {
                 Ok(mut host) => {
+                    host.url = Some(url.to_string());
                     host.command = command;
                     return Some(host);
                 }
@@ -190,8 +193,9 @@ impl Host {
                     runmd_path = runmd_path.join(".runmd");
                 }
 
-                match Host::open::<P>(runmd_path).await {
+                match Host::open::<P>(runmd_path.clone()).await {
                     Ok(mut host) => {
+                        host.runmd_path = runmd_path.to_str().and_then(|s| Some(s.to_string()));
                         host.command = command;
                         Some(host)
                     }
@@ -503,13 +507,6 @@ impl Host {
     /// Shuts down systems and cancels all thunks,
     ///
     pub fn exit(&mut self) {
-        self.world_mut()
-            .exec(|mut cancel_tokens: WriteStorage<CancelThunk>| {
-                for token in cancel_tokens.drain().join() {
-                    token.0.send(()).ok();
-                }
-            });
-
         self.world_mut()
             .remove::<tokio::runtime::Runtime>()
             .expect("should be able to remove")

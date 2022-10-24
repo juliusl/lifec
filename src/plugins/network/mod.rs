@@ -8,7 +8,7 @@ use tracing::{event, Level};
 
 use crate::prelude::*;
 
-use super::{CancelThunk, ErrorContext, Event, EventRuntime, ThunkContext};
+use super::{ErrorContext, Event, EventRuntime, ThunkContext};
 
 mod proxy;
 pub use proxy::ProxiedMessage;
@@ -98,7 +98,6 @@ impl Extension for NetworkRuntime {
     fn configure_app_world(world: &mut specs::World) {
         world.register::<Event>();
         world.register::<ThunkContext>();
-        world.register::<CancelThunk>();
         world.register::<ErrorContext>();
         world.register::<Proxy>();
         world.register::<BlockAddress>();

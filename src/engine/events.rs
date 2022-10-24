@@ -44,6 +44,9 @@ pub enum EventStatus {
     /// Means that the operation has already completed
     ///
     Cancelled(Entity),
+    /// Means that the entity has not been activated yet
+    ///
+    Inactive(Entity),
 }
 
 impl<'a> Events<'a> {
@@ -54,24 +57,25 @@ impl<'a> Events<'a> {
 
         let mut status = vec![];
 
-        for (entity, _, operation) in (entities, events, operations.maybe())
-            .join()
-            .filter(|(_, e, _)| e.is_active())
-        {
-            if let Some(operation) = operation {
-                if operation.is_ready() {
-                    status.push(EventStatus::Ready(entity));
-                } else if operation.is_completed() {
-                    status.push(EventStatus::Completed(entity));
-                } else if operation.is_empty() {
-                    status.push(EventStatus::Scheduled(entity));
-                } else if operation.is_cancelled() {
-                    status.push(EventStatus::Cancelled(entity));
+        for (entity, event, operation) in (entities, events, operations.maybe()).join() {
+            if event.is_active() {
+                if let Some(operation) = operation {
+                    if operation.is_ready() {
+                        status.push(EventStatus::Ready(entity));
+                    } else if operation.is_completed() {
+                        status.push(EventStatus::Completed(entity));
+                    } else if operation.is_empty() {
+                        status.push(EventStatus::Scheduled(entity));
+                    } else if operation.is_cancelled() {
+                        status.push(EventStatus::Cancelled(entity));
+                    } else {
+                        status.push(EventStatus::InProgress(entity));
+                    }
                 } else {
-                    status.push(EventStatus::InProgress(entity));
+                    status.push(EventStatus::New(entity));
                 }
             } else {
-                status.push(EventStatus::New(entity));
+                status.push(EventStatus::Inactive(entity));
             }
         }
 
@@ -138,6 +142,7 @@ impl<'a> Events<'a> {
                 EventStatus::Cancelled(cancelled) => {
                     event!(Level::TRACE, "{} is cancelled", cancelled.id());
                 }
+                _ => {}
             }
         }
     }
@@ -278,12 +283,7 @@ impl<'a> Events<'a> {
         let Events(_, _, plugins, _, sequences, .., events, _, operations) = self;
 
         let e = events.get(event).expect("should have an event");
-        event!(
-            Level::DEBUG,
-            "\n\n\t{}\tstarted event {}\n",
-            e,
-            event.id()
-        );
+        event!(Level::DEBUG, "\n\n\t{}\tstarted event {}\n", e, event.id());
 
         let sequence = sequences.get(event).expect("should have a sequence");
 
@@ -338,13 +338,12 @@ impl<'a> Events<'a> {
 
 impl<'a> Events<'a> {
     /// Returns true if there will no more activity,
-    /// 
+    ///
     pub fn should_exit(&self) -> bool {
         let event_data = self.scan();
 
         event_data.iter().all(|e| match e {
-            EventStatus::Completed(_)|
-            EventStatus::Cancelled(_) => true,
+            EventStatus::Completed(_) | EventStatus::Cancelled(_) => true,
             _ => false,
         })
     }

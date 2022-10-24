@@ -95,12 +95,12 @@ impl Extension for RuntimeEditor {
                 // }
             }
             WindowEvent::CloseRequested => {
-                let mut cancel_source = world.write_component::<CancelThunk>();
-                for cancel_thunk in (&world.entities()).join() {
-                    if let Some(cancel_thunk) = cancel_source.remove(cancel_thunk) {
-                        cancel_thunk.0.send(()).ok();
-                    }
-                }
+                // let mut cancel_source = world.write_component::<CancelThunk>();
+                // for cancel_thunk in (&world.entities()).join() {
+                //     if let Some(cancel_thunk) = cancel_source.remove(cancel_thunk) {
+                //         cancel_thunk.0.send(()).ok();
+                //     }
+                // }
             }
             _ => {}
         }
