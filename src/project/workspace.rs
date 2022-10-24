@@ -252,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    //#[tracing_test::traced_test]
+    #[tracing_test::traced_test]
     fn test_compile_workspace() {
         use atlier::system::{Attribute, Value};
         use reality::Block;
