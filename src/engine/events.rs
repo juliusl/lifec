@@ -94,7 +94,12 @@ impl<'a> Events<'a> {
                     let next_entities = self.get_next_entities(*ready);
 
                     for next in next_entities {
-                        event!(Level::DEBUG, "{} -> {}", ready.id(), next.id());
+                        event!(
+                            Level::DEBUG,
+                            "\n\n\tEvent transition\n\t{} -> {}\n",
+                            ready.id(),
+                            next.id()
+                        );
                         if let Some(error) = result.as_ref().and_then(ThunkContext::get_errors) {
                             self.set_error_connection_state(*ready, next, error.clone());
                             self.send_error_context(error);
@@ -105,6 +110,7 @@ impl<'a> Events<'a> {
                                 event!(Level::DEBUG, "Repeating event");
                                 let Events(.., limits, _, _, _) = self;
                                 if let Some(limit) = limits.get_mut(next) {
+                                    event!(Level::DEBUG, "Remaining repeats {}", limit.0);
                                     if !limit.take_one() {
                                         event!(Level::DEBUG, "Limit reached for {}", next.id());
 
@@ -137,7 +143,7 @@ impl<'a> Events<'a> {
     }
 
     /// Performs a serialized tick, waiting for any events in-progress before returning,
-    /// 
+    ///
     pub fn serialized_tick(&mut self) {
         let event_state = self.scan();
         for event in event_state {
@@ -151,7 +157,7 @@ impl<'a> Events<'a> {
     }
 
     /// Scans event data and handles any ready transitions, does not block,
-    /// 
+    ///
     pub fn tick(&mut self) {
         let event_state = self.scan();
         self.handle(event_state);
@@ -269,7 +275,15 @@ impl<'a> Events<'a> {
     /// Starts an event immediately, cancels any ongoing operations
     ///
     pub fn start(&mut self, event: Entity, previous: Option<&ThunkContext>) {
-        let Events(_, _, plugins, _, sequences, .., operations) = self;
+        let Events(_, _, plugins, _, sequences, .., events, _, operations) = self;
+
+        let e = events.get(event).expect("should have an event");
+        event!(
+            Level::DEBUG,
+            "\n\n\t{}\tstarted event {}\n",
+            e,
+            event.id()
+        );
 
         let sequence = sequences.get(event).expect("should have a sequence");
 
@@ -319,6 +333,20 @@ impl<'a> Events<'a> {
         {
             self.cancel(*from);
         }
+    }
+}
+
+impl<'a> Events<'a> {
+    /// Returns true if there will no more activity,
+    /// 
+    pub fn should_exit(&self) -> bool {
+        let event_data = self.scan();
+
+        event_data.iter().all(|e| match e {
+            EventStatus::Completed(_)|
+            EventStatus::Cancelled(_) => true,
+            _ => false,
+        })
     }
 }
 

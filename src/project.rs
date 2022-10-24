@@ -202,5 +202,6 @@ pub fn default_world() -> World {
     world.register::<Transition>();
     world.register::<ThunkContext>();
     world.register::<AttributeGraph>();
+    world.insert(Some(Workspace::new("", None)));
     world
 }

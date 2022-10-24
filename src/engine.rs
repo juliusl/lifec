@@ -256,7 +256,7 @@ impl SpecialAttribute for Engine {
 
                 let forks = Self::parse_idents(e);
 
-                engine.set_lifecycle(Lifecycle::Next, Some(forks));
+                engine.set_lifecycle(Lifecycle::Fork, Some(forks));
             });
 
             parser.add_custom_with("repeat", |p, e| {

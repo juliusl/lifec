@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{fmt::Display, time::Instant};
 
 use specs::{Component, DenseVecStorage};
 
@@ -13,7 +13,7 @@ pub enum Activity {
     ///
     Scheduled(Instant),
     /// Skipped
-    /// 
+    ///
     Skipped(Instant, Instant),
     /// Started to run,
     ///
@@ -43,7 +43,9 @@ impl Activity {
             Activity::Scheduled(scheduled) => {
                 Some(Activity::Started(*scheduled, Instant::now(), 1))
             }
-            Activity::Skipped(scheduled, _) => Some(Activity::Started(*scheduled, Instant::now(), 1)),
+            Activity::Skipped(scheduled, _) => {
+                Some(Activity::Started(*scheduled, Instant::now(), 1))
+            }
             Activity::Started(_, _, _) => None,
             Activity::Completed(scheduled, _, _, iterations) => Some(Activity::Started(
                 *scheduled,
@@ -83,5 +85,41 @@ impl Activity {
 impl Default for Activity {
     fn default() -> Self {
         Self::None
+    }
+}
+
+impl Display for Activity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Activity::Scheduled(scheduled) => {
+                write!(f, "scheduled, elapsed: {:?}", scheduled.elapsed())
+            }
+            Activity::Skipped(scheduled, stopped) => {
+                write!(f, "skipped, elapsed-scheduled: {:?}", *stopped - *scheduled)
+            }
+            Activity::Started(scheduled, stopped, count) => write!(
+                f,
+                "started, elapsed-scheduled: {:?}, count: {}",
+                *stopped - *scheduled,
+                count
+            ),
+            Activity::Completed(scheduled, started, completed, count) => write!(
+                f,
+                "completed, elapsed-scheduled: {:?}, duration: {:?}, count: {}",
+                *started - *scheduled,
+                *completed - *started,
+                count
+            ),
+            Activity::Error(scheduled, started, stopped, count) => write!(
+                f,
+                "error, elapsed-scheduled: {:?}, elapsed: {:?}, count: {}",
+                *started - *scheduled,
+                *stopped - *started,
+                count
+            ),
+            Activity::None => {
+                Ok(())
+            },
+        }
     }
 }

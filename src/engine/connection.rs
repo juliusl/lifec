@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use specs::{Component, Entity, VecStorage};
+use tracing::{event, Level};
 
 use crate::prelude::ErrorContext;
 
@@ -45,13 +46,13 @@ impl ConnectionState {
     }
 
     /// Returns the incoming entity,
-    /// 
+    ///
     pub fn incoming(&self) -> Entity {
         self.incoming
     }
 
     /// Returns the source of this connection state,
-    /// 
+    ///
     pub fn source(&self) -> Entity {
         self.source.unwrap_or(self.incoming)
     }
@@ -72,7 +73,7 @@ pub struct Connection {
 
 impl Connection {
     /// Returns a new connection,
-    /// 
+    ///
     pub fn new(from: HashSet<Entity>, to: Entity) -> Self {
         Self {
             from,
@@ -88,8 +89,10 @@ impl Connection {
     }
 
     /// Returns an iterator over the connection state,
-    /// 
-    pub fn connection_state<'a>(&'a self) -> impl Iterator<Item = (&'a ConnectionState, &'a Activity)> {
+    ///
+    pub fn connection_state<'a>(
+        &'a self,
+    ) -> impl Iterator<Item = (&'a ConnectionState, &'a Activity)> {
         self.connection_state.iter()
     }
 
@@ -109,6 +112,13 @@ impl Connection {
             let connection_state = &ConnectionState::original(incoming);
             if let Some(activity) = self.connection_state.get(connection_state) {
                 if let Some(start) = activity.start() {
+                    event!(
+                        Level::DEBUG,
+                        "\n\n\tConnection update\n\tincoming event {}\n\tto       event {}\n\t{}\n",
+                        incoming.id(),
+                        self.to.id(),
+                        start
+                    );
                     self.connection_state
                         .insert(connection_state.clone(), start);
                 }
@@ -122,8 +132,16 @@ impl Connection {
         if self.from.contains(&incoming) {
             let connection_state = &ConnectionState::original(incoming);
             if let Some(activity) = self.connection_state.get(connection_state) {
+                let completed = activity.complete(error);
+                event!(
+                    Level::DEBUG,
+                    "\n\n\tConnection update\n\tincoming event {}\n\tto       event {}\n\t{}\n",
+                    incoming.id(),
+                    self.to.id(),
+                    completed
+                );
                 self.connection_state
-                    .insert(connection_state.clone(), activity.complete(error));
+                    .insert(connection_state.clone(), completed);
             }
         }
     }

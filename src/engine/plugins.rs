@@ -7,7 +7,7 @@ use tokio::{select, sync::oneshot};
 use crate::prelude::*;
 
 mod listener;
-pub use listener::PluginListener as PluginListener;
+pub use listener::PluginListener;
 
 mod broker;
 pub use broker::Broker as PluginBroker;
@@ -117,6 +117,13 @@ impl<'a> Plugins<'a> {
                             }
                         }
                     }
+
+                    event!(
+                        Level::DEBUG,
+                        "\n\n\t{:?}\n\tcompleted\n\tplugin {}\n",
+                        thunk,
+                        e.id(),
+                    );
 
                     cancel_source = Some(_rx);
                 } else {

@@ -6,13 +6,13 @@ use specs::{Component, DenseVecStorage, Entity};
 use tracing::{event, Level};
 
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
-/// 
+///
 #[derive(Debug, Component, Clone)]
 #[storage(DenseVecStorage)]
 pub struct Event(
     /// Name of this event
     pub String,
-    /// Thunks that will be executed, 
+    /// Thunks that will be executed,
     pub Vec<Thunk>,
     /// Sequence to execute,
     pub Option<Sequence>,
@@ -20,25 +20,25 @@ pub struct Event(
 
 impl Event {
     /// Returns a new event component,
-    /// 
+    ///
     pub fn new(block: &Block) -> Self {
         Self(block.name().to_string(), vec![], Some(Sequence::default()))
     }
 
     /// Returns an empty event,
-    /// 
+    ///
     pub fn empty() -> Self {
         Self(String::default(), vec![], Some(Sequence::default()))
     }
 
     /// Sets the name for this event,
-    /// 
+    ///
     pub fn set_name(&mut self, name: impl AsRef<str>) {
         self.0 = name.as_ref().to_string();
     }
 
     /// Adds a thunk to this event and the entity w/ it's data,
-    /// 
+    ///
     pub fn add_thunk(&mut self, thunk: Thunk, entity: Entity) {
         if let Some(sequence) = self.2.as_mut() {
             self.1.push(thunk);
@@ -49,22 +49,22 @@ impl Event {
     }
 
     /// Activates the event by removing the underlying sequence so that no new thunks can be added,
-    /// 
-    /// This indicates that the sequence component on the entity is final, and no further changes 
+    ///
+    /// This indicates that the sequence component on the entity is final, and no further changes
     /// will be made to it's event
-    /// 
+    ///
     pub fn activate(&mut self) -> Option<Sequence> {
         self.2.take()
     }
 
     /// Returns true if this event is active, that is, the owner of this component can expect no further changes,
-    /// 
+    ///
     pub fn is_active(&self) -> bool {
         self.sequence().is_none()
     }
 
     /// Returns the event's sequence,
-    /// 
+    ///
     pub fn sequence(&self) -> Option<&Sequence> {
         self.2.as_ref()
     }
@@ -73,12 +73,6 @@ impl Event {
     ///
     pub fn symbol(&self) -> &String {
         &self.0
-    }
-
-    /// Returns the a clone of the inner thunk
-    ///
-    pub fn thunk(&self) -> Thunk {
-        self.1.get(0).expect("should have a thunk").clone()
     }
 
     /// Creates an event component, with a task created with on_event
@@ -95,9 +89,8 @@ impl Event {
     }
 
     /// Creates an event component from a thunk,
-    /// 
-    pub fn from_thunk(event_name: impl AsRef<str>, thunk: Thunk) -> Self
-    {
+    ///
+    pub fn from_thunk(event_name: impl AsRef<str>, thunk: Thunk) -> Self {
         Self(
             event_name.as_ref().to_string(),
             vec![thunk],
@@ -108,8 +101,10 @@ impl Event {
 
 impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ", self.0)?;
-        write!(f, "{}", self.thunk() .0)?;
+        writeln!(f, "Event `{}`", self.0)?;
+        for thunk in self.1.iter() {
+            writeln!(f, "\t      `{}`", thunk.0)?;
+        }
         Ok(())
     }
 }

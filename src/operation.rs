@@ -82,7 +82,6 @@ impl Operation {
             );
         }
 
-        event!(Level::INFO, "Starting operation for {symbol} for entity {}", context.state().entity_id());
         let mut clone = self.clone();
         clone.task = func(context);
         clone

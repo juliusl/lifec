@@ -246,7 +246,6 @@ mod tests {
         use atlier::system::{Attribute, Value};
         use reality::Block;
         use reality::BlockProperty;
-        use specs::Join;
         use specs::WorldExt;
         use tracing::Level;
 
@@ -278,22 +277,30 @@ mod tests {
 
             ``` setup
             + .runtime
-            : .println hello setup
+            : .println hello setup a
+            : .println hello setup b
+            : .println hello setup c
             ```
 
             ``` receive
             + .runtime
-            : .println hello receive
+            : .println hello receive a
+            : .println hello receive b
+            : .println hello receive c
             ```
 
             ``` cancel
             + .runtime
-            : .println hello cancel
+            : .println hello cancel a
+            : .println hello cancel b
+            : .println hello cancel c
             ```
 
             ``` execute
             + .runtime
-            : .println hello execute
+            : .println hello execute a
+            : .println hello execute b
+            : .println hello execute c
             ```
             "#,
         );
@@ -386,17 +393,6 @@ mod tests {
             for i in 0..9 {
                 tracing::event!(Level::DEBUG, "Tick {i}");
                 events.serialized_tick();
-            }
-        }
-
-        for (_, connection) in (
-            &host.world().entities(),
-            &host.world().read_component::<Connection>(),
-        )
-            .join()
-        {
-            for (connection_state, activity) in connection.connection_state() {
-                println!("{:?}, {:?}", connection_state, activity);
             }
         }
 

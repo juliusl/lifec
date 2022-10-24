@@ -66,12 +66,6 @@ impl EventSource {
     //         },
     //     }
     // }
-
-    /// Returns the event's plugin thunk
-    /// 
-    pub fn thunk(&self) -> Thunk {
-        self.event.thunk()
-    }
 }
 
 impl Clone for EventSource {

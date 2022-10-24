@@ -408,23 +408,9 @@ impl Host {
     /// Returns true if the host should exit,
     ///
     pub fn should_exit(&self) -> bool {
-        // let entities = self.world().entities();
-        // let lifecycle_options = self.world().read_component::<LifecycleOptions>();
-        // let events = self.world().read_component::<Event>();
-        // if (&entities, &events, &lifecycle_options).join().all(
-        //     |(entity, event, lifecycle_option)| match (event, lifecycle_option) {
-        //         (Event(.., None), LifecycleOptions::Exit(None)) => {
-        //             event!(Level::TRACE, "{:?} has exited", entity);
-        //             true
-        //         }
-        //         _ => false,
-        //     },
-        // ) {
-        //     true
-        // } else {
-        //     false
-        // }
-        false
+        let events = self.world().system_data::<Events>();
+
+        events.should_exit()
     }
 
     /// Finds the starting entity from some expression,
