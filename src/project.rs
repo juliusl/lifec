@@ -6,7 +6,8 @@ pub use source::Source;
 
 mod workspace;
 pub use workspace::Workspace;
-use workspace::WorkspaceConfig;
+pub use workspace::WorkspaceConfig;
+pub use workspace::WorkspaceOperation;
 
 mod listener;
 pub use listener::Listener;
@@ -57,7 +58,9 @@ pub trait Project {
         workspace: &Workspace,
         files: impl Iterator<Item = &'a RunmdFile>,
     ) -> World {
-        let mut parser = Self::parser().with_special_attr::<WorkspaceConfig>();
+        let mut parser = Self::parser()
+            .with_special_attr::<WorkspaceConfig>()
+            .with_special_attr::<WorkspaceOperation>();
 
         for RunmdFile { symbol, source } in files {
             parser.set_implicit_symbol(&symbol);

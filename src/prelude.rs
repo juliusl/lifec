@@ -29,6 +29,8 @@ pub use crate::project::Project;
 pub use crate::project::RunmdFile;
 pub use crate::project::Source;
 pub use crate::project::Workspace;
+pub use crate::project::WorkspaceConfig;
+pub use crate::project::WorkspaceOperation;
 pub use crate::resources::Resources;
 pub use crate::runtime::EventSource;
 pub use crate::runtime::Runtime;

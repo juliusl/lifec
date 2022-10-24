@@ -4,6 +4,9 @@ use std::path::PathBuf;
 mod config;
 pub use config::Config as WorkspaceConfig;
 
+mod operation;
+pub use operation::Operation as WorkspaceOperation;
+
 /// Struct for managing a complex runmd project,
 ///
 /// For small projects consisting of a single runmd file, the default Host is good enough.
@@ -164,7 +167,7 @@ impl Workspace {
     }
 
     /// Returns an iterator over tags,
-    /// 
+    ///
     pub fn iter_tags(&self) -> impl Iterator<Item = &String> {
         if let Some(tags) = self.use_tags.as_ref() {
             tags.iter()
@@ -236,7 +239,7 @@ mod tests {
         fn on_status_update(&mut self, status_update: &StatusUpdate) {
             event!(Level::TRACE, "Received status_update {:?}", status_update);
         }
-        
+
         fn on_completed_event(&mut self, e: &Entity) {
             event!(Level::TRACE, "Completed event - {}", e.id());
         }
@@ -267,6 +270,14 @@ mod tests {
         # Test that the tagged version is Test2
         + test .config receive.test
         : name .symbol Test2
+        
+        + .operation print
+        : .println Hello Print Operation a
+        : .println Hello Print Operation b
+
+        + test .operation print
+        : .println Hello Print Operation a 2
+        : .println Hello Print Operation b 2
         ```
         "#,
         );
@@ -376,6 +387,16 @@ mod tests {
                 default.find_property("name"),
                 Some(BlockProperty::Single(Value::Symbol("Test2".to_string())))
             );
+
+            let default = indexes.get(2).expect("should have index");
+            assert_eq!(
+                default.root(),
+                &Attribute::new(29, "operation", Value::Empty)
+            );
+            assert_eq!(
+                default.find_property("name"),
+                Some(BlockProperty::Single(Value::Symbol("print".to_string())))
+            );
         }
 
         let mut host = Host::from(world);
@@ -384,7 +405,6 @@ mod tests {
 
         let mut dispatcher = host.prepare::<Test>();
         {
-
             let mut events = host.world().system_data::<Events>();
             // Test that initially everything is idle
             assert!(events.scan().is_empty());
@@ -408,11 +428,13 @@ mod tests {
         {
             let broker = host.world().system_data::<PluginBroker>();
 
-            broker.try_send_status_update((
-                host.world().entities().create(),
-                0.0,
-                String::from("test"),
-            )).ok();
+            broker
+                .try_send_status_update((
+                    host.world().entities().create(),
+                    0.0,
+                    String::from("test"),
+                ))
+                .ok();
         }
 
         dispatcher.dispatch(host.world());
@@ -426,7 +448,6 @@ mod tests {
 
         let mut dispatcher = host.prepare::<Test>();
         {
-
             let mut events = host.world().system_data::<Events>();
             // Test that initially everything is idle
             assert!(events.scan().is_empty());
@@ -450,14 +471,23 @@ mod tests {
         {
             let broker = host.world().system_data::<PluginBroker>();
 
-            broker.try_send_status_update((
-                host.world().entities().create(),
-                0.0,
-                String::from("test"),
-            )).ok();
+            broker
+                .try_send_status_update((
+                    host.world().entities().create(),
+                    0.0,
+                    String::from("test"),
+                ))
+                .ok();
         }
 
         dispatcher.dispatch(host.world());
         dispatcher.dispatch(host.world());
+
+        let mut operation_data = host.world().system_data::<WorkspaceOperation>();
+        let operation = operation_data.execute_operation("print", None, None);
+        operation.expect("should have an operation").wait();
+
+        let operation = operation_data.execute_operation("print", Some("test".to_string()), None);
+        operation.expect("should have an operation").wait();
     }
 }
