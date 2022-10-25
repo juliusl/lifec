@@ -20,6 +20,7 @@ impl Commands {
     pub fn start_engine(name: impl AsRef<str>) -> Self {
         Self::Start(Start {
             engine_name: Some(name.as_ref().to_string()),
+            operation: None, 
             id: None,
             thunk_context: None,
         })

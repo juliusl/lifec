@@ -286,9 +286,7 @@ impl ThunkContext {
 
     /// Enables a tcp listener for this context to listen to. accepts the first listener, creates a connection
     /// and then exits after the connection is dropped.
-    ///
-    /// Returns a buffered reader over each line sent over the stream.
-    ///
+    /// 
     pub async fn enable_listener(
         &self,
         cancel_source: &mut oneshot::Receiver<()>,

@@ -18,6 +18,10 @@ pub struct Start {
     /// 
     #[clap(long)]
     pub engine_name: Option<String>,
+    /// Name of an operation defined in the root workspace to start,
+    /// 
+    #[clap(long)]
+    pub operation: Option<String>,
     /// Optional thunk context to use to start the event,
     /// 
     /// Advanced use case,

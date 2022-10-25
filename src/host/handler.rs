@@ -55,7 +55,7 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
 
     fn run(&mut self, (mut plugin_messages,  mut completed_plugins, mut errors, mut listener): Self::SystemData) {
         if let Some(operation) = plugin_messages.try_next_operation() {
-            listener.on_operation(&operation);
+            listener.on_operation(operation);
         }
 
         if let Some(runmd) = plugin_messages.try_next_runmd_file() {

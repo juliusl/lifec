@@ -34,6 +34,9 @@ pub mod async_ext;
 mod handler;
 use handler::ListenerSetup;
 
+mod runner;
+pub use runner::Runner;
+
 /// Struct for initializing and hosting the runtime as well as parsing CLI arguments,
 ///
 /// Used with a type that implements the Project trait.

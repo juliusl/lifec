@@ -27,6 +27,24 @@ pub struct Plugins<'a>(
 );
 
 impl<'a> Plugins<'a> {
+    /// Returns a reference to plugin features,
+    /// 
+    pub fn features(&self) -> &PluginFeatures<'a> {
+        let Plugins(features, ..) = self;
+
+        features
+    }
+
+    /// Returns a new context,
+    /// 
+    pub fn new_context(&self) -> ThunkContext {
+        let Plugins(_, entities, ..)  = self;
+
+        let entity = entities.create();
+
+        self.initialize_context(entity, None)
+    }
+
     /// Returns an initialized context,
     ///
     pub fn initialize_context(
@@ -36,13 +54,18 @@ impl<'a> Plugins<'a> {
     ) -> ThunkContext {
         let Plugins(plugin_features, .., blocks, graphs) = self;
 
-        let context =
+        let mut context =
             plugin_features.enable(entity, initial_context.unwrap_or(&ThunkContext::default()));
 
-        let block = blocks.get(entity).expect("should have a block");
-        let graph = graphs.get(entity).expect("should have a graph");
+        if let Some(block) = blocks.get(entity) {
+            context = context.with_block(block);
+        }
 
-        context.with_state(graph.clone()).with_block(block)
+        if let Some(graph) = graphs.get(entity) {
+            context = context.with_state(graph.clone());
+        }
+
+        context
     }
 
     /// Combines a sequence of plugin calls into an operation,

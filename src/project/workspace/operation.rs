@@ -3,6 +3,7 @@ use atlier::system::Value;
 use reality::{Block, SpecialAttribute};
 use specs::prelude::*;
 use specs::{Entities, ReadStorage, SystemData, WorldExt};
+use tracing::{event, Level};
 
 /// Special attribute to define an operation in the root block for the workspace,
 ///
@@ -79,6 +80,32 @@ impl<'a> Operations<'a> {
         }
 
         None
+    }
+
+    /// Dispatches an operation,
+    /// 
+    pub fn dispatch_operation(
+        &mut self,
+        operation: impl AsRef<str>,
+        tag: Option<String>,
+        context: Option<&ThunkContext>,
+    ) {
+        let name = operation.as_ref().to_string();
+        
+        let operation = { 
+            self.execute_operation(operation, tag, context).take()
+        };
+
+        let Operations(plugins, ..) = self;
+
+        match plugins.features().broker().try_send_operation(operation.expect("should have started the operation")) {
+            Ok(_) => {
+                event!(Level::DEBUG, "Dispatched operation {name}");
+            },
+            Err(err) => {
+                event!(Level::ERROR, "Error sending operation {err}");
+            },
+        }
     }
 }
 

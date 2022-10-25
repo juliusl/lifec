@@ -22,7 +22,7 @@ where
 
     /// Called when a completed operation is received,
     ///
-    fn on_operation(&mut self, operation: &Operation);
+    fn on_operation(&mut self, operation: Operation);
 
     /// Called when an error context is received,
     ///

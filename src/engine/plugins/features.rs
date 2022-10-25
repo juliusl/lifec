@@ -37,4 +37,12 @@ impl<'a> Features<'a> {
     pub fn handle(&self) -> Handle {
         self.1.handle().clone()
     }
+
+    /// Returns a broker,
+    /// 
+    pub fn broker(&self) -> &PluginBroker<'a> {
+        let Features(.., broker) = self; 
+
+        broker
+    }
 }

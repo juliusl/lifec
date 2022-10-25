@@ -246,7 +246,11 @@ mod tests {
         }
 
         fn on_runmd(&mut self, _: &RunmdFile) {}
-        fn on_operation(&mut self, _: &Operation) {}
+        fn on_operation(&mut self, mut operation: Operation) {
+            if let Some(result) = operation.wait() {
+                event!(Level::TRACE, "{:#?}", result.state().values());
+            }
+        }
         fn on_error_context(&mut self, _: &ErrorContext) {}
         fn on_start_command(&mut self, _: &Start) {}
     }
@@ -500,9 +504,17 @@ mod tests {
             let mut operation_data = host.world().system_data::<Operations>();
             let operation = operation_data.execute_operation("print", None, None);
             operation.expect("should have an operation").wait();
-    
-            let operation = operation_data.execute_operation("print", Some("test".to_string()), None);
+
+            let operation =
+                operation_data.execute_operation("print", Some("test".to_string()), None);
             operation.expect("should have an operation").wait();
+
+            operation_data.dispatch_operation("print", None, None);
+
         }
+        dispatcher.dispatch(host.world());
+        dispatcher.dispatch(host.world());
+        dispatcher.dispatch(host.world());
+        dispatcher.dispatch(host.world());
     }
 }
