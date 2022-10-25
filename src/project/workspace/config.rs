@@ -67,6 +67,26 @@ impl<'a> Config<'a> {
             }
         }
     }
+
+    /// Apply config to state,
+    /// 
+    pub fn apply(&mut self, workspace: &Workspace) {
+        let configs = self.scan_root();
+
+        if let Some(config) = configs.iter().find(|c| c.root().name() == "config") {
+            self.find_apply(config);
+        }
+
+        for tag in workspace.iter_tags() {
+            for config in configs
+                .clone()
+                .iter()
+                .filter(|c| c.root().name().starts_with(tag))
+            {
+                self.find_apply(config);
+            }
+        }
+    }
 }
 
 impl<'a> SpecialAttribute for Config<'a> {

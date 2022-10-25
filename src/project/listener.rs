@@ -1,10 +1,12 @@
+use specs::shred::Resource;
+
 use crate::prelude::*;
 
 /// Event handler trait for messages brokered from the runtime,
 ///
 pub trait Listener
 where
-    Self: Send + Sync + 'static
+    Self: Default + Resource + Send + Sync + 'static
 {
     /// Returns a new listener,
     ///
@@ -33,15 +35,4 @@ where
     /// Called when a start command is received,
     ///
     fn on_start_command(&mut self, start_command: &Start);
-}
-
-/// Enumeration of message types that can be listened to,
-///
-pub enum Messages {
-    RunmdFile(RunmdFile),
-    StatusUpdate(StatusUpdate),
-    Operation(Operation),
-    StartCommand(Start),
-    ErrorContext(ErrorContext),
-    CompletedPlugin(Entity),
 }

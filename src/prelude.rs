@@ -40,7 +40,7 @@ pub use atlier::system::{combine, combine_default, App, Extension, Value};
 pub use specs::{
     storage::BTreeStorage, Component, DefaultVecStorage, DenseVecStorage, DispatcherBuilder,
     Entities, Entity, HashMapStorage, Join, Read, ReadStorage, System, VecStorage, World, WorldExt,
-    WriteStorage,
+    WriteStorage
 };
 pub use tokio::{io::BufReader, runtime::Handle, select};
 

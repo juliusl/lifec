@@ -147,7 +147,7 @@ impl Listener for Test {
     }
 
     fn on_completed_event(&mut self, e: &Entity) {
-        event!(Level::INFO, "Completed event - {}", e.id());
+        println!("Completed event - {}", e.id());
     }
 
     fn on_runmd(&mut self, _: &RunmdFile) {}

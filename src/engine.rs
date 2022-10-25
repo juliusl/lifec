@@ -33,9 +33,6 @@ pub use events::Events;
 mod lifecycle;
 pub use lifecycle::Lifecycle;
 
-mod systems;
-pub use systems::install;
-
 mod limit;
 pub use limit::Limit;
 

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use specs::{DispatcherBuilder, System, World, Write};
+use specs::{DispatcherBuilder, System, World, Write, shred::DynamicSystemData};
 
 type EnableListener = fn(&World, &mut DispatcherBuilder);
 
@@ -23,7 +23,7 @@ impl ListenerSetup {
 /// Wrapper struct over an event listener that implements a system to handle events,
 ///
 struct EventHandler<L: Listener> {
-    listener: L,
+    listener: Option<L>,
 }
 
 impl<L> EventHandler<L>
@@ -33,40 +33,49 @@ where
     /// Returns a new event handler,
     ///
     pub fn new(listener: L) -> Self {
-        Self { listener }
+        Self { listener: Some(listener) }
     }
 }
 
 impl<'a, L: Listener> System<'a> for EventHandler<L> {
     type SystemData = (
-        crate::engine::PluginListener<'a>,
+        PluginListener<'a>,
         Write<'a, tokio::sync::broadcast::Receiver<Entity>, EventRuntime>,
         Write<'a, tokio::sync::mpsc::Receiver<ErrorContext>, EventRuntime>,
+        Write<'a, L>,
     );
 
-    fn run(&mut self, (mut plugin_messages,  mut completed_plugins, mut errors): Self::SystemData) {
+    fn setup(&mut self, world: &mut World) {
+        <Self::SystemData as DynamicSystemData>::setup(&self.accessor(), world);
+    
+        if let Some(listener) = self.listener.take() {
+            world.insert(listener);
+        }
+    }
+
+    fn run(&mut self, (mut plugin_messages,  mut completed_plugins, mut errors, mut listener): Self::SystemData) {
         if let Some(operation) = plugin_messages.try_next_operation() {
-            self.listener.on_operation(&operation);
+            listener.on_operation(&operation);
         }
 
         if let Some(runmd) = plugin_messages.try_next_runmd_file() {
-            self.listener.on_runmd(&runmd);
+            listener.on_runmd(&runmd);
         }
 
         if let Some(start) = plugin_messages.try_next_start_command() {
-            self.listener.on_start_command(&start);
+            listener.on_start_command(&start);
         }
 
         if let Some(status_update) = plugin_messages.try_next_status_update() {
-            self.listener.on_status_update(&status_update);
+            listener.on_status_update(&status_update);
         }
 
         if let Some(entity) = completed_plugins.try_recv().ok() {
-            self.listener.on_completed_event(&entity);
+            listener.on_completed_event(&entity);
         }
 
         if let Some(error) = errors.try_recv().ok() {
-            self.listener.on_error_context(&error);
+            listener.on_error_context(&error);
         }
     }
 }

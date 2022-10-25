@@ -109,7 +109,7 @@ impl<'a> Events<'a> {
     /// Scans event status and returns a vector of entites w/ their status,
     ///
     pub fn scan(&self) -> Vec<EventStatus> {
-        let Events(_, _, _, _, entities, cursors, .., events, _, operations) = self;
+        let Events(_, _, _, _, entities, _, .., events, _, operations) = self;
 
         let mut status = vec![];
 
