@@ -1,10 +1,10 @@
 use std::{collections::HashSet, sync::Arc};
 
-use imgui::{ChildWindow, Window, StyleVar};
+use imgui::{ChildWindow, StyleVar, Window};
 use specs::Write;
 
 use crate::{
-    editor::{Node, Appendix},
+    editor::{Appendix, Node},
     prelude::*,
 };
 
@@ -30,7 +30,7 @@ impl Editor for Host {
     where
         P: Project,
     {
-        // Setup task list view --
+        // Build runtime appendix
         self.world_mut().exec(
             |(entities, events, thunks, mut appendix): (
                 Entities,
@@ -42,13 +42,11 @@ impl Editor for Host {
                     match (event, thunk) {
                         (None, Some(thunk)) => {
                             appendix.insert_general(entity, thunk);
-                        },
+                        }
                         (Some(event), None) => {
                             appendix.insert_general(entity, event);
-                        },
-                        _ => {
-
                         }
+                        _ => {}
                     }
                 }
             },
@@ -104,27 +102,18 @@ impl From<HashSet<(String, Event)>> for HostEditor {
 ///
 #[derive(Default)]
 pub struct HostEditor {
+    /// Current nodes,
+    ///
+    nodes: Vec<Node>,
     /// Available workspace operations to execute,
     ///
     workspace_operations: HashSet<(String, Event)>,
-    /// Current event statuses of the host,
-    ///
-    event_status: Vec<EventStatus>,
-    /// Currrent cursor state,
-    ///
-    cursors: Vec<Cursor>,
-    /// Current nodes,
-    /// 
-    nodes: HashSet<Node>,
     /// Tick rate,
     ///
     tick_rate: u64,
     /// Command to execute a serialized tick,
     ///
     tick: Option<()>,
-    /// Command to active an event,
-    ///
-    activate: Option<Entity>,
     /// Command to pause the runtime,
     ///
     pause: Option<()>,
@@ -137,17 +126,8 @@ impl<'a> System<'a> for HostEditor {
     type SystemData = Events<'a>;
 
     fn run(&mut self, mut events: Self::SystemData) {
-        self.event_status = events.scan();
-        self.cursors = events.scan_cursors();
-
         if let Some(_) = self.tick.take() {
             events.serialized_tick();
-        }
-
-        if let Some(event) = self.activate.take() {
-            if events.activate(event) {
-                event!(Level::DEBUG, "Activating event {}", event.id());
-            }
         }
 
         if let Some(_) = self.pause.take() {
@@ -159,13 +139,25 @@ impl<'a> System<'a> for HostEditor {
         }
 
         if let Some(_) = self.reset.take() {
-            events.reset();
+            events.reset_all();
         }
 
         self.tick_rate = events.tick_rate();
 
+        for mut node in self.nodes.drain(..) {
+            if let Some(event) = node.activate.take() {
+                if events.activate(event) {
+                    event!(Level::DEBUG, "Activating event {}", event.id());
+                }
+            } else if let Some(event) = node.reset.take() {
+                if events.reset(event) {
+                    event!(Level::DEBUG, "Reseting event {}", event.id());
+                }
+            }
+        }
+
         for node in events.nodes() {
-            self.nodes.insert(node);
+            self.nodes.push(node);
         }
     }
 }
@@ -189,38 +181,28 @@ impl App for HostEditor {
                 }
 
                 ui.same_line();
-                if ui.button("Reset") {
+                if ui.button("Reset All") {
                     self.reset = Some(());
                 }
                 ui.same_line();
                 ui.text(format!("tick rate: {} hz", self.tick_rate));
                 ui.separator();
+                ui.new_line();
 
-                let can_activate = self
-                    .event_status
-                    .iter()
-                    .filter_map(|s| match s {
-                        EventStatus::Inactive(e) => Some(e),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>();
-
-                if !can_activate.is_empty() {
-                    ChildWindow::new(&format!("Event Commands"))
-                        .size([200.0, 0.0])
-                        .build(ui, || {
-                            let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
-                            let window_padding = ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
-                            for inactive in can_activate {
-                                if ui.button(format!("Start {}", inactive.id())) {
-                                    self.activate = Some(inactive.clone());
-                                }
-                            }
-                            frame_padding.end();
-                            window_padding.end();
-                        });
-                    ui.same_line();
-                }
+                ChildWindow::new(&format!("Event Section"))
+                    .size([250.0, 0.0])
+                    .build(ui, || {
+                        let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
+                        let window_padding =
+                            ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
+                        for node in self.nodes.iter_mut() {
+                            node.edit_ui(ui);
+                            ui.new_line();
+                        }
+                        frame_padding.end();
+                        window_padding.end();
+                    });
+                ui.same_line();
             });
     }
 
@@ -232,17 +214,6 @@ impl App for HostEditor {
                 ui.text("Operations:");
                 for (tag, operation) in self.workspace_operations.iter() {
                     ui.text(format!("tag: {tag}, name: {}", operation.symbol()));
-                }
-
-                ui.new_line();
-                ui.text("Events:");
-                for (status, cursor) in self.event_status.iter().zip(self.cursors.iter()) {
-                    ui.text(format!("{} {}", status, cursor));
-                }
-
-                ui.new_line();
-                for node in self.nodes.iter() {
-                    node.display_ui(ui);
                 }
                 frame_padding.end();
                 window_padding.end();

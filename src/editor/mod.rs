@@ -15,6 +15,7 @@ pub use list::List;
 
 mod node;
 pub use node::Node;
+pub use node::NodeStatus;
 
 mod appendix;
 pub use appendix::Appendix;

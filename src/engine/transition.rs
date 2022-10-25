@@ -22,7 +22,7 @@ use specs::{Component, DenseVecStorage};
 /// : .exit   
 /// 
 /// 
-#[derive(Component, Default, Clone, Debug)]
+#[derive(Component, Default, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[storage(DenseVecStorage)]
 pub enum Transition {
     /// Default transition, cancel any ongoing tasks and replace w/ the incoming task

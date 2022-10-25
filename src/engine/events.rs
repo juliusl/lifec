@@ -4,7 +4,7 @@ use specs::{prelude::*, Entities, SystemData};
 
 use super::{Limit, Plugins, TickControl, Transition};
 use crate::{
-    editor::{Appendix, Node},
+    editor::{Appendix, Node, NodeStatus},
     prelude::*,
 };
 
@@ -13,25 +13,25 @@ use tracing::{event, Level};
 /// Event system data,
 ///
 #[derive(SystemData)]
-pub struct Events<'a>(
-    Write<'a, TickControl>,
-    Read<'a, Arc<Appendix>>,
-    Read<'a, tokio::sync::mpsc::Sender<ErrorContext>, EventRuntime>,
-    Read<'a, tokio::sync::broadcast::Sender<Entity>, EventRuntime>,
-    Plugins<'a>,
-    Entities<'a>,
-    ReadStorage<'a, Cursor>,
-    ReadStorage<'a, Transition>,
-    WriteStorage<'a, Sequence>,
-    WriteStorage<'a, Limit>,
-    WriteStorage<'a, Event>,
-    WriteStorage<'a, Connection>,
-    WriteStorage<'a, Operation>,
-);
+pub struct Events<'a> {
+    tick_control: Write<'a, TickControl>,
+    appendix: Read<'a, Arc<Appendix>>,
+    send_errors: Read<'a, tokio::sync::mpsc::Sender<ErrorContext>, EventRuntime>,
+    send_completed: Read<'a, tokio::sync::broadcast::Sender<Entity>, EventRuntime>,
+    plugins: Plugins<'a>,
+    entities: Entities<'a>,
+    cursors: ReadStorage<'a, Cursor>,
+    transitions: ReadStorage<'a, Transition>,
+    sequences: WriteStorage<'a, Sequence>,
+    limits: WriteStorage<'a, Limit>,
+    events: WriteStorage<'a, Event>,
+    connections: WriteStorage<'a, Connection>,
+    operations: WriteStorage<'a, Operation>,
+}
 
 /// Enumeration of event statuses,
 ///
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum EventStatus {
     /// Means that the operation is empty has no activity
     ///
@@ -51,7 +51,7 @@ pub enum EventStatus {
     /// Means that the operation has already completed
     ///
     Cancelled(Entity),
-    /// Means that the entity has not been activated yet
+    /// Means that the event has not been activated yet
     ///
     Inactive(Entity),
 }
@@ -75,15 +75,13 @@ impl EventStatus {
 impl Display for EventStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EventStatus::Scheduled(e) => write!(f, "scheduled,  event - {:02}", e.id()),
-            EventStatus::New(e) => write!(f, "new         event - {:02}", e.id()),
-            EventStatus::InProgress(e) => {
-                write!(f, "in-progress event - {:02}", e.id())
-            }
-            EventStatus::Ready(e) => write!(f, "ready       event - {:02}", e.id()),
-            EventStatus::Completed(e) => write!(f, "completed   event - {:02}", e.id()),
-            EventStatus::Cancelled(e) => write!(f, "cancelled   event - {:02}", e.id()),
-            EventStatus::Inactive(e) => write!(f, "inactive    event - {:02}", e.id()),
+            EventStatus::Scheduled(_) => write!(f, "scheduled"),
+            EventStatus::New(_) => write!(f, "new"),
+            EventStatus::InProgress(_) => write!(f, "in progress"),
+            EventStatus::Ready(_) => write!(f, "ready"),
+            EventStatus::Completed(_) => write!(f, "completed"),
+            EventStatus::Cancelled(_) => write!(f, "cancelled"),
+            EventStatus::Inactive(_) => write!(f, "inactive"),
         }
     }
 }
@@ -91,52 +89,90 @@ impl Display for EventStatus {
 impl<'a> Events<'a> {
     /// Resets Completed/Cancelled events
     ///
-    pub fn reset(&mut self) {
+    pub fn reset_all(&mut self) {
         let statuses = self.scan();
 
-        let Events(.., sequences, _, events, _, operations) = self;
-
         for status in statuses.iter() {
-            match status {
-                EventStatus::Completed(e) | EventStatus::Cancelled(e) => {
-                    operations.remove(*e);
+            self.reset(status.entity());
+        }
+    }
 
-                    if let (Some(sequence), Some(event)) = (sequences.get(*e), events.get_mut(*e)) {
-                        event.reactivate(sequence.clone());
-                    }
+    /// Resets a completed/cancelled event,
+    /// 
+    pub fn reset(&mut self, event: Entity) -> bool {
+        let status = self.status(event);
+
+        let Events {
+            sequences,
+            events,
+            operations,
+            ..
+        } = self;
+
+        match status {
+            EventStatus::Completed(e) | EventStatus::Cancelled(e) => {
+                operations.remove(e);
+
+                if let (Some(sequence), Some(event)) = (sequences.get(e), events.get_mut(e)) {
+                    event.reactivate(sequence.clone());
+                    true
+                } else {
+                    false
                 }
-                _ => continue,
             }
+            _ => false
+        }
+    }
+
+    /// Returns the event status for an event,
+    ///
+    pub fn status(&self, entity: Entity) -> EventStatus {
+        let Events {
+            entities,
+            events,
+            operations,
+            ..
+        } = self;
+
+        let (event, operation) = (events, operations.maybe())
+            .join()
+            .get(entity, entities)
+            .expect("should have a value");
+
+        if event.is_active() {
+            if let Some(operation) = operation {
+                if operation.is_ready() {
+                    EventStatus::Ready(entity)
+                } else if operation.is_completed() {
+                    EventStatus::Completed(entity)
+                } else if operation.is_empty() {
+                    EventStatus::Scheduled(entity)
+                } else if operation.is_cancelled() {
+                    EventStatus::Cancelled(entity)
+                } else {
+                    EventStatus::InProgress(entity)
+                }
+            } else {
+                EventStatus::New(entity)
+            }
+        } else {
+            EventStatus::Inactive(entity)
         }
     }
 
     /// Scans event status and returns a vector of entites w/ their status,
     ///
     pub fn scan(&self) -> Vec<EventStatus> {
-        let Events(_, _, _, _, _, entities, _, .., events, _, operations) = self;
+        let Events {
+            entities,
+            events,
+            ..
+        } = self;
 
         let mut status = vec![];
 
-        for (entity, event, operation) in (entities, events, operations.maybe()).join() {
-            if event.is_active() {
-                if let Some(operation) = operation {
-                    if operation.is_ready() {
-                        status.push(EventStatus::Ready(entity));
-                    } else if operation.is_completed() {
-                        status.push(EventStatus::Completed(entity));
-                    } else if operation.is_empty() {
-                        status.push(EventStatus::Scheduled(entity));
-                    } else if operation.is_cancelled() {
-                        status.push(EventStatus::Cancelled(entity));
-                    } else {
-                        status.push(EventStatus::InProgress(entity));
-                    }
-                } else {
-                    status.push(EventStatus::New(entity));
-                }
-            } else {
-                status.push(EventStatus::Inactive(entity));
-            }
+        for (entity, _) in (entities, events).join() {
+            status.push(self.status(entity));
         }
 
         status
@@ -145,7 +181,12 @@ impl<'a> Events<'a> {
     /// Returns a vector of cursors,
     ///
     pub fn scan_cursors(&self) -> Vec<Cursor> {
-        let Events(_, _, _, _, _, entities, cursors, .., events, _, _) = self;
+        let Events {
+            entities,
+            cursors,
+            events,
+            ..
+        } = self;
 
         let mut _cursors = vec![];
 
@@ -185,7 +226,7 @@ impl<'a> Events<'a> {
                             self.send_completed_event(*ready);
                             if !self.activate(next) {
                                 event!(Level::DEBUG, "Repeating event");
-                                let Events(.., limits, _, _, _) = self;
+                                let Events { limits, .. } = self;
                                 if let Some(limit) = limits.get_mut(next) {
                                     event!(Level::DEBUG, "Remaining repeats {}", limit.0);
                                     if !limit.take_one() {
@@ -219,7 +260,7 @@ impl<'a> Events<'a> {
             }
         }
 
-        let Events(tick_control, ..) = self;
+        let Events { tick_control, .. } = self;
         tick_control.update_tick_rate();
     }
 
@@ -247,7 +288,7 @@ impl<'a> Events<'a> {
     /// Returns next entities this event points to,
     ///
     pub fn get_next_entities(&mut self, event: Entity) -> Vec<Entity> {
-        let Events(_, _, _, _, _, _, cursors, ..) = self;
+        let Events { cursors, .. } = self;
         if let Some(cursor) = cursors.get(event) {
             match cursor {
                 Cursor::Next(next) => {
@@ -263,7 +304,7 @@ impl<'a> Events<'a> {
     /// Returns a result for an event if the operation is ready,
     ///
     pub fn get_result(&mut self, event: Entity) -> Option<ThunkContext> {
-        let Events(.., operations) = self;
+        let Events { operations, .. } = self;
 
         if let Some(operation) = operations.get_mut(event) {
             operation.wait_if_ready()
@@ -275,7 +316,7 @@ impl<'a> Events<'a> {
     /// Returns a result for an event if the operation is ready,
     ///
     pub fn wait_on(&mut self, event: Entity) -> Option<ThunkContext> {
-        let Events(.., operations) = self;
+        let Events { operations, .. } = self;
 
         if let Some(operation) = operations.get_mut(event) {
             operation.wait()
@@ -287,7 +328,7 @@ impl<'a> Events<'a> {
     /// Waits for an event's operation to be ready w/o completing it,
     ///
     pub fn wait_for_ready(&mut self, event: Entity) {
-        let Events(.., operations) = self;
+        let Events { operations, .. } = self;
 
         loop {
             if let Some(operation) = operations.get_mut(event) {
@@ -301,7 +342,7 @@ impl<'a> Events<'a> {
     /// Cancels an event's operation
     ///
     pub fn cancel(&mut self, event: Entity) {
-        let Events(.., operations) = self;
+        let Events { operations, .. } = self;
 
         if let Some(operation) = operations.get_mut(event) {
             event!(Level::TRACE, "Cancelling {}", event.id());
@@ -313,7 +354,9 @@ impl<'a> Events<'a> {
     ///
     pub fn activate(&mut self, event: Entity) -> bool {
         let event_entity = event;
-        let Events(.., sequences, _, events, _, _) = self;
+        let Events {
+            sequences, events, ..
+        } = self;
         if let Some(event) = events.get_mut(event) {
             if let Some(sequence) = event.activate() {
                 if !sequences.contains(event_entity) {
@@ -333,7 +376,7 @@ impl<'a> Events<'a> {
     /// Handles the transition of an event,
     ///
     pub fn transition(&mut self, previous: Option<&ThunkContext>, event: Entity) {
-        let Events(.., transitions, _, _, _, _, _) = self;
+        let Events { transitions, .. } = self;
 
         let transition = transitions.get(event).unwrap_or(&Transition::Start);
         match transition {
@@ -366,7 +409,13 @@ impl<'a> Events<'a> {
     /// Starts an event immediately, cancels any ongoing operations
     ///
     pub fn start(&mut self, event: Entity, previous: Option<&ThunkContext>) {
-        let Events(_, _, _, _, plugins, _, _, _, sequences, .., events, _, operations) = self;
+        let Events {
+            plugins,
+            sequences,
+            events,
+            operations,
+            ..
+        } = self;
 
         let e = events.get(event).expect("should have an event");
         event!(Level::DEBUG, "\n\n\t{}\tstarted event {}\n", e, event.id());
@@ -401,7 +450,11 @@ impl<'a> Events<'a> {
     /// Selects an incoming event and cancels any others,
     ///
     pub fn select(&mut self, event: Entity, previous: &ThunkContext) {
-        let Events(_, _, _, _, _, entities, .., connections, _) = self;
+        let Events {
+            entities,
+            connections,
+            ..
+        } = self;
 
         let selected = previous
             .state()
@@ -439,7 +492,7 @@ impl<'a> Events<'a> {
     /// Returns true if the runtime can continue,
     ///
     pub fn can_continue(&self) -> bool {
-        let Events(tick_control, ..) = self;
+        let Events { tick_control, .. } = self;
 
         tick_control.can_tick()
     }
@@ -447,7 +500,7 @@ impl<'a> Events<'a> {
     /// Pauses the event runtime,
     ///
     pub fn pause(&mut self) {
-        let Events(tick_control, ..) = self;
+        let Events { tick_control, .. } = self;
 
         tick_control.pause()
     }
@@ -455,7 +508,7 @@ impl<'a> Events<'a> {
     /// Resumes the event runtime,
     ///
     pub fn resume(&mut self) {
-        let Events(tick_control, ..) = self;
+        let Events { tick_control, .. } = self;
 
         tick_control.reset()
     }
@@ -463,7 +516,7 @@ impl<'a> Events<'a> {
     /// Returns the tick frequency,
     ///
     pub fn tick_rate(&self) -> u64 {
-        let Events(tick_control, ..) = self;
+        let Events { tick_control, .. } = self;
 
         tick_control.tick_rate()
     }
@@ -475,17 +528,17 @@ impl<'a> Events<'a> {
     /// Tries to send an error context,
     ///
     pub fn send_error_context(&self, error_context: ErrorContext) {
-        let Events(_, _, errors, ..) = self;
+        let Events { send_errors, .. } = self;
 
-        errors.try_send(error_context).ok();
+        send_errors.try_send(error_context).ok();
     }
 
     /// Returns the event entity that just completed,
     ///
     pub fn send_completed_event(&self, event: Entity) {
-        let Events(_, _, _, completed, ..) = self;
+        let Events { send_completed, .. } = self;
 
-        completed.send(event).ok();
+        send_completed.send(event).ok();
     }
 }
 
@@ -495,7 +548,11 @@ impl<'a> Events<'a> {
     /// Sets the scheduled connection state for the connections this event is connected to,
     ///
     pub fn set_scheduled_connection_state(&mut self, event: Entity) {
-        let Events(.., cursors, _, _, _, _, connections, _) = self;
+        let Events {
+            cursors,
+            connections,
+            ..
+        } = self;
 
         if let Some(cursor) = &cursors.get(event) {
             match cursor {
@@ -518,7 +575,11 @@ impl<'a> Events<'a> {
     /// Sets the connection state to started for this event, on the connections it is connected to,
     ///
     pub fn set_started_connection_state(&mut self, event: Entity) {
-        let Events(.., cursors, _, _, _, _, connections, _) = self;
+        let Events {
+            cursors,
+            connections,
+            ..
+        } = self;
 
         if let Some(cursor) = &cursors.get(event) {
             match cursor {
@@ -546,7 +607,7 @@ impl<'a> Events<'a> {
         event: Entity,
         error: ErrorContext,
     ) {
-        let Events(.., connections, _) = self;
+        let Events { connections, .. } = self;
         if let Some(connection) = connections.get_mut(event) {
             connection.complete(incoming, Some(&error));
         }
@@ -555,7 +616,7 @@ impl<'a> Events<'a> {
     /// Sets the connection state to completed for the incoming event, on the connected event
     ///
     pub fn set_completed_connection_state(&mut self, incoming: Entity, event: Entity) {
-        let Events(.., _, _, connections, _) = self;
+        let Events { connections, .. } = self;
 
         if let Some(connection) = connections.get_mut(event) {
             connection.complete(incoming, None);
@@ -567,26 +628,46 @@ impl<'a> Events<'a> {
 ///
 impl<'a> Events<'a> {
     /// Returns an iterator over event nodes,
-    /// 
-    pub fn nodes(&'a self) -> impl Iterator<Item = Node> + 'a {
-        let Events(_, _, _, _, _, entities, ..) = self;
-
-        entities.join().filter_map(|e| self.node(e))
+    ///
+    pub fn nodes(&'a self) -> Vec<Node> {
+        self.scan()
+            .iter()
+            .filter_map(|e| self.node(e.entity()))
+            .collect::<Vec<_>>()
     }
 
     /// Returns a node,
     ///
     pub fn node(&self, event: Entity) -> Option<Node> {
-        let Events(_, appendix, _, _, _, entities, cursors, .., events, connections, _) = self;
+        let Events {
+            appendix,
+            entities,
+            cursors,
+            events,
+            connections,
+            transitions,
+            ..
+        } = self;
 
-        if let Some((_, connection, cursor)) = (events, connections.maybe(), cursors.maybe())
+        if let Some((_, connection, cursor, transition)) = (
+            events,
+            connections.maybe(),
+            cursors.maybe(),
+            transitions.maybe(),
+        )
             .join()
             .get(event, entities)
         {
             Some(Node {
+                status: NodeStatus::Event(self.status(event)),
+                transition: transition.cloned(),
                 connection: connection.cloned(),
                 cursor: cursor.cloned(),
                 appendix: appendix.deref().clone(),
+                activate: None,
+                reset: None,
+                edit: None,
+                display: None,
             })
         } else {
             None

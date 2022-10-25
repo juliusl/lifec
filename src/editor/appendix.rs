@@ -19,10 +19,16 @@ impl Appendix {
         self.general.insert(entity, general.into());
     }
 
+    /// Returns a general description of the entity
+    /// 
+    pub fn general<'a>(&'a self, entity: &'a Entity) -> Option<&'a General> {
+        self.general.get(entity)
+    }
+
     /// Returns a name for an entity,
     /// 
     pub fn name<'a>(&'a self, entity: &'a Entity) -> Option<&'a str> {
-        self.general.get(entity).and_then(|g| Some(g.name.as_str()))
+        self.general(entity).and_then(|g| Some(g.name.as_str()))
     }
 }
 

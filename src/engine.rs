@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 
 use crate::prelude::*;
@@ -21,9 +20,9 @@ mod cursor;
 pub use cursor::Cursor;
 
 mod plugins;
+pub use plugins::PluginBroker;
 pub use plugins::PluginFeatures;
 pub use plugins::PluginListener;
-pub use plugins::PluginBroker;
 pub use plugins::Plugins;
 
 mod events;
@@ -85,7 +84,7 @@ pub struct Engine {
     ///
     start: Option<Entity>,
     /// Limit this engine can repeat
-    /// 
+    ///
     limit: Option<Limit>,
     /// Vector of transitions
     ///
@@ -114,7 +113,7 @@ impl Engine {
     }
 
     /// Returns the limit of this engine, if any
-    /// 
+    ///
     pub fn limit(&self) -> Option<&Limit> {
         self.limit.as_ref()
     }
@@ -287,6 +286,20 @@ impl Interpreter for Engine {
     ///
     fn interpret(&self, world: &World, block: &Block) {
         if block.is_root_block() {
+            for e in block
+                .index()
+                .iter()
+                .filter(|r| r.root().name().ends_with("operation"))
+            {
+                let entity = world.entities().entity(e.root().id());
+                if let Some(event) = world.write_component::<Event>().get_mut(entity) {
+                    if let Some(name) = e.find_property("name").and_then(|p| p.symbol().cloned()) {
+                        // TODO -- can format this better,
+                        event.set_name(format!("operation {name}"));
+                    }
+                }
+            }
+
             return;
         }
 
@@ -331,10 +344,10 @@ impl Interpreter for Engine {
                                 sequence.set_cursor(engine);
                             }
                         }
-                        (Lifecycle::Loop, _) |  (Lifecycle::Repeat(_), _)  => {
+                        (Lifecycle::Loop, _) | (Lifecycle::Repeat(_), _) => {
                             sequence.set_cursor(block_entity);
                         }
-                        (Lifecycle::Exit, _) => { /* No-OP */}
+                        (Lifecycle::Exit, _) => { /* No-OP */ }
                         _ => {
                             tracing::event!(
                                 Level::ERROR,

@@ -18,11 +18,11 @@ pub enum Cursor {
 impl Display for Cursor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Cursor::Next(next) => write!(f, "-> {:02}", next.id()),
+            Cursor::Next(next) => write!(f, "next: {:02}", next.id()),
             Cursor::Fork(forks) => {
                 write!(
                     f,
-                    "-> {}",
+                    "fork: {}",
                     forks
                         .iter()
                         .map(|f| format!("{:02}", f.id()))
