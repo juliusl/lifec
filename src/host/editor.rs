@@ -1,9 +1,10 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Arc};
 
 use imgui::{ChildWindow, Window, StyleVar};
+use specs::Write;
 
 use crate::{
-    editor::{ProgressStatusBar, StartButton, Task},
+    editor::{ProgressStatusBar, StartButton, Task, Node, Appendix, GeneralDescription},
     prelude::*,
 };
 
@@ -29,30 +30,26 @@ impl Editor for Host {
     where
         P: Project,
     {
-        // Register some common components for viewing event state
-        self.world_mut().register::<Task>();
-        self.world_mut().register::<ProgressStatusBar>();
-        self.world_mut().register::<StartButton>();
-
         // Setup task list view --
         self.world_mut().exec(
-            |(entities, events, mut tasks, mut progress_bars, mut start_buttons): (
+            |(entities, events, thunks, mut appendix): (
                 Entities,
                 ReadStorage<Event>,
-                WriteStorage<Task>,
-                WriteStorage<ProgressStatusBar>,
-                WriteStorage<StartButton>,
+                ReadStorage<Thunk>,
+                Write<Appendix>,
             )| {
-                for (entity, _) in (&entities, &events).join() {
-                    tasks
-                        .insert(entity, Task::default())
-                        .expect("should be able to insert task");
-                    progress_bars
-                        .insert(entity, ProgressStatusBar::default())
-                        .expect("should be able to insert progress status bar");
-                    start_buttons
-                        .insert(entity, StartButton::default())
-                        .expect("should be able to insert start button");
+                for (entity, event, thunk) in (&entities, events.maybe(), thunks.maybe()).join() {
+                    match (event, thunk) {
+                        (None, Some(thunk)) => {
+                            appendix.general.insert(entity, GeneralDescription { name: thunk.symbol().to_string() });
+                        },
+                        (Some(event), None) => {
+                            appendix.general.insert(entity, GeneralDescription { name: event.symbol().to_string() });
+                        },
+                        _ => {
+
+                        }
+                    }
                 }
             },
         );
@@ -73,6 +70,10 @@ impl Editor for Host {
             let operations = self.world().system_data::<Operations>();
             HashSet::from_iter(operations.scan_root().iter().cloned())
         };
+
+        if let Some(appendix) = self.world_mut().remove::<Appendix>() {
+            self.world_mut().insert(Arc::new(appendix));
+        }
 
         // Consume the compiled world
         let world = self.world.take();
@@ -112,6 +113,9 @@ pub struct HostEditor {
     /// Currrent cursor state,
     ///
     cursors: Vec<Cursor>,
+    /// Current nodes,
+    /// 
+    nodes: HashSet<Node>,
     /// Tick rate,
     ///
     tick_rate: u64,
@@ -159,6 +163,10 @@ impl<'a> System<'a> for HostEditor {
         }
 
         self.tick_rate = events.tick_rate();
+
+        for node in events.nodes() {
+            self.nodes.insert(node);
+        }
     }
 }
 
@@ -230,6 +238,11 @@ impl App for HostEditor {
                 ui.text("Events:");
                 for (status, cursor) in self.event_status.iter().zip(self.cursors.iter()) {
                     ui.text(format!("{} {}", status, cursor));
+                }
+
+                ui.new_line();
+                for node in self.nodes.iter() {
+                    node.display_ui(ui);
                 }
                 frame_padding.end();
                 window_padding.end();

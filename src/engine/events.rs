@@ -1,9 +1,12 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Deref, sync::Arc};
 
 use specs::{prelude::*, Entities, SystemData};
 
 use super::{Limit, Plugins, TickControl, Transition};
-use crate::prelude::*;
+use crate::{
+    editor::{Appendix, Node},
+    prelude::*,
+};
 
 use tracing::{event, Level};
 
@@ -12,6 +15,7 @@ use tracing::{event, Level};
 #[derive(SystemData)]
 pub struct Events<'a>(
     Write<'a, TickControl>,
+    Read<'a, Arc<Appendix>>,
     Read<'a, tokio::sync::mpsc::Sender<ErrorContext>, EventRuntime>,
     Read<'a, tokio::sync::broadcast::Sender<Entity>, EventRuntime>,
     Plugins<'a>,
@@ -109,7 +113,7 @@ impl<'a> Events<'a> {
     /// Scans event status and returns a vector of entites w/ their status,
     ///
     pub fn scan(&self) -> Vec<EventStatus> {
-        let Events(_, _, _, _, entities, _, .., events, _, operations) = self;
+        let Events(_, _, _, _, _, entities, _, .., events, _, operations) = self;
 
         let mut status = vec![];
 
@@ -141,7 +145,7 @@ impl<'a> Events<'a> {
     /// Returns a vector of cursors,
     ///
     pub fn scan_cursors(&self) -> Vec<Cursor> {
-        let Events(_, _, _, _, entities, cursors, .., events, _, _) = self;
+        let Events(_, _, _, _, _, entities, cursors, .., events, _, _) = self;
 
         let mut _cursors = vec![];
 
@@ -243,7 +247,7 @@ impl<'a> Events<'a> {
     /// Returns next entities this event points to,
     ///
     pub fn get_next_entities(&mut self, event: Entity) -> Vec<Entity> {
-        let Events(_, _, _, _, _, cursors, ..) = self;
+        let Events(_, _, _, _, _, _, cursors, ..) = self;
         if let Some(cursor) = cursors.get(event) {
             match cursor {
                 Cursor::Next(next) => {
@@ -362,7 +366,7 @@ impl<'a> Events<'a> {
     /// Starts an event immediately, cancels any ongoing operations
     ///
     pub fn start(&mut self, event: Entity, previous: Option<&ThunkContext>) {
-        let Events(_, _, _, plugins, _, _, _, sequences, .., events, _, operations) = self;
+        let Events(_, _, _, _, plugins, _, _, _, sequences, .., events, _, operations) = self;
 
         let e = events.get(event).expect("should have an event");
         event!(Level::DEBUG, "\n\n\t{}\tstarted event {}\n", e, event.id());
@@ -397,7 +401,7 @@ impl<'a> Events<'a> {
     /// Selects an incoming event and cancels any others,
     ///
     pub fn select(&mut self, event: Entity, previous: &ThunkContext) {
-        let Events(_, _, _, _, entities, .., connections, _) = self;
+        let Events(_, _, _, _, _, entities, .., connections, _) = self;
 
         let selected = previous
             .state()
@@ -471,7 +475,7 @@ impl<'a> Events<'a> {
     /// Tries to send an error context,
     ///
     pub fn send_error_context(&self, error_context: ErrorContext) {
-        let Events(_, errors, ..) = self;
+        let Events(_, _, errors, ..) = self;
 
         errors.try_send(error_context).ok();
     }
@@ -479,7 +483,7 @@ impl<'a> Events<'a> {
     /// Returns the event entity that just completed,
     ///
     pub fn send_completed_event(&self, event: Entity) {
-        let Events(_, _, completed, ..) = self;
+        let Events(_, _, _, completed, ..) = self;
 
         completed.send(event).ok();
     }
@@ -555,6 +559,37 @@ impl<'a> Events<'a> {
 
         if let Some(connection) = connections.get_mut(event) {
             connection.complete(incoming, None);
+        }
+    }
+}
+
+/// Editor related functions
+///
+impl<'a> Events<'a> {
+    /// Returns an iterator over event nodes,
+    /// 
+    pub fn nodes(&'a self) -> impl Iterator<Item = Node> + 'a {
+        let Events(_, _, _, _, _, entities, ..) = self;
+
+        entities.join().filter_map(|e| self.node(e))
+    }
+
+    /// Returns a node,
+    ///
+    pub fn node(&self, event: Entity) -> Option<Node> {
+        let Events(_, appendix, _, _, _, entities, cursors, .., events, connections, _) = self;
+
+        if let Some((_, connection, cursor)) = (events, connections.maybe(), cursors.maybe())
+            .join()
+            .get(event, entities)
+        {
+            Some(Node {
+                connection: connection.cloned(),
+                cursor: cursor.cloned(),
+                appendix: appendix.deref().clone(),
+            })
+        } else {
+            None
         }
     }
 }

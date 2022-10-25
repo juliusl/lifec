@@ -13,6 +13,12 @@ pub use task::Task;
 mod list;
 pub use list::List;
 
+mod node;
+pub use node::Node;
+
+mod appendix;
+pub use appendix::Appendix;
+pub use appendix::GeneralDescription;
 
 /// Generate a unique title
 pub fn unique_title(title: impl AsRef<str>) -> String {

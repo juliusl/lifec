@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 
 use specs::{Component, Entity, VecStorage};
 use tracing::{event, Level};
@@ -60,7 +61,7 @@ impl ConnectionState {
 
 /// This component configures the Sequence cursor to point at the sequence it is connected to
 ///
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, PartialEq, Eq)]
 #[storage(VecStorage)]
 pub struct Connection {
     /// Set of entities of incoming connections,
@@ -69,6 +70,19 @@ pub struct Connection {
     to: Entity,
     /// Map of the connection state,
     connection_state: HashMap<ConnectionState, Activity>,
+}
+
+impl Hash for Connection {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        for f in self.from.iter() {
+            f.hash(state);
+        }
+        self.to.hash(state);
+        for (c, a) in self.connection_state.iter() {
+            c.hash(state);
+            a.hash(state);
+        }
+    }
 }
 
 impl Connection {
@@ -80,6 +94,12 @@ impl Connection {
             to,
             connection_state: HashMap::default(),
         }
+    }
+
+    /// Returns the entity this connection points to,
+    /// 
+    pub fn entity(&self) -> Entity {
+        self.to
     }
 
     /// Returns an iterator over each connection,
