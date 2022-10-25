@@ -26,6 +26,9 @@ pub struct Node {
     /// Status of the current node,
     ///
     pub status: NodeStatus,
+    /// Appendix to look up descriptions for related entities,
+    /// 
+    pub appendix: Arc<Appendix>,
     /// The Cursor component stores entities this node points to
     ///
     pub cursor: Option<Cursor>,
@@ -35,15 +38,9 @@ pub struct Node {
     /// The transition behavior for this node,
     ///
     pub transition: Option<Transition>,
-    /// Reference to an appendix, to lookup desciriptions on entities this node references,
-    ///
-    pub appendix: Arc<Appendix>,
-    /// Command to activate this node,
-    ///
-    pub activate: Option<Entity>,
-    /// Command to reset this node,
+    /// Command for this node,
     /// 
-    pub reset: Option<Entity>,
+    pub command: Option<NodeCommand>,
     /// Edit node ui function,
     ///
     pub edit: Option<EditNode>,
@@ -59,6 +56,18 @@ pub enum NodeStatus {
     Event(EventStatus),
 }
 
+/// Enumeration of node commands,
+/// 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum NodeCommand {
+    /// Command to activate this node,
+    /// 
+    Activate(Entity),
+    /// Command to reset this node,
+    /// 
+    Reset(Entity),
+}
+
 impl App for Node {
     fn name() -> &'static str {
         "node"
@@ -69,7 +78,6 @@ impl App for Node {
             edit(self, ui);
         } else {
             match &self.status {
-                // if self.connection.is_some() || self.cursor.is_some()
                 NodeStatus::Event(status) => {
                     if let Some(general) = self.appendix.general(&status.entity()) {
                         general.display_ui(ui);
@@ -87,17 +95,17 @@ impl App for Node {
                     match status {
                         EventStatus::Inactive(_) => {
                             if ui.button(format!("Start {}", status.entity().id())) {
-                                self.activate = Some(status.entity());
+                                self.command = Some(NodeCommand::Activate(status.entity()));
                             }
                         }
                         EventStatus::Cancelled(_) | EventStatus::Completed(_) => {
                             if ui.button(format!("Reset {}", status.entity().id())) {
-                                self.reset = Some(status.entity());
+                                self.command = Some(NodeCommand::Reset(status.entity()));
                             }
                         }
                         _ => {}
                     }
-                } // _ => {}
+                }
             }
         }
     }
@@ -116,7 +124,7 @@ impl Hash for Node {
         self.connection.hash(state);
         self.transition.hash(state);
         self.appendix.hash(state);
-        self.activate.hash(state);
+        self.command.hash(state);
     }
 }
 
@@ -127,6 +135,6 @@ impl PartialEq for Node {
             && self.connection == other.connection
             && self.transition == other.transition
             && self.appendix == other.appendix
-            && self.activate == other.activate
+            && self.command == other.command
     }
 }

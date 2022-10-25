@@ -8,7 +8,7 @@ use specs::prelude::*;
 
 use crate::prelude::{Runtime, Host, Sequencer};
 
-use super::{Workspace, Project, default_world, workspace};
+use super::{Workspace, Project, default_world};
 
 /// Wrapper struct over runmd source,
 /// 

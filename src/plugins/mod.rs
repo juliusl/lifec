@@ -141,14 +141,6 @@ pub trait Plugin {
                     }
                 }
 
-                // This is used after .runtime
-                // If the consumer writes an ident afterwards, than that will
-                // be used as the event name
-                let mut event_name = "call";
-                if let Value::Symbol(e) = parser.value() {
-                    event_name = e;
-                }
-
                 world.write_component()
                     .insert(child, Thunk::from_plugin::<Self>())
                     .expect("should be able to insert thunk component");

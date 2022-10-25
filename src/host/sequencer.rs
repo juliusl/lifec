@@ -5,7 +5,7 @@ use crate::prelude::*;
 /// Extension of Host to handle linking engine sequences together
 ///
 pub trait Sequencer {
-    /// Link event sequences for each engine
+    /// Link event sequences,
     ///
     fn link_sequences(&mut self);
 }
@@ -17,8 +17,8 @@ impl Sequencer for Host {
                 block_map,
                 entities,
                 blocks,
-                events,
                 engines,
+                events,
                 mut limits,
                 mut sequences,
                 mut connections,
@@ -27,8 +27,8 @@ impl Sequencer for Host {
                 Read<HashMap<String, Entity>>,
                 Entities,
                 ReadStorage<Block>,
-                ReadStorage<Event>,
                 ReadStorage<Engine>,
+                ReadStorage<Event>,
                 WriteStorage<Limit>,
                 WriteStorage<Sequence>,
                 WriteStorage<Connection>,

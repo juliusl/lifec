@@ -51,7 +51,6 @@ impl Editor for Host {
                 }
             },
         );
-        self.world_mut().maintain();
 
         self.open::<P, _>(1920.0, 1080.0, RuntimeEditor::default())
     }
@@ -108,7 +107,7 @@ pub struct HostEditor {
     /// Available workspace operations to execute,
     ///
     workspace_operations: HashSet<(String, Event)>,
-    /// Tick rate,
+    /// Event tick rate,
     ///
     tick_rate: u64,
     /// Command to execute a serialized tick,
@@ -144,18 +143,27 @@ impl<'a> System<'a> for HostEditor {
 
         self.tick_rate = events.tick_rate();
 
+        // Handle node commands
+        // 
         for mut node in self.nodes.drain(..) {
-            if let Some(event) = node.activate.take() {
-                if events.activate(event) {
-                    event!(Level::DEBUG, "Activating event {}", event.id());
-                }
-            } else if let Some(event) = node.reset.take() {
-                if events.reset(event) {
-                    event!(Level::DEBUG, "Reseting event {}", event.id());
+            if let Some(command) = node.command.take() {
+                match command {
+                    crate::editor::NodeCommand::Activate(event) => {
+                        if events.activate(event) {
+                            event!(Level::DEBUG, "Activating event {}", event.id());
+                        }
+                    }
+                    crate::editor::NodeCommand::Reset(event) => {
+                        if events.reset(event) {
+                            event!(Level::DEBUG, "Reseting event {}", event.id());
+                        }
+                    },
                 }
             }
         }
 
+        // Get latest node state,
+        //
         for node in events.nodes() {
             self.nodes.push(node);
         }

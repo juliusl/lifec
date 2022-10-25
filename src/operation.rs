@@ -73,7 +73,7 @@ impl Operation {
 
     /// Starts a task with a thunk and returns it w/ self,
     ///
-    pub fn start_with(&self, Thunk(symbol, func): &Thunk, context: &ThunkContext) -> Self
+    pub fn start_with(&self, Thunk(_, func): &Thunk, context: &ThunkContext) -> Self
     {
         if self.result.is_some() {
             event!(

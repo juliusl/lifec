@@ -664,8 +664,7 @@ impl<'a> Events<'a> {
                 connection: connection.cloned(),
                 cursor: cursor.cloned(),
                 appendix: appendix.deref().clone(),
-                activate: None,
-                reset: None,
+                command: None,
                 edit: None,
                 display: None,
             })
