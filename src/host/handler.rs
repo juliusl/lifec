@@ -42,40 +42,40 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
         PluginListener<'a>,
         Write<'a, tokio::sync::broadcast::Receiver<Entity>, EventRuntime>,
         Write<'a, tokio::sync::mpsc::Receiver<ErrorContext>, EventRuntime>,
-        Write<'a, L>,
+        Write<'a, Option<L>>,
     );
 
     fn setup(&mut self, world: &mut World) {
         <Self::SystemData as DynamicSystemData>::setup(&self.accessor(), world);
     
-        if let Some(listener) = self.listener.take() {
-            world.insert(listener);
-        }
+        world.insert(self.listener.take());
     }
 
     fn run(&mut self, (mut plugin_messages,  mut completed_plugins, mut errors, mut listener): Self::SystemData) {
-        if let Some(operation) = plugin_messages.try_next_operation() {
-            listener.on_operation(operation);
-        }
-
-        if let Some(runmd) = plugin_messages.try_next_runmd_file() {
-            listener.on_runmd(&runmd);
-        }
-
-        if let Some(start) = plugin_messages.try_next_start_command() {
-            listener.on_start_command(&start);
-        }
-
-        if let Some(status_update) = plugin_messages.try_next_status_update() {
-            listener.on_status_update(&status_update);
-        }
-
-        if let Some(entity) = completed_plugins.try_recv().ok() {
-            listener.on_completed_event(&entity);
-        }
-
-        if let Some(error) = errors.try_recv().ok() {
-            listener.on_error_context(&error);
+        if let Some(listener) = listener.as_mut() {
+            if let Some(operation) = plugin_messages.try_next_operation() {
+                listener.on_operation(operation);
+            }
+    
+            if let Some(runmd) = plugin_messages.try_next_runmd_file() {
+                listener.on_runmd(&runmd);
+            }
+    
+            if let Some(start) = plugin_messages.try_next_start_command() {
+                listener.on_start_command(&start);
+            }
+    
+            if let Some(status_update) = plugin_messages.try_next_status_update() {
+                listener.on_status_update(&status_update);
+            }
+    
+            if let Some(entity) = completed_plugins.try_recv().ok() {
+                listener.on_completed_event(&entity);
+            }
+    
+            if let Some(error) = errors.try_recv().ok() {
+                listener.on_error_context(&error);
+            }
         }
     }
 }

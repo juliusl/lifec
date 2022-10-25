@@ -9,6 +9,8 @@ pub use general::General;
 /// 
 #[derive(Default, PartialEq, Eq)]
 pub struct Appendix {
+    /// Index of General information about an entity,
+    /// 
     pub general: HashMap<Entity, General>,
 }
 

@@ -17,9 +17,7 @@ pub type EditNode = fn(&mut Node, &Ui);
 ///
 pub type DisplayNode = fn(&Node, &Ui);
 
-/// Struct for visualizing entities w/ a cursor and/or connection component,
-///
-/// Can also signal actions to take,
+/// Struct for visualizing and commanding node-like entities,
 ///
 #[derive(Eq)]
 pub struct Node {
@@ -29,7 +27,7 @@ pub struct Node {
     /// Appendix to look up descriptions for related entities,
     /// 
     pub appendix: Arc<Appendix>,
-    /// The Cursor component stores entities this node points to
+    /// The cursor component stores entities this node points to
     ///
     pub cursor: Option<Cursor>,
     /// The conenction component stores entities that point to this node,
@@ -66,6 +64,11 @@ pub enum NodeCommand {
     /// Command to reset this node,
     /// 
     Reset(Entity),
+    /// Custom command for this node,
+    /// 
+    /// This allows for extending capabilities of the node,
+    /// 
+    Custom(&'static str, Entity),
 }
 
 impl App for Node {

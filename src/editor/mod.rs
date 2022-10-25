@@ -1,22 +1,15 @@
- mod runtime_editor;
-pub use runtime_editor::RuntimeEditor;
+mod workspace_editor;
+pub use workspace_editor::WorkspaceEditor;
 
-mod progress;
-pub use progress::ProgressStatusBar;
-
-mod start_button;
-pub use start_button::StartButton;
-
-mod task;
-pub use task::Task;
-
-mod list;
-pub use list::List;
+mod host_editor;
+pub use host_editor::HostEditor;
 
 mod node;
 pub use node::Node;
 pub use node::NodeStatus;
 pub use node::NodeCommand;
+pub use node::DisplayNode;
+pub use node::EditNode;
 
 mod appendix;
 pub use appendix::Appendix;
