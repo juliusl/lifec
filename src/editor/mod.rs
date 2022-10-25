@@ -18,7 +18,7 @@ pub use node::Node;
 
 mod appendix;
 pub use appendix::Appendix;
-pub use appendix::GeneralDescription;
+pub use appendix::General;
 
 /// Generate a unique title
 pub fn unique_title(title: impl AsRef<str>) -> String {

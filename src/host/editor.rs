@@ -4,7 +4,7 @@ use imgui::{ChildWindow, Window, StyleVar};
 use specs::Write;
 
 use crate::{
-    editor::{ProgressStatusBar, StartButton, Task, Node, Appendix, GeneralDescription},
+    editor::{Node, Appendix},
     prelude::*,
 };
 
@@ -41,10 +41,10 @@ impl Editor for Host {
                 for (entity, event, thunk) in (&entities, events.maybe(), thunks.maybe()).join() {
                     match (event, thunk) {
                         (None, Some(thunk)) => {
-                            appendix.general.insert(entity, GeneralDescription { name: thunk.symbol().to_string() });
+                            appendix.insert_general(entity, thunk);
                         },
                         (Some(event), None) => {
-                            appendix.general.insert(entity, GeneralDescription { name: event.symbol().to_string() });
+                            appendix.insert_general(entity, event);
                         },
                         _ => {
 

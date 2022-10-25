@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::prelude::*;
+use crate::{prelude::*, editor::General};
 use reality::Block;
 use specs::{Component, DenseVecStorage, Entity};
 use tracing::{event, Level};
@@ -112,5 +112,11 @@ impl Display for Event {
             writeln!(f, "\t      `{}`", thunk.0)?;
         }
         Ok(())
+    }
+}
+
+impl Into<General> for &Event {
+    fn into(self) -> General {
+        General { name: self.0.to_string() }
     }
 }
