@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use specs::{prelude::*, Entities, SystemData};
 
 use super::{Limit, Plugins, TickControl, Transition};
@@ -50,11 +52,64 @@ pub enum EventStatus {
     Inactive(Entity),
 }
 
+impl EventStatus {
+    /// Returns the entity,
+    ///
+    pub fn entity(&self) -> Entity {
+        match self {
+            EventStatus::Scheduled(e)
+            | EventStatus::New(e)
+            | EventStatus::InProgress(e)
+            | EventStatus::Ready(e)
+            | EventStatus::Completed(e)
+            | EventStatus::Cancelled(e)
+            | EventStatus::Inactive(e) => *e,
+        }
+    }
+}
+
+impl Display for EventStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EventStatus::Scheduled(e) => write!(f, "scheduled,  event - {:02}", e.id()),
+            EventStatus::New(e) => write!(f, "new         event - {:02}", e.id()),
+            EventStatus::InProgress(e) => {
+                write!(f, "in-progress event - {:02}", e.id())
+            }
+            EventStatus::Ready(e) => write!(f, "ready       event - {:02}", e.id()),
+            EventStatus::Completed(e) => write!(f, "completed   event - {:02}", e.id()),
+            EventStatus::Cancelled(e) => write!(f, "cancelled   event - {:02}", e.id()),
+            EventStatus::Inactive(e) => write!(f, "inactive    event - {:02}", e.id()),
+        }
+    }
+}
+
 impl<'a> Events<'a> {
+    /// Resets Completed/Cancelled events
+    ///
+    pub fn reset(&mut self) {
+        let statuses = self.scan();
+
+        let Events(.., sequences, _, events, _, operations) = self;
+
+        for status in statuses.iter() {
+            match status {
+                EventStatus::Completed(e) | EventStatus::Cancelled(e) => {
+                    operations.remove(*e);
+
+                    if let (Some(sequence), Some(event)) = (sequences.get(*e), events.get_mut(*e)) {
+                        event.reactivate(sequence.clone());
+                    }
+                }
+                _ => continue,
+            }
+        }
+    }
+
     /// Scans event status and returns a vector of entites w/ their status,
     ///
     pub fn scan(&self) -> Vec<EventStatus> {
-        let Events(_, _, _, _, entities, .., events, _, operations) = self;
+        let Events(_, _, _, _, entities, cursors, .., events, _, operations) = self;
 
         let mut status = vec![];
 
@@ -81,6 +136,19 @@ impl<'a> Events<'a> {
         }
 
         status
+    }
+
+    /// Returns a vector of cursors,
+    ///
+    pub fn scan_cursors(&self) -> Vec<Cursor> {
+        let Events(_, _, _, _, entities, cursors, .., events, _, _) = self;
+
+        let mut _cursors = vec![];
+
+        for (_, cursor, _) in (entities, cursors, events).join() {
+            _cursors.push(cursor.clone());
+        }
+        _cursors
     }
 
     /// Handles events,
@@ -357,7 +425,9 @@ impl<'a> Events<'a> {
         let event_data = self.scan();
 
         event_data.iter().all(|e| match e {
-            EventStatus::Inactive(_) | EventStatus::Completed(_) | EventStatus::Cancelled(_) => true,
+            EventStatus::Inactive(_) | EventStatus::Completed(_) | EventStatus::Cancelled(_) => {
+                true
+            }
             _ => false,
         })
     }
@@ -387,10 +457,10 @@ impl<'a> Events<'a> {
     }
 
     /// Returns the tick frequency,
-    /// 
+    ///
     pub fn tick_rate(&self) -> u64 {
         let Events(tick_control, ..) = self;
-        
+
         tick_control.tick_rate()
     }
 }

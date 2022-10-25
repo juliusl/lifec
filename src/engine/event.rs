@@ -57,6 +57,12 @@ impl Event {
         self.2.take()
     }
 
+    /// Reactivates the event,
+    /// 
+    pub fn reactivate(&mut self, sequence: Sequence) {
+        self.2 = Some(sequence);
+    }
+
     /// Returns true if this event is active, that is, the owner of this component can expect no further changes,
     ///
     pub fn is_active(&self) -> bool {
