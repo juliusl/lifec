@@ -12,7 +12,7 @@ use crate::prelude::*;
 /// 
 /// The execution behavior is determined by the components on the entities themselves.
 /// 
-#[derive(Component, Debug, Default, Clone)]
+#[derive(Component, Debug, Default, Clone, Hash, PartialEq, Eq)]
 #[storage(DefaultVecStorage)]
 pub struct Sequence(
     /// Sequence, a list of entities w/ events that are called in sequence,

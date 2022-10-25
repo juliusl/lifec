@@ -7,7 +7,7 @@ use tracing::{event, Level};
 
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
 ///
-#[derive(Debug, Component, Clone)]
+#[derive(Debug, Component, Clone, Hash, PartialEq, Eq)]
 #[storage(DenseVecStorage)]
 pub struct Event(
     /// Name of this event

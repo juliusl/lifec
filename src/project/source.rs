@@ -56,6 +56,8 @@ impl<'a> WorkspaceSource<'a> {
 
         let mut host = Host::from(world);
         host.link_sequences();
+
+        host.prepare::<Adhoc>();
         host
     }
 }

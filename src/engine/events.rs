@@ -1,6 +1,6 @@
 use specs::{prelude::*, Entities, SystemData};
 
-use super::{Limit, Plugins, Transition};
+use super::{Limit, Plugins, TickControl, Transition};
 use crate::prelude::*;
 
 use tracing::{event, Level};
@@ -9,6 +9,7 @@ use tracing::{event, Level};
 ///
 #[derive(SystemData)]
 pub struct Events<'a>(
+    Write<'a, TickControl>,
     Read<'a, tokio::sync::mpsc::Sender<ErrorContext>, EventRuntime>,
     Read<'a, tokio::sync::broadcast::Sender<Entity>, EventRuntime>,
     Plugins<'a>,
@@ -53,7 +54,7 @@ impl<'a> Events<'a> {
     /// Scans event status and returns a vector of entites w/ their status,
     ///
     pub fn scan(&self) -> Vec<EventStatus> {
-        let Events(_, _, _, entities, .., events, _, operations) = self;
+        let Events(_, _, _, _, entities, .., events, _, operations) = self;
 
         let mut status = vec![];
 
@@ -145,6 +146,9 @@ impl<'a> Events<'a> {
                 _ => {}
             }
         }
+
+        let Events(tick_control, ..) = self;
+        tick_control.update_tick_rate();
     }
 
     /// Performs a serialized tick, waiting for any events in-progress before returning,
@@ -171,7 +175,7 @@ impl<'a> Events<'a> {
     /// Returns next entities this event points to,
     ///
     pub fn get_next_entities(&mut self, event: Entity) -> Vec<Entity> {
-        let Events(_, _, _, _, cursors, ..) = self;
+        let Events(_, _, _, _, _, cursors, ..) = self;
         if let Some(cursor) = cursors.get(event) {
             match cursor {
                 Cursor::Next(next) => {
@@ -290,7 +294,7 @@ impl<'a> Events<'a> {
     /// Starts an event immediately, cancels any ongoing operations
     ///
     pub fn start(&mut self, event: Entity, previous: Option<&ThunkContext>) {
-        let Events(_, _, plugins, _, _, _, sequences, .., events, _, operations) = self;
+        let Events(_, _, _, plugins, _, _, _, sequences, .., events, _, operations) = self;
 
         let e = events.get(event).expect("should have an event");
         event!(Level::DEBUG, "\n\n\t{}\tstarted event {}\n", e, event.id());
@@ -325,7 +329,7 @@ impl<'a> Events<'a> {
     /// Selects an incoming event and cancels any others,
     ///
     pub fn select(&mut self, event: Entity, previous: &ThunkContext) {
-        let Events(_, _, _, entities, .., connections, _) = self;
+        let Events(_, _, _, _, entities, .., connections, _) = self;
 
         let selected = previous
             .state()
@@ -353,9 +357,41 @@ impl<'a> Events<'a> {
         let event_data = self.scan();
 
         event_data.iter().all(|e| match e {
-            EventStatus::Completed(_) | EventStatus::Cancelled(_) => true,
+            EventStatus::Inactive(_) | EventStatus::Completed(_) | EventStatus::Cancelled(_) => true,
             _ => false,
         })
+    }
+
+    /// Returns true if the runtime can continue,
+    ///
+    pub fn can_continue(&self) -> bool {
+        let Events(tick_control, ..) = self;
+
+        tick_control.can_tick()
+    }
+
+    /// Pauses the event runtime,
+    ///
+    pub fn pause(&mut self) {
+        let Events(tick_control, ..) = self;
+
+        tick_control.pause()
+    }
+
+    /// Resumes the event runtime,
+    ///
+    pub fn resume(&mut self) {
+        let Events(tick_control, ..) = self;
+
+        tick_control.reset()
+    }
+
+    /// Returns the tick frequency,
+    /// 
+    pub fn tick_rate(&self) -> u64 {
+        let Events(tick_control, ..) = self;
+        
+        tick_control.tick_rate()
     }
 }
 
@@ -365,7 +401,7 @@ impl<'a> Events<'a> {
     /// Tries to send an error context,
     ///
     pub fn send_error_context(&self, error_context: ErrorContext) {
-        let Events(errors, ..) = self;
+        let Events(_, errors, ..) = self;
 
         errors.try_send(error_context).ok();
     }
@@ -373,7 +409,7 @@ impl<'a> Events<'a> {
     /// Returns the event entity that just completed,
     ///
     pub fn send_completed_event(&self, event: Entity) {
-        let Events(_, completed, ..) = self;
+        let Events(_, _, completed, ..) = self;
 
         completed.send(event).ok();
     }

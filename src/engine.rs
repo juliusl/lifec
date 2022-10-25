@@ -39,6 +39,9 @@ pub use systems::install;
 mod limit;
 pub use limit::Limit;
 
+mod tick_control;
+pub use tick_control::TickControl;
+
 use tracing::Level;
 
 /// An engine is a sequence of events, this component manages

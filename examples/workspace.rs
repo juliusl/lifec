@@ -125,7 +125,7 @@ fn main() {
     let mut host = Host::from(world);
     host.enable_listener::<Test>();
     host.link_sequences();
-    host.open_runtime_editor()
+    host.open_runtime_editor::<Test>()
 }
 
 #[derive(Default)]
@@ -147,7 +147,7 @@ impl Listener for Test {
     }
 
     fn on_completed_event(&mut self, e: &Entity) {
-        event!(Level::TRACE, "Completed event - {}", e.id());
+        event!(Level::INFO, "Completed event - {}", e.id());
     }
 
     fn on_runmd(&mut self, _: &RunmdFile) {}

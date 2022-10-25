@@ -158,6 +158,8 @@ impl<'a> System<'a> for EventRuntime {
     fn run(
         &mut self, mut events: Self::SystemData,
     ) {
-        events.tick();
+        if !events.should_exit() && events.can_continue() {
+            events.tick();
+        }
     }
 }

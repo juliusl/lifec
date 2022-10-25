@@ -2,7 +2,7 @@ use specs::{Entity, Component, VecStorage};
 
 /// Enumeration of cursor types for a sequence,
 /// 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, Hash, PartialEq, Eq)]
 #[storage(VecStorage)]
 pub enum Cursor {
     /// Cursor that points to one other entity,

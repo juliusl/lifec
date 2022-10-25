@@ -13,6 +13,7 @@ pub use thunk_context::ThunkContext;
 use super::Plugin;
 use tokio::task::JoinHandle;
 use std::fmt::Debug;
+use std::hash::Hash;
 
 /// Thunk is a function that can be passed around for the system to call later
 #[derive(Component, Clone)]
@@ -23,6 +24,21 @@ pub struct Thunk(
     // thunk fn
     pub fn(&ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
 );
+
+impl PartialEq for Thunk {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for Thunk {
+}
+
+impl Hash for Thunk {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
 
 /// Config for a thunk context
 #[derive(Component, Clone)]

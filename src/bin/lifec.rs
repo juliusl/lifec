@@ -60,7 +60,7 @@ async fn main() {
                         .await
                         .expect("Should be able to create host");
 
-                    host.open_runtime_editor();
+                    host.open_runtime_editor::<Lifec>();
                 }
                 Commands::Host(host) => {
                     let mut host = host

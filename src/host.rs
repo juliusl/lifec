@@ -1,11 +1,8 @@
-use crate::{
-    prelude::*,
-    project::Listener,
-};
+use crate::{prelude::*, project::Listener};
 use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
-use specs::{Dispatcher, DispatcherBuilder, Entity, Join, World, WorldExt, WriteStorage};
+use specs::{Dispatcher, DispatcherBuilder, Entity, World, WorldExt};
 use std::{
     error::Error,
     fmt::Debug,
@@ -75,7 +72,7 @@ pub struct Host {
     #[clap(skip)]
     pub world: Option<World>,
     /// Will setup a listener for the host
-    /// 
+    ///
     #[clap(skip)]
     listener_setup: Option<ListenerSetup>,
 }
@@ -443,24 +440,30 @@ impl Host {
         }
     }
 
+    /// Creates a new dispatcher builder,
+    ///
+    pub fn new_dispatcher_builder<'a, 'b, P>(&mut self) -> DispatcherBuilder<'a, 'b>
+    where
+        P: Project,
+    {
+        let mut dispatcher = Host::dispatcher_builder();
+        P::configure_dispatcher(self.world(), &mut dispatcher);
+
+        if let Some(setup) = self.listener_setup.as_ref() {
+            let ListenerSetup(enable) = setup;
+
+            enable(self.world(), &mut dispatcher);
+        }
+        dispatcher
+    }
+
     /// Prepares the host to start by creating a new dispatcher,
     ///
     pub fn prepare<'a, 'b, P>(&mut self) -> Dispatcher<'a, 'b>
     where
         P: Project,
     {
-        let mut dispatcher = {
-            let mut dispatcher = Host::dispatcher_builder();
-            P::configure_dispatcher(self.world(), &mut dispatcher);
-
-            if let Some(setup) = self.listener_setup.as_ref() {
-                let ListenerSetup(enable) = setup;
-
-                enable(self.world(), &mut dispatcher);
-            }
-
-            dispatcher.build()
-        };
+        let mut dispatcher = self.new_dispatcher_builder::<P>().build();
         dispatcher.setup(self.world_mut());
         dispatcher
     }
