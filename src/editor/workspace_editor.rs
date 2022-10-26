@@ -9,5 +9,5 @@ pub struct WorkspaceEditor {
 }
 
 impl Extension for WorkspaceEditor {
- 
+    
 }

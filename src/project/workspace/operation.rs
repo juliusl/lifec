@@ -1,4 +1,5 @@
-use crate::prelude::{Event, Plugins, Runtime, ThunkContext};
+use crate::engine::Adhoc;
+use crate::prelude::{Event, Plugins, Runtime, Sequence, ThunkContext};
 use atlier::system::Value;
 use reality::{Block, SpecialAttribute};
 use specs::prelude::*;
@@ -8,18 +9,25 @@ use tracing::{event, Level};
 /// Special attribute to define an operation in the root block for the workspace,
 ///
 #[derive(SystemData)]
-pub struct Operations<'a>(
-    Plugins<'a>,
-    Entities<'a>,
-    ReadStorage<'a, Block>,
-    ReadStorage<'a, Event>,
-);
+pub struct Operations<'a> {
+    plugins: Plugins<'a>,
+    entities: Entities<'a>,
+    blocks: ReadStorage<'a, Block>,
+    adhocs: ReadStorage<'a, Adhoc>,
+    sequences: ReadStorage<'a, Sequence>,
+}
 
 impl<'a> Operations<'a> {
     /// Returns a map of operations and their
     ///
-    pub fn scan_root(&self) -> Vec<(String, crate::prelude::Event)> {
-        let Operations(.., entities, blocks, events) = self;
+    pub fn scan_root(&self) -> Vec<(Adhoc, Sequence)> {
+        let Operations {
+            entities,
+            blocks,
+            adhocs,
+            sequences,
+            ..
+        } = self;
 
         let mut operations = vec![];
 
@@ -34,20 +42,17 @@ impl<'a> Operations<'a> {
                 let operation_entity = operation.root().id();
                 let operation_entity = entities.entity(operation_entity);
 
-                let mut event = events
+                let adhoc = adhocs
                     .get(operation_entity)
-                    .expect("should have an event")
+                    .expect("should have an adhoc component")
                     .clone();
 
-                event.set_name(
-                    operation
-                        .find_property("name")
-                        .expect("should have a name")
-                        .symbol()
-                        .expect("should be a symbol"),
-                );
+                let sequence = sequences
+                    .get(operation_entity)
+                    .expect("should have a sequence")
+                    .clone();
 
-                operations.push((operation.root().name().to_string(), event));
+                operations.push((adhoc, sequence));
             }
         }
 
@@ -64,18 +69,17 @@ impl<'a> Operations<'a> {
     ) -> Option<crate::prelude::Operation> {
         let operations = self.scan_root();
 
-        let Operations(plugins, ..) = self;
+        let Operations { plugins, .. } = self;
 
-        if let Some(operation) = operations.iter().find(|(label, event)| {
-            let matches_operation_name = event.0 == operation.as_ref();
+        if let Some((_, sequence)) = operations.iter().find(|(adhoc, _)| {
+            let matches_operation_name = adhoc.name().as_ref() == operation.as_ref();
 
             if let Some(tag) = tag.as_ref() {
-                label.starts_with(tag) && matches_operation_name
+                adhoc.tag().as_ref() == tag && matches_operation_name
             } else {
                 matches_operation_name
             }
         }) {
-            let sequence = operation.1.sequence().expect("should have a sequence");
             return Some(plugins.start_sequence(sequence, context));
         }
 
@@ -83,7 +87,7 @@ impl<'a> Operations<'a> {
     }
 
     /// Dispatches an operation,
-    /// 
+    ///
     pub fn dispatch_operation(
         &mut self,
         operation: impl AsRef<str>,
@@ -91,20 +95,22 @@ impl<'a> Operations<'a> {
         context: Option<&ThunkContext>,
     ) {
         let name = operation.as_ref().to_string();
-        
-        let operation = { 
-            self.execute_operation(operation, tag, context).take()
-        };
 
-        let Operations(plugins, ..) = self;
+        let operation = { self.execute_operation(operation, tag, context).take() };
 
-        match plugins.features().broker().try_send_operation(operation.expect("should have started the operation")) {
+        let Operations { plugins, .. } = self;
+
+        match plugins
+            .features()
+            .broker()
+            .try_send_operation(operation.expect("should have started the operation"))
+        {
             Ok(_) => {
                 event!(Level::DEBUG, "Dispatched operation {name}");
-            },
+            }
             Err(err) => {
                 event!(Level::ERROR, "Error sending operation {err}");
-            },
+            }
         }
     }
 }
@@ -116,15 +122,27 @@ impl<'a> SpecialAttribute for Operations<'a> {
 
     fn parse(parser: &mut reality::AttributeParser, content: impl AsRef<str>) {
         Runtime::parse(parser, "");
-        let world = parser.world().expect("should have world");
+        let world = parser.world().expect("should have world").clone();
+        let mut adhocs = world.write_component::<Adhoc>();
         let operation_entity = world.entities().create();
+        let name = content.as_ref().to_string();
 
-        if let Some(name) = parser.name() {
-            if name != "operation" {
-                parser.set_name(format!("{name}.operation"));
+        let tag = if let Some(tag) = parser.name() {
+            if tag != "operation" {
+                let tag = format!("{tag}.operation");
+                parser.set_name(&tag);
+                tag.to_string()
+            } else {
+                tag.to_string()
             }
-        }
+        } else {
+            panic!("parser should have had a name");
+        };
+
         parser.set_id(operation_entity.id() as u32);
-        parser.define("name", Value::Symbol(content.as_ref().to_string()));
+        parser.define("name", Value::Symbol(name.to_string()));
+        adhocs
+            .insert(operation_entity, Adhoc { name, tag })
+            .expect("should be able to insert component");
     }
 }

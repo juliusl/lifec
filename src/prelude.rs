@@ -40,7 +40,7 @@ pub use crate::project::Source;
 pub use crate::project::Workspace;
 pub use crate::project::WorkspaceConfig;
 pub use crate::resources::Resources;
-pub use crate::runtime::EventSource;
+pub use crate::runtime::ThunkSource;
 pub use crate::runtime::Runtime;
 pub use crate::state::AttributeGraph;
 pub use crate::state::AttributeIndex;

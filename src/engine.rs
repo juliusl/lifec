@@ -2,6 +2,9 @@ use std::collections::HashMap;
 
 use crate::prelude::*;
 
+mod adhoc;
+pub use adhoc::Adhoc;
+
 mod event;
 pub use event::Event;
 

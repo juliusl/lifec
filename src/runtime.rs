@@ -5,8 +5,8 @@ use specs::{Component, DefaultVecStorage, WorldExt};
 use tracing::event;
 use tracing::Level;
 
-mod event_source;
-pub use event_source::EventSource;
+mod thunk_source;
+pub use thunk_source::ThunkSource;
 
 /// Runtime provides access to the underlying project, and function tables for creating components
 ///
@@ -14,7 +14,7 @@ pub use event_source::EventSource;
 #[storage(DefaultVecStorage)]
 pub struct Runtime {
     /// Table of functions for creating new event components
-    plugins: BTreeMap<String, EventSource>,
+    plugins: BTreeMap<String, ThunkSource>,
     /// Set of custom attributes to use, added from install()
     custom_attributes: BTreeMap<String, CustomAttribute>,
 }
@@ -59,7 +59,7 @@ impl Runtime {
         // Register event sources
         self.plugins.insert(
             format!("{}::{}", &event_name, P::symbol()),  
-            EventSource::new::<P>(&event_name)
+            ThunkSource::new::<P>()
         );
     }
 

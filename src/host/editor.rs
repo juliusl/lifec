@@ -1,4 +1,4 @@
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use specs::Write;
 
@@ -44,12 +44,6 @@ impl Editor for Host {
         self.prepare::<P>();
         let builder = self.new_dispatcher_builder::<P>();
 
-        // Get defined workspace operations
-        let set = {
-            let operations = self.world().system_data::<Operations>();
-            HashSet::from_iter(operations.scan_root().iter().cloned())
-        };
-
         // Consume Appendix and convert to read-only Arc
         if let Some(appendix) = self.world_mut().remove::<Appendix>() {
             self.world_mut().insert(Arc::new(appendix));
@@ -63,7 +57,7 @@ impl Editor for Host {
             HostEditor::name(),
             width,
             height,
-            HostEditor::from(set),
+            HostEditor::default(),
             extension,
             world,
             Some(builder),
