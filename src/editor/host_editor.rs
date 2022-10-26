@@ -40,6 +40,38 @@ pub struct HostEditor {
     reset: Option<()>,
 }
 
+impl HostEditor {
+    /// Dispatch a command to tick events,
+    /// 
+    pub fn tick_events(&mut self) {
+        self.tick = Some(());
+    }
+
+    /// Dispatch a command to pause events,
+    /// 
+    pub fn pause_events(&mut self) {
+        self.pause = Some(());
+    }
+
+    /// Dispatch a command to reset events,
+    /// 
+    pub fn reset_events(&mut self) {
+        self.reset = Some(());
+    }
+
+    /// Dispatch a command to set tick limit,
+    /// 
+    pub fn set_tick_limit(&mut self, hz: u64) {
+        self.tick_limit = Some(hz);
+    }
+
+    /// Disable tick limit,
+    /// 
+    pub fn disable_tick_limit(&mut self) {
+        self.tick_limit.take();
+    }
+}
+
 impl App for HostEditor {
     fn name() -> &'static str {
         "Lifec Host Editor"
@@ -119,9 +151,9 @@ impl<'a> System<'a> for HostEditor {
             }
         }
 
-        let mut mutations = HashMap::<Entity, HashMap<Entity, AttributeGraph>>::default();
         // Handle node commands
-        //
+        // TODO: Can record/serialize this
+        let mut mutations = HashMap::<Entity, HashMap<Entity, AttributeGraph>>::default();
         for mut node in self.nodes.drain(..) {
             if let Some(command) = node.command.take() {
                 match command {
@@ -193,16 +225,16 @@ impl HostEditor {
     fn tool_bar(&mut self, ui: &Ui) {
         if self.is_paused {
             if ui.button("Tick") {
-                self.tick = Some(());
+                self.tick_events();
             }
 
             ui.same_line();
             if ui.button("Resume") {
-                self.pause = Some(());
+                self.pause_events();
             }
         } else {
             if ui.button("Pause") {
-                self.pause = Some(());
+                self.pause_events();
             }
         }
 

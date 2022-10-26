@@ -2,7 +2,7 @@ use std::{fmt::Display, ops::Deref, sync::Arc, collections::HashMap};
 
 use specs::{prelude::*, Entities, SystemData};
 
-use super::{Limit, Plugins, Profiler, TickControl, Transition, sequence};
+use super::{Limit, Plugins, Profiler, TickControl, Transition};
 use crate::{
     editor::{Appendix, Node, NodeStatus},
     prelude::*,
@@ -32,7 +32,7 @@ pub struct Events<'a> {
 
 /// Enumeration of event statuses,
 ///
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum EventStatus {
     /// Means that the operation is empty has no activity
     ///

@@ -128,11 +128,53 @@ impl Node {
         }
         drawn
     }
+
+    /// Dispatch a command to activate entity,
+    /// 
+    pub fn activate(&mut self, entity: Entity) {
+        self.command = Some(NodeCommand::Activate(entity));
+    }
+
+    /// Dispatch a command to pause entity,
+    /// 
+    pub fn pause(&mut self, entity: Entity) {
+        self.command = Some(NodeCommand::Pause(entity));
+    }
+
+    /// Dispatch a command to reset entity,
+    /// 
+    pub fn reset(&mut self, entity: Entity) {
+        self.command = Some(NodeCommand::Reset(entity));
+    }
+
+    /// Dispatch a command to resume entity,
+    /// 
+    pub fn resume(&mut self, entity: Entity) {
+        self.command = Some(NodeCommand::Resume(entity));
+    }
+
+    /// Dispatch a command to cancel entity,
+    /// 
+    pub fn cancel(&mut self, entity: Entity) {
+        self.command = Some(NodeCommand::Cancel(entity));
+    }
+
+    /// Dispatch a command to update a graph,
+    /// 
+    pub fn update(&mut self, graph: AttributeGraph) {
+        self.command = Some(NodeCommand::Update(graph));
+    }
+
+    /// Dispatch a custom command,
+    /// 
+    pub fn custom(&mut self, name: &'static str, entity: Entity) {
+        self.command = Some(NodeCommand::Custom(name, entity));
+    }
 }
 
 /// Enumeration of node statuses,
 ///
-#[derive(Hash, PartialEq, Eq)]
+#[derive(Hash, PartialEq, Eq, Clone, Copy)]
 pub enum NodeStatus {
     /// These are event nodes
     Event(EventStatus),
@@ -189,7 +231,7 @@ impl App for Node {
         if let Some(edit) = self.edit {
             edit(self, ui);
         } else {
-            match &self.status {
+            match self.status {
                 NodeStatus::Profiler => {}
                 NodeStatus::Event(status) => {
                     if let Some(general) = self.appendix.general(&status.entity()) {
@@ -209,37 +251,37 @@ impl App for Node {
                     match status {
                         EventStatus::Inactive(_) => {
                             if ui.button(format!("Start {}", status.entity().id())) {
-                                self.command = Some(NodeCommand::Activate(status.entity()));
+                                self.activate(status.entity());
                             }
 
                             ui.same_line();
-                            if ui.button(format!("Set breakpoint {}", status.entity().id())) {
-                                self.command = Some(NodeCommand::Pause(status.entity()));
+                            if ui.button(format!("Pause {}", status.entity().id())) {
+                                self.pause(status.entity());
                             }
                         }
                         EventStatus::Paused(_) => {
                             if ui.button(format!("Resume {}", status.entity().id())) {
-                                self.command = Some(NodeCommand::Resume(status.entity()));
+                                self.resume(status.entity());
                             }
                             ui.same_line();
                             if ui.button(format!("Cancel {}", status.entity().id())) {
-                                self.command = Some(NodeCommand::Cancel(status.entity()));
+                                self.pause(status.entity());
                             }
                         }
                         EventStatus::InProgress(_) => {
                             if ui.button(format!("Pause {}", status.entity().id())) {
-                                self.command = Some(NodeCommand::Pause(status.entity()));
+                                self.pause(status.entity());
                             }
 
                             ui.same_line();
                             if ui.button(format!("Cancel {}", status.entity().id())) {
-                                self.command = Some(NodeCommand::Cancel(status.entity()));
+                                self.cancel(status.entity());
                             }
                             // TODO: Can add a progress/status bar here
                         }
                         EventStatus::Cancelled(_) | EventStatus::Completed(_) => {
                             if ui.button(format!("Reset {}", status.entity().id())) {
-                                self.command = Some(NodeCommand::Reset(status.entity()));
+                                self.reset(status.entity());
                             }
                         }
                         _ => {}

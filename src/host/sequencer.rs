@@ -1,7 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use hyper::server::conn;
-
 use crate::{
     engine::{Adhoc, Profiler},
     prelude::*,
@@ -70,6 +68,8 @@ impl Sequencer for Host {
                 }
 
                 // Unpack adhoc operations, link to profiler
+                // Since adhoc operations are not part of an engine, they need a connection so
+                // that activity can be measured.
                 let profiler = entities.create();
                 profilers
                     .insert(profiler, Profiler::default())
