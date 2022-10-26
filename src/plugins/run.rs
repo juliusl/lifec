@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use reality::{BlockObject, BlockProperties};
 
-use super::{AttributeIndex, Host, Plugin, Project, Sequencer};
+use super::{AttributeIndex, Host, Plugin, Project};
 
 use crate::prelude::Operations;
 
