@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use reality::{BlockObject, BlockProperties};
 
-use super::{AttributeIndex, Host, Plugin, Project};
+use super::{AttributeIndex, Host, Plugin, Project, Sequencer};
 
 use crate::prelude::Operations;
 
@@ -50,6 +50,7 @@ where
 
                     let world = P::compile_workspace(root, [].iter(), None);
                     let mut host = Host::from(world);
+                    host.link_sequences();
                     let _ = host.prepare::<P>();
 
                     // TODO: This might need some polish

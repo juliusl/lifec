@@ -47,7 +47,7 @@ impl App for HostEditor {
         let window_padding = ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
         let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
         Window::new("Events")
-            .size([1200.0, 700.0], imgui::Condition::Appearing)
+            .size([1300.0, 700.0], imgui::Condition::Appearing)
             .build(ui, || {
                 // Toolbar for controlling event runtime
                 self.tool_bar(ui);

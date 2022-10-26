@@ -61,53 +61,58 @@ impl Node {
             {
                 // TODO: Can use appendix to look up stuff
                 // TODO: Add view-options
-                imgui::PlotLines::new(
+                let buckets = histogram
+                    .iter_linear(100)
+                    .map(|h| h.percentile() as f32)
+                    .collect::<Vec<_>>();
+                imgui::PlotHistogram::new(
                     ui,
                     format!(
-                        "Performance (ms) for {} -> {}",
+                        "Performance Buckets (ms) for {} -> {}",
                         incoming.id(),
                         connection.entity().id()
                     ),
-                    histogram
-                        .iter_all()
-                        .map(|h| h.percentile() as f32)
-                        .collect::<Vec<_>>()
-                        .as_slice(),
+                    buckets.as_slice(),
                 )
+                .overlay_text(format!("# of buckets {} (100ms)", buckets.len()))
                 .graph_size([0.0, 75.0])
                 .build();
 
                 ui.spacing();
                 let group = ui.begin_group();
                 let percentile = histogram.value_at_percentile(50.0);
-                
                 ui.text(format!(
-                    "50th ({:5}): {:5} ms",
+                    "~ {:3}% <= {:6} ms",
                     histogram.percentile_below(percentile) as u64,
                     percentile
                 ));
-
                 ui.spacing();
                 let percentile = histogram.value_at_percentile(75.0);
                 ui.text(format!(
-                    "75th ({:5}): {:5} ms",
+                    "~ {:3}% <= {:6} ms",
                     histogram.percentile_below(percentile) as u64,
                     percentile
                 ));
                 let percentile = histogram.value_at_percentile(90.0);
                 ui.text(format!(
-                    "90th ({:5}): {:5} ms",
+                    "~ {:3}% <= {:6} ms",
                     histogram.percentile_below(percentile) as u64,
                     percentile
                 ));
                 let percentile = histogram.value_at_percentile(99.0);
                 ui.text(format!(
-                    "99th ({:5}): {:5} ms",
+                    "~ {:3}% <= {:6} ms",
                     histogram.percentile_below(percentile) as u64,
                     histogram.value_at_percentile(99.0)
                 ));
                 group.end();
-                
+
+                ui.same_line();
+                ui.spacing();
+                ui.same_line();
+                let group = ui.begin_group();
+                ui.text(format!("total samples: {:10}", histogram.len()));
+                group.end();
                 ui.new_line();
                 drawn = true;
             }
@@ -162,7 +167,7 @@ impl App for Node {
             edit(self, ui);
         } else {
             match &self.status {
-                NodeStatus::Profiler => {},
+                NodeStatus::Profiler => {}
                 NodeStatus::Event(status) => {
                     if let Some(general) = self.appendix.general(&status.entity()) {
                         general.display_ui(ui);

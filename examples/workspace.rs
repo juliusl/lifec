@@ -46,7 +46,7 @@ fn main() {
         : .once     setup
         : .start    receive, cancel
         : .select   execute
-        : .loop
+        : .next     test-2
         ```
 
         ``` setup
@@ -84,22 +84,25 @@ fn main() {
         : .once     setup
         : .start    receive, cancel
         : .select   execute
-        : .repeat   1
+        : .next     test
         ```
 
         ``` setup
         + .runtime
         : .println hello setup 2
+        : .chaos
         ```
 
         ``` receive
         + .runtime
         : .println hello receive 2
+        : .chaos
         ```
 
         ``` cancel
         + .runtime
         : .println hello cancel 2
+        : .chaos
         ```
 
         ``` execute
@@ -108,7 +111,9 @@ fn main() {
         + .runtime
         : .println hello execute 2
         : .run print-2
+        : .chaos
         : .run {opname}
+        : .chaos
         ```
         "#,
     );

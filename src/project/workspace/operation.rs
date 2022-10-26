@@ -42,17 +42,9 @@ impl<'a> Operations<'a> {
                 let operation_entity = operation.root().id();
                 let operation_entity = entities.entity(operation_entity);
 
-                let adhoc = adhocs
-                    .get(operation_entity)
-                    .expect("should have an adhoc component")
-                    .clone();
-
-                let sequence = sequences
-                    .get(operation_entity)
-                    .expect("should have a sequence")
-                    .clone();
-
-                operations.push((adhoc, sequence));
+                if let Some((adhoc, operation)) = (adhocs, sequences).join().get(operation_entity, entities) {
+                    operations.push((adhoc.clone(), operation.clone()));
+                }
             }
         }
 
