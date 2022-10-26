@@ -1,3 +1,5 @@
+use crate::engine::Adhoc;
+use crate::engine::Profiler;
 use crate::prelude::*;
 
 mod source;
@@ -214,6 +216,7 @@ pub fn default_parser(world: World) -> Parser {
 pub fn default_world() -> World {
     let mut world = specs::World::new();
     world.register::<Thunk>();
+    world.register::<Adhoc>();
     world.register::<Limit>();
     world.register::<Event>();
     world.register::<Cursor>();
@@ -221,6 +224,7 @@ pub fn default_world() -> World {
     world.register::<Runtime>();
     world.register::<Sequence>();
     world.register::<Activity>();
+    world.register::<Profiler>();
     world.register::<Operation>();
     world.register::<RunmdFile>();
     world.register::<Transition>();

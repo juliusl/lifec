@@ -1,6 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::prelude::*;
+use crate::{
+    engine::{Adhoc, Profiler},
+    prelude::*,
+};
 
 /// Extension of Host to handle linking engine sequences together
 ///
@@ -19,6 +22,8 @@ impl Sequencer for Host {
                 blocks,
                 engines,
                 events,
+                adhocs,
+                mut profilers,
                 mut limits,
                 mut sequences,
                 mut connections,
@@ -29,6 +34,8 @@ impl Sequencer for Host {
                 ReadStorage<Block>,
                 ReadStorage<Engine>,
                 ReadStorage<Event>,
+                ReadStorage<Adhoc>,
+                WriteStorage<Profiler>,
                 WriteStorage<Limit>,
                 WriteStorage<Sequence>,
                 WriteStorage<Connection>,
@@ -59,6 +66,25 @@ impl Sequencer for Host {
                         }
                     }
                 }
+
+                // Unpack adhoc operations, link to profiler
+                let profiler = entities.create();
+                profilers
+                    .insert(profiler, Profiler::default())
+                    .expect("should be able to insert component");
+
+                let mut profiler_connections = HashSet::<Entity>::default();
+
+                for (entity, _, events) in (&entities, &adhocs, &events).join() {
+                    let sequence = events.sequence().expect("should have a sequence").clone();
+                    sequences
+                        .insert(entity, sequence)
+                        .expect("should be able to insert");
+                    profiler_connections.insert(entity);
+                }
+                connections
+                    .insert(profiler, Connection::new(profiler_connections, profiler))
+                    .expect("should be able to insert connection");
 
                 // Process cursors
                 for (_, connection) in (&entities, &connections).join() {
@@ -133,7 +159,7 @@ mod test {
 
     #[derive(Default)]
     struct Test;
-    
+
     impl Project for Test {
         fn interpret(_: &specs::World, _: &reality::Block) {
             // no-op

@@ -2,6 +2,9 @@ use std::collections::HashMap;
 
 use crate::prelude::*;
 
+mod profiler;
+pub use profiler::Profiler;
+
 mod adhoc;
 pub use adhoc::Adhoc;
 

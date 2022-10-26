@@ -55,7 +55,7 @@ impl Node {
     pub fn histograms(&self, ui: &Ui) -> bool {
         let mut drawn = false;
         if let Some(connection) = self.connection.as_ref() {
-            for (connection_state, histogram) in connection
+            for (incoming, histogram) in connection
                 .performance()
                 .filter(|(_, h)| !h.is_empty() && h.len() > 1)
             {
@@ -65,7 +65,7 @@ impl Node {
                     ui,
                     format!(
                         "Performance (ms) for {} -> {}",
-                        connection_state.incoming().id(),
+                        incoming.id(),
                         connection.entity().id()
                     ),
                     histogram
@@ -86,7 +86,7 @@ impl Node {
                     histogram.percentile_below(percentile) as u64,
                     percentile
                 ));
-                
+
                 ui.spacing();
                 let percentile = histogram.value_at_percentile(75.0);
                 ui.text(format!(
@@ -120,7 +120,10 @@ impl Node {
 ///
 #[derive(Hash, PartialEq, Eq)]
 pub enum NodeStatus {
+    /// These are event nodes
     Event(EventStatus),
+    /// This is a termination point for event nodes that are adhoc operations
+    Profiler,
 }
 
 /// Enumeration of node commands,
@@ -159,6 +162,7 @@ impl App for Node {
             edit(self, ui);
         } else {
             match &self.status {
+                NodeStatus::Profiler => {},
                 NodeStatus::Event(status) => {
                     if let Some(general) = self.appendix.general(&status.entity()) {
                         general.display_ui(ui);

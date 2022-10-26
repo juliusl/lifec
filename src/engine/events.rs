@@ -2,7 +2,7 @@ use std::{fmt::Display, ops::Deref, sync::Arc};
 
 use specs::{prelude::*, Entities, SystemData};
 
-use super::{Limit, Plugins, TickControl, Transition};
+use super::{Limit, Plugins, Profiler, TickControl, Transition};
 use crate::{
     editor::{Appendix, Node, NodeStatus},
     prelude::*,
@@ -22,6 +22,7 @@ pub struct Events<'a> {
     entities: Entities<'a>,
     cursors: ReadStorage<'a, Cursor>,
     transitions: ReadStorage<'a, Transition>,
+    profilers: ReadStorage<'a, Profiler>,
     sequences: WriteStorage<'a, Sequence>,
     limits: WriteStorage<'a, Limit>,
     events: WriteStorage<'a, Event>,
@@ -43,7 +44,7 @@ pub enum EventStatus {
     ///
     InProgress(Entity),
     /// Means that the entity has been paused
-    /// 
+    ///
     Paused(Entity),
     /// Means that the operation is ready to transition
     ///
@@ -103,7 +104,7 @@ impl<'a> Events<'a> {
     }
 
     /// Resets a completed/cancelled event,
-    /// 
+    ///
     pub fn reset(&mut self, event: Entity) -> bool {
         let status = self.status(event);
 
@@ -125,7 +126,7 @@ impl<'a> Events<'a> {
                     false
                 }
             }
-            _ => false
+            _ => false,
         }
     }
 
@@ -174,9 +175,7 @@ impl<'a> Events<'a> {
     ///
     pub fn scan(&self) -> Vec<EventStatus> {
         let Events {
-            entities,
-            events,
-            ..
+            entities, events, ..
         } = self;
 
         let mut status = vec![];
@@ -210,12 +209,12 @@ impl<'a> Events<'a> {
     ///
     pub fn handle(&mut self, events: Vec<EventStatus>) {
         for event in events.iter() {
-           self.handle_event(event)
+            self.handle_event(event)
         }
     }
 
     /// Handles a single event,
-    /// 
+    ///
     pub fn handle_event(&mut self, event: &EventStatus) {
         match event {
             EventStatus::Scheduled(e) | EventStatus::New(e) => {
@@ -283,14 +282,15 @@ impl<'a> Events<'a> {
     /// Performs a serialized tick, waiting for any events in-progress before returning,
     ///
     /// This is similar to a debugger "step",
-    /// 
+    ///
     pub fn serialized_tick(&mut self) {
         let event_state = self.scan();
         for event in event_state {
             match event {
-                EventStatus::InProgress(e) => { // | EventStatus::Paused(e) => { 
+                EventStatus::InProgress(e) => {
+                    // | EventStatus::Paused(e) => {
                     self.wait_for_ready(e);
-                },
+                }
                 _ => {}
             }
         }
@@ -440,22 +440,30 @@ impl<'a> Events<'a> {
             ..
         } = self;
 
-        let e = events.get(event).expect("should have an event");
-        event!(Level::DEBUG, "\n\n\t{}\tstarted event {}\n", e, event.id());
+        if let Some(e) = events.get(event) {
+            event!(Level::DEBUG, "\n\n\t{}\tstarted event {}\n", e, event.id());
 
-        let sequence = sequences.get(event).expect("should have a sequence");
+            let sequence = sequences.get(event).expect("should have a sequence");
 
-        let operation = plugins.start_sequence(sequence, previous);
+            let operation = plugins.start_sequence(sequence, previous);
 
-        if let Some(existing) = operations.get_mut(event) {
-            existing.set_task(operation);
+            if let Some(existing) = operations.get_mut(event) {
+                existing.set_task(operation);
+            } else {
+                operations
+                    .insert(event, operation)
+                    .expect("should be able to insert operation");
+            }
+
+            self.set_started_connection_state(event);
         } else {
-            operations
-                .insert(event, operation)
-                .expect("should be able to insert operation");
+            // TODO - Can reset the adhoc operation from here,
+            event!(
+                Level::DEBUG,
+                "Did not have an event to start for {}",
+                event.id()
+            );
         }
-
-        self.set_started_connection_state(event);
     }
 
     /// Skips if the event already has a result,
@@ -545,7 +553,7 @@ impl<'a> Events<'a> {
     }
 
     /// Handles any rate limits,
-    /// 
+    ///
     pub fn handle_rate_limits(&mut self) {
         let Events { tick_control, .. } = self;
 
@@ -555,7 +563,7 @@ impl<'a> Events<'a> {
     }
 
     /// Set a rate limit on the tick control,
-    /// 
+    ///
     pub fn set_rate_limit(&mut self, limit: u64) {
         let Events { tick_control, .. } = self;
 
@@ -563,7 +571,7 @@ impl<'a> Events<'a> {
     }
 
     /// Clears any rate limits on the tick control,
-    /// 
+    ///
     pub fn clear_rate_limit(&mut self) {
         let Events { tick_control, .. } = self;
 
@@ -571,9 +579,9 @@ impl<'a> Events<'a> {
     }
 
     /// Pauses a specific event,
-    /// 
+    ///
     /// This can also be used as a "breakpoint",
-    /// 
+    ///
     pub fn pause_event(&mut self, event: Entity) -> bool {
         let Events { tick_control, .. } = self;
 
@@ -581,11 +589,36 @@ impl<'a> Events<'a> {
     }
 
     /// Resumes a specific event,
-    /// 
+    ///
     pub fn resume_event(&mut self, event: Entity) -> bool {
         let Events { tick_control, .. } = self;
 
         tick_control.resume_entity(event)
+    }
+
+    /// Returns connections from adhoc profilers,
+    ///
+    pub fn adhoc_profilers(&self) -> Vec<Node> {
+        let Events {
+            appendix,
+            profilers,
+            connections,
+            ..
+        } = self;
+
+        (profilers, connections)
+            .join()
+            .map(|(_, c)| Node {
+                status: NodeStatus::Profiler,
+                appendix: appendix.deref().clone(),
+                cursor: None,
+                connection: Some(c.clone()),
+                transition: None,
+                command: None,
+                edit: None,
+                display: None,
+            })
+            .collect::<Vec<_>>()
     }
 }
 

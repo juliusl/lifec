@@ -72,7 +72,7 @@ pub struct Connection {
     /// Map of the connection state,
     connection_state: HashMap<ConnectionState, Activity>,
     /// Histogram of performance per connection,
-    performance: HashMap<ConnectionState, Histogram<u32>>,
+    performance: HashMap<Entity, Histogram<u32>>,
 }
 
 impl Hash for Connection {
@@ -112,19 +112,17 @@ impl Connection {
         self.from.iter().map(|f| (f, &self.to))
     }
 
-    /// Returns an iterator over the connection state, 
-    /// 
+    /// Returns an iterator over the connection state,
+    ///
     pub fn connection_state<'a>(
         &'a self,
     ) -> impl Iterator<Item = (&'a ConnectionState, &'a Activity)> {
         self.connection_state.iter()
     }
 
-    /// Returns an iterator over performance of connections, 
-    /// 
-    pub fn performance<'a>(
-        &'a self,
-    ) -> impl Iterator<Item = (&'a ConnectionState, &'a Histogram<u32>)> {
+    /// Returns an iterator over performance of connections,
+    ///
+    pub fn performance<'a>(&'a self) -> impl Iterator<Item = (&'a Entity, &'a Histogram<u32>)> {
         self.performance.iter()
     }
 
@@ -133,14 +131,11 @@ impl Connection {
     pub fn schedule(&mut self, incoming: Entity) {
         if self.from.contains(&incoming) {
             let key = ConnectionState::original(incoming);
-            self.connection_state.insert(
-                key, 
-                Activity::schedule()
-            );
+            self.connection_state.insert(key, Activity::schedule());
 
-            if !self.performance.contains_key(&key) {
+            if !self.performance.contains_key(&key.source()) {
                 self.performance.insert(
-                    key,
+                    key.source(),
                     Histogram::<u32>::new(3).expect("should be able to create histogram"),
                 );
             }
@@ -185,13 +180,15 @@ impl Connection {
                 self.connection_state
                     .insert(*connection_state, completed.clone());
 
-                if let (Some(duration), Some(perf)) = (completed.duration_ms(), self.performance.get_mut(&connection_state)) {
+                if let (Some(duration), Some(perf)) = (
+                    completed.duration_ms(),
+                    self.performance.get_mut(&connection_state.source()),
+                ) {
                     match perf.record(duration) {
-                        Ok(_) => {
-                        },
+                        Ok(_) => {}
                         Err(err) => {
                             event!(Level::ERROR, "Could not record connection perf, {err}")
-                        },
+                        }
                     }
                 }
             }

@@ -12,6 +12,9 @@ pub struct HostEditor {
     /// Current nodes,
     ///
     nodes: Vec<Node>,
+    /// Adhoc profiler nodes,
+    /// 
+    adhoc_profilers: Vec<Node>,
     /// Histogram of tick rate,
     /// 
     tick_rate: Histogram<u64>,
@@ -161,6 +164,10 @@ impl<'a> System<'a> for HostEditor {
         for node in events.nodes() {
             self.nodes.push(node);
         }
+
+        // Get latest adhoc profiler state,
+        //
+        self.adhoc_profilers = events.adhoc_profilers();
     }
 }
 
@@ -252,6 +259,12 @@ impl HostEditor {
                 ui.new_line();
             }
         }
+
+        for node in self.adhoc_profilers.iter() {
+            if node.histograms(ui) {
+                ui.new_line();
+            }
+        }
     }
 }
 
@@ -259,6 +272,7 @@ impl Default for HostEditor {
     fn default() -> Self {
         Self {
             tick_rate: Histogram::<u64>::new(2).expect("should be able to create"),
+            adhoc_profilers: vec![],
             is_paused: Default::default(),
             is_stopped: false,
             tick_limit: Default::default(),

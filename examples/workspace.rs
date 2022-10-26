@@ -20,20 +20,20 @@ fn main() {
     
     + .operation print
     : .println Hello Print Operation a
-    : .println Hello Print Operation b
+    : .chaos
 
     + test .operation print
     : .println Hello Print Operation a 2
-    : .println Hello Print Operation b 2
+    : .chaos
 
     + .operation print-2
     : .println Hello Print Operation c 3
-    : .println Hello Print Operation c 3
+    : .chaos
 
 
     + test .operation print-2
     : .println Hello Print Operation c 4
-    : .println Hello Print Operation c 4
+    : .chaos
     ```
     "#,
     );
