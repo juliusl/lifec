@@ -169,7 +169,7 @@ impl Host {
                     }
                 }
                 Err(err) => {
-                    event!(Level::ERROR, "Could not parser workspace uri, {err}");
+                    event!(Level::ERROR, "Could not parse workspace uri, {err}");
                     None
                 }
             },

@@ -1,8 +1,8 @@
-use std::{sync::Arc, ops::Deref};
+use std::{ops::Deref, sync::Arc};
 
 use specs::Write;
 
-use crate::{prelude::*, editor::State};
+use crate::{editor::State, prelude::*};
 
 /// Extension trait for Host, that provides functions for opening a GUI editor,
 ///
@@ -64,7 +64,7 @@ impl Editor for Host {
             Some(builder),
         );
     }
-    
+
     fn build_appendix(&mut self) {
         // Build runtime appendix
         self.world_mut().exec(
@@ -75,11 +75,18 @@ impl Editor for Host {
                 ReadStorage<AttributeGraph>,
                 Write<Appendix>,
             )| {
-                for (entity, event, thunk, graph) in (&entities, events.maybe(), thunks.maybe(), graphs.maybe()).join() {
+                for (entity, event, thunk, graph) in
+                    (&entities, events.maybe(), thunks.maybe(), graphs.maybe()).join()
+                {
                     match (event, thunk, graph) {
                         (None, Some(thunk), Some(graph)) => {
                             appendix.insert_general(entity, thunk);
-                            appendix.insert_state(entity, State { graph: graph.clone() });
+                            appendix.insert_state(
+                                entity,
+                                State {
+                                    graph: graph.clone(),
+                                },
+                            );
                         }
                         (Some(event), None, _) => {
                             appendix.insert_general(entity, event);

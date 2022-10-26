@@ -52,15 +52,18 @@ async fn main() {
                     host.handle_start::<Lifec>();
                 }
                 Commands::Host(Host {
+                    workspace: Some(workspace),
                     command: Some(lifec::host::Commands::Open),
                     ..
                 }) => {
+                    host.workspace = Some(workspace);
                     let host = host
                         .create_host::<Lifec>()
                         .await
                         .expect("Should be able to create host");
-
-                    host.open_runtime_editor::<Lifec>();
+                    tokio::task::block_in_place(move || {
+                        host.open_runtime_editor::<Lifec>();
+                    });
                 }
                 Commands::Host(host) => {
                     let mut host = host
