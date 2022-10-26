@@ -75,11 +75,7 @@ impl Sequencer for Host {
 
                 let mut profiler_connections = HashSet::<Entity>::default();
 
-                for (entity, _, events) in (&entities, &adhocs, &events).join() {
-                    let sequence = events.sequence().expect("should have a sequence").clone();
-                    sequences
-                        .insert(entity, sequence)
-                        .expect("should be able to insert");
+                for (entity, _, _) in (&entities, &adhocs, &events).join() {
                     profiler_connections.insert(entity);
                 }
                 connections

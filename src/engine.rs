@@ -300,9 +300,13 @@ impl Interpreter for Engine {
                 let entity = world.entities().entity(e.root().id());
                 if let Some(event) = world.write_component::<Event>().get_mut(entity) {
                     if let Some(name) = e.find_property("name").and_then(|p| p.symbol().cloned()) {
-                        // TODO -- can format this better,
-                        event.set_name(format!("operation {name}"));
+                        event.set_name(format!("{name}"));
                     }
+
+                    let mut sequences = world.write_component::<Sequence>();
+                    sequences
+                        .insert(entity, event.sequence().expect("should have a sequence").clone())
+                        .expect("should be able to insert component");
                 }
             }
 
