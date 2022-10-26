@@ -181,6 +181,24 @@ impl Workspace {
     pub fn work_dir(&self) -> &PathBuf {
         &self.work_dir
     }
+
+    /// Returns the path property of the workspace,
+    /// 
+    pub fn get_path(&self) -> Option<&String> {
+        self.path.as_ref()
+    }
+
+    /// Returns the host property of the workspace,
+    /// 
+    pub fn get_host(&self) -> &String {
+        &self.host
+    }
+
+    /// Returns the tenant property of the workspace,
+    /// 
+    pub fn get_tenant(&self) -> Option<&String> {
+        self.tenant.as_ref()
+    }
 }
 
 #[test]
