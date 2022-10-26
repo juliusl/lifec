@@ -1,8 +1,8 @@
-use std::{fmt::Display, ops::Deref, sync::Arc};
+use std::{fmt::Display, ops::Deref, sync::Arc, collections::HashMap};
 
 use specs::{prelude::*, Entities, SystemData};
 
-use super::{Limit, Plugins, Profiler, TickControl, Transition};
+use super::{Limit, Plugins, Profiler, TickControl, Transition, sequence};
 use crate::{
     editor::{Appendix, Node, NodeStatus},
     prelude::*,
@@ -396,6 +396,14 @@ impl<'a> Events<'a> {
         }
     }
 
+    /// Updates state,
+    /// 
+    pub fn update_state(&mut self, graph: &AttributeGraph) -> bool {
+        let  Self { plugins, .. } = self;
+        
+        plugins.update_graph(graph.clone())
+    }
+
     /// Handles the transition of an event,
     ///
     pub fn transition(&mut self, previous: Option<&ThunkContext>, event: Entity) {
@@ -611,8 +619,10 @@ impl<'a> Events<'a> {
             .map(|(_, c)| Node {
                 status: NodeStatus::Profiler,
                 appendix: appendix.deref().clone(),
+                mutations: HashMap::default(),
                 cursor: None,
                 connection: Some(c.clone()),
+                sequence: None,
                 transition: None,
                 command: None,
                 edit: None,
@@ -746,14 +756,16 @@ impl<'a> Events<'a> {
             events,
             connections,
             transitions,
+            sequences,
             ..
         } = self;
 
-        if let Some((_, connection, cursor, transition)) = (
+        if let Some((_, connection, cursor, transition, sequence)) = (
             events,
             connections.maybe(),
             cursors.maybe(),
             transitions.maybe(),
+            sequences.maybe(),
         )
             .join()
             .get(event, entities)
@@ -763,7 +775,9 @@ impl<'a> Events<'a> {
                 transition: transition.cloned(),
                 connection: connection.cloned(),
                 cursor: cursor.cloned(),
+                sequence: sequence.cloned(),
                 appendix: appendix.deref().clone(),
+                mutations: HashMap::default(),
                 command: None,
                 edit: None,
                 display: None,

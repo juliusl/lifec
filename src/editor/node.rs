@@ -1,11 +1,14 @@
-use std::hash::Hash;
+use std::{hash::Hash, collections::HashMap};
 use std::sync::Arc;
 
 use atlier::system::App;
-use imgui::Ui;
+use imgui::{TreeNode, Ui};
 use specs::Entity;
 
-use crate::prelude::{Connection, Cursor, EventStatus, Transition};
+use crate::{
+    prelude::{Connection, Cursor, EventStatus, Sequence, Transition},
+    state::AttributeGraph,
+};
 
 use super::Appendix;
 
@@ -36,9 +39,15 @@ pub struct Node {
     /// The transition behavior for this node,
     ///
     pub transition: Option<Transition>,
+    /// The internal sequence this node represents,
+    ///
+    pub sequence: Option<Sequence>,
     /// Command for this node,
     ///
     pub command: Option<NodeCommand>,
+    /// If this node has been edited, then this will be set.
+    ///
+    pub mutations: HashMap<Entity, AttributeGraph>,
     /// Edit node ui function,
     ///
     pub edit: Option<EditNode>,
@@ -131,9 +140,20 @@ pub enum NodeStatus {
     Profiler,
 }
 
+impl NodeStatus {
+    /// Returns the entity,
+    /// 
+    pub fn entity(&self) -> Entity {
+        match self {
+            NodeStatus::Event(status) => status.entity(),
+            NodeStatus::Profiler => panic!("Not implemented"),
+        }
+    }
+}
+
 /// Enumeration of node commands,
 ///
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Hash)]
 pub enum NodeCommand {
     /// Command to activate this node,
     ///
@@ -150,6 +170,9 @@ pub enum NodeCommand {
     /// Command to cancel this node,
     ///
     Cancel(Entity),
+    /// Command to update state,
+    ///
+    Update(AttributeGraph),
     /// Custom command for this node,
     ///
     /// This allows for extending capabilities of the node,
@@ -172,6 +195,7 @@ impl App for Node {
                     if let Some(general) = self.appendix.general(&status.entity()) {
                         general.display_ui(ui);
                     }
+
                     ui.text(format!("id: {}", status.entity().id()));
                     ui.text(format!("status: {status}"));
 
@@ -219,6 +243,57 @@ impl App for Node {
                             }
                         }
                         _ => {}
+                    }
+
+                    // Thunk state
+                    if let Some(sequence) = self.sequence.as_ref() {
+                        TreeNode::new(format!("Thunks {}", status.entity().id())).build(ui, || {
+                            for (i, s) in sequence.iter_entities().enumerate() {
+                                if let Some(name) = self.appendix.name(&s) {
+                                    TreeNode::new(format!("{i} - {name}")).build(ui, || {
+                                        if let Some(state) = self.appendix.state(&s) {
+                                            let mut graph =
+                                                self.mutations.get(&s).cloned().unwrap_or(state.graph.clone());
+                                            let previous = graph.clone();
+                                            for (name, property) in
+                                                graph.resolve_properties_mut().iter_properties_mut()
+                                            {
+                                                property.edit(
+                                                    move |value| {
+                                                        AttributeGraph::edit_value(
+                                                            format!("{name} {i}"),
+                                                            value,
+                                                            ui,
+                                                        )
+                                                    },
+                                                    move |values| {
+                                                        imgui::ListBox::new(format!("{name} {i}"))
+                                                            .build(ui, || {
+                                                                for (idx, value) in
+                                                                    values.iter_mut().enumerate()
+                                                                {
+                                                                    AttributeGraph::edit_value(
+                                                                        format!("{name} {i}-{idx}"),
+                                                                        value,
+                                                                        ui,
+                                                                    );
+                                                                }
+                                                            });
+                                                    },
+                                                    || None,
+                                                );
+                                            }
+
+                                            if graph != previous {
+                                                self.mutations.insert(s, graph.clone());
+                                                self.command =
+                                                    Some(NodeCommand::Update(graph.clone()));
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        });
                     }
                 }
             }

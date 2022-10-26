@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use hyper::server::conn;
+
 use crate::{
     engine::{Adhoc, Profiler},
     prelude::*,
@@ -104,7 +106,7 @@ impl Sequencer for Host {
                 for (engine, sequence) in (&engines, &sequences).join() {
                     if let Some(last) = sequence.last() {
                         if let Some(cursor) = sequence.cursor().cloned() {
-                            // Translate cursor into events
+                            // Translate engine cursors into events
                             let cursor = match cursor {
                                 Cursor::Next(next) => {
                                     let engine = engines.get(next).expect("should have an engine");
@@ -137,6 +139,21 @@ impl Sequencer for Host {
                                         }
                                     }
                                 }
+                            }
+
+                            match &cursor {
+                                Cursor::Next(next) => {
+                                    if let Some(connection) = connections.get_mut(*next) {
+                                        connection.add_incoming(last);
+                                    }
+                                },
+                                Cursor::Fork(forks) => {
+                                    for fork in forks.iter() {
+                                        if let Some(connection) = connections.get_mut(*fork) {
+                                            connection.add_incoming(last);
+                                        }
+                                    }
+                                },
                             }
 
                             cursors

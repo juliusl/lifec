@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use atlier::system::{Attribute, Value};
+use imgui::Ui;
 use reality::BlockProperties;
 use specs::{storage::HashMapStorage, Component};
 use std::{
@@ -39,23 +40,21 @@ impl AttributeGraph {
     /// Applies a config to the graph's control values,
     ///
     /// Stores the applied block properties,
-    /// 
+    ///
     pub fn apply(&mut self, config: BlockProperties) {
         event!(Level::TRACE, "Applying config {:#?}", config);
         for (name, property) in config.iter_properties() {
             match property {
                 BlockProperty::Single(value) => {
                     self.add_control(name, value.clone());
-                },
+                }
                 BlockProperty::List(values) => {
                     // Control values can only have a single value, so apply the last value in the list
                     // Since by default the indexer will convert a duplicate named attribute into a list property
                     let last = values.last().expect("should have a last value");
                     self.add_control(name, last.clone());
-                },
-                _ => {
-
                 }
+                _ => {}
             }
         }
 
@@ -110,7 +109,7 @@ impl AttributeGraph {
 
     /// Resolves the properties to use within the current scope,
     ///
-    fn resolve_properties(&self) -> &BlockProperties {
+    pub fn resolve_properties(&self) -> &BlockProperties {
         if let Some(child) = self
             .child
             .and_then(|child| self.index.child_properties(child))
@@ -118,6 +117,16 @@ impl AttributeGraph {
             child
         } else {
             self.index.properties()
+        }
+    }
+
+    /// Resolves the properties to use within the current scope,
+    ///
+    pub fn resolve_properties_mut(&mut self) -> &mut BlockProperties {
+        if let Some(child) = self.child {
+            self.index.child_properties_mut(child).unwrap()
+        } else {
+            self.index.properties_mut()
         }
     }
 }
@@ -297,6 +306,95 @@ impl AttributeIndex for AttributeGraph {
         } else if let Some((name, value)) = attr.transient {
             let name = name.trim_start_matches(&root);
             properties.set(name, BlockProperty::Single(value.clone()));
+        }
+    }
+}
+
+impl AttributeGraph {
+    /// Edit value,
+    ///
+    pub fn edit_value(name: impl AsRef<str>, value: &mut Value, ui: &Ui) {
+        match value {
+            atlier::system::Value::Empty => {
+                ui.label_text(name, "empty");
+            }
+            atlier::system::Value::Bool(b) => {
+                ui.checkbox(name, b);
+            }
+            atlier::system::Value::TextBuffer(text) => {
+                ui.input_text(name, text).build();
+            }
+            atlier::system::Value::Int(i) => {
+                ui.input_int(name, i).build();
+            }
+            atlier::system::Value::IntPair(a, b) => {
+                let clone = &mut [*a, *b];
+                ui.input_int2(name, clone).build();
+                *a = clone[0];
+                *b = clone[1];
+            }
+            atlier::system::Value::IntRange(a, b, c) => {
+                let clone = &mut [*a, *b, *c];
+                ui.input_int3(name, clone).build();
+                *a = clone[0];
+                *b = clone[1];
+                *c = clone[2];
+            }
+            atlier::system::Value::Float(f) => {
+                ui.input_float(name, f).build();
+            }
+            atlier::system::Value::FloatPair(a, b) => {
+                let clone = &mut [*a, *b];
+                ui.input_float2(name, clone).build();
+                *a = clone[0];
+                *b = clone[1];
+            }
+            atlier::system::Value::FloatRange(a, b, c) => {
+                let clone = &mut [*a, *b, *c];
+                ui.input_float3(name, clone).build();
+                *a = clone[0];
+                *b = clone[1];
+                *c = clone[2];
+            }
+            atlier::system::Value::BinaryVector(_) => {}
+            atlier::system::Value::Reference(_) => {}
+            atlier::system::Value::Symbol(s) => {
+                ui.input_text(name, s).build();
+            }
+            atlier::system::Value::Complex(_) => {}
+        }
+    }
+}
+
+impl App for AttributeGraph {
+    fn name() -> &'static str {
+        "graph"
+    }
+
+    fn edit_ui(&mut self, ui: &imgui::Ui) {
+        let id = self.entity_id();
+        for (name, property) in self.resolve_properties_mut().iter_properties_mut() {
+            property.edit(
+                move |value| Self::edit_value(format!("{name} {id}"), value, ui),
+                move |values| {
+                    imgui::ListBox::new(format!("{name} {id}")).build(ui, || {
+                        for (idx, value) in values.iter_mut().enumerate() {
+                            Self::edit_value(format!("{name} {id}-{idx}"), value, ui);
+                        }
+                    });
+                },
+                || None,
+            )
+        }
+    }
+
+    fn display_ui(&self, ui: &imgui::Ui) {
+        for (name, property) in self.resolve_properties().iter_properties() {
+            ui.text(format!("{name}: {property}"));
+        }
+
+        for (name, value) in self.index.control_values() {
+            ui.text(format!("{name}: {:?}", value));
         }
     }
 }

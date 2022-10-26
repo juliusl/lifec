@@ -119,8 +119,6 @@ impl Into<General> for &Event {
     fn into(self) -> General {
         General { 
             name: self.0.to_string(),
-            description: "todo".to_string(),
-            caveats: "todo".to_string(),
         }
     }
 }

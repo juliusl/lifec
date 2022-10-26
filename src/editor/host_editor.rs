@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use atlier::system::App;
 use hdrhistogram::Histogram;
 use imgui::{ChildWindow, SliderFlags, StyleVar, Ui, Window};
-use specs::System;
+use specs::{System, Entity};
 use tracing::{event, Level};
 
-use crate::prelude::{Events, Node};
+use crate::{prelude::{Events, Node}, state::{AttributeIndex, AttributeGraph}};
 
 /// Tool for viewing and interacting with a host,
 ///
@@ -117,6 +119,7 @@ impl<'a> System<'a> for HostEditor {
             }
         }
 
+        let mut mutations = HashMap::<Entity, HashMap<Entity, AttributeGraph>>::default();
         // Handle node commands
         //
         for mut node in self.nodes.drain(..) {
@@ -147,6 +150,11 @@ impl<'a> System<'a> for HostEditor {
                             event!(Level::DEBUG, "Cancelling event {}", event.id());
                         }
                     }
+                    crate::editor::NodeCommand::Update(graph) => {
+                        if events.update_state(&graph) {
+                            event!(Level::DEBUG, "Updating state for {}", graph.entity_id());
+                        }
+                    }
                     crate::editor::NodeCommand::Custom(name, entity) => {
                         event!(
                             Level::DEBUG,
@@ -157,11 +165,19 @@ impl<'a> System<'a> for HostEditor {
                     }
                 }
             }
+
+            if node.mutations.len() > 0 {
+                mutations.insert(node.status.entity(), node.mutations);
+            }
         }
 
         // Get latest node state,
         //
-        for node in events.nodes() {
+        for mut node in events.nodes() {
+            if let Some(mutations) = mutations.remove(&node.status.entity()) {
+                node.mutations = mutations;
+            }
+
             self.nodes.push(node);
         }
 

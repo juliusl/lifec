@@ -5,13 +5,19 @@ use std::hash::Hash;
 mod general;
 pub use general::General;
 
+mod state;
+pub use state::State;
+
 /// Struct for storing descriptions of entities,
 /// 
-#[derive(Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct Appendix {
     /// Index of General information about an entity,
     /// 
     pub general: HashMap<Entity, General>,
+    /// Index of State infomation about an entity,
+    /// 
+    pub state: HashMap<Entity, State>,
 }
 
 impl Appendix {
@@ -21,7 +27,19 @@ impl Appendix {
         self.general.insert(entity, general.into());
     }
 
-    /// Returns a general description of the entity
+    /// Inserts a state description for the entity to the appendix,
+    /// 
+    pub fn insert_state(&mut self, entity: Entity, state: impl Into<State>) {
+        self.state.insert(entity, state.into());
+    }
+
+    /// Returns a state description for the entity,
+    /// 
+    pub fn state<'a>(&'a self, entity: &'a Entity) -> Option<&'a State> {
+        self.state.get(entity)
+    }
+
+    /// Returns a general description of the entity,
     /// 
     pub fn general<'a>(&'a self, entity: &'a Entity) -> Option<&'a General> {
         self.general.get(entity)

@@ -58,7 +58,7 @@ fn main() {
         ``` receive
         + .runtime
         : .println hello receive a {name}
-        : .fmt name
+        : .fmt name, description
         : .chaos
         ```
 

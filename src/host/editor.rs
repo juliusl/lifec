@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{sync::Arc, ops::Deref};
 
 use specs::Write;
 
-use crate::prelude::*;
+use crate::{prelude::*, editor::State};
 
 /// Extension trait for Host, that provides functions for opening a GUI editor,
 ///
@@ -31,7 +31,8 @@ impl Editor for Host {
         P: Project,
     {
         self.build_appendix();
-        self.open::<P, _>(1920.0, 1080.0, WorkspaceEditor::default())
+        let appendix = self.world().read_resource::<Appendix>().deref().clone();
+        self.open::<P, _>(1920.0, 1080.0, WorkspaceEditor::from(appendix))
     }
 
     fn open<P, E>(mut self, width: f64, height: f64, extension: E)
@@ -67,18 +68,20 @@ impl Editor for Host {
     fn build_appendix(&mut self) {
         // Build runtime appendix
         self.world_mut().exec(
-            |(entities, events, thunks, mut appendix): (
+            |(entities, events, thunks, graphs, mut appendix): (
                 Entities,
                 ReadStorage<Event>,
                 ReadStorage<Thunk>,
+                ReadStorage<AttributeGraph>,
                 Write<Appendix>,
             )| {
-                for (entity, event, thunk) in (&entities, events.maybe(), thunks.maybe()).join() {
-                    match (event, thunk) {
-                        (None, Some(thunk)) => {
+                for (entity, event, thunk, graph) in (&entities, events.maybe(), thunks.maybe(), graphs.maybe()).join() {
+                    match (event, thunk, graph) {
+                        (None, Some(thunk), Some(graph)) => {
                             appendix.insert_general(entity, thunk);
+                            appendix.insert_state(entity, State { graph: graph.clone() });
                         }
-                        (Some(event), None) => {
+                        (Some(event), None, _) => {
                             appendix.insert_general(entity, event);
                         }
                         _ => {}

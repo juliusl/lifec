@@ -23,7 +23,7 @@ pub struct Plugins<'a>(
     Entities<'a>,
     ReadStorage<'a, Thunk>,
     ReadStorage<'a, Block>,
-    ReadStorage<'a, AttributeGraph>,
+    WriteStorage<'a, AttributeGraph>,
 );
 
 impl<'a> Plugins<'a> {
@@ -33,6 +33,18 @@ impl<'a> Plugins<'a> {
         let Plugins(features, ..) = self;
 
         features
+    }
+
+    /// Updates a graph,
+    /// 
+    pub fn update_graph(&mut self, graph: AttributeGraph) -> bool {
+        let Plugins(_, entities, .., graphs) = self;
+        let entity = entities.entity(graph.entity_id());
+        if let Some(_) = graphs.insert(entity, graph).expect("should be able to insert") {
+            true
+        } else {
+            false
+        }
     }
 
     /// Returns a new context,

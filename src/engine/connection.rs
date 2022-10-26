@@ -106,6 +106,12 @@ impl Connection {
         self.to
     }
 
+    /// Add an incoming entity,
+    /// 
+    pub fn add_incoming(&mut self, incoming: Entity) {
+        self.from.insert(incoming);
+    }
+
     /// Returns an iterator over each connection,
     ///
     pub fn connections<'a>(&'a self) -> impl Iterator<Item = (&'a Entity, &'a Entity)> {

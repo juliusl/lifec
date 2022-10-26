@@ -14,6 +14,7 @@ pub use node::EditNode;
 mod appendix;
 pub use appendix::Appendix;
 pub use appendix::General;
+pub use appendix::State;
 
 /// Generate a unique title
 pub fn unique_title(title: impl AsRef<str>) -> String {
