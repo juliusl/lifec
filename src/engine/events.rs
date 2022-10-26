@@ -263,14 +263,15 @@ impl<'a> Events<'a> {
                     }
                 }
             }
-            EventStatus::InProgress(in_progress) => {
-                event!(Level::TRACE, "{} is in progress", in_progress.id());
+            EventStatus::InProgress(_) => {
+                // TODO make a better place to send these --
+                // event!(Level::TRACE, "{} is in progress", in_progress.id());
             }
-            EventStatus::Completed(completed) => {
-                event!(Level::TRACE, "{} is complete", completed.id());
+            EventStatus::Completed(_) => {
+                // event!(Level::TRACE, "{} is complete", completed.id());
             }
-            EventStatus::Cancelled(cancelled) => {
-                event!(Level::TRACE, "{} is cancelled", cancelled.id());
+            EventStatus::Cancelled(_) => {
+                // event!(Level::TRACE, "{} is cancelled", cancelled.id());
             }
             _ => {}
         }

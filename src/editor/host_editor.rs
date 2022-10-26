@@ -81,7 +81,7 @@ impl App for HostEditor {
         let window_padding = ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
         let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
         Window::new("Events")
-            .size([1300.0, 700.0], imgui::Condition::Appearing)
+            .size([1400.0, 700.0], imgui::Condition::Appearing)
             .build(ui, || {
                 // Toolbar for controlling event runtime
                 self.tool_bar(ui);
@@ -89,7 +89,8 @@ impl App for HostEditor {
                 // Left-Section for viewing current events and some informatino on each,
                 ui.separator();
                 ChildWindow::new(&format!("Event Section"))
-                    .size([400.0, 0.0])
+                    .size([500.0, 0.0])
+                    .always_auto_resize(true)
                     .build(ui, || {
                         // TODO: Can add additional view formats for this, ex: table view
                         self.event_list(ui);
@@ -257,6 +258,7 @@ impl HostEditor {
         for node in self.nodes.iter_mut() {
             node.edit_ui(ui);
             ui.new_line();
+            ui.separator();
         }
     }
 

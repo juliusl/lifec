@@ -77,7 +77,7 @@ impl<'a> Config<'a> {
             self.find_apply(config);
         }
 
-        for tag in workspace.iter_tags() {
+        if let Some(tag) = workspace.tag() {
             for config in configs
                 .clone()
                 .iter()

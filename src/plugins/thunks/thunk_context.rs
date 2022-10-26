@@ -142,6 +142,12 @@ impl ThunkContext {
         }
     }
 
+    /// Returns the current tag to use,
+    /// 
+    pub fn tag(&self) -> Option<String> {
+        self.workspace.as_ref().and_then(|w| w.tag().cloned())
+    }
+
     /// Copies previous state to the current state,
     ///
     /// This is so that previous values can move forward to the next plugin, when .commit() gets called.
@@ -563,15 +569,15 @@ impl ThunkContext {
 
     /// If the socket is enabled for this context, returns the block address
     ///
-    pub fn to_block_address(&self) -> Option<BlockAddress> {
-        if let Some(_socket_addr) = self.socket_address() {
-            // let address = BlockAddress::new(self);
-            // Some(address.with_socket_addr(socket_addr))
-            todo!()
-        } else {
-            None
-        }
-    }
+    // pub fn to_block_address(&self) -> Option<BlockAddress> {
+    //     if let Some(_socket_addr) = self.socket_address() {
+    //         // let address = BlockAddress::new(self);
+    //         // Some(address.with_socket_addr(socket_addr))
+    //         todo!()
+    //     } else {
+    //         None
+    //     }
+    // }
 
     /// Read lines from a stream and returns the result,
     ///

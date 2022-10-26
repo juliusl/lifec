@@ -52,8 +52,6 @@ where
                     let mut host = Host::from(world);
                     let _ = host.prepare::<P>();
 
-                    // TODO: This might need some polish
-                    let tag = root.iter_tags().next();
 
                     let result = {
                         let mut workspace_oeprations =
@@ -61,7 +59,7 @@ where
 
                         if let Some(mut operation) = workspace_oeprations.execute_operation(
                             operation,
-                            tag.cloned(),
+                            root.tag().cloned(),
                             Some(&tc),
                         ) {
                             operation.task(cancel_source).await

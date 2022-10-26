@@ -4,7 +4,6 @@ use crate::prelude::*;
 
 mod source;
 pub use source::RunmdFile;
-pub use source::Source;
 pub use source::WorkspaceSource;
 
 mod workspace;
@@ -110,13 +109,13 @@ where
         parser.unset_implicit_symbol();
 
         let mut world = if let Some(root_runmd) = workspace.root_runmd() {
-            Self::compile(root_runmd, Some(parser), false)
+            Self::compile(root_runmd, Some(parser))
         } else {
             let root = workspace.work_dir().join(".runmd");
             match std::fs::read_to_string(&root) {
                 Ok(runmd) => {
                     workspace.set_root_runmd(&runmd);
-                    Self::compile(runmd, Some(parser), false)
+                    Self::compile(runmd, Some(parser))
                 }
                 Err(err) => {
                     panic!("Could not compile workspace, root .runmd file required, {err}");
@@ -143,16 +142,10 @@ where
     ///
     /// Override with care as this adds critical components for the event runtime,
     ///
-    fn compile(runmd: impl AsRef<str>, parser: Option<Parser>, is_single_src: bool) -> World {
+    fn compile(runmd: impl AsRef<str>, parser: Option<Parser>) -> World {
         let parser = parser.unwrap_or(Self::parser()).parse(runmd.as_ref());
 
         let mut world = parser.commit();
-
-        // If this is loading just one file, then a Source can be inserted
-        if is_single_src {
-            // Save source to world
-            world.insert(Source(runmd.as_ref().to_string()));
-        }
 
         let engine = &mut Engine::default();
         engine.initialize(&mut world);

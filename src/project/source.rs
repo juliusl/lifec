@@ -10,11 +10,6 @@ use crate::prelude::{Runtime, Host, Sequencer};
 
 use super::{Workspace, Project, default_world};
 
-/// Wrapper struct over runmd source,
-/// 
-#[derive(Default)]
-pub struct Source(pub String);
-
 /// System data for workspace source and resources used to parse the world,
 /// 
 #[derive(SystemData)]

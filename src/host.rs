@@ -1,15 +1,8 @@
 use crate::{prelude::*, project::Listener};
-use clap::Args;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use specs::{Dispatcher, DispatcherBuilder, Entity, World, WorldExt};
-use std::{
-    error::Error,
-    fmt::Debug,
-    path::PathBuf,
-    str::{from_utf8, FromStr},
-    sync::Arc,
-};
+use std::{error::Error, path::PathBuf, str::from_utf8, sync::Arc};
 
 mod inspector;
 pub use inspector::Inspector;
@@ -37,189 +30,27 @@ use handler::ListenerSetup;
 mod runner;
 pub use runner::Runner;
 
+mod host_settings;
+pub use host_settings::HostSettings;
+
 /// Struct for initializing and hosting the runtime as well as parsing CLI arguments,
 ///
 /// Used with a type that implements the Project trait.
 ///
-#[derive(Default, Args)]
-#[clap(arg_required_else_help = true)]
+#[derive(Default)]
 pub struct Host {
-    /// Root directory, defaults to current directory
-    ///
-    #[clap(long)]
-    pub root: Option<PathBuf>,
-    /// URL to .runmd file used to configure this host,
-    ///
-    #[clap(long)]
-    pub url: Option<String>,
-    /// Path to runmd file used to configure this host,
-    /// Defaults to .runmd,
-    ///
-    #[clap(long)]
-    pub runmd_path: Option<String>,
-    /// Uri for a workspace,
-    ///
-    /// A workspace directory is a directory of .runmd files that are compiled together. A valid workspace directory requires a root
-    /// .runmd file, followed by named runmd files (ex. test.runmd). Named files will be parsed w/ the file name used as the implicit block
-    /// symbol. All named files will be parsed first and the root .runmd file will be parsed last. When this mode is used, the workspace feature
-    /// will be enabled with thunk contexts, so all plugins will execute in the context of the same work_dir.
-    ///
-    #[clap(short, long)]
-    pub workspace: Option<String>,
-    /// The command to execute w/ this host,
-    ///
-    #[clap(subcommand)]
-    pub command: Option<Commands>,
     /// The compiled specs World,
     ///
-    #[clap(skip)]
-    pub world: Option<World>,
+    world: Option<World>,
+    /// Workspace to use that provides environment related values, work_dir, uri, etc..
+    ///
+    workspace: Workspace,
+    /// If set, host will use these settings when it starts up
+    ///
+    start: Option<Start>,
     /// Will setup a listener for the host
     ///
-    #[clap(skip)]
     listener_setup: Option<ListenerSetup>,
-}
-
-/// CLI functions
-///
-impl Host {
-    /// Handles the current command
-    ///
-    pub fn handle_start<P>(&mut self)
-    where
-        P: Project,
-    {
-        match self.command() {
-            Some(Commands::Start(Start { id: Some(id), .. })) => {
-                event!(Level::DEBUG, "Starting engine by id {id}");
-                self.start::<P>(*id);
-            }
-            Some(Commands::Start(Start {
-                engine_name: Some(engine_name),
-                ..
-            })) => {
-                event!(Level::DEBUG, "Starting engine by name {engine_name}");
-                self.start_with::<P>(engine_name.clone());
-            }
-            _ => {
-                unreachable!("A command should exist by this point")
-            }
-        }
-    }
-
-    /// Returns the current command,
-    ///
-    pub fn command(&self) -> Option<&Commands> {
-        self.command.as_ref()
-    }
-
-    /// Sets the command argument,
-    ///
-    pub fn set_command(&mut self, command: Commands) {
-        self.command = Some(command);
-    }
-
-    /// Sets the runmd path argument, if None defaults to ./.runmd
-    ///
-    pub fn set_path(&mut self, path: impl AsRef<str>) {
-        self.runmd_path = Some(path.as_ref().to_string());
-    }
-
-    /// Sets the runmd url argument,
-    ///
-    pub fn set_url(&mut self, url: impl AsRef<str>) {
-        self.url = Some(url.as_ref().to_string());
-    }
-
-    /// Creates a new lifec host,
-    ///
-    /// Will parse runmd from either a url, local file path, or current directory
-    ///
-    pub async fn create_host<P>(&self) -> Option<Host>
-    where
-        P: Project,
-    {
-        let command = self.command().cloned();
-        match self {
-            Self {
-                root,
-                workspace: Some(workspace),
-                ..
-            } => match Uri::from_str(workspace) {
-                Ok(uri) => {
-                    if let Some((tenant, host)) =
-                        uri.host().expect("should have a host").split_once(".")
-                    {
-                        let root = root.clone();
-                        let mut host = Host::load_workspace::<P>(
-                            root,
-                            host,
-                            tenant,
-                            if uri.path().is_empty() {
-                                None
-                            } else {
-                                Some(uri.path())
-                            },
-                        );
-                        host.command = command;
-                        Some(host)
-                    } else {
-                        event!(Level::ERROR, "Tenant and host are required");
-                        None
-                    }
-                }
-                Err(err) => {
-                    event!(Level::ERROR, "Could not parse workspace uri, {err}");
-                    None
-                }
-            },
-            Self { url: Some(url), .. } => match Host::get::<P>(url).await {
-                Ok(mut host) => {
-                    host.url = Some(url.to_string());
-                    host.command = command;
-                    return Some(host);
-                }
-                Err(err) => {
-                    event!(Level::ERROR, "Could not get runmd from url {url}, {err}");
-                    return None;
-                }
-            },
-            Self {
-                runmd_path: Some(runmd_path),
-                ..
-            } => {
-                let mut runmd_path = PathBuf::from(runmd_path);
-                if runmd_path.is_dir() {
-                    runmd_path = runmd_path.join(".runmd");
-                }
-
-                match Host::open::<P>(runmd_path.clone()).await {
-                    Ok(mut host) => {
-                        host.runmd_path = runmd_path.to_str().and_then(|s| Some(s.to_string()));
-                        host.command = command;
-                        Some(host)
-                    }
-                    Err(err) => {
-                        event!(Level::ERROR, "Could not load runmd from path {err}");
-                        None
-                    }
-                }
-            }
-            _ => match Host::runmd::<P>().await {
-                Ok(mut host) => {
-                    host.command = command;
-                    Some(host)
-                }
-                Err(err) => {
-                    event!(
-                        Level::ERROR,
-                        "Could not load `.runmd` from current directory {err}"
-                    );
-                    None
-                }
-            },
-        }
-    }
 }
 
 /// ECS configuration,
@@ -248,7 +79,7 @@ impl Host {
         self.listener_setup = Some(ListenerSetup::new::<L>());
     }
 
-    /// Get a reference to the world,
+    /// Get an Arc reference to the world,
     ///
     pub fn world_ref(&self) -> Arc<&World> {
         Arc::new(self.world.as_ref().expect("should exist"))
@@ -266,13 +97,57 @@ impl Host {
         self.world.as_mut().expect("World should exist")
     }
 
-    /// Opens the .runmd file in the current directory,
+    /// Return the workspace for the host,
+    ///
+    pub fn workspace(&self) -> &Workspace {
+        &self.workspace
+    }
+
+    /// Assumes the current directory is a workspace if a .runmd file is present,
     ///
     pub async fn runmd<P>() -> Result<Self, impl Error>
     where
         P: Project,
     {
-        Self::open::<P>(".runmd").await
+        let path = PathBuf::from(".runmd")
+            .canonicalize()
+            .expect("should exist");
+
+        let mut files = vec![];
+        for e in path
+            .parent()
+            .expect("should have a parent dir")
+            .read_dir()
+            .expect("should be able to read dir")
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".runmd"))
+            .filter(|e| e.file_name().to_string_lossy() != ".runmd")
+            .filter(|e| e.file_type().and_then(|f| Ok(f.is_file())).ok() == Some(true))        
+        {
+            let file_name = e.file_name();
+            event!(Level::DEBUG, "Found file {:?}", &file_name);
+
+            if let Some(src) = tokio::fs::read_to_string(&file_name).await.ok() {
+                let file = RunmdFile {
+                    source: Some(src),
+                    symbol: file_name.to_str().expect("should be a string").trim_end_matches(".runmd").to_string()
+                };
+                files.push(file);
+                event!(Level::TRACE, "Added {:?}", &file_name);
+            } else {
+                event!(Level::WARN, "Could not read file {:?}, Skipping", &file_name);
+            }
+        }
+
+        let mut host = Self {
+            workspace: Workspace::default(),
+            start: None,
+            world: Some(P::compile_workspace(&Workspace::default(), files.iter(), None)),
+            listener_setup: None,
+        };
+
+        host.link_sequences();
+        Ok::<_, std::io::Error>(host)
     }
 
     /// Opens a file, compiles, and returns a host,
@@ -330,13 +205,13 @@ impl Host {
     where
         P: Project,
     {
+        let mut workspace = Workspace::default();
+        workspace.set_root_runmd(content.as_ref());
+
         let mut host = Self {
-            root: None,
-            runmd_path: None,
-            url: None,
-            command: None,
-            workspace: None,
-            world: Some(P::compile(content, None, true)),
+            workspace,
+            start: None,
+            world: Some(P::compile(content, None)),
             listener_setup: None,
         };
 
@@ -351,6 +226,7 @@ impl Host {
         host: impl AsRef<str>,
         tenant: impl AsRef<str>,
         path: Option<impl AsRef<str>>,
+        tag: Option<impl AsRef<str>>,
     ) -> Self
     where
         P: Project,
@@ -362,6 +238,10 @@ impl Host {
             if let Some(w) = workspace.path(path.as_ref()) {
                 workspace = w;
             }
+        }
+
+        if let Some(tag) = tag {
+            workspace = workspace.use_tag(tag);
         }
 
         let mut files = vec![];
@@ -396,11 +276,8 @@ impl Host {
         }
 
         let mut host = Self {
-            root: None,
-            workspace: None,
-            runmd_path: None,
-            url: None,
-            command: None,
+            workspace: workspace.clone(),
+            start: None,
             world: Some(P::compile_workspace(&workspace, files.iter(), None)),
             listener_setup: None,
         };
@@ -437,10 +314,23 @@ impl Host {
         let engine_name = engine_name.as_ref();
 
         if let Some(start) = self.find_start(engine_name) {
-            self.start::<P>(start.clone().id());
+            self.start = Some(Start {
+                id: Some(start.id()),
+                engine_name: None,
+                operation: None,
+                thunk_context: None,
+            });
+            self.start::<P>();
         } else {
             panic!("Did not start {engine_name}");
         }
+    }
+
+    /// Returns self w/ a start set,
+    ///
+    pub fn with_start(mut self, start: &Start) -> Self {
+        self.start = Some(start.clone());
+        self
     }
 
     /// Creates a new dispatcher builder,
@@ -471,23 +361,47 @@ impl Host {
         dispatcher
     }
 
-    /// Starts an event entity,
+    /// Consumes the start directive and starts the host,
     ///
-    pub fn start<P>(&mut self, event_entity: u32)
+    pub fn start<P>(&mut self)
     where
         P: Project,
     {
-        let mut dispatcher = self.prepare::<P>();
+        if match self.start.take() {
+            Some(start) => match start {
+                Start { id: Some(id), .. } => {
+                    let id = self.world().entities().entity(id);
+                    self.start_event(id);
+                    true
+                }
+                Start {
+                    engine_name: Some(engine_name),
+                    ..
+                } => {
+                    if let Some(id) = self.find_start(engine_name) {
+                        self.start_event(id);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                _ => {
+                    event!(Level::ERROR, "Invalid start settings, {:?}", start);
+                    false
+                }
+            },
+            None => false,
+        } {
+            let mut dispatcher = self.prepare::<P>();
 
-        // Starts an event
-        let event = self.world().entities().entity(event_entity);
-        self.start_event(event);
+            // Waits for event runtime to exit
+            self.wait_for_exit(&mut dispatcher);
 
-        // Waits for event runtime to exit
-        self.wait_for_exit(&mut dispatcher);
-
-        // Exits by shutting down the inner tokio runtime
-        self.exit();
+            // Exits by shutting down the inner tokio runtime
+            self.exit();
+        } else {
+            event!(Level::ERROR, "A start setting was not set for host");
+        }
     }
 
     /// Waits for the host systems to exit,
@@ -506,8 +420,6 @@ impl Host {
         if let Some(event) = self.world().write_component::<Event>().get_mut(event) {
             event.activate();
         }
-
-        self.world_mut().maintain();
     }
 
     /// Shuts down systems and cancels all thunks,
@@ -520,15 +432,6 @@ impl Host {
     }
 }
 
-impl Debug for Host {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Host")
-            .field("url", &self.url)
-            .field("runmd_path", &self.runmd_path)
-            .finish()
-    }
-}
-
 impl Into<World> for Host {
     fn into(self) -> World {
         self.world.unwrap()
@@ -538,11 +441,8 @@ impl Into<World> for Host {
 impl From<World> for Host {
     fn from(world: World) -> Self {
         Host {
-            root: None,
-            url: None,
-            runmd_path: None,
-            workspace: None,
-            command: None,
+            workspace: Workspace::default(),
+            start: None,
             world: Some(world),
             listener_setup: None,
         }
@@ -572,7 +472,7 @@ mod test {
     #[test]
     #[tracing_test::traced_test]
     fn test_host() {
-        use crate::prelude::{Commands, Host};
+        use crate::prelude::Host;
         let mut host = Host::load_content::<Test>(
             r#"
         ``` repeat
@@ -594,25 +494,23 @@ mod test {
         "#,
         );
 
-        host.set_command(Commands::start_engine("repeat"));
-        host.handle_start::<Test>();
+        host.start_with::<Test>("repeat");
     }
 
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_example() {
+        use crate::prelude::Host;
         use hyper::http::Uri;
 
         let uri = Uri::from_static("test.example.com");
 
         eprintln!("{:?}", uri.host().unwrap().split_once("."));
 
-        use crate::prelude::{Commands, Host};
         let mut host = Host::open::<Test>("examples/hello_runmd/.runmd")
             .await
             .expect("should load");
-        host.set_command(Commands::start_engine("test_block1"));
-        host.handle_start::<Test>();
+        host.start_with::<Test>("test_block1");
 
         // Make sure everything exited successfully
         assert!(logs_contain(

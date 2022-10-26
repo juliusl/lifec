@@ -40,8 +40,8 @@ pub struct Workspace {
     root: Option<PathBuf>,
     /// Content of the root runmd file of the workspace,
     root_runmd: Option<String>,
-    /// Use this list of tags when generating an engine
-    use_tags: Option<Vec<String>>,
+    /// Optionally, include a tag, this tag can be used to distinguish between different version of a workspace config, operation
+    tag: Option<String>,
     /// Name of the host,
     host: String,
     /// Name of the tenant,
@@ -64,7 +64,7 @@ impl Workspace {
             work_dir: work_dir.to_path_buf(),
             root,
             root_runmd: None,
-            use_tags: None,
+            tag: None,
             host: host.as_ref().to_string(),
             tenant: None,
             path: None,
@@ -83,11 +83,11 @@ impl Workspace {
         self.root_runmd.clone()
     }
 
-    /// Returns a clone with tags,
+    /// Returns a clone with tag set,
     ///
-    pub fn use_tags(&self, tags: Vec<impl AsRef<str>>) -> Self {
+    pub fn use_tag(&self, tag: impl AsRef<str>) -> Self {
         let mut clone = self.clone();
-        clone.use_tags = Some(tags.iter().map(|t| t.as_ref().to_string()).collect());
+        clone.tag = Some(tag.as_ref().to_string());
         clone
     }
 
@@ -113,7 +113,13 @@ impl Workspace {
                 Some(format!("{}.{tenant}.{host}/{path}", block.symbol()))
             }
             _ => None,
-        }
+        }.and_then(|uri| {
+            if let Some(tag) = self.tag.as_ref() {
+                Some(format!("{uri}#{tag}"))
+            } else {
+                Some(uri)
+            }
+        })
     }
 
     /// Get a tenant from the workspace,
@@ -131,7 +137,7 @@ impl Workspace {
             work_dir,
             root: self.root.clone(),
             root_runmd: None,
-            use_tags: None,
+            tag: None,
             host: self.host.to_string(),
             tenant: Some(tenant.as_ref().to_string()),
             path: None,
@@ -155,7 +161,7 @@ impl Workspace {
                 work_dir,
                 root: self.root.clone(),
                 root_runmd: None,
-                use_tags: None,
+                tag: None,
                 host: self.host.to_string(),
                 tenant: Some(tenant.to_string()),
                 path: Some(path.as_ref().to_string()),
@@ -168,12 +174,8 @@ impl Workspace {
 
     /// Returns an iterator over tags,
     ///
-    pub fn iter_tags(&self) -> impl Iterator<Item = &String> {
-        if let Some(tags) = self.use_tags.as_ref() {
-            tags.iter()
-        } else {
-            [].iter()
-        }
+    pub fn tag(&self) -> Option<&String> {
+        self.tag.as_ref()
     }
 
     /// Returns a path buf to the work dir,
@@ -236,6 +238,16 @@ fn test_workspace_paths() {
     assert_eq!(
         Some("try.workspace.test.lifec.io/tester".to_string()),
         path.identity_uri(parser.get_block("try", "workspace"))
+    );
+
+    let tag = path.use_tag("test");
+    assert_eq!(
+        &PathBuf::from(".world/lifec.io/test/tester"),
+        tag.work_dir()
+    );
+    assert_eq!(
+        Some("try.workspace.test.lifec.io/tester#test".to_string()),
+        tag.identity_uri(parser.get_block("try", "workspace"))
     );
 }
 
@@ -478,7 +490,7 @@ mod tests {
         dispatcher.dispatch(host.world());
 
         // Test with tags
-        let world = Test::compile_workspace(&workspace.use_tags(vec!["test"]), files.iter(), None);
+        let world = Test::compile_workspace(&workspace.use_tag("test"), files.iter(), None);
         let mut host = Host::from(world);
         host.enable_listener::<Test>();
         host.link_sequences();

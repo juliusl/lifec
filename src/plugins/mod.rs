@@ -2,15 +2,15 @@ pub use crate::prelude::*;
 use tokio::select;
 use tokio::sync::oneshot;
 
-mod network;
-pub use network::BlockAddress;
-pub use network::NetworkEvent;
-pub use network::NetworkRuntime;
-pub use network::NetworkTask;
-pub use network::ProxiedMessage;
-pub use network::Proxy;
-pub use network::TCP;
-pub use network::UDP;
+// mod network;
+// pub use network::BlockAddress;
+// pub use network::NetworkEvent;
+// pub use network::NetworkRuntime;
+// pub use network::NetworkTask;
+// pub use network::ProxiedMessage;
+// pub use network::Proxy;
+// pub use network::TCP;
+// pub use network::UDP;
 
 mod events;
 pub use events::EventRuntime;
