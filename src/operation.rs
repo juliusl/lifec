@@ -262,12 +262,17 @@ impl Operation {
         self.cancelled
     }
 
-    /// Cancels any ongoing task,
+    /// Cancels any ongoing task, 
     /// 
-    pub fn cancel(&mut self) {
+    /// returns true if a change was made
+    /// 
+    pub fn cancel(&mut self) -> bool {
         if let Some((_, cancel)) = self.task.take() {
             cancel.send(()).ok();
             self.cancelled = true;
+            true 
+        } else {
+            false
         }
     }
 }

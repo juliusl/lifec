@@ -1,5 +1,8 @@
 use specs::{Component, DefaultVecStorage};
 
+mod chaos;
+pub use chaos::Chaos;
+
 pub struct Test;
 
 /// Debug component 

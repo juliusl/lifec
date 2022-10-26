@@ -46,36 +46,32 @@ fn main() {
         : .once     setup
         : .start    receive, cancel
         : .select   execute
-        : .next     test-2
+        : .loop
         ```
 
         ``` setup
         + .runtime
         : .println hello setup a
-        : .println hello setup b
-        : .println hello setup c
+        : .chaos
         ```
 
         ``` receive
         + .runtime
         : .println hello receive a {name}
         : .fmt name
-        : .println hello receive b
-        : .println hello receive c
+        : .chaos
         ```
 
         ``` cancel
         + .runtime
         : .println hello cancel a
-        : .println hello cancel b
-        : .println hello cancel c
+        : .chaos
         ```
 
         ``` execute
         + .runtime
         : .println hello execute a
-        : .println hello execute b
-        : .println hello execute c
+        : .chaos
         ```
         "#,
     );

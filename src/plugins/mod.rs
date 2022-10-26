@@ -25,6 +25,7 @@ pub use thunks::ThunkContext;
 
 mod testing;
 pub use testing::Test;
+pub use testing::Chaos;
 
 mod process;
 pub use process::Process;

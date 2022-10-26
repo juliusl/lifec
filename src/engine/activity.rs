@@ -1,4 +1,4 @@
-use std::{fmt::Display, time::Instant};
+use std::{fmt::Display, time::{Instant, Duration}};
 
 use specs::{Component, DenseVecStorage};
 
@@ -78,6 +78,20 @@ impl Activity {
             Activity::Completed(..) => self.clone(),
             Activity::Error(..) => self.clone(),
             Activity::None => Activity::None,
+        }
+    }
+
+    /// From start to complete/error
+    /// 
+    pub fn duration_ms(&self) -> Option<u64> {
+        match self {
+            Activity::Completed(_, started, _, _) |
+            Activity::Error(_, started, _, _) => {
+                Some(started.elapsed().as_millis() as u64)
+            },
+            _ => {
+                None
+            }
         }
     }
 }

@@ -160,6 +160,9 @@ impl<'a> System<'a> for EventRuntime {
     ) {
         if !events.should_exit() && events.can_continue() {
             events.tick();
+        } else {
+            // If a rate limit is set, this will update the freq w/o changing the last tick
+            events.handle_rate_limits();
         }
     }
 }

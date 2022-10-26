@@ -199,6 +199,7 @@ pub fn default_runtime() -> Runtime {
     runtime.install_with_custom::<Readln>("");
     runtime.install_with_custom::<Watch>("");
     runtime.install_with_custom::<Publish>("");
+    runtime.install_with_custom::<Chaos>("");
     runtime
 }
 

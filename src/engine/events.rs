@@ -42,6 +42,9 @@ pub enum EventStatus {
     /// Means that the operation is in progress
     ///
     InProgress(Entity),
+    /// Means that the entity has been paused
+    /// 
+    Paused(Entity),
     /// Means that the operation is ready to transition
     ///
     Ready(Entity),
@@ -62,6 +65,7 @@ impl EventStatus {
     pub fn entity(&self) -> Entity {
         match self {
             EventStatus::Scheduled(e)
+            | EventStatus::Paused(e)
             | EventStatus::New(e)
             | EventStatus::InProgress(e)
             | EventStatus::Ready(e)
@@ -82,6 +86,7 @@ impl Display for EventStatus {
             EventStatus::Completed(_) => write!(f, "completed"),
             EventStatus::Cancelled(_) => write!(f, "cancelled"),
             EventStatus::Inactive(_) => write!(f, "inactive"),
+            EventStatus::Paused(_) => write!(f, "paused"),
         }
     }
 }
@@ -128,6 +133,7 @@ impl<'a> Events<'a> {
     ///
     pub fn status(&self, entity: Entity) -> EventStatus {
         let Events {
+            tick_control,
             entities,
             events,
             operations,
@@ -138,6 +144,10 @@ impl<'a> Events<'a> {
             .join()
             .get(entity, entities)
             .expect("should have a value");
+
+        if tick_control.is_paused(entity) {
+            return EventStatus::Paused(entity);
+        }
 
         if event.is_active() {
             if let Some(operation) = operation {
@@ -196,68 +206,74 @@ impl<'a> Events<'a> {
         _cursors
     }
 
-    /// Handles events,
+    /// Handles a vec of events,
     ///
     pub fn handle(&mut self, events: Vec<EventStatus>) {
         for event in events.iter() {
-            match event {
-                EventStatus::Scheduled(e) | EventStatus::New(e) => {
-                    event!(Level::DEBUG, "Starting event {}", e.id());
-                    self.set_scheduled_connection_state(*e);
-                    self.transition(None, *e);
-                }
-                EventStatus::Ready(ready) => {
-                    let result = self.get_result(*ready);
+           self.handle_event(event)
+        }
+    }
 
-                    let next_entities = self.get_next_entities(*ready);
+    /// Handles a single event,
+    /// 
+    pub fn handle_event(&mut self, event: &EventStatus) {
+        match event {
+            EventStatus::Scheduled(e) | EventStatus::New(e) => {
+                event!(Level::DEBUG, "Starting event {}", e.id());
+                self.set_scheduled_connection_state(*e);
+                self.transition(None, *e);
+            }
+            EventStatus::Ready(ready) => {
+                let result = self.get_result(*ready);
 
-                    for next in next_entities {
-                        event!(
-                            Level::DEBUG,
-                            "\n\n\tEvent transition\n\t{} -> {}\n",
-                            ready.id(),
-                            next.id()
-                        );
-                        if let Some(error) = result.as_ref().and_then(ThunkContext::get_errors) {
-                            self.set_error_connection_state(*ready, next, error.clone());
-                            self.send_error_context(error);
-                        } else {
-                            self.set_completed_connection_state(*ready, next);
-                            self.send_completed_event(*ready);
-                            if !self.activate(next) {
-                                event!(Level::DEBUG, "Repeating event");
-                                let Events { limits, .. } = self;
-                                if let Some(limit) = limits.get_mut(next) {
-                                    event!(Level::DEBUG, "Remaining repeats {}", limit.0);
-                                    if !limit.take_one() {
-                                        event!(Level::DEBUG, "Limit reached for {}", next.id());
+                let next_entities = self.get_next_entities(*ready);
 
-                                        for n in self.get_next_entities(next) {
-                                            self.set_completed_connection_state(next, n);
-                                        }
-                                        return;
+                for next in next_entities {
+                    event!(
+                        Level::DEBUG,
+                        "\n\n\tEvent transition\n\t{} -> {}\n",
+                        ready.id(),
+                        next.id()
+                    );
+                    if let Some(error) = result.as_ref().and_then(ThunkContext::get_errors) {
+                        self.set_error_connection_state(*ready, next, error.clone());
+                        self.send_error_context(error);
+                    } else {
+                        self.set_completed_connection_state(*ready, next);
+                        self.send_completed_event(*ready);
+                        if !self.activate(next) {
+                            event!(Level::DEBUG, "Repeating event");
+                            let Events { limits, .. } = self;
+                            if let Some(limit) = limits.get_mut(next) {
+                                event!(Level::DEBUG, "Remaining repeats {}", limit.0);
+                                if !limit.take_one() {
+                                    event!(Level::DEBUG, "Limit reached for {}", next.id());
+
+                                    for n in self.get_next_entities(next) {
+                                        self.set_completed_connection_state(next, n);
                                     }
+                                    return;
                                 }
                             }
-
-                            // Signal to the events this event is connected to that this
-                            // event is being processed
-                            self.set_scheduled_connection_state(next);
-                            self.transition(result.as_ref(), next);
                         }
+
+                        // Signal to the events this event is connected to that this
+                        // event is being processed
+                        self.set_scheduled_connection_state(next);
+                        self.transition(result.as_ref(), next);
                     }
                 }
-                EventStatus::InProgress(in_progress) => {
-                    event!(Level::TRACE, "{} is in progress", in_progress.id());
-                }
-                EventStatus::Completed(completed) => {
-                    event!(Level::TRACE, "{} is complete", completed.id());
-                }
-                EventStatus::Cancelled(cancelled) => {
-                    event!(Level::TRACE, "{} is cancelled", cancelled.id());
-                }
-                _ => {}
             }
+            EventStatus::InProgress(in_progress) => {
+                event!(Level::TRACE, "{} is in progress", in_progress.id());
+            }
+            EventStatus::Completed(completed) => {
+                event!(Level::TRACE, "{} is complete", completed.id());
+            }
+            EventStatus::Cancelled(cancelled) => {
+                event!(Level::TRACE, "{} is cancelled", cancelled.id());
+            }
+            _ => {}
         }
 
         let Events { tick_control, .. } = self;
@@ -266,11 +282,16 @@ impl<'a> Events<'a> {
 
     /// Performs a serialized tick, waiting for any events in-progress before returning,
     ///
+    /// This is similar to a debugger "step",
+    /// 
     pub fn serialized_tick(&mut self) {
         let event_state = self.scan();
         for event in event_state {
-            if let EventStatus::InProgress(in_progress) = event {
-                self.wait_for_ready(in_progress);
+            match event {
+                EventStatus::InProgress(e) => { // | EventStatus::Paused(e) => { 
+                    self.wait_for_ready(e);
+                },
+                _ => {}
             }
         }
 
@@ -341,12 +362,14 @@ impl<'a> Events<'a> {
 
     /// Cancels an event's operation
     ///
-    pub fn cancel(&mut self, event: Entity) {
+    pub fn cancel(&mut self, event: Entity) -> bool {
         let Events { operations, .. } = self;
 
         if let Some(operation) = operations.get_mut(event) {
             event!(Level::TRACE, "Cancelling {}", event.id());
-            operation.cancel();
+            operation.cancel()
+        } else {
+            false
         }
     }
 
@@ -510,7 +533,7 @@ impl<'a> Events<'a> {
     pub fn resume(&mut self) {
         let Events { tick_control, .. } = self;
 
-        tick_control.reset()
+        tick_control.resume()
     }
 
     /// Returns the tick frequency,
@@ -519,6 +542,50 @@ impl<'a> Events<'a> {
         let Events { tick_control, .. } = self;
 
         tick_control.tick_rate()
+    }
+
+    /// Handles any rate limits,
+    /// 
+    pub fn handle_rate_limits(&mut self) {
+        let Events { tick_control, .. } = self;
+
+        if tick_control.rate_limit().is_some() {
+            tick_control.update_rate_limit();
+        }
+    }
+
+    /// Set a rate limit on the tick control,
+    /// 
+    pub fn set_rate_limit(&mut self, limit: u64) {
+        let Events { tick_control, .. } = self;
+
+        tick_control.set_rate_limit(limit);
+    }
+
+    /// Clears any rate limits on the tick control,
+    /// 
+    pub fn clear_rate_limit(&mut self) {
+        let Events { tick_control, .. } = self;
+
+        tick_control.remove_rate_limit();
+    }
+
+    /// Pauses a specific event,
+    /// 
+    /// This can also be used as a "breakpoint",
+    /// 
+    pub fn pause_event(&mut self, event: Entity) -> bool {
+        let Events { tick_control, .. } = self;
+
+        tick_control.pause_entity(event)
+    }
+
+    /// Resumes a specific event,
+    /// 
+    pub fn resume_event(&mut self, event: Entity) -> bool {
+        let Events { tick_control, .. } = self;
+
+        tick_control.resume_entity(event)
     }
 }
 
