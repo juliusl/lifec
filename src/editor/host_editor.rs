@@ -3,10 +3,15 @@ use std::collections::HashMap;
 use atlier::system::App;
 use hdrhistogram::Histogram;
 use imgui::{ChildWindow, SliderFlags, StyleVar, Ui, Window};
-use specs::{System, Entity};
+use specs::{Entity, System};
 use tracing::{event, Level};
 
-use crate::{prelude::{Events, Node}, state::{AttributeIndex, AttributeGraph}};
+use crate::{
+    prelude::{Events, Node},
+    state::{AttributeGraph, AttributeIndex},
+};
+
+use super::Profiler;
 
 /// Tool for viewing and interacting with a host,
 ///
@@ -15,10 +20,10 @@ pub struct HostEditor {
     ///
     nodes: Vec<Node>,
     /// Adhoc profiler nodes,
-    /// 
+    ///
     adhoc_profilers: Vec<Node>,
     /// Histogram of tick rate,
-    /// 
+    ///
     tick_rate: Histogram<u64>,
     /// True if the event runtime is paused,
     ///
@@ -42,31 +47,31 @@ pub struct HostEditor {
 
 impl HostEditor {
     /// Dispatch a command to tick events,
-    /// 
+    ///
     pub fn tick_events(&mut self) {
         self.tick = Some(());
     }
 
     /// Dispatch a command to pause events,
-    /// 
+    ///
     pub fn pause_events(&mut self) {
         self.pause = Some(());
     }
 
     /// Dispatch a command to reset events,
-    /// 
+    ///
     pub fn reset_events(&mut self) {
         self.reset = Some(());
     }
 
     /// Dispatch a command to set tick limit,
-    /// 
+    ///
     pub fn set_tick_limit(&mut self, hz: u64) {
         self.tick_limit = Some(hz);
     }
 
     /// Disable tick limit,
-    /// 
+    ///
     pub fn disable_tick_limit(&mut self) {
         self.tick_limit.take();
     }
@@ -96,7 +101,7 @@ impl App for HostEditor {
                         self.event_list(ui);
                     });
 
-                // Right section for viewing performance related information, 
+                // Right section for viewing performance related information,
                 ui.same_line();
                 ChildWindow::new(&format!("Performance Section")).build(ui, || {
                     self.performance_section(ui);
@@ -251,7 +256,7 @@ impl HostEditor {
         }
     }
 
-    /// Event nodes in list format, 
+    /// Event nodes in list format,
     ///
     fn event_list(&mut self, ui: &Ui) {
         // TODO - Add some filtering?
@@ -303,17 +308,42 @@ impl HostEditor {
     ///
     fn performance_section(&mut self, ui: &Ui) {
         self.tick_rate_tools(ui);
+        ui.new_line();
 
-        for node in self.nodes.iter() {
-            if node.histograms(ui) {
-                ui.new_line();
+        ui.text("Performance");
+        ui.spacing();
+        if let Some(tab_bar) = ui.tab_bar("Performance Tabs") {
+            let tab = ui.tab_item("Engine events");
+            if ui.is_item_hovered() {
+                ui.tooltip_text("Performance histograms of event transitions");
             }
-        }
+            if let Some(token) = tab {
+                // This is the performance of engine operation events
+                for node in self.nodes.iter() {
+                    // TODO: Make these configurable
+                    if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
+                        ui.new_line();
+                    }
+                }
 
-        for node in self.adhoc_profilers.iter() {
-            if node.histograms(ui) {
-                ui.new_line();
+                token.end();
             }
+
+            let tab = ui.tab_item("Operations");
+            if ui.is_item_hovered() {
+                ui.tooltip_text("Performance histograms of adhoc operation execution");
+            }
+            if let Some(token) = tab {
+                // This is the performance of adhoc operation events
+                for node in self.adhoc_profilers.iter() {
+                    if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
+                        ui.new_line();
+                    }
+                }
+                token.end();
+            }
+
+            tab_bar.end();
         }
     }
 }

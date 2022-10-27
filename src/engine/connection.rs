@@ -62,7 +62,7 @@ impl ConnectionState {
 
 /// This component configures the Sequence cursor to point at the sequence it is connected to
 ///
-#[derive(Component, Debug, Clone, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, PartialEq)]
 #[storage(VecStorage)]
 pub struct Connection {
     /// Set of entities of incoming connections,

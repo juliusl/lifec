@@ -2,7 +2,7 @@ use std::{ops::Deref, sync::Arc};
 
 use specs::Write;
 
-use crate::{editor::State, prelude::*};
+use crate::{editor::State, prelude::*, engine::Profiler};
 
 /// Extension trait for Host, that provides functions for opening a GUI editor,
 ///
@@ -68,18 +68,20 @@ impl Editor for Host {
     fn build_appendix(&mut self) {
         // Build runtime appendix
         self.world_mut().exec(
-            |(entities, events, thunks, graphs, mut appendix): (
+            |(entities, engines, events, thunks, graphs, profilers, mut appendix): (
                 Entities,
+                ReadStorage<Engine>,
                 ReadStorage<Event>,
                 ReadStorage<Thunk>,
                 ReadStorage<AttributeGraph>,
+                ReadStorage<Profiler>,
                 Write<Appendix>,
             )| {
-                for (entity, event, thunk, graph) in
-                    (&entities, events.maybe(), thunks.maybe(), graphs.maybe()).join()
+                for (entity, engine, event, thunk, graph) in
+                    (&entities, engines.maybe(), events.maybe(), thunks.maybe(), graphs.maybe()).join()
                 {
-                    match (event, thunk, graph) {
-                        (None, Some(thunk), Some(graph)) => {
+                    match (event, thunk, graph, engine) {
+                        (None, Some(thunk), Some(graph), None) => {
                             appendix.insert_general(entity, thunk);
                             appendix.insert_state(
                                 entity,
@@ -88,11 +90,18 @@ impl Editor for Host {
                                 },
                             );
                         }
-                        (Some(event), None, _) => {
+                        (Some(event), None, _, None) => {
                             appendix.insert_general(entity, event);
+                        }
+                        (None, None, None, Some(engine)) => {
+                            appendix.insert_general(entity, engine)
                         }
                         _ => {}
                     }
+                }
+
+                for (entity, _) in (&entities, &profilers).join() {
+                    appendix.insert_general(entity, General { name: "profiler".to_string() })
                 }
             },
         );

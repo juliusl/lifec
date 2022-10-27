@@ -92,7 +92,17 @@ impl Display for EventStatus {
     }
 }
 
+
 impl<'a> Events<'a> {
+    /// Returns an iterator over joined tuple w/ Sequence storage,
+    /// 
+    pub fn join_sequences<C>(&'a self, other: &'a WriteStorage<'a, C>) -> impl Iterator<Item = (Entity, &Sequence, &C)>
+    where
+        C: Component
+    {
+        (&self.entities, &self.sequences, other).join()
+    }
+    
     /// Resets Completed/Cancelled events
     ///
     pub fn reset_all(&mut self) {

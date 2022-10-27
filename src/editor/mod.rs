@@ -10,6 +10,9 @@ pub use node::NodeStatus;
 pub use node::NodeCommand;
 pub use node::DisplayNode;
 pub use node::EditNode;
+pub use node::CommandDispatcher;
+pub use node::EventNode;
+pub use node::Profiler;
 
 mod appendix;
 pub use appendix::Appendix;

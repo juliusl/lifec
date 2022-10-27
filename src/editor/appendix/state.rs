@@ -4,7 +4,7 @@ use crate::state::AttributeGraph;
 /// 
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct State {
-    /// Initial block properties
+    /// Initial state,
     ///
     pub graph: AttributeGraph,
 }

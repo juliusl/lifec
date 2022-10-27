@@ -35,6 +35,10 @@ mod events;
 pub use events::EventStatus;
 pub use events::Events;
 
+mod engines;
+pub use engines::Engines;
+pub use engines::EngineStatus;
+
 mod lifecycle;
 pub use lifecycle::Lifecycle;
 
@@ -86,32 +90,24 @@ use tracing::Level;
 #[derive(Clone, Default, Debug, Component)]
 #[storage(VecStorage)]
 pub struct Engine {
-    /// Pointer to the start of the engine sequence
-    ///
-    start: Option<Entity>,
-    /// Limit this engine can repeat
-    ///
-    limit: Option<Limit>,
+    /// Name of this engine,
+    /// 
+    name: String, 
     /// Vector of transitions
     ///
     transitions: Vec<(Transition, Vec<String>)>,
     /// Lifecycle operation to use,
     ///
     lifecycle: Option<(Lifecycle, Option<Vec<String>>)>,
+    /// Pointer to the start of the engine sequence
+    ///
+    start: Option<Entity>,
+    /// Limit this engine can repeat
+    ///
+    limit: Option<Limit>,
 }
 
 impl Engine {
-    /// Creates a new engine component w/ start,
-    ///
-    pub fn new(start: Entity) -> Self {
-        Self {
-            start: Some(start),
-            limit: None,
-            transitions: vec![],
-            lifecycle: None,
-        }
-    }
-
     /// Returns the start of the engine,
     ///
     pub fn start(&self) -> Option<&Entity> {
@@ -319,6 +315,8 @@ impl Interpreter for Engine {
             let mut sequence = Sequence::default();
 
             if let Some(engine) = world.write_component::<Engine>().get_mut(block_entity) {
+                engine.name = block.symbol().to_string();
+
                 // Assign transitions to events
                 for (transition, events) in engine.clone().iter_transitions() {
                     for event in events.iter().filter_map(|e| {
@@ -394,6 +392,12 @@ impl Interpreter for Engine {
                     .expect("should be able to insert component");
             }
         }
+    }
+}
+
+impl Into<General> for &Engine {
+    fn into(self) -> General {
+        General { name: self.name.to_string() }
     }
 }
 

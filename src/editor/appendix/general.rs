@@ -18,6 +18,6 @@ impl App for General {
     }
 
     fn display_ui(&self, ui: &imgui::Ui) {
-        ui.text(format!("name:        {}", self.name));
+        ui.text(format!("name: {}", self.name));
     }
 }
