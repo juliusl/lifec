@@ -4,6 +4,7 @@ use atlier::system::App;
 use hdrhistogram::Histogram;
 use imgui::{ChildWindow, SliderFlags, StyleVar, Ui, Window};
 use specs::{Entity, System};
+use tokio::time::Instant;
 use tracing::{event, Level};
 
 use crate::{
@@ -25,6 +26,9 @@ pub struct HostEditor {
     /// Histogram of tick rate,
     ///
     tick_rate: Histogram<u64>,
+    /// Timestamp of last refresh,
+    /// 
+    last_refresh: Instant, 
     /// True if the event runtime is paused,
     ///
     is_paused: bool,
@@ -155,6 +159,11 @@ impl<'a> System<'a> for HostEditor {
                     event!(Level::ERROR, "Error recording tick rate, {err}");
                 }
             }
+        }
+
+        if self.last_refresh.elapsed().as_secs() > 1 {
+            self.tick_rate.clear();
+            self.last_refresh = Instant::now();
         }
 
         // Handle node commands
@@ -340,6 +349,7 @@ impl Default for HostEditor {
             is_paused: Default::default(),
             is_stopped: false,
             tick_limit: Default::default(),
+            last_refresh: Instant::now(),
             tick: Default::default(),
             pause: Default::default(),
             reset: Default::default(),

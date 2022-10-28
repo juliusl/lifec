@@ -37,8 +37,8 @@ pub use events::EventStatus;
 pub use events::Events;
 
 mod engines;
-pub use engines::Engines;
 pub use engines::EngineStatus;
+pub use engines::Engines;
 
 mod lifecycle;
 pub use lifecycle::Lifecycle;
@@ -92,8 +92,8 @@ use tracing::Level;
 #[storage(VecStorage)]
 pub struct Engine {
     /// Name of this engine,
-    /// 
-    name: String, 
+    ///
+    name: String,
     /// Vector of transitions
     ///
     transitions: Vec<(Transition, Vec<String>)>,
@@ -302,8 +302,20 @@ impl Interpreter for Engine {
 
                     let mut sequences = world.write_component::<Sequence>();
                     sequences
-                        .insert(entity, event.sequence().expect("should have a sequence").clone())
+                        .insert(
+                            entity,
+                            event.sequence().expect("should have a sequence").clone(),
+                        )
                         .expect("should be able to insert component");
+                }
+
+                if let Some(adhoc) = world.read_component::<Adhoc>().get(entity) {
+                    let mut block_map = world.write_resource::<HashMap<String, Entity>>();
+                    if !adhoc.tag().as_ref().is_empty() {
+                        block_map.insert(format!("adhoc-{}#{}", adhoc.name, adhoc.tag().as_ref()), entity);
+                    } else {
+                        block_map.insert(format!("adhoc-{}", adhoc.name), entity);
+                    }
                 }
             }
 
@@ -398,7 +410,9 @@ impl Interpreter for Engine {
 
 impl Into<General> for &Engine {
     fn into(self) -> General {
-        General { name: self.name.to_string() }
+        General {
+            name: self.name.to_string(),
+        }
     }
 }
 

@@ -1,5 +1,8 @@
 
+use std::collections::HashMap;
+
 use atlier::system::{Extension};
+use specs::{WorldExt, Entity};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 
 use crate::engine::Engines;
@@ -44,6 +47,11 @@ impl Extension for WorkspaceEditor {
                 ui.new_line();
                 ui.separator();
             }
+        }
+
+        let map = world.read_resource::<HashMap<String, Entity>>();
+        for (expression, entity) in map.iter() {
+            ui.text(format!("{} - {}", entity.id(), expression));
         }
 
         // for (_, state) in self.appendix.state.iter_mut() {
