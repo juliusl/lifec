@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 use hdrhistogram::Histogram;
-use specs::{Component, Entity, VecStorage};
+use specs::{Component, Entity, VecStorage, DenseVecStorage};
 use tracing::{event, Level};
 
 use crate::prelude::ErrorContext;
@@ -16,7 +16,8 @@ use super::Activity;
 ///
 /// The connection state will always have a way to look up the original components.
 ///
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+#[derive(Component, Debug, Copy, Clone, Hash, PartialEq, Eq)]
+#[storage(DenseVecStorage)]
 pub struct ConnectionState {
     /// Incoming entity,
     ///
@@ -57,6 +58,12 @@ impl ConnectionState {
     ///
     pub fn source(&self) -> Entity {
         self.source.unwrap_or(self.incoming)
+    }
+
+    /// Returns true if this connection state was spawned,
+    /// 
+    pub fn is_spawned(&self) -> bool {
+        self.source.is_some()
     }
 }
 
@@ -168,7 +175,7 @@ impl Connection {
 
     /// Schedules an incoming connection,
     ///
-    pub fn schedule(&mut self, incoming: Entity) {
+    pub fn schedule(&mut self, incoming: Entity) -> Option<ConnectionState> {
         if let Some(key) = self.get_key(incoming) {
             self.connection_state.insert(key, Activity::schedule());
 
@@ -178,6 +185,10 @@ impl Connection {
                     Histogram::<u32>::new(3).expect("should be able to create histogram"),
                 );
             }
+
+            Some(key)
+        } else {
+            None
         }
     }
 

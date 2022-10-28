@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use atlier::system::App;
 use hdrhistogram::Histogram;
@@ -8,7 +8,7 @@ use tracing::{event, Level};
 
 use crate::{
     prelude::{Events, Node},
-    state::{AttributeGraph, AttributeIndex},
+    state::AttributeGraph,
 };
 
 use super::Profiler;
@@ -162,46 +162,7 @@ impl<'a> System<'a> for HostEditor {
         let mut mutations = HashMap::<Entity, HashMap<Entity, AttributeGraph>>::default();
         for mut node in self.nodes.drain(..) {
             if let Some(command) = node.command.take() {
-                match command {
-                    crate::editor::NodeCommand::Activate(event) => {
-                        if events.activate(event) {
-                            event!(Level::DEBUG, "Activating event {}", event.id());
-                        }
-                    }
-                    crate::editor::NodeCommand::Reset(event) => {
-                        if events.reset(event) {
-                            event!(Level::DEBUG, "Reseting event {}", event.id());
-                        }
-                    }
-                    crate::editor::NodeCommand::Pause(event) => {
-                        if events.pause_event(event) {
-                            event!(Level::DEBUG, "Pausing event {}", event.id());
-                        }
-                    }
-                    crate::editor::NodeCommand::Resume(event) => {
-                        if events.resume_event(event) {
-                            event!(Level::DEBUG, "Resuming event {}", event.id());
-                        }
-                    }
-                    crate::editor::NodeCommand::Cancel(event) => {
-                        if events.cancel(event) {
-                            event!(Level::DEBUG, "Cancelling event {}", event.id());
-                        }
-                    }
-                    crate::editor::NodeCommand::Update(graph) => {
-                        if events.update_state(&graph) {
-                            event!(Level::DEBUG, "Updating state for {}", graph.entity_id());
-                        }
-                    }
-                    crate::editor::NodeCommand::Custom(name, entity) => {
-                        event!(
-                            Level::DEBUG,
-                            "Custom command {name} received for {}",
-                            entity.id()
-                        );
-                        // TODO -- Could add some custom providers
-                    }
-                }
+                events.handle_node_command(command);
             }
 
             if node.mutations.len() > 0 {
@@ -259,11 +220,34 @@ impl HostEditor {
     /// Event nodes in list format,
     ///
     fn event_list(&mut self, ui: &Ui) {
-        // TODO - Add some filtering?
+        let mut events = BTreeMap::<String, Vec<&mut Node>>::default();
+
         for node in self.nodes.iter_mut() {
-            node.edit_ui(ui);
-            ui.new_line();
-            ui.separator();
+            let control_symbol = node.control_symbol();
+
+            if !control_symbol.is_empty() {
+                if let Some(coll) = events.get_mut(&control_symbol) {
+                    coll.push(node);
+                } else {
+                    events.insert(control_symbol, vec![node]);
+                }
+            } else {
+                if let Some(coll) = events.get_mut("Adhoc Operations") {
+                    coll.push(node);
+                } else {
+                    events.insert(String::from("Adhoc Operations"), vec![node]);
+                }
+            }
+        }
+
+        for (title, nodes) in events {
+            if imgui::CollapsingHeader::new(format!("Engine: {title}")).build(ui) {
+                for node in nodes {
+                    node.edit_ui(ui);
+                    ui.new_line();
+                    ui.separator();
+                }
+            }
         }
     }
 

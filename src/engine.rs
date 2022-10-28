@@ -16,6 +16,7 @@ pub use sequence::Sequence;
 
 mod connection;
 pub use connection::Connection;
+pub use connection::ConnectionState;
 
 mod activity;
 pub use activity::Activity;

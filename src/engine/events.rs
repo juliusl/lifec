@@ -1,8 +1,10 @@
-use std::{fmt::Display, ops::Deref, sync::Arc, collections::HashMap};
+use std::{collections::HashMap, fmt::Display, ops::Deref, sync::Arc};
 
 use specs::{prelude::*, Entities, SystemData};
 
-use super::{Limit, Plugins, Profiler, TickControl, Transition, Adhoc};
+use super::{
+    connection::ConnectionState, Adhoc, Limit, Plugins, Profiler, TickControl, Transition,
+};
 use crate::{
     editor::{Appendix, Node, NodeStatus},
     prelude::*,
@@ -20,16 +22,17 @@ pub struct Events<'a> {
     send_completed: Read<'a, tokio::sync::broadcast::Sender<Entity>, EventRuntime>,
     plugins: Plugins<'a>,
     entities: Entities<'a>,
-    cursors: ReadStorage<'a, Cursor>,
     transitions: ReadStorage<'a, Transition>,
     profilers: ReadStorage<'a, Profiler>,
     adhocs: ReadStorage<'a, Adhoc>,
     blocks: ReadStorage<'a, Block>,
+    cursors: WriteStorage<'a, Cursor>,
     sequences: WriteStorage<'a, Sequence>,
     limits: WriteStorage<'a, Limit>,
     events: WriteStorage<'a, Event>,
     connections: WriteStorage<'a, Connection>,
     operations: WriteStorage<'a, Operation>,
+    connection_states: WriteStorage<'a, ConnectionState>,
 }
 
 /// Enumeration of event statuses,
@@ -94,7 +97,6 @@ impl Display for EventStatus {
     }
 }
 
-
 impl<'a> Events<'a> {
     /// Returns a list of adhoc operations,
     ///
@@ -120,7 +122,9 @@ impl<'a> Events<'a> {
                 let operation_entity = operation.root().id();
                 let operation_entity = entities.entity(operation_entity);
 
-                if let Some((adhoc, operation)) = (adhocs, sequences).join().get(operation_entity, entities) {
+                if let Some((adhoc, operation)) =
+                    (adhocs, sequences).join().get(operation_entity, entities)
+                {
                     operations.push((adhoc.clone(), operation.clone()));
                 }
             }
@@ -130,14 +134,17 @@ impl<'a> Events<'a> {
     }
 
     /// Returns an iterator over joined tuple w/ Sequence storage,
-    /// 
-    pub fn join_sequences<C>(&'a self, other: &'a WriteStorage<'a, C>) -> impl Iterator<Item = (Entity, &Sequence, &C)>
+    ///
+    pub fn join_sequences<C>(
+        &'a self,
+        other: &'a WriteStorage<'a, C>,
+    ) -> impl Iterator<Item = (Entity, &Sequence, &C)>
     where
-        C: Component
+        C: Component,
     {
         (&self.entities, &self.sequences, other).join()
     }
-    
+
     /// Resets Completed/Cancelled events
     ///
     pub fn reset_all(&mut self) {
@@ -443,10 +450,10 @@ impl<'a> Events<'a> {
     }
 
     /// Updates state,
-    /// 
+    ///
     pub fn update_state(&mut self, graph: &AttributeGraph) -> bool {
-        let  Self { plugins, .. } = self;
-        
+        let Self { plugins, .. } = self;
+
         plugins.update_graph(graph.clone())
     }
 
@@ -560,29 +567,56 @@ impl<'a> Events<'a> {
     }
 
     /// Spawn takes an event and creates a new entity based off of the original event,
-    /// 
+    ///
     /// In addition, it must handle connecting the spawned entity to the original event's cursors,
-    /// When updating the connection, the connection state will be distinct from the original, however all perf. metrics will be 
+    /// When updating the connection, the connection state will be distinct from the original, however all perf. metrics will be
     /// recorded in the original's histogram, as the spawned entity will be ephemeral.
-    /// 
+    ///
     pub fn spawn(&mut self, source: Entity) -> Entity {
         let spawned = self.entities.create();
 
+        // Add spawned event to connections
         for e in self.get_next_entities(source).iter() {
             if let Some(connection) = self.connections.get_mut(*e) {
                 connection.add_spawned(source, spawned);
             }
         }
 
+        // Enable sequence on spawned
+        let sequence = self.sequences.get(source).expect("should have a sequence");
+        self.sequences
+            .insert(spawned, sequence.clone())
+            .expect("should be able to insert");
+
+        // Enable event on spawned
+        let event = self.events.get(source).expect("should have event");
+        self.events
+            .insert(spawned, event.clone())
+            .expect("should be able to insert");
+
+        // Enable cursor on spawned
+        if let Some(cursor) = self.cursors.get(source) {
+            self.cursors
+                .insert(spawned, cursor.clone())
+                .expect("should be able to insert");
+        }
+
         spawned
     }
 
     /// Returns an iterator over spawned events,
-    /// 
+    ///
     pub fn scan_spawned_events(&self) -> impl Iterator<Item = (&Entity, &Entity)> {
-        let Self { entities, connections, .. } = self; 
+        let Self {
+            entities,
+            connections,
+            ..
+        } = self;
 
-        (entities, connections).join().map(|(_, c)| c.iter_spawned()).flatten()
+        (entities, connections)
+            .join()
+            .map(|(_, c)| c.iter_spawned())
+            .flatten()
     }
 }
 
@@ -690,10 +724,12 @@ impl<'a> Events<'a> {
             .join()
             .map(|(_, c)| Node {
                 status: NodeStatus::Profiler,
+                connection: Some(c.clone()),
+                adhoc: None,
                 appendix: appendix.deref().clone(),
                 mutations: HashMap::default(),
+                connection_state: None,
                 cursor: None,
-                connection: Some(c.clone()),
                 sequence: None,
                 transition: None,
                 command: None,
@@ -733,6 +769,7 @@ impl<'a> Events<'a> {
         let Events {
             cursors,
             connections,
+            connection_states,
             ..
         } = self;
 
@@ -740,13 +777,21 @@ impl<'a> Events<'a> {
             match cursor {
                 Cursor::Next(next) => {
                     if let Some(connection) = connections.get_mut(*next) {
-                        connection.schedule(event);
+                        if let Some(key) = connection.schedule(event) {
+                            connection_states
+                                .insert(event, key)
+                                .expect("should be able to insert connection state");
+                        }
                     }
                 }
                 Cursor::Fork(forks) => {
                     for fork in forks {
                         if let Some(connection) = connections.get_mut(*fork) {
-                            connection.schedule(event);
+                            if let Some(key) = connection.schedule(event) {
+                                connection_states
+                                    .insert(event, key)
+                                    .expect("should be able to insert connection state");
+                            }
                         }
                     }
                 }
@@ -829,15 +874,19 @@ impl<'a> Events<'a> {
             connections,
             transitions,
             sequences,
+            connection_states,
+            adhocs,
             ..
         } = self;
 
-        if let Some((_, connection, cursor, transition, sequence)) = (
+        if let Some((_, connection, cursor, transition, sequence, connection_state, adhoc)) = (
             events,
             connections.maybe(),
             cursors.maybe(),
             transitions.maybe(),
             sequences.maybe(),
+            connection_states.maybe(),
+            adhocs.maybe(),
         )
             .join()
             .get(event, entities)
@@ -848,7 +897,9 @@ impl<'a> Events<'a> {
                 connection: connection.cloned(),
                 cursor: cursor.cloned(),
                 sequence: sequence.cloned(),
+                connection_state: connection_state.cloned(),
                 appendix: appendix.deref().clone(),
+                adhoc: adhoc.cloned(),
                 mutations: HashMap::default(),
                 command: None,
                 edit: None,
@@ -856,6 +907,67 @@ impl<'a> Events<'a> {
             })
         } else {
             None
+        }
+    }
+
+    /// Handles the node command,
+    ///
+    pub fn handle_node_command(&mut self, command: NodeCommand) {
+        match command {
+            crate::editor::NodeCommand::Activate(event) => {
+                if self.activate(event) {
+                    event!(Level::DEBUG, "Activating event {}", event.id());
+                }
+            }
+            crate::editor::NodeCommand::Reset(event) => {
+                if self.reset(event) {
+                    event!(Level::DEBUG, "Reseting event {}", event.id());
+                }
+            }
+            crate::editor::NodeCommand::Pause(event) => {
+                if self.pause_event(event) {
+                    event!(Level::DEBUG, "Pausing event {}", event.id());
+                }
+            }
+            crate::editor::NodeCommand::Resume(event) => {
+                if self.resume_event(event) {
+                    event!(Level::DEBUG, "Resuming event {}", event.id());
+                }
+            }
+            crate::editor::NodeCommand::Cancel(event) => {
+                if self.cancel(event) {
+                    event!(Level::DEBUG, "Cancelling event {}", event.id());
+                }
+            }
+            crate::editor::NodeCommand::Spawn(event) => {
+                let spawned = self.spawn(event);
+                if self.activate(spawned) {
+                    event!(Level::DEBUG, "Spawning event {}", event.id());
+                }
+            }
+            crate::editor::NodeCommand::Update(graph) => {
+                if self.update_state(&graph) {
+                    event!(Level::DEBUG, "Updating state for {}", graph.entity_id());
+                }
+            }
+            crate::editor::NodeCommand::Custom(name, entity) => {
+                event!(
+                    Level::DEBUG,
+                    "Custom command {name} received for {}",
+                    entity.id()
+                );
+
+                if name == "delete_spawned" {
+                    match self.entities.delete(entity) {
+                        Ok(_) => {
+                            event!(Level::DEBUG, "Deleted spawned entity, {}", entity.id());
+                        },
+                        Err(err) => {
+                            event!(Level::ERROR, "Could not delete entity {}, {err}", entity.id());
+                        },
+                    }
+                }
+            }
         }
     }
 }

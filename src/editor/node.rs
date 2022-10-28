@@ -1,19 +1,23 @@
-use std::{hash::Hash, collections::HashMap};
 use std::sync::Arc;
+use std::{collections::HashMap, hash::Hash};
 
 use atlier::system::App;
 use imgui::Ui;
 use specs::Entity;
 
-use crate::{prelude::{Connection, Cursor, Sequence, Transition}, state::AttributeGraph};
 use super::Appendix;
+use crate::engine::{Adhoc, ConnectionState};
+use crate::{
+    prelude::{Connection, Cursor, Sequence, Transition},
+    state::AttributeGraph,
+};
 
 mod event;
 pub use event::EventNode;
 
 mod commands;
-pub use commands::NodeCommand;
 pub use commands::CommandDispatcher;
+pub use commands::NodeCommand;
 
 mod status;
 pub use status::NodeStatus;
@@ -50,6 +54,12 @@ pub struct Node {
     /// The internal sequence this node represents,
     ///
     pub sequence: Option<Sequence>,
+    /// Connection state for this node, which is also the key used to reference this within a connection,
+    ///
+    pub connection_state: Option<ConnectionState>,
+    /// Adhoc config,
+    ///
+    pub adhoc: Option<Adhoc>,
     /// Command for this node,
     ///
     pub command: Option<NodeCommand>,
@@ -62,6 +72,36 @@ pub struct Node {
     /// Display node ui function,
     ///
     pub display: Option<DisplayNode>,
+}
+
+impl Node {
+    /// Returns true if this node was spawned,
+    ///
+    /// Spawned means that this node is ephemeral and can be deleted after it has transitioned to either Complete or Cancelled,
+    ///
+    pub fn is_spawned(&self) -> bool {
+        if let Some(state) = self.connection_state {
+            state.is_spawned()
+        } else {
+            false
+        }
+    }
+
+    /// Returns true if this node has an adhoc config,
+    ///
+    pub fn is_adhoc(&self) -> bool {
+        self.adhoc.is_some()
+    }
+
+    /// Returns the control block symbol, if empty the control is the root block,
+    ///
+    pub fn control_symbol(&self) -> String {
+        if let Some(state) = self.appendix.state(&self.status.entity()) {
+            state.control_symbol.to_string()
+        } else {
+            String::default()
+        }
+    }
 }
 
 impl App for Node {

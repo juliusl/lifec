@@ -136,6 +136,6 @@ impl BlockObject for Request {
     }
 
     fn parser(&self) -> Option<reality::CustomAttribute> {
-        todo!()
+        Some(Self::as_custom_attr())
     }
 }

@@ -2,7 +2,7 @@ use std::{ops::Deref, sync::Arc};
 
 use specs::Write;
 
-use crate::{editor::State, prelude::*, engine::Profiler};
+use crate::{editor::State, engine::Profiler, prelude::*};
 
 /// Extension trait for Host, that provides functions for opening a GUI editor,
 ///
@@ -68,32 +68,50 @@ impl Editor for Host {
     fn build_appendix(&mut self) {
         // Build runtime appendix
         self.world_mut().exec(
-            |(entities, engines, events, thunks, graphs, profilers, mut appendix): (
+            |(entities, engines, events, thunks, graphs, profilers, blocks, mut appendix): (
                 Entities,
                 ReadStorage<Engine>,
                 ReadStorage<Event>,
                 ReadStorage<Thunk>,
                 ReadStorage<AttributeGraph>,
                 ReadStorage<Profiler>,
+                ReadStorage<Block>,
                 Write<Appendix>,
             )| {
-                for (entity, engine, event, thunk, graph) in
-                    (&entities, engines.maybe(), events.maybe(), thunks.maybe(), graphs.maybe()).join()
+                for (entity, block, engine, event, thunk, graph) in (
+                    &entities,
+                    blocks.maybe(),
+                    engines.maybe(),
+                    events.maybe(),
+                    thunks.maybe(),
+                    graphs.maybe(),
+                )
+                    .join()
                 {
-                    match (event, thunk, graph, engine) {
-                        (None, Some(thunk), Some(graph), None) => {
+                    match (block, event, thunk, graph, engine) {
+                        (Some(block), None, Some(thunk), Some(graph), None) => {
                             appendix.insert_general(entity, thunk);
                             appendix.insert_state(
                                 entity,
                                 State {
-                                    graph: graph.clone(),
+                                    control_symbol: block.symbol().to_string(),
+                                    graph: Some(graph.clone()),
                                 },
                             );
                         }
-                        (Some(event), None, _, None) => {
+                        (block, Some(event), None, _, None) => {
                             appendix.insert_general(entity, event);
+                            if let Some(block) = block {
+                                appendix.insert_state(
+                                    entity,
+                                    State {
+                                        control_symbol: block.symbol().to_string(),
+                                        graph: None,
+                                    },
+                                );
+                            }
                         }
-                        (None, None, None, Some(engine)) => {
+                        (_, None, None, None, Some(engine)) => {
                             appendix.insert_general(entity, engine)
                         }
                         _ => {}
@@ -101,7 +119,12 @@ impl Editor for Host {
                 }
 
                 for (entity, _) in (&entities, &profilers).join() {
-                    appendix.insert_general(entity, General { name: "profiler".to_string() })
+                    appendix.insert_general(
+                        entity,
+                        General {
+                            name: "profiler".to_string(),
+                        },
+                    )
                 }
             },
         );

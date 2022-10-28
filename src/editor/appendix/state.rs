@@ -4,7 +4,10 @@ use crate::state::AttributeGraph;
 /// 
 #[derive(Clone, Default, PartialEq, Eq)]
 pub struct State {
+    /// Control symbol,
+    /// 
+    pub control_symbol: String,
     /// Initial state,
     ///
-    pub graph: AttributeGraph,
+    pub graph: Option<AttributeGraph>,
 }
