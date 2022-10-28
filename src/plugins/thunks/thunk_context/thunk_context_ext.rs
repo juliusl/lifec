@@ -47,4 +47,3 @@ impl AttributeIndex for ThunkContext {
         self.state().values()
     }
 }
-

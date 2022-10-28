@@ -1,6 +1,6 @@
 use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
 
-use crate::prelude::*;
+use crate::prelude::{*, attributes::Fmt};
 use hyper::{Body, Response};
 use reality::Block;
 use specs::{Component, DenseVecStorage, Entity};
@@ -608,6 +608,16 @@ impl ThunkContext {
                 Some(ErrorContext::new(e.clone(), None))
             }
         })
+    }
+}
+
+/// Functions consuming special attributes,
+/// 
+impl ThunkContext {
+    /// Formats a message w/ symbols from state,
+    /// 
+    pub fn format(&self, message: impl AsRef<str>) -> String {
+        Fmt::apply(self, message.as_ref())
     }
 }
 

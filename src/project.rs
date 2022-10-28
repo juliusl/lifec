@@ -188,10 +188,11 @@ where
 pub fn default_runtime() -> Runtime {
     let mut runtime = Runtime::default();
     runtime.install_with_custom::<Process>("");
-    runtime.install_with_custom::<Println>("");
+    runtime.install_with_custom::<Request>("");
     runtime.install_with_custom::<Install>("");
     runtime.install_with_custom::<Timer>("");
     runtime.install_with_custom::<Readln>("");
+    runtime.install_with_custom::<Println>("");
     runtime.install_with_custom::<Watch>("");
     runtime.install_with_custom::<Publish>("");
     runtime.install_with_custom::<Chaos>("");
