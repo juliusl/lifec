@@ -89,9 +89,12 @@ pub struct ThunkContext {
     ///
     udp_socket: Option<Arc<UdpSocket>>,
 
-    /// Caches a single http response, Cannot be cloned
+    /// Caches a single http response, Cannot be cloned,
     /// 
     response_cache: Option<Response<Body>>,
+    /// Caches a single http body, Cannot be cloned,
+    /// 
+    body_cache: Option<Body>,
 }
 
 impl Clone for ThunkContext {
@@ -114,12 +117,19 @@ impl Clone for ThunkContext {
             char_device: self.char_device.clone(),
             udp_socket: self.udp_socket.clone(),
             response_cache: None,
+            body_cache: None,
         }
     }
 }
 
 /// This block has all the async related features
 impl ThunkContext {
+    /// Caches a http body in the context,
+    /// 
+    pub fn cache_body(&mut self, body: Body) {
+        self.body_cache = Some(body);
+    }
+
     /// Caches a response in this context,
     /// 
     /// The motivation behind this is that http responses are common enough that most applications will use them, however reading the body 
@@ -133,6 +143,12 @@ impl ThunkContext {
     /// 
     pub fn take_response(&mut self) -> Option<Response<Body>> {
         self.response_cache.take()
+    }
+
+    /// Takes the body from the body cache,
+    /// 
+    pub fn take_body(&mut self) -> Option<Body> {
+        self.body_cache.take()
     }
 
     /// Returns a clone of the block that originated this context,
@@ -229,6 +245,10 @@ impl ThunkContext {
             event!(Level::WARN, "Committing context without consuming response_cache");
         }
 
+        if self.body_cache.is_some() {
+            event!(Level::WARN, "Committing context without consuming body_cache");    
+        }
+
         let mut clone = self.clone();
         clone.previous_graph = Some(clone.graph.clone());
         clone
@@ -237,9 +257,16 @@ impl ThunkContext {
     /// Takes any un-clonable fields from the context, and add's it to a committed version of the context,
     /// 
     pub fn consume(&mut self) -> Self {
-        if let Some(resp) = self.take_response() {
+        if self.response_cache.is_some() || self.body_cache.is_some() {
+            let response = self.take_response();
+            let body = self.take_body();
             let mut comitted = self.commit();
-            comitted.response_cache = Some(resp);
+            if let Some(response) = response {
+                comitted.cache_response(response);
+            }
+            if let Some(body) = body {
+                comitted.cache_body(body);
+            }
             comitted
         } else {
             self.commit()
