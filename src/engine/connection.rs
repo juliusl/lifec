@@ -103,6 +103,12 @@ impl Connection {
         }
     }
 
+    /// Returns an iterator over a tuple of spawned events and their source from this connection,
+    /// 
+    pub fn iter_spawned(&self) -> impl Iterator<Item = (&Entity, &Entity)> {
+        self.spawned.iter()
+    }
+
     /// Returns the entity this connection points to,
     ///
     pub fn entity(&self) -> Entity {

@@ -2,7 +2,7 @@ use std::{fmt::Display, ops::Deref, sync::Arc, collections::HashMap};
 
 use specs::{prelude::*, Entities, SystemData};
 
-use super::{Limit, Plugins, Profiler, TickControl, Transition};
+use super::{Limit, Plugins, Profiler, TickControl, Transition, Adhoc};
 use crate::{
     editor::{Appendix, Node, NodeStatus},
     prelude::*,
@@ -23,6 +23,8 @@ pub struct Events<'a> {
     cursors: ReadStorage<'a, Cursor>,
     transitions: ReadStorage<'a, Transition>,
     profilers: ReadStorage<'a, Profiler>,
+    adhocs: ReadStorage<'a, Adhoc>,
+    blocks: ReadStorage<'a, Block>,
     sequences: WriteStorage<'a, Sequence>,
     limits: WriteStorage<'a, Limit>,
     events: WriteStorage<'a, Event>,
@@ -94,6 +96,39 @@ impl Display for EventStatus {
 
 
 impl<'a> Events<'a> {
+    /// Returns a list of adhoc operations,
+    ///
+    pub fn list_adhoc_operations(&self) -> Vec<(Adhoc, Sequence)> {
+        let Self {
+            entities,
+            blocks,
+            adhocs,
+            sequences,
+            ..
+        } = self;
+
+        let mut operations = vec![];
+
+        let root_block = entities.entity(0);
+
+        if let Some(block) = blocks.get(root_block) {
+            for operation in block
+                .index()
+                .iter()
+                .filter(|b| b.root().name().ends_with("operation"))
+            {
+                let operation_entity = operation.root().id();
+                let operation_entity = entities.entity(operation_entity);
+
+                if let Some((adhoc, operation)) = (adhocs, sequences).join().get(operation_entity, entities) {
+                    operations.push((adhoc.clone(), operation.clone()));
+                }
+            }
+        }
+
+        operations
+    }
+
     /// Returns an iterator over joined tuple w/ Sequence storage,
     /// 
     pub fn join_sequences<C>(&'a self, other: &'a WriteStorage<'a, C>) -> impl Iterator<Item = (Entity, &Sequence, &C)>
@@ -359,11 +394,11 @@ impl<'a> Events<'a> {
 
     /// Waits for an event's operation to be ready w/o completing it,
     ///
-    pub fn wait_for_ready(&mut self, event: Entity) {
+    pub fn wait_for_ready(&self, event: Entity) {
         let Events { operations, .. } = self;
 
         loop {
-            if let Some(operation) = operations.get_mut(event) {
+            if let Some(operation) = operations.get(event) {
                 if operation.is_ready() {
                     break;
                 }
@@ -438,8 +473,8 @@ impl<'a> Events<'a> {
                 }
             }
             Transition::Spawn => {
-                // TODO: Duplicates the current event data under a new entity
-                todo!()
+                let spawned = self.spawn(event);
+                self.start(spawned, previous);
             }
             Transition::Buffer => {
                 // TODO: Buffers incoming events
@@ -522,6 +557,32 @@ impl<'a> Events<'a> {
         {
             self.cancel(*from);
         }
+    }
+
+    /// Spawn takes an event and creates a new entity based off of the original event,
+    /// 
+    /// In addition, it must handle connecting the spawned entity to the original event's cursors,
+    /// When updating the connection, the connection state will be distinct from the original, however all perf. metrics will be 
+    /// recorded in the original's histogram, as the spawned entity will be ephemeral.
+    /// 
+    pub fn spawn(&mut self, source: Entity) -> Entity {
+        let spawned = self.entities.create();
+
+        for e in self.get_next_entities(source).iter() {
+            if let Some(connection) = self.connections.get_mut(*e) {
+                connection.add_spawned(source, spawned);
+            }
+        }
+
+        spawned
+    }
+
+    /// Returns an iterator over spawned events,
+    /// 
+    pub fn scan_spawned_events(&self) -> impl Iterator<Item = (&Entity, &Entity)> {
+        let Self { entities, connections, .. } = self; 
+
+        (entities, connections).join().map(|(_, c)| c.iter_spawned()).flatten()
     }
 }
 
