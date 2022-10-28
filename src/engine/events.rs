@@ -98,6 +98,12 @@ impl Display for EventStatus {
 }
 
 impl<'a> Events<'a> {
+    /// Returns plugins data,
+    /// 
+    pub fn plugins(&self) -> &Plugins<'a> {
+        &self.plugins
+    }
+
     /// Returns a list of adhoc operations,
     ///
     pub fn list_adhoc_operations(&self) -> Vec<(Adhoc, Sequence)> {
