@@ -76,7 +76,6 @@ pub struct ThunkContext {
     start_command_dispatcher: Option<Sender<Start>>,
     /// Channel to send bytes to a listening char_device
     char_device: Option<Sender<(u32, u8)>>,
-
     /// UDP socket,
     ///
     /// Notes: Since UDP is connectionless, it can be shared, cloned, and stored in the
@@ -88,7 +87,6 @@ pub struct ThunkContext {
     ///     3) and cannot be stored in the context,
     ///
     udp_socket: Option<Arc<UdpSocket>>,
-
     /// Caches a single http response, Cannot be cloned,
     /// 
     response_cache: Option<Response<Body>>,
@@ -124,6 +122,12 @@ impl Clone for ThunkContext {
 
 /// This block has all the async related features
 impl ThunkContext {
+    /// Modify graph state,
+    /// 
+    pub fn modify_graph(&mut self) -> &mut AttributeGraph {
+        &mut self.graph
+    }
+
     /// Caches a http body in the context,
     /// 
     pub fn cache_body(&mut self, body: Body) {
