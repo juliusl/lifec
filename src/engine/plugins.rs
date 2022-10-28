@@ -141,7 +141,7 @@ impl<'a> Plugins<'a> {
                         select! {
                             result = operation.task(rx) => {
                                 match result {
-                                    Some(result) => context = result.commit(),
+                                    Some(mut result) => context = result.consume(),
                                     None => {
                                     }
                                 }

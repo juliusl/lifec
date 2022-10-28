@@ -1,6 +1,7 @@
 use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
 
 use crate::prelude::*;
+use hyper::{Body, Response};
 use reality::Block;
 use specs::{Component, DenseVecStorage, Entity};
 use tokio::{
@@ -35,10 +36,9 @@ use super::{CancelSource, CancelToken, ErrorContext, SecureClient, StatusUpdate}
 /// that context will keep it's async deps for subsequent calls. This ensures that as long as a plugin only makes changes
 /// to the context once, on subsequent calls of the plugin, the context will remain the same.
 ///
-#[derive(Debug, Component, Default, Clone)]
+#[derive(Debug, Component, Default)]
 #[storage(DenseVecStorage)]
-pub struct 
-ThunkContext {
+pub struct ThunkContext {
     /// # State Properties
 
     /// Compiled block that sourced the thunk,
@@ -88,10 +88,53 @@ ThunkContext {
     ///     3) and cannot be stored in the context,
     ///
     udp_socket: Option<Arc<UdpSocket>>,
+
+    /// Caches a single http response, Cannot be cloned
+    /// 
+    response_cache: Option<Response<Body>>,
+}
+
+impl Clone for ThunkContext {
+    fn clone(&self) -> Self {
+        Self {
+            block: self.block.clone(),
+            error_graph: self.error_graph.clone(),
+            previous_graph: self.previous_graph.clone(),
+            graph: self.graph.clone(),
+            entity: self.entity.clone(),
+            handle: self.handle.clone(),
+            client: self.client.clone(),
+            workspace: self.workspace.clone(),
+            local_tcp_addr: self.local_tcp_addr.clone(),
+            local_udp_addr: self.local_udp_addr.clone(),
+            status_updates: self.status_updates.clone(),
+            dispatcher: self.dispatcher.clone(),
+            operation_dispatcher: self.operation_dispatcher.clone(),
+            start_command_dispatcher: self.start_command_dispatcher.clone(),
+            char_device: self.char_device.clone(),
+            udp_socket: self.udp_socket.clone(),
+            response_cache: None,
+        }
+    }
 }
 
 /// This block has all the async related features
 impl ThunkContext {
+    /// Caches a response in this context,
+    /// 
+    /// The motivation behind this is that http responses are common enough that most applications will use them, however reading the body 
+    /// from the response and saving it directly to graph as binary can get very expensive. Since the response has the body as a stream, this is cheaper.
+    /// 
+    pub fn cache_response(&mut self, resp: Response<Body>) {
+        self.response_cache = Some(resp);
+    }
+    
+    /// Takes the response from the response cache,
+    /// 
+    pub fn take_response(&mut self) -> Option<Response<Body>> {
+        self.response_cache.take()
+    }
+
     /// Returns a clone of the block that originated this context,
     ///
     /// Typically using this directly is advanced, it's more likely that state/state_mut are used to get state data,
@@ -125,7 +168,7 @@ impl ThunkContext {
     }
 
     /// Returns the workspace in use,
-    /// 
+    ///
     pub fn workspace(&self) -> Option<&Workspace> {
         self.workspace.as_ref()
     }
@@ -143,7 +186,7 @@ impl ThunkContext {
     }
 
     /// Returns the current tag to use,
-    /// 
+    ///
     pub fn tag(&self) -> Option<String> {
         self.workspace.as_ref().and_then(|w| w.tag().cloned())
     }
@@ -182,9 +225,25 @@ impl ThunkContext {
     /// previous field,
     ///
     pub fn commit(&self) -> Self {
+        if self.response_cache.is_some() {
+            event!(Level::WARN, "Committing context without consuming response_cache");
+        }
+
         let mut clone = self.clone();
         clone.previous_graph = Some(clone.graph.clone());
         clone
+    }
+
+    /// Takes any un-clonable fields from the context, and add's it to a committed version of the context,
+    /// 
+    pub fn consume(&mut self) -> Self {
+        if let Some(resp) = self.take_response() {
+            let mut comitted = self.commit();
+            comitted.response_cache = Some(resp);
+            comitted
+        } else {
+            self.commit()
+        }
     }
 
     /// Returns true if the property is some boolean
@@ -292,7 +351,7 @@ impl ThunkContext {
 
     /// Enables a tcp listener for this context to listen to. accepts the first listener, creates a connection
     /// and then exits after the connection is dropped.
-    /// 
+    ///
     pub async fn enable_listener(
         &self,
         cancel_source: &mut oneshot::Receiver<()>,

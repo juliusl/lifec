@@ -226,7 +226,7 @@ where
                             }
                         }
 
-                        let mut next_tc = tc.commit();
+                        let mut next_tc = tc.consume();
 
                         if let Some((handle, cancel)) = B::call(&next_tc) {
                             select! {
