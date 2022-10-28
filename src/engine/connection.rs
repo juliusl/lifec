@@ -65,6 +65,8 @@ impl ConnectionState {
 #[derive(Component, Debug, Clone, PartialEq)]
 #[storage(VecStorage)]
 pub struct Connection {
+    /// Map of spawned entities and the source they are spawned from,
+    spawned: HashMap<Entity, Entity>,
     /// Set of entities of incoming connections,
     from: HashSet<Entity>,
     /// Owner of this connection,
@@ -97,6 +99,7 @@ impl Connection {
             to,
             connection_state: HashMap::default(),
             performance: HashMap::default(),
+            spawned: HashMap::default(),
         }
     }
 
@@ -107,9 +110,17 @@ impl Connection {
     }
 
     /// Add an incoming entity,
-    /// 
+    ///
     pub fn add_incoming(&mut self, incoming: Entity) {
         self.from.insert(incoming);
+    }
+
+    /// Adds an incoming spawned entity,
+    ///
+    pub fn add_spawned(&mut self, source: Entity, spawned: Entity) {
+        if self.from.contains(&source) {
+            self.spawned.insert(spawned, source);
+        }
     }
 
     /// Returns an iterator over each connection,
@@ -132,11 +143,27 @@ impl Connection {
         self.performance.iter()
     }
 
+    /// Returns the key for an incoming event,
+    ///
+    pub fn get_key(&self, incoming: Entity) -> Option<ConnectionState> {
+        if self.from.contains(&incoming) {
+            Some(ConnectionState::original(incoming))
+        } else if let Some(source) = self.spawned.get(&incoming) {
+            Some(ConnectionState::duplicate(incoming, *source))
+        } else {
+            event!(
+                Level::WARN,
+                "Trying to schedule an unknown event, {}",
+                incoming.id()
+            );
+            None
+        }
+    }
+
     /// Schedules an incoming connection,
     ///
     pub fn schedule(&mut self, incoming: Entity) {
-        if self.from.contains(&incoming) {
-            let key = ConnectionState::original(incoming);
+        if let Some(key) = self.get_key(incoming) {
             self.connection_state.insert(key, Activity::schedule());
 
             if !self.performance.contains_key(&key.source()) {
@@ -151,9 +178,8 @@ impl Connection {
     /// Starts a scheduled incoming connection,
     ///
     pub fn start(&mut self, incoming: Entity) {
-        if self.from.contains(&incoming) {
-            let connection_state = &ConnectionState::original(incoming);
-            if let Some(activity) = self.connection_state.get(connection_state) {
+        if let Some(connection_state) = self.get_key(incoming) {
+            if let Some(activity) = self.connection_state.get(&connection_state) {
                 if let Some(start) = activity.start() {
                     event!(
                         Level::DEBUG,
@@ -172,9 +198,8 @@ impl Connection {
     /// Completes an active connection,
     ///
     pub fn complete(&mut self, incoming: Entity, error: Option<&ErrorContext>) {
-        if self.from.contains(&incoming) {
-            let connection_state = &ConnectionState::original(incoming);
-            if let Some(activity) = self.connection_state.get(connection_state) {
+        if let Some(connection_state) = self.get_key(incoming) {
+            if let Some(activity) = self.connection_state.get(&connection_state) {
                 let completed = activity.complete(error);
                 event!(
                     Level::DEBUG,
@@ -184,7 +209,7 @@ impl Connection {
                     completed
                 );
                 self.connection_state
-                    .insert(*connection_state, completed.clone());
+                    .insert(connection_state, completed.clone());
 
                 if let (Some(duration), Some(perf)) = (
                     completed.duration_ms(),
