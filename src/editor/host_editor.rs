@@ -146,10 +146,8 @@ impl App for HostEditor {
             let Guest { guest_host, owner } = guest;
             
             let title = format!("Guest {}", owner.id());
-            let events = guest_host.world().system_data::<Events>();
-            for (e, s) in events.scan_spawned_events() {
-                ui.text(format!("{} {}", e.id(), s.id()));
-            }
+            let events = guest_host.world().system_data::<PluginFeatures>();
+            events.host_editor().events_window(title, ui);
         }
 
         window_padding.end();
