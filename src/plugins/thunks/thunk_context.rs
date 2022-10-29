@@ -1,3 +1,4 @@
+use crate::engine::Yielding;
 use crate::guest::Guest;
 use crate::prelude::{attributes::Fmt, *};
 use hyper::{Body, Response};
@@ -78,7 +79,7 @@ pub struct ThunkContext {
     /// Dispatcher for sending a guest, 
     guest_dispatcher: Option<Sender<Guest>>,
     /// Dispatcher for sending a node command, 
-    node_dispatcher: Option<Sender<NodeCommand>>,
+    node_dispatcher: Option<Sender<(NodeCommand, Option<Yielding>)>>,
     /// Channel to send bytes to a listening char_device
     char_device: Option<Sender<(u32, u8)>>,
     /// Watches for changes to the world's HostEditor,
@@ -433,7 +434,7 @@ impl ThunkContext {
 
      /// Returns a context w/ the node dispatcher enabled
     /// 
-    pub fn enable_node_dispatcher(&mut self, nodes: Sender<NodeCommand>) -> &mut ThunkContext{
+    pub fn enable_node_dispatcher(&mut self, nodes: Sender<(NodeCommand, Option<Yielding>)>) -> &mut ThunkContext{
         self.node_dispatcher = Some(nodes);
         self
     }
@@ -682,8 +683,42 @@ impl ThunkContext {
 
     /// Returns a node dispatcher,
     /// 
-    pub fn node_dispatcher(&self) -> Option<Sender<NodeCommand>> {
+    pub fn node_dispatcher(&self) -> Option<Sender<(NodeCommand, Option<Yielding>)>> {
         self.node_dispatcher.clone()
+    }
+
+    /// Sends a node command, if the command was a spawn command assumes yielding and returns a receiver to get the result on completion,
+    /// 
+    pub fn dispatch_node_command(&self, command: NodeCommand) -> Option<tokio::sync::oneshot::Receiver<ThunkContext>> {
+        if let Some(node_dispatcher) = self.node_dispatcher.as_ref() {
+            match command {
+                NodeCommand::Spawn(_, _) => {
+                    let (yielding, receiver) = Yielding::new(self.clone());
+                    match node_dispatcher.try_send((command, Some(yielding))) {
+                        Ok(_) => {
+                            Some(receiver)
+                        },
+                        Err(err) => {
+                            event!(Level::ERROR, "Could not send command, {err}");
+                            None
+                        },
+                    }
+                },
+                _ => {
+                    match node_dispatcher.try_send((command, None)) {
+                        Ok(_) => {
+                            None
+                        },
+                        Err(err) => {
+                            event!(Level::ERROR, "Could not send command, {err}");
+                            None
+                        },
+                    }
+                }
+            }
+        } else {
+            None 
+        }
     }
     
     /// Spawns and executes a task that will be managed by the event runtime

@@ -3,7 +3,7 @@ use std::ops::Deref;
 use specs::{prelude::*, Read};
 use tokio::sync::mpsc::{error::SendError, error::TrySendError, Sender};
 
-use crate::{prelude::*, guest::Guest};
+use crate::{prelude::*, guest::Guest, engine::Yielding};
 
 /// Resources for sending messages from plugins,
 ///
@@ -14,7 +14,7 @@ pub struct Broker<'a> {
     operation_sender: Read<'a, Sender<Operation>, EventRuntime>,
     start_sender: Read<'a, Sender<Start>, EventRuntime>,
     guest_sender: Read<'a, Sender<Guest>, EventRuntime>,
-    node_sender: Read<'a, Sender<NodeCommand>, EventRuntime>,
+    node_sender: Read<'a, Sender<(NodeCommand, Option<Yielding>)>, EventRuntime>,
 }
 
 impl<'a> Broker<'a> {
@@ -104,9 +104,9 @@ impl<'a> Broker<'a> {
 
     /// Sends a node command,
     /// 
-    pub fn try_send_node_command(&self, node_command: NodeCommand) -> Result<(), TrySendError<NodeCommand>> {
+    pub fn try_send_node_command(&self, node_command: NodeCommand, yielding: Option<Yielding>) -> Result<(), TrySendError<(NodeCommand, Option<Yielding>)>> {
         let Broker { node_sender, .. } = self; 
 
-        node_sender.try_send(node_command)
+        node_sender.try_send((node_command, yielding))
     }
 }

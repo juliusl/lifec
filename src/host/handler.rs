@@ -97,8 +97,8 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
                     .expect("should be able to insert guest");
             }
 
-            if let Some(command) = plugin_messages.try_next_node_command() {
-                events.handle_node_command(command);
+            if let Some((command, yielding)) = plugin_messages.try_next_node_command() {
+                events.handle_node_command(command, yielding);
             }
         }
     }

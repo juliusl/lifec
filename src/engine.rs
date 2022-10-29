@@ -49,6 +49,9 @@ pub use limit::Limit;
 mod tick_control;
 pub use tick_control::TickControl;
 
+mod yielding;
+pub use yielding::Yielding;
+
 use tracing::Level;
 
 /// An engine is a sequence of events, this component manages

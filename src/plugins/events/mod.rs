@@ -1,5 +1,5 @@
 use super::thunks::{ErrorContext, SecureClient, StatusUpdate};
-use crate::{guest::Guest, prelude::*};
+use crate::{guest::Guest, prelude::*, engine::Yielding};
 use hyper::Client;
 use hyper_tls::HttpsConnector;
 use specs::{shred::SetupHandler, Entity, System, World};
@@ -56,18 +56,18 @@ impl SetupHandler<sync::mpsc::Receiver<Guest>> for EventRuntime {
 }
 
 /// Setup for tokio-mulitple-producers single-consumer channel for nodes
-impl SetupHandler<sync::mpsc::Sender<NodeCommand>> for EventRuntime {
+impl SetupHandler<sync::mpsc::Sender<(NodeCommand, Option<Yielding>)>> for EventRuntime {
     fn setup(world: &mut specs::World) {
-        let (tx, rx) = mpsc::channel::<NodeCommand>(30);
+        let (tx, rx) = mpsc::channel::<(NodeCommand, Option<Yielding>)>(30);
         world.insert(tx);
         world.insert(rx);
     }
 }
 
 /// Setup for tokio-mulitple-producers single-consumer channel for nodes
-impl SetupHandler<sync::mpsc::Receiver<NodeCommand>> for EventRuntime {
+impl SetupHandler<sync::mpsc::Receiver<(NodeCommand, Option<Yielding>)>> for EventRuntime {
     fn setup(world: &mut specs::World) {
-        let (tx, rx) = mpsc::channel::<NodeCommand>(30);
+        let (tx, rx) = mpsc::channel::<(NodeCommand, Option<Yielding>)>(30);
         world.insert(tx);
         world.insert(rx);
     }

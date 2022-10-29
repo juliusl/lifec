@@ -1,5 +1,6 @@
 use crate::engine::Adhoc;
 use crate::engine::Profiler;
+use crate::engine::Yielding;
 use crate::prelude::*;
 
 mod source;
@@ -221,6 +222,7 @@ pub fn default_world() -> World {
     world.register::<Profiler>();
     world.register::<Operation>();
     world.register::<RunmdFile>();
+    world.register::<Yielding>();
     world.register::<Transition>();
     world.register::<ThunkContext>();
     world.register::<AttributeGraph>();

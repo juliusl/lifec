@@ -1,7 +1,7 @@
 use specs::prelude::*;
 use tokio::sync::mpsc::Receiver;
 
-use crate::{prelude::*, guest::Guest};
+use crate::{prelude::*, guest::Guest, engine::Yielding};
 
 /// Resources for consuming messages from plugins,
 ///
@@ -14,7 +14,7 @@ pub struct PluginListener<'a> {
     operations: Write<'a, Receiver<Operation>, EventRuntime>,
     starts: Write<'a, Receiver<Start>, EventRuntime>,
     guests: Write<'a, Receiver<Guest>, EventRuntime>,
-    nodes: Write<'a, Receiver<NodeCommand>, EventRuntime>,
+    nodes: Write<'a, Receiver<(NodeCommand, Option<Yielding>)>, EventRuntime>,
 }
 
 impl<'a> PluginListener<'a> {
@@ -61,7 +61,7 @@ impl<'a> PluginListener<'a> {
 
     /// Waits for the next node,
     /// 
-    pub async fn next_node_command(&mut self) -> Option<NodeCommand> {
+    pub async fn next_node_command(&mut self) -> Option<(NodeCommand, Option<Yielding>)> {
         let PluginListener { nodes, .. } = self;
 
         nodes.recv().await
@@ -110,7 +110,7 @@ impl<'a> PluginListener<'a> {
 
     /// Tries to wait for the next node command,
     /// 
-    pub fn try_next_node_command(&mut self) -> Option<NodeCommand> {
+    pub fn try_next_node_command(&mut self) -> Option<(NodeCommand, Option<Yielding>)> {
         let PluginListener { nodes, .. } = self;
 
         nodes.try_recv().ok()

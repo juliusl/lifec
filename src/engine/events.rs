@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display, ops::Deref, sync::Arc};
 use specs::{prelude::*, Entities, SystemData};
 
 use super::{
-    connection::ConnectionState, Adhoc, Limit, Plugins, Profiler, TickControl, Transition,
+    connection::ConnectionState, Adhoc, Limit, Plugins, Profiler, TickControl, Transition, Yielding,
 };
 use crate::{
     editor::{Appendix, Node, NodeStatus},
@@ -33,6 +33,7 @@ pub struct Events<'a> {
     connections: WriteStorage<'a, Connection>,
     operations: WriteStorage<'a, Operation>,
     connection_states: WriteStorage<'a, ConnectionState>,
+    yielding: WriteStorage<'a, Yielding>,
 }
 
 /// Enumeration of event statuses,
@@ -281,7 +282,27 @@ impl<'a> Events<'a> {
                 self.transition(None, *e);
             }
             EventStatus::Ready(ready) => {
-                let result = self.get_result(*ready);
+                let mut result = self.get_result(*ready);
+
+                let result = if let Some(result) = result.take() {
+                    let clone = result.clone();
+
+                    if let Some(Yielding(yielding, _)) = self.yielding.remove(*ready) {
+                        match yielding.send(result) {
+                            Ok(_) => {
+                                Some(clone)
+                            },
+                            Err(err) => {
+                                event!(Level::ERROR, "Could not send to yielding channel");
+                                Some(err)
+                            },
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
 
                 let next_entities = self.get_next_entities(*ready);
 
@@ -504,6 +525,7 @@ impl<'a> Events<'a> {
             sequences,
             events,
             operations,
+            yielding,
             ..
         } = self;
 
@@ -511,6 +533,16 @@ impl<'a> Events<'a> {
             event!(Level::DEBUG, "\n\n\t{}\tstarted event {}\n", e, event.id());
 
             let sequence = sequences.get(event).expect("should have a sequence");
+
+            let previous = if let None = previous {
+                if let Some(Yielding(_, previous)) = yielding.get(event) {
+                    Some(previous)
+                } else {
+                    None
+                }
+            } else {
+                previous
+            };
 
             let operation = plugins.start_sequence(sequence, previous);
 
@@ -918,7 +950,7 @@ impl<'a> Events<'a> {
 
     /// Handles the node command,
     ///
-    pub fn handle_node_command(&mut self, command: NodeCommand) {
+    pub fn handle_node_command(&mut self, command: NodeCommand, yielding: Option<Yielding>) {
         match command {
             crate::editor::NodeCommand::Activate(event) => {
                 if self.activate(event) {
@@ -945,8 +977,13 @@ impl<'a> Events<'a> {
                     event!(Level::DEBUG, "Cancelling event {}", event.id());
                 }
             }
-            crate::editor::NodeCommand::Spawn(event) => {
+            crate::editor::NodeCommand::Spawn(event, _) => {
                 let spawned = self.spawn(event);
+
+                if let Some(yielding) = yielding {
+                    self.yielding.insert(spawned, yielding).expect("should be able to insert");
+                }
+
                 if self.activate(spawned) {
                     event!(Level::DEBUG, "Spawning event {}", event.id());
                 }
