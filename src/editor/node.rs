@@ -35,6 +35,7 @@ pub type DisplayNode = fn(&Node, &Ui);
 
 /// Struct for visualizing and commanding node-like entities,
 ///
+#[derive(Clone)]
 pub struct Node {
     /// Status of the current node,
     ///
@@ -138,6 +139,12 @@ impl Hash for Node {
         self.transition.hash(state);
         self.appendix.hash(state);
         self.command.hash(state);
+        self.connection_state.hash(state);
+        for (e, g) in self.mutations.iter(){
+            e.hash(state);
+            g.hash(state);
+        }
+        self.adhoc.hash(state);
     }
 }
 
@@ -149,5 +156,8 @@ impl PartialEq for Node {
             && self.transition == other.transition
             && self.appendix == other.appendix
             && self.command == other.command
+            && self.adhoc == other.adhoc
+            && self.connection_state == other.connection_state
+            && self.mutations == other.mutations
     }
 }

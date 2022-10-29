@@ -3,6 +3,10 @@ use lifec::prelude::*;
 /// Example showing opening an editor for a workspace,
 /// 
 fn main() {
+    tracing_subscriber::fmt::Subscriber::builder()
+    .compact()
+    .init();
+
     let mut workspace = Workspace::new("test.io", None);
     workspace.set_root_runmd(
         r#"

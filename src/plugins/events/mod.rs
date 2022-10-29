@@ -26,6 +26,25 @@ impl SetupHandler<tokio::runtime::Runtime> for EventRuntime {
     }
 }
 
+/// Setup for tokio-broadcast channel for entity updates
+impl SetupHandler<sync::watch::Receiver<HostEditor>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = sync::watch::channel::<HostEditor>(HostEditor::default());
+        world.insert(rx);
+        world.insert(tx);
+    }
+}
+
+
+/// Setup for tokio-broadcast channel for entity updates
+impl SetupHandler<sync::watch::Sender<HostEditor>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = sync::watch::channel::<HostEditor>(HostEditor::default());
+        world.insert(rx);
+        world.insert(tx);
+    }
+}
+
 /// Setup for tokio-mulitple-producers single-consumer channel for status updates
 impl SetupHandler<sync::mpsc::Sender<StatusUpdate>> for EventRuntime {
     fn setup(world: &mut specs::World) {

@@ -1,9 +1,9 @@
-use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
-
-use crate::prelude::{*, attributes::Fmt};
+use crate::prelude::{attributes::Fmt, *};
 use hyper::{Body, Response};
 use reality::Block;
 use specs::{Component, DenseVecStorage, Entity};
+use std::fmt::Debug;
+use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
     net::{TcpListener, UdpSocket},
@@ -36,7 +36,7 @@ use super::{CancelSource, CancelToken, ErrorContext, SecureClient, StatusUpdate}
 /// that context will keep it's async deps for subsequent calls. This ensures that as long as a plugin only makes changes
 /// to the context once, on subsequent calls of the plugin, the context will remain the same.
 ///
-#[derive(Debug, Component, Default)]
+#[derive(Component, Default)]
 #[storage(DenseVecStorage)]
 pub struct ThunkContext {
     /// # State Properties
@@ -76,6 +76,8 @@ pub struct ThunkContext {
     start_command_dispatcher: Option<Sender<Start>>,
     /// Channel to send bytes to a listening char_device
     char_device: Option<Sender<(u32, u8)>>,
+    /// Watches for changes to the world's HostEditor,
+    host_editor_watcher: Option<tokio::sync::watch::Receiver<HostEditor>>,
     /// UDP socket,
     ///
     /// Notes: Since UDP is connectionless, it can be shared, cloned, and stored in the
@@ -88,10 +90,10 @@ pub struct ThunkContext {
     ///
     udp_socket: Option<Arc<UdpSocket>>,
     /// Caches a single http response, Cannot be cloned,
-    /// 
+    ///
     response_cache: Option<Response<Body>>,
     /// Caches a single http body, Cannot be cloned,
-    /// 
+    ///
     body_cache: Option<Body>,
 }
 
@@ -114,43 +116,69 @@ impl Clone for ThunkContext {
             start_command_dispatcher: self.start_command_dispatcher.clone(),
             char_device: self.char_device.clone(),
             udp_socket: self.udp_socket.clone(),
+            host_editor_watcher: self.host_editor_watcher.clone(),
             response_cache: None,
             body_cache: None,
         }
     }
 }
 
+impl Debug for ThunkContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ThunkContext")
+            .field("block", &self.block)
+            .field("error_graph", &self.error_graph)
+            .field("previous_graph", &self.previous_graph)
+            .field("graph", &self.graph)
+            .field("entity", &self.entity)
+            .field("handle", &self.handle)
+            .field("client", &self.client)
+            .field("workspace", &self.workspace)
+            .field("local_tcp_addr", &self.local_tcp_addr)
+            .field("local_udp_addr", &self.local_udp_addr)
+            .field("status_updates", &self.status_updates)
+            .field("dispatcher", &self.dispatcher)
+            .field("operation_dispatcher", &self.operation_dispatcher)
+            .field("start_command_dispatcher", &self.start_command_dispatcher)
+            .field("char_device", &self.char_device)
+            .field("udp_socket", &self.udp_socket)
+            .field("response_cache", &self.response_cache)
+            .field("body_cache", &self.body_cache)
+            .finish()
+    }
+}
+
 /// This block has all the async related features
 impl ThunkContext {
     /// Modify graph state,
-    /// 
+    ///
     pub fn modify_graph(&mut self) -> &mut AttributeGraph {
         &mut self.graph
     }
 
     /// Caches a http body in the context,
-    /// 
+    ///
     pub fn cache_body(&mut self, body: Body) {
         self.body_cache = Some(body);
     }
 
     /// Caches a response in this context,
-    /// 
-    /// The motivation behind this is that http responses are common enough that most applications will use them, however reading the body 
+    ///
+    /// The motivation behind this is that http responses are common enough that most applications will use them, however reading the body
     /// from the response and saving it directly to graph as binary can get very expensive. Since the response has the body as a stream, this is cheaper.
-    /// 
+    ///
     pub fn cache_response(&mut self, resp: Response<Body>) {
         self.response_cache = Some(resp);
     }
-    
+
     /// Takes the response from the response cache,
-    /// 
+    ///
     pub fn take_response(&mut self) -> Option<Response<Body>> {
         self.response_cache.take()
     }
 
     /// Takes the body from the body cache,
-    /// 
+    ///
     pub fn take_body(&mut self) -> Option<Body> {
         self.body_cache.take()
     }
@@ -246,11 +274,17 @@ impl ThunkContext {
     ///
     pub fn commit(&self) -> Self {
         if self.response_cache.is_some() {
-            event!(Level::WARN, "Committing context without consuming response_cache");
+            event!(
+                Level::WARN,
+                "Committing context without consuming response_cache"
+            );
         }
 
         if self.body_cache.is_some() {
-            event!(Level::WARN, "Committing context without consuming body_cache");    
+            event!(
+                Level::WARN,
+                "Committing context without consuming body_cache"
+            );
         }
 
         let mut clone = self.clone();
@@ -259,7 +293,7 @@ impl ThunkContext {
     }
 
     /// Takes any un-clonable fields from the context, and add's it to a committed version of the context,
-    /// 
+    ///
     pub fn consume(&mut self) -> Self {
         if self.response_cache.is_some() || self.body_cache.is_some() {
             let response = self.take_response();
@@ -378,6 +412,51 @@ impl ThunkContext {
     ///
     pub fn enable_workspace(&mut self, workspace: Workspace) {
         self.workspace = Some(workspace);
+    }
+
+    /// Enables watching the runtime's host editor,
+    /// 
+    pub fn enable_host_editor_watcher(&mut self, watcher: tokio::sync::watch::Receiver<HostEditor>) {
+        self.host_editor_watcher = Some(watcher);
+    }
+
+    /// Returns the current state of the host editor,
+    /// 
+    pub fn host_editor(&self) -> Option<HostEditor> {
+        if let Some(host_editor) = self.host_editor_watcher.as_ref() {
+            Some(host_editor.borrow().clone())
+        } else {
+            None
+        }
+    }
+
+    /// Returns the next host editor, if None, either there was an error or this feature is not enabled,
+    /// or the channel has closed.
+    /// 
+    pub async fn next_host_editor(&mut self) -> Option<HostEditor> {
+        if let Some(watcher) = self.host_editor_watcher.as_mut() {
+            match watcher.changed().await {
+                Ok(_) => {
+                    Some(watcher.borrow().clone())
+                },
+                Err(err) => {
+                    event!(Level::ERROR, "Error watching host editor for changes {err}");
+                    None
+                },
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Returns a new host watcher receiver,
+    /// 
+    pub fn host_watcher(&self) -> Option<tokio::sync::watch::Receiver<HostEditor>> {
+        if let Some(recv) = self.host_editor_watcher.as_ref() {
+            Some(recv.clone())
+        } else {
+            None
+        }
     }
 
     /// Enables a tcp listener for this context to listen to. accepts the first listener, creates a connection
@@ -643,10 +722,10 @@ impl ThunkContext {
 }
 
 /// Functions consuming special attributes,
-/// 
+///
 impl ThunkContext {
     /// Formats a message w/ symbols from state,
-    /// 
+    ///
     pub fn format(&self, message: impl AsRef<str>) -> String {
         Fmt::apply(self, message.as_ref())
     }

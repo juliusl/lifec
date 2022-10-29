@@ -1,12 +1,13 @@
 use std::collections::{BTreeMap, HashMap};
-
+use std::hash::Hash;
 use atlier::system::App;
 use hdrhistogram::Histogram;
 use imgui::{ChildWindow, SliderFlags, StyleVar, Ui, Window};
-use specs::{Entity, System};
+use specs::{Entity, System, Read};
 use tokio::time::Instant;
 use tracing::{event, Level};
 
+use crate::prelude::EventRuntime;
 use crate::{
     prelude::{Events, Node},
     state::AttributeGraph,
@@ -16,6 +17,7 @@ use super::Profiler;
 
 /// Tool for viewing and interacting with a host,
 ///
+#[derive(Clone, PartialEq)]
 pub struct HostEditor {
     /// Current nodes,
     ///
@@ -47,6 +49,20 @@ pub struct HostEditor {
     /// Command to reset state on all events,
     ///
     reset: Option<()>,
+}
+
+impl Hash for HostEditor {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.nodes.hash(state);
+        self.adhoc_profilers.hash(state);
+        self.last_refresh.hash(state);
+        self.is_paused.hash(state);
+        self.is_stopped.hash(state);
+        self.tick_limit.hash(state);
+        self.tick.hash(state);
+        self.pause.hash(state);
+        self.reset.hash(state);
+    }
 }
 
 impl HostEditor {
@@ -119,9 +135,9 @@ impl App for HostEditor {
 }
 
 impl<'a> System<'a> for HostEditor {
-    type SystemData = Events<'a>;
+    type SystemData = (Events<'a>,  Read<'a, tokio::sync::watch::Sender<HostEditor>, EventRuntime>);
 
-    fn run(&mut self, mut events: Self::SystemData) {
+    fn run(&mut self, (mut events, watcher): Self::SystemData) {
         // General event runtime state
         self.is_paused = !events.can_continue();
         self.is_stopped = events.should_exit();
@@ -192,6 +208,17 @@ impl<'a> System<'a> for HostEditor {
         // Get latest adhoc profiler state,
         //
         self.adhoc_profilers = events.adhoc_profilers();
+
+        // Update watcher
+        // 
+        watcher.send_if_modified(|current| {
+            if current != self {
+                event!(Level::DEBUG, "Refreshed");
+                true
+            } else {
+                false
+            }
+        });
     }
 }
 

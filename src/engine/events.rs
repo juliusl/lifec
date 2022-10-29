@@ -715,35 +715,6 @@ impl<'a> Events<'a> {
 
         tick_control.resume_entity(event)
     }
-
-    /// Returns connections from adhoc profilers,
-    ///
-    pub fn adhoc_profilers(&self) -> Vec<Node> {
-        let Events {
-            appendix,
-            profilers,
-            connections,
-            ..
-        } = self;
-
-        (profilers, connections)
-            .join()
-            .map(|(_, c)| Node {
-                status: NodeStatus::Profiler,
-                connection: Some(c.clone()),
-                adhoc: None,
-                appendix: appendix.deref().clone(),
-                mutations: HashMap::default(),
-                connection_state: None,
-                cursor: None,
-                sequence: None,
-                transition: None,
-                command: None,
-                edit: None,
-                display: None,
-            })
-            .collect::<Vec<_>>()
-    }
 }
 
 /// Functions for sending messages,
@@ -860,6 +831,35 @@ impl<'a> Events<'a> {
 /// Editor related functions
 ///
 impl<'a> Events<'a> {
+    /// Returns connections from adhoc profilers as a vector of nodes,
+    ///
+    pub fn adhoc_profilers(&self) -> Vec<Node> {
+        let Events {
+            appendix,
+            profilers,
+            connections,
+            ..
+        } = self;
+
+        (profilers, connections)
+            .join()
+            .map(|(_, c)| Node {
+                status: NodeStatus::Profiler,
+                connection: Some(c.clone()),
+                adhoc: None,
+                appendix: appendix.deref().clone(),
+                mutations: HashMap::default(),
+                connection_state: None,
+                cursor: None,
+                sequence: None,
+                transition: None,
+                command: None,
+                edit: None,
+                display: None,
+            })
+            .collect::<Vec<_>>()
+    }
+
     /// Returns an iterator over event nodes,
     ///
     pub fn nodes(&'a self) -> Vec<Node> {
