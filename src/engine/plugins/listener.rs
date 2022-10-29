@@ -137,7 +137,8 @@ impl<'a> PluginListener<'a> {
     /// Returns the current host editor,
     /// 
     pub fn host_editor(&self) -> HostEditor {
-        self.host_editor.borrow().clone()
+        let channel = self.host_editor.deref();
+        channel.borrow().clone()
     }
 
     /// Enables features on the thunk context,
