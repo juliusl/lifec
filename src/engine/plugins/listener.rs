@@ -16,7 +16,6 @@ pub struct PluginListener<'a> {
     operations: Write<'a, Receiver<Operation>, EventRuntime>,
     starts: Write<'a, Receiver<Start>, EventRuntime>,
     guests: Write<'a, Receiver<Guest>, EventRuntime>,
-    host_editor: Read<'a, tokio::sync::watch::Receiver<HostEditor>, EventRuntime>,
 }
 
 impl<'a> PluginListener<'a> {
@@ -100,38 +99,5 @@ impl<'a> PluginListener<'a> {
         let PluginListener { guests, .. } = self;
 
         guests.try_recv().ok()
-    }
-
-    /// Returns a clone of the host editor if there was a change,
-    /// 
-    pub fn try_next_host_editor(&self) -> Option<HostEditor> {
-        let PluginListener { host_editor, .. } = self; 
-
-         match host_editor.has_changed() {
-            Ok(changed) => {
-                if changed {
-                    Some(host_editor.borrow().clone())
-                } else {
-                    None 
-                }
-            },
-            Err(err) => {
-                event!(Level::ERROR, "Error checking for host editor change {err}");
-                None
-            },
-        }
-    }
-
-    /// Returns the current host editor,
-    /// 
-    pub fn host_editor(&self) -> HostEditor {
-        let channel = self.host_editor.deref();
-        channel.borrow().clone()
-    }
-
-    /// Enables features on the thunk context,
-    /// 
-    pub fn enable(&self, context: &mut ThunkContext) {
-        context.enable_host_editor_watcher(self.host_editor.deref().clone());
     }
 }

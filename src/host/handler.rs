@@ -83,10 +83,6 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
                 listener.on_error_context(&error);
             }
 
-            if let Some(host_editor) = plugin_messages.try_next_host_editor() {
-                listener.on_host_editor(host_editor);
-            }
-
             if let Some(Guest { owner, guest_host }) = plugin_messages.try_next_guest() {
                 guests
                     .insert(owner, Guest { owner, guest_host })

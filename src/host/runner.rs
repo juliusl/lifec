@@ -34,8 +34,4 @@ impl Listener for Runner {
     fn on_error_context(&mut self, _error: &crate::prelude::ErrorContext) {
         todo!()
     }
-
-    fn on_host_editor(&mut self, _host_editor: crate::prelude::HostEditor) {
-        todo!()
-    }
 }

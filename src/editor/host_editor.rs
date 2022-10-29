@@ -8,7 +8,7 @@ use tokio::time::Instant;
 use tracing::{event, Level};
 
 use crate::guest::Guest;
-use crate::prelude::{EventRuntime, PluginListener};
+use crate::prelude::EventRuntime;
 use crate::{
     prelude::{Events, Node},
     state::AttributeGraph,

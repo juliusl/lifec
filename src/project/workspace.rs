@@ -283,7 +283,6 @@ mod tests {
         }
         fn on_error_context(&mut self, _: &ErrorContext) {}
         fn on_start_command(&mut self, _: &Start) {}
-        fn on_host_editor(&mut self, _: HostEditor) {}
     }
 
     #[test]
