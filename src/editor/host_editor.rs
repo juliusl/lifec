@@ -144,12 +144,7 @@ impl App for HostEditor {
 
         for (_, guest) in self.guests.iter() {
             let Guest { guest_host, owner } = guest;
-            // let _host_editor = guest_host.world().system_data::<PluginListener>();
-            // let mut host_editor = host_editor.host_editor();
-            // host_editor.events_window(
-            //     format!("Guest({}) Events", owner.id()), 
-            //     ui
-            // );
+            ui.text(format!("{}", owner.id()));
         }
 
         window_padding.end();
