@@ -8,7 +8,7 @@ use tokio::time::Instant;
 use tracing::{event, Level};
 
 use crate::guest::Guest;
-use crate::prelude::EventRuntime;
+use crate::prelude::{EventRuntime, PluginFeatures};
 use crate::{
     prelude::{Events, Node},
     state::AttributeGraph,
@@ -144,7 +144,10 @@ impl App for HostEditor {
 
         for (_, guest) in self.guests.iter() {
             let Guest { guest_host, owner } = guest;
-            ui.text(format!("{}", owner.id()));
+            
+            let title = format!("Guest {}", owner.id());
+            let features = guest_host.world().system_data::<PluginFeatures>();
+            features.host_editor().events_window(title, ui);
         }
 
         window_padding.end();
