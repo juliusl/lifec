@@ -14,6 +14,7 @@ pub struct PluginListener<'a> {
     operations: Write<'a, Receiver<Operation>, EventRuntime>,
     starts: Write<'a, Receiver<Start>, EventRuntime>,
     guests: Write<'a, Receiver<Guest>, EventRuntime>,
+    nodes: Write<'a, Receiver<NodeCommand>, EventRuntime>,
 }
 
 impl<'a> PluginListener<'a> {
@@ -58,6 +59,14 @@ impl<'a> PluginListener<'a> {
         guests.recv().await
     }
 
+    /// Waits for the next node,
+    /// 
+    pub async fn next_node_command(&mut self) -> Option<NodeCommand> {
+        let PluginListener { nodes, .. } = self;
+
+        nodes.recv().await
+    }
+
     /// Tries to wait for the next status update,
     /// 
     pub fn try_next_status_update(&mut self) -> Option<StatusUpdate> {
@@ -97,5 +106,13 @@ impl<'a> PluginListener<'a> {
         let PluginListener { guests, .. } = self;
 
         guests.try_recv().ok()
+    }
+
+    /// Tries to wait for the next node command,
+    /// 
+    pub fn try_next_node_command(&mut self) -> Option<NodeCommand> {
+        let PluginListener { nodes, .. } = self;
+
+        nodes.try_recv().ok()
     }
 }

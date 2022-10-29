@@ -6,7 +6,7 @@ use super::Node;
 
 /// Enumeration of node commands,
 ///
-#[derive(Clone, PartialEq, Eq, PartialOrd, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
 pub enum NodeCommand {
     /// Command to activate this node,
     ///

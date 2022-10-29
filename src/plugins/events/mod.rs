@@ -55,6 +55,24 @@ impl SetupHandler<sync::mpsc::Receiver<Guest>> for EventRuntime {
     }
 }
 
+/// Setup for tokio-mulitple-producers single-consumer channel for nodes
+impl SetupHandler<sync::mpsc::Sender<NodeCommand>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<NodeCommand>(30);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
+/// Setup for tokio-mulitple-producers single-consumer channel for nodes
+impl SetupHandler<sync::mpsc::Receiver<NodeCommand>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<NodeCommand>(30);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
 /// Setup for tokio-mulitple-producers single-consumer channel for status updates
 impl SetupHandler<sync::mpsc::Sender<StatusUpdate>> for EventRuntime {
     fn setup(world: &mut specs::World) {

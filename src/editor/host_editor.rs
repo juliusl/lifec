@@ -215,7 +215,14 @@ impl<'a> System<'a> for HostEditor {
         let mut mutations = HashMap::<Entity, HashMap<Entity, AttributeGraph>>::default();
         for mut node in self.nodes.drain(..) {
             if let Some(command) = node.command.take() {
-                events.handle_node_command(command);
+                match events.plugins().features().broker().try_send_node_command(command.clone()) {
+                    Ok(_) => {
+                        event!(Level::DEBUG, "Sent node command {:?}", command);
+                    },
+                    Err(err) => {
+                        event!(Level::ERROR, "Could not send node command {err}, {:?}", command);
+                    },
+                }
             }
 
             if node.mutations.len() > 0 {

@@ -77,6 +77,8 @@ pub struct ThunkContext {
     start_command_dispatcher: Option<Sender<Start>>,
     /// Dispatcher for sending a guest, 
     guest_dispatcher: Option<Sender<Guest>>,
+    /// Dispatcher for sending a node command, 
+    node_dispatcher: Option<Sender<NodeCommand>>,
     /// Channel to send bytes to a listening char_device
     char_device: Option<Sender<(u32, u8)>>,
     /// Watches for changes to the world's HostEditor,
@@ -121,6 +123,7 @@ impl Clone for ThunkContext {
             udp_socket: self.udp_socket.clone(),
             host_editor_watcher: self.host_editor_watcher.clone(),
             guest_dispatcher: self.guest_dispatcher.clone(),
+            node_dispatcher: self.node_dispatcher.clone(),
             response_cache: None,
             body_cache: None,
         }
@@ -428,6 +431,13 @@ impl ThunkContext {
         self
     }
 
+     /// Returns a context w/ the node dispatcher enabled
+    /// 
+    pub fn enable_node_dispatcher(&mut self, nodes: Sender<NodeCommand>) -> &mut ThunkContext{
+        self.node_dispatcher = Some(nodes);
+        self
+    }
+
     /// Enables output to a char_device, a plugin can use to output bytes to.
     ///
     /// The implementation of the char_device, can choose how to handle this output,
@@ -670,6 +680,12 @@ impl ThunkContext {
         self.dispatcher.clone()
     }
 
+    /// Returns a node dispatcher,
+    /// 
+    pub fn node_dispatcher(&self) -> Option<Sender<NodeCommand>> {
+        self.node_dispatcher.clone()
+    }
+    
     /// Spawns and executes a task that will be managed by the event runtime
     ///
     /// Caveat: async must be enabled for this api to work, otherwise it will result in a

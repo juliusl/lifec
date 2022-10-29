@@ -46,6 +46,7 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
         Write<'a, tokio::sync::mpsc::Receiver<ErrorContext>, EventRuntime>,
         Write<'a, Option<L>>,
         WriteStorage<'a, Guest>,
+        Events<'a>,
     );
 
     fn setup(&mut self, world: &mut World) {
@@ -56,7 +57,14 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
 
     fn run(
         &mut self,
-        (mut plugin_messages,  mut completed_plugins, mut errors, mut listener, mut guests): Self::SystemData,
+        (
+            mut plugin_messages,
+            mut completed_plugins,
+            mut errors,
+            mut listener,
+            mut guests,
+            mut events,
+        ): Self::SystemData,
     ) {
         if let Some(listener) = listener.as_mut() {
             if let Some(operation) = plugin_messages.try_next_operation() {
@@ -87,6 +95,10 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
                 guests
                     .insert(owner, Guest { owner, guest_host })
                     .expect("should be able to insert guest");
+            }
+
+            if let Some(command) = plugin_messages.try_next_node_command() {
+                events.handle_node_command(command);
             }
         }
     }
