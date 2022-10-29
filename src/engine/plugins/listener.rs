@@ -16,7 +16,7 @@ pub struct PluginListener<'a> {
     operations: Write<'a, Receiver<Operation>, EventRuntime>,
     starts: Write<'a, Receiver<Start>, EventRuntime>,
     guests: Write<'a, Receiver<Guest>, EventRuntime>,
-    host_editor: Write<'a, tokio::sync::watch::Receiver<HostEditor>, EventRuntime>,
+    host_editor: Read<'a, tokio::sync::watch::Receiver<HostEditor>, EventRuntime>,
 }
 
 impl<'a> PluginListener<'a> {
@@ -59,18 +59,6 @@ impl<'a> PluginListener<'a> {
         let PluginListener { guests, .. } = self;
 
         guests.recv().await
-    }
-
-    /// Waits for the host editor to change and returns a clone,
-    /// 
-    pub async fn next_host_editor(&mut self) -> Option<HostEditor> {
-        match self.host_editor.changed().await {
-            Ok(_) => Some(self.host_editor.borrow().clone()),
-            Err(err) => {
-                event!(Level::ERROR, "Error waiting for a host change {err}");
-                None
-            },
-        }
     }
 
     /// Tries to wait for the next status update,
