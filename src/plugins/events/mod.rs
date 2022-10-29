@@ -180,19 +180,14 @@ impl SetupHandler<SecureClient> for EventRuntime {
 }
 
 impl<'a> System<'a> for EventRuntime {
-    type SystemData = (Events<'a>, ReadStorage<'a, Guest>);
+    type SystemData = Events<'a>;
 
-    fn run(&mut self, (mut events, guests): Self::SystemData) {
+    fn run(&mut self, mut events: Self::SystemData) {
         if !events.should_exit() && events.can_continue() {
             events.tick();
         } else {
             // If a rate limit is set, this will update the freq w/o changing the last tick
             events.handle_rate_limits();
-        }
-
-        for guest in guests.join() {
-            let mut events = guest.guest_host.world().system_data::<Events>();
-            events.tick();
         }
     }
 }
