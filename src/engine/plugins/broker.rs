@@ -13,21 +13,19 @@ pub struct Broker<'a> {
     runmd_sender: Read<'a, Sender<RunmdFile>, EventRuntime>,
     operation_sender: Read<'a, Sender<Operation>, EventRuntime>,
     start_sender: Read<'a, Sender<Start>, EventRuntime>,
-    host_editor: Write<'a, tokio::sync::watch::Receiver<HostEditor>, EventRuntime>,
 }
 
 impl<'a> Broker<'a> {
     /// Enables message senders on a thunk context,
     ///
     pub fn enable(&self, context: &mut ThunkContext) {
-        let Broker { status_sender, runmd_sender, operation_sender, start_sender, host_editor } = self;
+        let Broker { status_sender, runmd_sender, operation_sender, start_sender } = self;
 
         context
             .enable_dispatcher(runmd_sender.deref().clone())
             .enable_operation_dispatcher(operation_sender.deref().clone())
             .enable_status_updates(status_sender.deref().clone())
-            .enable_start_command_dispatcher(start_sender.deref().clone())
-            .enable_host_editor_watcher(host_editor.deref().clone());
+            .enable_start_command_dispatcher(start_sender.deref().clone());
     }
 
     /// Sends a status update,
@@ -65,18 +63,6 @@ impl<'a> Broker<'a> {
         start_sender.send(start).await
     }
 
-    /// Waits for the host editor to change and returns a clone,
-    /// 
-    pub async fn host_editor_changed(&mut self) -> Option<HostEditor> {
-        match self.host_editor.changed().await {
-            Ok(_) => Some(self.host_editor.borrow().clone()),
-            Err(err) => {
-                event!(Level::ERROR, "Error waiting for a host change {err}");
-                None
-            },
-        }
-    }
-
     /// Sends a status update,
     ///
     pub fn try_send_status_update(
@@ -110,31 +96,5 @@ impl<'a> Broker<'a> {
         let Broker { start_sender, .. }  = self;
 
         start_sender.try_send(start)
-    }
-
-    /// Returns a clone of the host editor if there was a change,
-    /// 
-    pub fn try_receive_host_editor_change(&self) -> Option<HostEditor> {
-        let Broker { host_editor, .. } = self; 
-
-         match host_editor.has_changed() {
-            Ok(changed) => {
-                if changed {
-                    Some(host_editor.borrow().clone())
-                } else {
-                    None 
-                }
-            },
-            Err(err) => {
-                event!(Level::ERROR, "Error checking for host editor change {err}");
-                None
-            },
-        }
-    }
-
-    /// Returns the current host editor,
-    /// 
-    pub fn host_editor(&self) -> HostEditor {
-        self.host_editor.borrow().clone()
     }
 }

@@ -35,4 +35,8 @@ where
     /// Called when a start command is received,
     ///
     fn on_start_command(&mut self, start_command: &Start);
+
+    /// Callend when a host_editor is received,
+    /// 
+    fn on_host_editor(&mut self, host_editor: HostEditor); 
 }

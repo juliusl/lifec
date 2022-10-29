@@ -159,4 +159,5 @@ impl Listener for Test {
     fn on_operation(&mut self, _: Operation) {}
     fn on_error_context(&mut self, _: &ErrorContext) {}
     fn on_start_command(&mut self, _: &Start) {}
+    fn on_host_editor(&mut self, _: HostEditor) {}
 }
