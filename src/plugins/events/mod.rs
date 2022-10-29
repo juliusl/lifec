@@ -1,7 +1,7 @@
 use super::{
     thunks::{ErrorContext, SecureClient, StatusUpdate},
 };
-use crate::prelude::*;
+use crate::{prelude::*, guest::Guest};
 use hyper::Client;
 use hyper_tls::HttpsConnector;
 use specs::{
@@ -26,7 +26,7 @@ impl SetupHandler<tokio::runtime::Runtime> for EventRuntime {
     }
 }
 
-/// Setup for tokio-broadcast channel for entity updates
+/// Setup for watch channel for host editor
 impl SetupHandler<sync::watch::Receiver<HostEditor>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         let (tx, rx) = sync::watch::channel::<HostEditor>(HostEditor::default());
@@ -35,13 +35,30 @@ impl SetupHandler<sync::watch::Receiver<HostEditor>> for EventRuntime {
     }
 }
 
-
-/// Setup for tokio-broadcast channel for entity updates
+/// Setup for watch channel for host editor
 impl SetupHandler<sync::watch::Sender<HostEditor>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         let (tx, rx) = sync::watch::channel::<HostEditor>(HostEditor::default());
         world.insert(rx);
         world.insert(tx);
+    }
+}
+
+/// Setup for tokio-mulitple-producers single-consumer channel for guests
+impl SetupHandler<sync::mpsc::Sender<Guest>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<Guest>(30);
+        world.insert(tx);
+        world.insert(rx);
+    }
+}
+
+/// Setup for tokio-mulitple-producers single-consumer channel for guests
+impl SetupHandler<sync::mpsc::Receiver<Guest>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        let (tx, rx) = mpsc::channel::<Guest>(30);
+        world.insert(tx);
+        world.insert(rx);
     }
 }
 

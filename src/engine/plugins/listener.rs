@@ -3,7 +3,7 @@ use std::ops::Deref;
 use specs::prelude::*;
 use tokio::sync::mpsc::Receiver;
 
-use crate::prelude::*;
+use crate::{prelude::*, guest::Guest};
 
 /// Resources for consuming messages from plugins,
 ///
@@ -15,6 +15,7 @@ pub struct PluginListener<'a> {
     runmd_files: Write<'a, Receiver<RunmdFile>, EventRuntime>,
     operations: Write<'a, Receiver<Operation>, EventRuntime>,
     starts: Write<'a, Receiver<Start>, EventRuntime>,
+    guests: Write<'a, Receiver<Guest>, EventRuntime>,
     host_editor: Write<'a, tokio::sync::watch::Receiver<HostEditor>, EventRuntime>,
 }
 
@@ -52,6 +53,13 @@ impl<'a> PluginListener<'a> {
         starts.recv().await
     }
 
+    /// Waits for the next guest,
+    /// 
+    pub async fn next_guest(&mut self) -> Option<Guest> {
+        let PluginListener { guests, .. } = self;
+
+        guests.recv().await
+    }
 
     /// Waits for the host editor to change and returns a clone,
     /// 
@@ -96,6 +104,14 @@ impl<'a> PluginListener<'a> {
         let PluginListener { starts, .. } = self;
 
         starts.try_recv().ok()
+    }
+
+    /// Tries to wait for the next guest,
+    /// 
+    pub fn try_next_guest(&mut self) -> Option<Guest> {
+        let PluginListener { guests, .. } = self;
+
+        guests.try_recv().ok()
     }
 
     /// Returns a clone of the host editor if there was a change,

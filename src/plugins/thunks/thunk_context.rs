@@ -1,3 +1,4 @@
+use crate::guest::Guest;
 use crate::prelude::{attributes::Fmt, *};
 use hyper::{Body, Response};
 use reality::Block;
@@ -74,6 +75,8 @@ pub struct ThunkContext {
     operation_dispatcher: Option<Sender<Operation>>,
     /// Dispatcher for start commands
     start_command_dispatcher: Option<Sender<Start>>,
+    /// Dispatcher for sending a guest, 
+    guest_dispatcher: Option<Sender<Guest>>,
     /// Channel to send bytes to a listening char_device
     char_device: Option<Sender<(u32, u8)>>,
     /// Watches for changes to the world's HostEditor,
@@ -117,6 +120,7 @@ impl Clone for ThunkContext {
             char_device: self.char_device.clone(),
             udp_socket: self.udp_socket.clone(),
             host_editor_watcher: self.host_editor_watcher.clone(),
+            guest_dispatcher: self.guest_dispatcher.clone(),
             response_cache: None,
             body_cache: None,
         }
@@ -140,6 +144,7 @@ impl Debug for ThunkContext {
             .field("dispatcher", &self.dispatcher)
             .field("operation_dispatcher", &self.operation_dispatcher)
             .field("start_command_dispatcher", &self.start_command_dispatcher)
+            .field("guest_dispatcher", &self.guest_dispatcher)
             .field("char_device", &self.char_device)
             .field("udp_socket", &self.udp_socket)
             .field("response_cache", &self.response_cache)
@@ -344,6 +349,24 @@ impl ThunkContext {
         async_enabled
     }
 
+    /// Enables a guest on this context's entity, returns true if the guest was dispatched,
+    /// 
+    pub fn enable_guest(&self, guest_host: Arc<Host>) -> bool {
+        if let (Some(owner), Some(guest_dispatcher)) = (self.entity, self.guest_dispatcher.as_ref()) {
+            match guest_dispatcher.try_send(Guest{ owner, guest_host }) {
+                Ok(_) => {
+                    true
+                },
+                Err(err) => {
+                    event!(Level::ERROR, "Error sending a guest {err}");
+                    false
+                },
+            }
+        } else {
+            false
+        }
+    }
+
     /// Returns a context w/ an https client
     ///
     /// The event runtime creates a client on setup, and passes a clone to each thunk context
@@ -395,6 +418,13 @@ impl ThunkContext {
         start_commands: Sender<Start>,
     ) -> &mut ThunkContext {
         self.start_command_dispatcher = Some(start_commands);
+        self
+    }
+
+    /// Returns a context w/ the guest sender enabled
+    /// 
+    pub fn enable_guest_dispatcher(&mut self, guest: Sender<Guest>) -> &mut ThunkContext{
+        self.guest_dispatcher = Some(guest);
         self
     }
 

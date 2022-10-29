@@ -1,13 +1,14 @@
-use std::collections::{BTreeMap, HashMap};
-use std::hash::Hash;
 use atlier::system::App;
 use hdrhistogram::Histogram;
 use imgui::{ChildWindow, SliderFlags, StyleVar, Ui, Window};
-use specs::{Entity, System, Read};
+use specs::{Entities, Entity, Join, Read, ReadStorage, System};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::hash::Hash;
 use tokio::time::Instant;
 use tracing::{event, Level};
 
-use crate::prelude::EventRuntime;
+use crate::guest::Guest;
+use crate::prelude::{EventRuntime, PluginListener};
 use crate::{
     prelude::{Events, Node},
     state::AttributeGraph,
@@ -29,8 +30,8 @@ pub struct HostEditor {
     ///
     tick_rate: Histogram<u64>,
     /// Timestamp of last refresh,
-    /// 
-    last_refresh: Instant, 
+    ///
+    last_refresh: Instant,
     /// True if the event runtime is paused,
     ///
     is_paused: bool,
@@ -49,6 +50,9 @@ pub struct HostEditor {
     /// Command to reset state on all events,
     ///
     reset: Option<()>,
+    /// Guests within the current host,
+    /// 
+    guests: HashSet<Guest>,
 }
 
 impl Hash for HostEditor {
@@ -95,17 +99,11 @@ impl HostEditor {
     pub fn disable_tick_limit(&mut self) {
         self.tick_limit.take();
     }
-}
 
-impl App for HostEditor {
-    fn name() -> &'static str {
-        "Lifec Host Editor"
-    }
-
-    fn edit_ui(&mut self, ui: &imgui::Ui) {
-        let window_padding = ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
-        let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
-        Window::new("Events")
+    /// Shows events window,
+    ///
+    pub fn events_window(&mut self, title: impl AsRef<str>, ui: &Ui) {
+        Window::new(title)
             .size([1400.0, 700.0], imgui::Condition::Appearing)
             .build(ui, || {
                 // Toolbar for controlling event runtime
@@ -127,6 +125,29 @@ impl App for HostEditor {
                     self.performance_section(ui);
                 });
             });
+    }
+}
+
+impl App for HostEditor {
+    fn name() -> &'static str {
+        "Lifec Host Editor"
+    }
+
+    fn edit_ui(&mut self, ui: &imgui::Ui) {
+        let window_padding = ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
+        let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
+        self.events_window("Events", ui);
+
+        for guest in self.guests.iter() {
+            let Guest { guest_host, owner } = guest;
+            let host_editor = guest_host.world().system_data::<PluginListener>();
+            let mut host_editor = host_editor.host_editor();
+            host_editor.events_window(
+                format!("Guest({}) Events", owner.id()), 
+                ui
+            );
+        }
+
         window_padding.end();
         frame_padding.end();
     }
@@ -135,9 +156,14 @@ impl App for HostEditor {
 }
 
 impl<'a> System<'a> for HostEditor {
-    type SystemData = (Events<'a>,  Read<'a, tokio::sync::watch::Sender<HostEditor>, EventRuntime>);
+    type SystemData = (
+        Events<'a>,
+        Read<'a, tokio::sync::watch::Sender<HostEditor>, EventRuntime>,
+        Entities<'a>,
+        ReadStorage<'a, Guest>,
+    );
 
-    fn run(&mut self, (mut events, watcher): Self::SystemData) {
+    fn run(&mut self, (mut events, watcher, entities, guests): Self::SystemData) {
         // General event runtime state
         self.is_paused = !events.can_continue();
         self.is_stopped = events.should_exit();
@@ -209,11 +235,20 @@ impl<'a> System<'a> for HostEditor {
         //
         self.adhoc_profilers = events.adhoc_profilers();
 
+        // Adds guests to host's set,
+        //
+        for (entity, guest) in (&entities, &guests).join() {
+            if self.guests.insert(guest.clone()) {
+                event!(Level::DEBUG, "Guest {}, added to host editor", entity.id());
+            }
+        }
+
         // Update watcher
-        // 
+        //
         watcher.send_if_modified(|current| {
             if current != self {
                 event!(Level::DEBUG, "Refreshed");
+                *current = self.clone();
                 true
             } else {
                 false
@@ -381,6 +416,7 @@ impl Default for HostEditor {
             pause: Default::default(),
             reset: Default::default(),
             nodes: Default::default(),
+            guests: Default::default(),
         }
     }
 }

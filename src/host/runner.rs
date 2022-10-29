@@ -35,7 +35,7 @@ impl Listener for Runner {
         todo!()
     }
 
-    fn on_host_editor(&mut self, host_editor: crate::prelude::HostEditor) {
+    fn on_host_editor(&mut self, _host_editor: crate::prelude::HostEditor) {
         todo!()
     }
 }

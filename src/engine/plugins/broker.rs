@@ -3,7 +3,7 @@ use std::ops::Deref;
 use specs::{prelude::*, Read};
 use tokio::sync::mpsc::{error::SendError, error::TrySendError, Sender};
 
-use crate::prelude::*;
+use crate::{prelude::*, guest::Guest};
 
 /// Resources for sending messages from plugins,
 ///
@@ -13,19 +13,21 @@ pub struct Broker<'a> {
     runmd_sender: Read<'a, Sender<RunmdFile>, EventRuntime>,
     operation_sender: Read<'a, Sender<Operation>, EventRuntime>,
     start_sender: Read<'a, Sender<Start>, EventRuntime>,
+    guest_sender: Read<'a, Sender<Guest>, EventRuntime>,
 }
 
 impl<'a> Broker<'a> {
     /// Enables message senders on a thunk context,
     ///
     pub fn enable(&self, context: &mut ThunkContext) {
-        let Broker { status_sender, runmd_sender, operation_sender, start_sender } = self;
+        let Broker { status_sender, runmd_sender, operation_sender, start_sender, guest_sender} = self;
 
         context
             .enable_dispatcher(runmd_sender.deref().clone())
             .enable_operation_dispatcher(operation_sender.deref().clone())
             .enable_status_updates(status_sender.deref().clone())
-            .enable_start_command_dispatcher(start_sender.deref().clone());
+            .enable_start_command_dispatcher(start_sender.deref().clone())
+            .enable_guest_dispatcher(guest_sender.deref().clone());
     }
 
     /// Sends a status update,
