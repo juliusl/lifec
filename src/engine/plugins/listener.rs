@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use specs::prelude::*;
 use tokio::sync::mpsc::Receiver;
 

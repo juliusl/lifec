@@ -1,16 +1,9 @@
-use super::{
-    thunks::{ErrorContext, SecureClient, StatusUpdate},
-};
-use crate::{prelude::*, guest::Guest};
+use super::thunks::{ErrorContext, SecureClient, StatusUpdate};
+use crate::{guest::Guest, prelude::*};
 use hyper::Client;
 use hyper_tls::HttpsConnector;
-use specs::{
-    shred::SetupHandler, Entity, System, World,
-};
-use tokio::sync::{
-    self, broadcast,
-    mpsc,
-};
+use specs::{shred::SetupHandler, Entity, System, World};
+use tokio::sync::{self, broadcast, mpsc};
 
 /// Event runtime drives the tokio::Runtime and schedules/monitors/orchestrates plugin events
 ///
@@ -88,7 +81,6 @@ impl SetupHandler<sync::broadcast::Receiver<Entity>> for EventRuntime {
         world.insert(tx);
     }
 }
-
 
 /// Setup for tokio-broadcast channel for entity updates
 impl SetupHandler<sync::broadcast::Sender<Entity>> for EventRuntime {
@@ -182,23 +174,25 @@ impl SetupHandler<super::Runtime> for EventRuntime {
 impl SetupHandler<SecureClient> for EventRuntime {
     fn setup(world: &mut World) {
         let https = HttpsConnector::new();
-        let client = Client::builder()
-            .build::<_, hyper::Body>(https);
+        let client = Client::builder().build::<_, hyper::Body>(https);
         world.insert(client);
     }
 }
 
 impl<'a> System<'a> for EventRuntime {
-    type SystemData = Events<'a>;
+    type SystemData = (Events<'a>, ReadStorage<'a, Guest>);
 
-    fn run(
-        &mut self, mut events: Self::SystemData,
-    ) {
+    fn run(&mut self, (mut events, guests): Self::SystemData) {
         if !events.should_exit() && events.can_continue() {
             events.tick();
         } else {
             // If a rate limit is set, this will update the freq w/o changing the last tick
             events.handle_rate_limits();
+        }
+
+        for guest in guests.join() {
+            let mut events = guest.guest_host.world().system_data::<Events>();
+            events.tick();
         }
     }
 }
