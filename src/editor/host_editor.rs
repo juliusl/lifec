@@ -2,7 +2,7 @@ use atlier::system::App;
 use hdrhistogram::Histogram;
 use imgui::{ChildWindow, SliderFlags, StyleVar, Ui, Window};
 use specs::{Entities, Entity, Join, Read, ReadStorage, System};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
 use tokio::time::Instant;
 use tracing::{event, Level};
@@ -52,7 +52,7 @@ pub struct HostEditor {
     reset: Option<()>,
     /// Guests within the current host,
     /// 
-    guests: HashSet<Guest>,
+    guests: HashMap<Entity, Guest>,
 }
 
 impl Hash for HostEditor {
@@ -138,9 +138,10 @@ impl App for HostEditor {
         let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
         self.events_window("Events", ui);
 
-        for guest in self.guests.iter() {
+        for (_, guest) in self.guests.iter() {
             let Guest { guest_host, owner } = guest;
             let host_editor = guest_host.world().system_data::<PluginListener>();
+
             let mut host_editor = host_editor.host_editor();
             host_editor.events_window(
                 format!("Guest({}) Events", owner.id()), 
@@ -238,7 +239,8 @@ impl<'a> System<'a> for HostEditor {
         // Adds guests to host's set,
         //
         for (entity, guest) in (&entities, &guests).join() {
-            if self.guests.insert(guest.clone()) {
+            if !self.guests.contains_key(&entity) {
+                self.guests.insert(entity, guest.clone());
                 event!(Level::DEBUG, "Guest {}, added to host editor", entity.id());
             }
         }
