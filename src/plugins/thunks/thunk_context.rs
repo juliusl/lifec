@@ -692,7 +692,7 @@ impl ThunkContext {
     pub fn dispatch_node_command(&self, command: NodeCommand) -> Option<tokio::sync::oneshot::Receiver<ThunkContext>> {
         if let Some(node_dispatcher) = self.node_dispatcher.as_ref() {
             match command {
-                NodeCommand::Spawn(_, _) => {
+                NodeCommand::Spawn(_) => {
                     let (yielding, receiver) = Yielding::new(self.clone());
                     match node_dispatcher.try_send((command, Some(yielding))) {
                         Ok(_) => {

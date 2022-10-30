@@ -25,7 +25,7 @@ pub enum NodeCommand {
     Cancel(Entity),
     /// Command to spawn this node,
     /// 
-    Spawn(Entity, Option<AttributeGraph>),
+    Spawn(Entity),
     /// Command to update state,
     ///
     Update(AttributeGraph),
@@ -61,7 +61,7 @@ pub trait CommandDispatcher {
 
     /// Dispatches a command to spawn an entity,
     /// 
-    fn spawn(&mut self, source: Entity, state: Option<AttributeGraph>);
+    fn spawn(&mut self, source: Entity);
 
     /// Dispatch a command to update a graph,
     /// 
@@ -93,8 +93,8 @@ impl CommandDispatcher for Node {
         self.command = Some(NodeCommand::Cancel(entity));
     }
 
-    fn spawn(&mut self, entity: Entity, state: Option<AttributeGraph>) {
-        self.command = Some(NodeCommand::Spawn(entity, state));
+    fn spawn(&mut self, entity: Entity) {
+        self.command = Some(NodeCommand::Spawn(entity));
     }
 
     fn update(&mut self, graph: AttributeGraph) {

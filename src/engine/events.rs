@@ -12,6 +12,8 @@ use crate::{
 
 use tracing::{event, Level};
 
+pub type NodeCommandHandler = fn(&mut Events, Entity);
+
 /// Event system data,
 ///
 #[derive(SystemData)]
@@ -20,6 +22,7 @@ pub struct Events<'a> {
     appendix: Read<'a, Arc<Appendix>>,
     send_errors: Read<'a, tokio::sync::mpsc::Sender<ErrorContext>, EventRuntime>,
     send_completed: Read<'a, tokio::sync::broadcast::Sender<Entity>, EventRuntime>,
+    handlers: Read<'a, HashMap<String, NodeCommandHandler>>,
     plugins: Plugins<'a>,
     entities: Entities<'a>,
     transitions: ReadStorage<'a, Transition>,
@@ -642,6 +645,19 @@ impl<'a> Events<'a> {
         spawned
     }
 
+    /// Deletes an entity,
+    /// 
+    pub fn delete(&mut self, entity: Entity) {
+        match self.entities.delete(entity) {
+            Ok(_) => {
+                event!(Level::DEBUG, "Deleted spawned entity, {}", entity.id());
+            },
+            Err(err) => {
+                event!(Level::ERROR, "Could not delete entity {}, {err}", entity.id());
+            },
+        }
+    }
+
     /// Returns an iterator over spawned events,
     ///
     pub fn scan_spawned_events(&self) -> impl Iterator<Item = (&Entity, &Entity)> {
@@ -977,7 +993,7 @@ impl<'a> Events<'a> {
                     event!(Level::DEBUG, "Cancelling event {}", event.id());
                 }
             }
-            crate::editor::NodeCommand::Spawn(event, _) => {
+            crate::editor::NodeCommand::Spawn(event) => {
                 let spawned = self.spawn(event);
 
                 if let Some(yielding) = yielding {
@@ -1000,15 +1016,8 @@ impl<'a> Events<'a> {
                     entity.id()
                 );
 
-                if name == "delete_spawned" {
-                    match self.entities.delete(entity) {
-                        Ok(_) => {
-                            event!(Level::DEBUG, "Deleted spawned entity, {}", entity.id());
-                        },
-                        Err(err) => {
-                            event!(Level::ERROR, "Could not delete entity {}, {err}", entity.id());
-                        },
-                    }
+                if let Some(handler) = self.handlers.get(name) {
+                    handler(self, entity);
                 }
             }
         }

@@ -33,6 +33,7 @@ pub use plugins::PluginListener;
 pub use plugins::Plugins;
 
 mod events;
+pub use events::NodeCommandHandler;
 pub use events::EventStatus;
 pub use events::Events;
 

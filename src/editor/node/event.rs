@@ -66,7 +66,7 @@ impl EventNode for Node {
                 if self.is_adhoc() {
                     ui.same_line();
                     if ui.button(format!("Spawn {}", event.entity().id())) {
-                        self.spawn(event.entity(), None);
+                        self.spawn(event.entity());
                     }
                 }
 

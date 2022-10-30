@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use crate::engine::Adhoc;
+use crate::engine::NodeCommandHandler;
 use crate::engine::Profiler;
 use crate::engine::Yielding;
 use crate::prelude::*;
@@ -53,7 +56,14 @@ where
     fn world() -> World {
         let mut world = default_world();
         world.insert(Self::runtime());
+        Self::initialize(&mut world);
         world
+    }
+
+    /// Override to provide custom node command handlers,
+    /// 
+    fn node_handlers() -> HashMap<String, NodeCommandHandler> {
+        default_node_handlers()
     }
 
     /// When compiling in the context of a project directory, the file name is taken into consideration when parsing
@@ -132,6 +142,7 @@ where
 
         // Finalize world
         world.insert(Some(workspace.clone()));
+        world.insert(Self::node_handlers());
 
         return world;
     }
@@ -150,8 +161,6 @@ where
 
         let engine = &mut Engine::default();
         engine.initialize(&mut world);
-
-        Self::initialize(&mut world);
 
         // Setup graphs for all plugin entities
         for (entity, block_index) in
@@ -208,6 +217,8 @@ pub fn default_parser(world: World) -> Parser {
         .with_special_attr::<Engine>()
 }
 
+/// Retursn the default lifec world,
+/// 
 pub fn default_world() -> World {
     let mut world = specs::World::new();
     world.register::<Thunk>();
@@ -226,6 +237,18 @@ pub fn default_world() -> World {
     world.register::<Transition>();
     world.register::<ThunkContext>();
     world.register::<AttributeGraph>();
-    world.insert(Some(Workspace::new("", None)));
+    world.insert(None::<Workspace>);
     world
+}
+
+/// Returns teh default custom node command handlers,
+/// 
+pub fn default_node_handlers() -> HashMap<String, NodeCommandHandler> {
+    let mut handlers = HashMap::<String, NodeCommandHandler>::default();
+
+    handlers.insert("delete_spawned".to_string(), |events, entity| {
+       events.delete(entity); 
+    });
+
+    handlers
 }
