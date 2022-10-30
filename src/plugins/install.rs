@@ -30,7 +30,8 @@ impl Plugin for Install {
                 let src_dir = tc
                     .state()
                     .find_symbol("src_dir")
-                    .unwrap_or(String::from("."));
+                    .unwrap_or(String::default());
+                    
                 let work_dir = tc
                     .work_dir()
                     .expect("work_dir required for install plugin");
