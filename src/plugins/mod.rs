@@ -1,3 +1,5 @@
+use std::future::Future;
+
 pub use crate::prelude::*;
 use tokio::select;
 use tokio::sync::oneshot;
@@ -49,6 +51,7 @@ pub use timer::Timer;
 pub use timer::TimerSettings;
 
 mod watch;
+use tokio::sync::oneshot::Receiver;
 pub use watch::Watch;
 
 mod run;
@@ -89,6 +92,45 @@ where
 {
     fn into(self) -> Thunk {
         Thunk::from_plugin::<P>()
+    }
+}
+
+/// Type alias for an async context handler function,
+/// 
+pub type ContextHandler<F> = fn(&mut ThunkContext) -> F;
+
+/// Helper function for awaiting a plugin call from within a plugin call,
+/// 
+pub async fn await_plugin<P, F>(cancel_source: Receiver<()>, context: &mut ThunkContext, on_result: ContextHandler<F>, on_error: ContextHandler<F>) -> Option<ThunkContext> 
+where 
+    P: Plugin,
+    F: Future<Output = Option<ThunkContext>>,
+{
+    let mut clone = context.clone();
+    if let Some((task, cancel)) = P::call(context) {
+        select! {
+            result = task => {
+                match result {
+                    Ok(mut context) => {
+                        on_result(&mut context).await
+                    },
+                    Err(err) => {
+                        event!(Level::ERROR, "Error awaiting plugin call, {err}");
+                        clone.error(|graph| {
+                            graph.with_text("error", format!("{err}"));
+                        });
+                        on_error(&mut clone).await
+                    },
+                }
+            },
+            _ = cancel_source => {
+                cancel.send(()).ok();
+                event!(Level::WARN, "Cancelling plugin call");
+                None
+            }
+        }
+    } else {
+        None
     }
 }
 
