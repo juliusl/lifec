@@ -145,15 +145,29 @@ impl Sequencer for Host {
                                 Cursor::Next(next) => {
                                     if let Some(connection) = connections.get_mut(*next) {
                                         connection.add_incoming(last);
+                                    } else {
+                                        let mut from = HashSet::new();
+                                        from.insert(last);
+                                        let connection = Connection::new(from, *next);
+                                        connections
+                                            .insert(*next, connection)
+                                            .expect("should be able to insert connection");
                                     }
-                                },
+                                }
                                 Cursor::Fork(forks) => {
                                     for fork in forks.iter() {
                                         if let Some(connection) = connections.get_mut(*fork) {
                                             connection.add_incoming(last);
+                                        } else {
+                                            let mut from = HashSet::new();
+                                            from.insert(last);
+                                            let connection = Connection::new(from, *fork);
+                                            connections
+                                                .insert(*fork, connection)
+                                                .expect("should be able to insert connection");
                                         }
                                     }
-                                },
+                                }
                             }
 
                             cursors
