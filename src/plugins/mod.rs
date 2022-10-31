@@ -1,5 +1,3 @@
-use std::future::Future;
-
 pub use crate::prelude::*;
 use tokio::select;
 use tokio::sync::oneshot;
@@ -28,8 +26,8 @@ pub use thunks::Thunk;
 pub use thunks::ThunkContext;
 
 mod testing;
-pub use testing::Test;
 pub use testing::Chaos;
+pub use testing::Test;
 
 mod process;
 pub use process::Process;
@@ -95,31 +93,35 @@ where
     }
 }
 
-/// Type alias for an async context handler function,
-/// 
-pub type ContextHandler<F> = fn(&mut ThunkContext) -> F;
+/// Type alias for a context handler function,
+///
+pub type ContextHandler = fn(ThunkContext) -> Option<ThunkContext>;
 
 /// Helper function for awaiting a plugin call from within a plugin call,
-/// 
-pub async fn await_plugin<P, F>(cancel_source: Receiver<()>, context: &mut ThunkContext, on_result: ContextHandler<F>, on_error: ContextHandler<F>) -> Option<ThunkContext> 
-where 
+///
+pub async fn await_plugin<P>(
+    cancel_source: Receiver<()>,
+    context: &mut ThunkContext,
+    on_result: ContextHandler,
+) -> Option<ThunkContext>
+where
     P: Plugin,
-    F: Future<Output = Option<ThunkContext>>,
 {
     let mut clone = context.clone();
     if let Some((task, cancel)) = P::call(context) {
         select! {
             result = task => {
                 match result {
-                    Ok(mut context) => {
-                        on_result(&mut context).await
+                    Ok(context) => {
+                        event!(Level::TRACE, "Plugin task completed");
+                        on_result(context)
                     },
                     Err(err) => {
                         event!(Level::ERROR, "Error awaiting plugin call, {err}");
                         clone.error(|graph| {
                             graph.with_text("error", format!("{err}"));
                         });
-                        on_error(&mut clone).await
+                        Some(clone)
                     },
                 }
             },
@@ -130,6 +132,7 @@ where
             }
         }
     } else {
+        event!(Level::WARN, "Plugin did not return a task");
         None
     }
 }
@@ -172,10 +175,15 @@ pub trait Plugin {
             if let Some(world) = parser.world() {
                 let entity = parser.entity().expect("should have an entity");
                 let child = world.entities().create();
-                
+
                 // Adding the thunk to the event defines the function to call,
                 {
-                    event!(Level::TRACE, "Adding entity {}'s thunk to event entity {}", child.id(), entity.id());
+                    event!(
+                        Level::TRACE,
+                        "Adding entity {}'s thunk to event entity {}",
+                        child.id(),
+                        entity.id()
+                    );
                     let mut events = world.write_component::<Event>();
                     if let Some(event) = events.get_mut(entity) {
                         event.add_thunk(Thunk::from_plugin::<Self>(), child);
@@ -188,7 +196,8 @@ pub trait Plugin {
                     }
                 }
 
-                world.write_component()
+                world
+                    .write_component()
                     .insert(child, Thunk::from_plugin::<Self>())
                     .expect("should be able to insert thunk component");
 
