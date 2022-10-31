@@ -1,5 +1,6 @@
 use hyper::{Body, Request as HttpRequest};
 use reality::{BlockObject, BlockProperties};
+use tracing::{event, Level};
 use crate::{
     prelude::{AsyncContext, Plugin, ThunkContext, Value},
     state::AttributeIndex,
@@ -102,6 +103,8 @@ impl Plugin for Request {
                         .find_binary("body")
                         .and_then(|b| Some(Body::from(b)))
                         .unwrap_or(Body::empty());
+
+                    event!(Level::TRACE, "{:#?}", request);
 
                     match request.body(body) {
                         Ok(request) => match client.request(request).await {
