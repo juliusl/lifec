@@ -21,7 +21,7 @@ impl Plugin for Install {
 
     fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
         context.clone().task(|_| {
-            let tc = context.clone();
+            let mut tc = context.clone();
             async {
                 let file_name = tc
                     .state()
@@ -44,7 +44,10 @@ impl Plugin for Install {
                 let dst = PathBuf::from(work_dir).join(&file_name);
 
                 match tokio::fs::copy(src, dst).await {
-                    Ok(_) => Some(tc),
+                    Ok(_) => {
+                        tc.copy_previous();
+                        Some(tc)
+                    },
                     Err(err) => {
                         panic!("Could not copy files {err}");
                     }
