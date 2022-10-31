@@ -76,11 +76,13 @@ impl Plugin for Request {
                     let mut request = HttpRequest::builder();
 
                     if let Some(uri) = tc.state().find_symbol("request") {
-                        request = request.uri(uri);
-                    } else if let Some(uri) = tc.search().find_symbol("uri") {
-                        request = request.uri(uri);
-                    } else if let Some(uri) = tc.search().find_symbol("api") {
-                        request = request.uri(uri);
+                        if !uri.is_empty() {
+                            request = request.uri(uri);
+                        } else if let Some(uri) = tc.search().find_symbol("uri") {
+                            request = request.uri(uri);
+                        } else if let Some(uri) = tc.search().find_symbol("api") {
+                            request = request.uri(uri);
+                        }
                     }
 
                     if let Some(method) = tc.state().find_symbol("method") {
