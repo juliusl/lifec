@@ -2,9 +2,9 @@ use std::marker::PhantomData;
 
 use reality::{BlockObject, BlockProperties};
 
-use super::{AttributeIndex, Host, Plugin, Project};
+use super::{Host, Plugin, Project};
 
-use crate::prelude::Operations;
+use crate::prelude::{Operations, ThunkContext, AsyncContext, AttributeIndex};
 
 /// Plugin to execute an operation defined within the root runmd of a workspace
 ///
@@ -29,7 +29,7 @@ where
         "Will compile a short-lived host to execute the operation. The plugins available are based on the Project."
     }
 
-    fn call(context: &super::ThunkContext) -> Option<super::AsyncContext> {
+    fn call(context: &mut ThunkContext) -> Option<AsyncContext> {
         context.task(|cancel_source| {
             let tc = context.clone();
             async move {

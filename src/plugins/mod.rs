@@ -101,7 +101,7 @@ pub trait Plugin {
 
     /// Implement to execute logic over this thunk context w/ the runtime event system,
     ///
-    fn call(context: &ThunkContext) -> Option<AsyncContext>;
+    fn call(context: &mut ThunkContext) -> Option<AsyncContext>;
 
     /// Returns a short string description for this plugin
     ///
@@ -168,7 +168,7 @@ pub trait Plugin {
 
 /// Function signature for the plugin trait's call() fn
 ///
-pub type Call = fn(&ThunkContext) -> Option<AsyncContext>;
+pub type Call = fn(&mut ThunkContext) -> Option<AsyncContext>;
 
 /// Combine plugins
 /// Example "Copy" plugin:
@@ -202,7 +202,7 @@ where
         "Combines two plugins by calling each one by one"
     }
 
-    fn call(context: &ThunkContext) -> Option<AsyncContext> {
+    fn call(context: &mut ThunkContext) -> Option<AsyncContext> {
         context.clone().task(|cancel_source| {
             let tc = context.clone();
             async {
@@ -212,7 +212,7 @@ where
                 if let Some(handle) = tc.handle() {
                     let combined_task = handle.spawn(async move {
                         let mut tc = tc.clone();
-                        if let Some((handle, cancel)) = A::call(&tc) {
+                        if let Some((handle, cancel)) = A::call(&mut tc) {
                             select! {
                                 next = handle => {
                                     match next {
@@ -232,7 +232,7 @@ where
 
                         let mut next_tc = tc.consume();
 
-                        if let Some((handle, cancel)) = B::call(&next_tc) {
+                        if let Some((handle, cancel)) = B::call(&mut next_tc) {
                             select! {
                                 next = handle => {
                                     match next {

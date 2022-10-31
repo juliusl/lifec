@@ -19,7 +19,7 @@ impl Plugin for Chaos {
         "Generates chaotic performance"
     }
 
-    fn call(context: &crate::prelude::ThunkContext) -> Option<crate::prelude::AsyncContext> {
+    fn call(context: &mut crate::prelude::ThunkContext) -> Option<crate::prelude::AsyncContext> {
         let mut tc = context.clone();
         use rand::Rng;
         let mut rng = rand::thread_rng();
@@ -27,7 +27,7 @@ impl Plugin for Chaos {
 
         tc.state_mut().with_symbol("timer", format!("{delay} ms"));
 
-        Timer::call(&tc)
+        Timer::call(&mut tc)
     }
 }
 

@@ -69,7 +69,7 @@ impl Plugin for Request {
         });
     }
 
-    fn call(context: &ThunkContext) -> Option<AsyncContext> {
+    fn call(context: &mut ThunkContext) -> Option<AsyncContext> {
         context.clone().task(|_| {
             let mut tc = context.clone();
             async move {

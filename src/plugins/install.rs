@@ -19,7 +19,7 @@ impl Plugin for Install {
         "Installs a file to the work_dir"
     }
 
-    fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
+    fn call(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
         context.clone().task(|_| {
             let mut tc = context.clone();
             async {

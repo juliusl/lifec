@@ -22,7 +22,7 @@ impl Plugin for Timer {
         "Create a timer w/ a duration of seconds."
     }
 
-    fn call(thunk_context: &ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
+    fn call(thunk_context: &mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)> {
         thunk_context.clone().task(|mut cancel_source| {
             let mut tc = thunk_context.clone();
             async move {

@@ -59,7 +59,7 @@ impl Plugin for Watch {
         "`notify` is mostly cross plat, but might run into issues on emulated environments"
     }
 
-    fn call(context: &ThunkContext) -> Option<AsyncContext> {
+    fn call(context: &mut ThunkContext) -> Option<AsyncContext> {
         context.task(|cancel_source| {
             let tc = context.clone();
             async {

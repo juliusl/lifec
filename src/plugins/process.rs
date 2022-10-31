@@ -96,7 +96,7 @@ impl Plugin for Process {
         });
     }
 
-    fn call(context: &super::ThunkContext) -> Option<AsyncContext> {
+    fn call(context: &mut ThunkContext) -> Option<AsyncContext> {
         let clone = context.clone();
         clone.clone().task(|cancel_source| {
             let mut tc = context.clone();

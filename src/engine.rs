@@ -33,9 +33,9 @@ pub use plugins::PluginListener;
 pub use plugins::Plugins;
 
 mod events;
-pub use events::NodeCommandHandler;
 pub use events::EventStatus;
 pub use events::Events;
+pub use events::NodeCommandHandler;
 
 mod engines;
 pub use engines::EngineStatus;
@@ -110,6 +110,12 @@ pub struct Engine {
     /// Limit this engine can repeat
     ///
     limit: Option<Limit>,
+    /// Psuedo-event to represent the engine's start,
+    /// 
+    start_event: Option<Entity>,
+    /// Psuedo-event to represent the engine's end,
+    /// 
+    end_event: Option<Entity>,
 }
 
 impl Engine {
@@ -123,6 +129,12 @@ impl Engine {
     ///
     pub fn limit(&self) -> Option<&Limit> {
         self.limit.as_ref()
+    }
+
+    /// Returns the lifecycle option for the engine,
+    /// 
+    pub fn lifecycle(&self) -> Option<&(Lifecycle, Option<Vec<String>>)> {
+        self.lifecycle.as_ref()
     }
 
     /// Finds the entity for a block,
@@ -173,6 +185,32 @@ impl Engine {
 
         self.lifecycle = Some((lifecycle, engines));
     }
+
+    /// Sets the engine's start event,
+    ///
+    pub fn set_start_event(&mut self, event: Entity) {
+        self.start_event = Some(event);
+    }
+
+    /// Sets the engine's end event,
+    ///
+    pub fn set_end_event(&mut self, event: Entity) {
+        self.end_event = Some(event);
+    }
+
+    /// Returns the engine start event entity,
+    ///
+    pub fn start_event(&self) -> Entity {
+        self.start_event
+            .expect("should have an entity for the start event")
+    }
+
+    /// Returns the engine end event entity,
+    ///
+    pub fn end_event(&self) -> Entity {
+        self.end_event
+            .expect("should be an entity for the end event")
+    }
 }
 
 impl SpecialAttribute for Engine {
@@ -183,11 +221,33 @@ impl SpecialAttribute for Engine {
     fn parse(parser: &mut AttributeParser, _todo: impl AsRef<str>) {
         if let Some(entity) = parser.entity() {
             let world = parser.world().expect("should have a world");
+            let mut engine = Engine::default();
+
+            let engine_start = world.entities().create();
+            let mut engine_start_event = Event::empty();
+            engine_start_event.set_name("engine_start");
             world
                 .write_component()
-                .insert(entity, Engine::default())
+                .insert(engine_start, engine_start_event)
+                .expect("should be able to insert event");
+            engine.set_start_event(engine_start);
+
+            let engine_end = world.entities().create();
+            let mut engine_end_event = Event::empty();
+            engine_end_event.set_name("engine_end");
+            world
+                .write_component()
+                .insert(engine_end, engine_end_event)
+                .expect("should be able to insert event");
+            engine.set_end_event(engine_end);
+
+            world
+                .write_component()
+                .insert(entity, engine)
                 .expect("should be able to insert");
 
+            parser.define_child(engine_start, "engine_start_event", true);
+            parser.define_child(engine_end, "engine_end_event", true);
             parser.add_custom_with("once", |p, events| {
                 let entity = p.entity().expect("should have entity");
                 let world = p.world().expect("should have world");
@@ -322,7 +382,10 @@ impl Interpreter for Engine {
                 if let Some(adhoc) = world.read_component::<Adhoc>().get(entity) {
                     let mut block_map = world.write_resource::<HashMap<String, Entity>>();
                     if !adhoc.tag().as_ref().is_empty() {
-                        block_map.insert(format!("adhoc-{}#{}", adhoc.name, adhoc.tag().as_ref()), entity);
+                        block_map.insert(
+                            format!("adhoc-{}#{}", adhoc.name, adhoc.tag().as_ref()),
+                            entity,
+                        );
                     } else {
                         block_map.insert(format!("adhoc-{}", adhoc.name), entity);
                     }
@@ -361,8 +424,7 @@ impl Interpreter for Engine {
                         (Lifecycle::Next, Some(engines)) => {
                             if let Some(engine) = engines
                                 .iter()
-                                .filter_map(|e| Engine::find_block(world, format!("{e}")))
-                                .next()
+                                .find_map(|e| Engine::find_block(world, format!("{e}")))
                             {
                                 sequence.set_cursor(engine);
                             }

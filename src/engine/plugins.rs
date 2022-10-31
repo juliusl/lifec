@@ -138,7 +138,7 @@ impl<'a> Plugins<'a> {
                     context.set_block(block);
 
                     let mut operation = Operation::empty(handle.clone())
-                        .start_with(thunk, &context);
+                        .start_with(thunk, &mut context);
                     {
                         let _rx = &mut _rx;
                         select! {

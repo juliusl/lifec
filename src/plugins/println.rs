@@ -16,7 +16,7 @@ impl Plugin for Println {
         "Prints a message to stdout, ex. .println <message>"
     }
 
-    fn call(context: &ThunkContext) -> Option<crate::plugins::AsyncContext> {
+    fn call(context: &mut ThunkContext) -> Option<crate::plugins::AsyncContext> {
         context.clone().task(|_| {
             let tc = context.clone();
             async move {

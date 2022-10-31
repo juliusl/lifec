@@ -22,7 +22,7 @@ pub struct Thunk(
     // Symbol that represents this thunk
     pub &'static str,
     // thunk fn
-    pub fn(&ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
+    pub fn(&mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
 );
 
 impl Thunk {

@@ -11,7 +11,7 @@ impl Plugin for Publish {
         "publish"
     }
 
-    fn call(context: &ThunkContext) -> Option<AsyncContext> {
+    fn call(context: &mut ThunkContext) -> Option<AsyncContext> {
         context.task(|mut cancel_source| {
             let tc = context.clone();
             async move {

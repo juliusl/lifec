@@ -64,7 +64,7 @@ impl Operation {
 
     /// Starts a task from a plugin call and returns it w/ self,
     ///
-    pub fn start<P>(&self, context: &ThunkContext) -> Self
+    pub fn start<P>(&self, context: &mut ThunkContext) -> Self
     where
         P: Plugin,
     {
@@ -73,7 +73,7 @@ impl Operation {
 
     /// Starts a task with a thunk and returns it w/ self,
     ///
-    pub fn start_with(&self, Thunk(_, func): &Thunk, context: &ThunkContext) -> Self
+    pub fn start_with(&self, Thunk(_, func): &Thunk, context: &mut ThunkContext) -> Self
     {
         if self.result.is_some() {
             event!(
@@ -89,7 +89,7 @@ impl Operation {
 
     /// Replaces any ongoing task by cancelling the previous task, and setting a new one
     /// 
-    pub fn replace(&mut self, Thunk(symbol, func): &Thunk, context: &ThunkContext) {
+    pub fn replace(&mut self, Thunk(symbol, func): &Thunk, context: &mut ThunkContext) {
         event!(Level::DEBUG, "Replacing operation for {symbol} for entity {}", context.state().entity_id());
         self.cancel(); 
 
