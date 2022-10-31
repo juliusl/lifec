@@ -86,12 +86,12 @@ impl Plugin for Request {
                         }
                     }
 
-                    if let Some(method) = tc.state().find_symbol("method") {
+                    if let Some(method) = tc.search().find_symbol("method") {
                         request = request.method(method.as_str());
                     }
               
                     for name in tc.search().find_symbol_values("header") {
-                        if let Some(header_value) = tc.state().find_symbol(&name) {
+                        if let Some(header_value) = tc.search().find_symbol(&name) {
                             let header_value = tc.format(header_value);
 
                             request = request.header(name, header_value);
@@ -99,7 +99,7 @@ impl Plugin for Request {
                     }
 
                     let body = tc
-                        .state()
+                        .search()
                         .find_binary("body")
                         .and_then(|b| Some(Body::from(b)))
                         .unwrap_or(Body::empty());
