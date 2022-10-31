@@ -1,12 +1,16 @@
 use lifec::prelude::*;
+use tracing_subscriber::EnvFilter;
 
 /// Example showing opening an editor for a workspace,
 /// 
 fn main() {
-    // tracing_subscriber::fmt::Subscriber::builder()
-    // .compact()
-    // .init();
-
+    tracing_subscriber::fmt::Subscriber::builder()
+        .with_env_filter(EnvFilter::builder()
+        .with_default_directive("lifec=debug".parse().expect("should parse"))
+        .from_env()
+        .expect("should work"))
+        .compact()
+        .init();
     let mut workspace = Workspace::new("test.io", None);
     workspace.set_root_runmd(
         r#"

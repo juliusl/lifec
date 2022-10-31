@@ -301,7 +301,7 @@ impl<'a> Events<'a> {
                             },
                         }
                     } else {
-                        None
+                        Some(clone)
                     }
                 } else {
                     None
