@@ -22,12 +22,17 @@ impl Plugin for Process {
     fn compile(parser: &mut AttributeParser) {
         // Enable .env to declare environment variables
         parser.add_custom_with("env", |p, value| {
-            let var_name = p.symbol().expect("Requires a var name").to_string();
-
             let last = p.last_child_entity().expect("should have added an entity for the process");
 
-            p.define_child(last, "env", Value::Symbol(var_name.to_string()));
-            p.define_child(last, var_name, Value::Symbol(value));
+            if let Some(var_name) = p.symbol() {
+                let var_name = var_name.to_string();
+                p.define_child(last, "env", Value::Symbol(var_name.to_string()));
+                if !value.is_empty() {
+                    p.define_child(last, var_name, Value::Symbol(value));
+                }
+            } else {
+                p.define_child(last, "env", Value::Symbol(value.to_string()));
+            }
         });
 
          // Enable .arg to declare arguments
