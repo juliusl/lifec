@@ -118,10 +118,10 @@ impl Plugin for Process {
 
                 // Set up any env variables
                 for (env_name, env_val) in tc
-                    .state()
+                    .search()
                     .find_symbol_values("env")
                     .iter()
-                    .filter_map(|e| tc.state().find_symbol(e).and_then(|s| Some((e, s))))
+                    .filter_map(|e| tc.search().find_symbol(e).and_then(|s| Some((e, s))))
                 {
                     event!(Level::TRACE, "Setting env var {env_name}");
                     command_task.env(env_name, env_val);
@@ -142,7 +142,7 @@ impl Plugin for Process {
                         for (env_name, env_val) in previous
                         .find_symbol_values("env")
                         .iter()
-                        .filter_map(|e| tc.state().find_symbol(e).and_then(|s| Some((e, s))))
+                        .filter_map(|e| previous.find_symbol(e).and_then(|s| Some((e, s))))
                     {
                         event!(Level::TRACE, "Setting env var {env_name}");
                         command_task.env(env_name, env_val);
