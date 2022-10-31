@@ -15,7 +15,7 @@ pub trait Editor {
 
     /// Opens this host app with an extension,
     ///
-    fn open<P, E>(self, width: f64, height: f64, extension: E)
+    fn open<P, E>(self, extension: E)
     where
         P: Project,
         E: Extension + 'static;
@@ -32,10 +32,10 @@ impl Editor for Host {
     {
         self.build_appendix();
         let appendix = self.world().read_resource::<Appendix>().deref().clone();
-        self.open::<P, _>(1920.0, 1080.0, WorkspaceEditor::from(appendix))
+        self.open::<P, _>(WorkspaceEditor::from(appendix))
     }
 
-    fn open<P, E>(mut self, width: f64, height: f64, extension: E)
+    fn open<P, E>(mut self, extension: E)
     where
         P: Project,
         E: Extension + 'static,
@@ -56,8 +56,6 @@ impl Editor for Host {
         // Open the window
         atlier::prelude::open_window(
             HostEditor::name(),
-            width,
-            height,
             HostEditor::default(),
             extension,
             world,
