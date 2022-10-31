@@ -257,7 +257,6 @@ impl<'a> System<'a> for HostEditor {
         //
         watcher.send_if_modified(|current| {
             if current != self {
-                event!(Level::DEBUG, "Refreshed");
                 *current = self.clone();
                 true
             } else {
