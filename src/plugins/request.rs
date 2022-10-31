@@ -79,6 +79,8 @@ impl Plugin for Request {
                         request = request.uri(uri);
                     } else if let Some(uri) = tc.search().find_symbol("uri") {
                         request = request.uri(uri);
+                    } else if let Some(uri) = tc.search().find_symbol("api") {
+                        request = request.uri(uri);
                     }
 
                     if let Some(method) = tc.state().find_symbol("method") {
@@ -99,7 +101,7 @@ impl Plugin for Request {
                         .and_then(|b| Some(Body::from(b)))
                         .unwrap_or(Body::empty());
 
-                    match request.body(Body::from(body)) {
+                    match request.body(body) {
                         Ok(request) => match client.request(request).await {
                             Ok(resp) => {
                                 tc.cache_response(resp);
