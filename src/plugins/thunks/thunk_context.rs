@@ -180,6 +180,18 @@ impl ThunkContext {
         self.response_cache = Some(resp);
     }
 
+    /// Returns a reference to the cached response,
+    /// 
+    pub fn cached_response(&self) -> Option<&Response<Body>> {
+        self.response_cache.as_ref()
+    }
+
+    /// Returns a reference to the cached body,
+    /// 
+    pub fn cached_body(&self) -> Option<&Body> {
+        self.body_cache.as_ref()
+    }
+
     /// Takes the response from the response cache,
     ///
     pub fn take_response(&mut self) -> Option<Response<Body>> {
