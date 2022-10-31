@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use crate::prelude::{AttributeParser, BlockObject, CustomAttribute, SpecialAttribute, Plugin};
+use crate::prelude::{AttributeParser, BlockObject, CustomAttribute, Plugin, SpecialAttribute};
 use specs::{Component, DefaultVecStorage, WorldExt};
 use tracing::event;
 use tracing::Level;
@@ -35,7 +35,6 @@ impl SpecialAttribute for Runtime {
                     .and_then(|r| Some(r.clone()))
                     // Otherwise, check to see if the world has a runtime resource
                     .unwrap_or(world.read_resource::<Runtime>().deref().clone());
-
                 for (_, c) in runtime.custom_attributes {
                     parser.add_custom(c);
                 }
@@ -46,7 +45,7 @@ impl SpecialAttribute for Runtime {
 
 impl Runtime {
     /// Installs a plugin on this runtime,
-    /// 
+    ///
     pub fn install<P>(&mut self, event_name: &'static str)
     where
         P: Plugin + Send + Default,
@@ -55,20 +54,20 @@ impl Runtime {
         if event_name.is_empty() {
             event_name = "call".to_string();
         }
-        
+
         // Register event sources
         self.plugins.insert(
-            format!("{}::{}", &event_name, P::symbol()),  
-            ThunkSource::new::<P>()
+            format!("{}::{}", &event_name, P::symbol()),
+            ThunkSource::new::<P>(),
         );
     }
 
     /// Installs a plugin on this runtime and also adds the plugin as a custom attribute,
-    /// 
+    ///
     /// If the plugin is using the parser feature, an entity and event component
     /// is created when the runmd block is compiled. Otherwise the event source
     /// is required.
-    /// 
+    ///
     pub fn install_with_custom<P>(&mut self, event_name: &'static str)
     where
         P: Plugin + BlockObject + Send + Default,
@@ -88,7 +87,7 @@ impl Runtime {
 #[tracing_test::traced_test]
 fn test_runtime() {
     use crate::prelude::*;
-    
+
     let mut runtime = Runtime::default();
     runtime.install_with_custom::<Process>("");
     runtime.install_with_custom::<Install>("");
@@ -134,23 +133,16 @@ fn test_runtime() {
     {
         eprintln!(
             "{:#?}",
-            world
-                .read_component::<BlockProperties>()
-                .get(process)
+            world.read_component::<BlockProperties>().get(process)
         );
-        eprintln!(
-            "{:#?}",
-            world.read_component::<BlockIndex>().get(process)
-        );
+        eprintln!("{:#?}", world.read_component::<BlockIndex>().get(process));
     }
 
     let process = world.entities().entity(3);
     {
         eprintln!(
             "{:#?}",
-            world
-                .read_component::<BlockProperties>()
-                .get(process)
+            world.read_component::<BlockProperties>().get(process)
         );
     }
 
@@ -158,9 +150,7 @@ fn test_runtime() {
     {
         eprintln!(
             "{:#?}",
-            world
-                .read_component::<BlockProperties>()
-                .get(process)
+            world.read_component::<BlockProperties>().get(process)
         );
     }
     // assert!(runtime.find_event_source("call println").is_some());

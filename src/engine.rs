@@ -132,11 +132,17 @@ impl Engine {
 
         tracing::event!(
             tracing::Level::DEBUG,
-            "Looking for block ``` {}",
+            "Looking for block `{}`",
             expression.as_ref()
         );
 
-        block_list.get(expression.as_ref()).cloned()
+        if let Some(entity) = block_list.get(expression.as_ref()).cloned() {
+            event!(Level::DEBUG, "Found block {}", entity.id());
+            Some(entity)
+        } else {
+            event!(Level::ERROR, "Could not find block {}", expression.as_ref());
+            None
+        }
     }
 
     /// Returns an iterator over transitions,

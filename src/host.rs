@@ -298,10 +298,13 @@ impl Host {
     ///
     pub fn find_start(&self, expression: impl AsRef<str>) -> Option<Entity> {
         Engine::find_block(self.world(), expression.as_ref().trim()).and_then(|e| {
-            self.world()
-                .read_component::<Engine>()
-                .get(e)
-                .and_then(|e| e.start().cloned())
+            if let Some(engine) = self.world().read_component::<Engine>().get(e) {
+                event!(Level::DEBUG, "Found {:#?}", engine);
+                engine.start().cloned()
+            } else {
+                event!(Level::DEBUG, "Couldn't find engine for {}", e.id());
+                None
+            }
         })
     }
 
@@ -313,17 +316,13 @@ impl Host {
     {
         let engine_name = engine_name.as_ref();
 
-        if let Some(start) = self.find_start(engine_name) {
-            self.start = Some(Start {
-                id: Some(start.id()),
-                engine_name: None,
-                operation: None,
-                thunk_context: None,
-            });
-            self.start::<P>();
-        } else {
-            panic!("Did not start {engine_name}");
-        }
+        self.start = Some(Start {
+            id: None,
+            engine_name: Some(engine_name.to_string()),
+            operation: None,
+            thunk_context: None,
+        });
+        self.start::<P>();
     }
 
     /// Returns self w/ a start set,
@@ -400,7 +399,7 @@ impl Host {
             // Exits by shutting down the inner tokio runtime
             self.exit();
         } else {
-            event!(Level::ERROR, "A start setting was not set for host");
+            panic!( "A start setting was not set for host")
         }
     }
 
@@ -477,8 +476,8 @@ mod test {
             r#"
         ``` repeat
         + .engine 
-        : .event print_1
-        : .event print_2
+        : .start print_1
+        : .start print_2
         : .repeat 5
         ```
 
@@ -511,19 +510,5 @@ mod test {
             .await
             .expect("should load");
         host.start_with::<Test>("test_block1");
-
-        // Make sure everything exited successfully
-        assert!(logs_contain(
-            "lifec::host: Entity(6, Generation(1)) has exited"
-        ));
-        assert!(logs_contain(
-            "lifec::host: Entity(9, Generation(1)) has exited"
-        ));
-        assert!(logs_contain(
-            "lifec::host: Entity(13, Generation(1)) has exited"
-        ));
-        assert!(logs_contain(
-            "lifec::host: Entity(17, Generation(1)) has exited"
-        ));
     }
 }
