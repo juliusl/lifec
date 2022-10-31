@@ -282,12 +282,24 @@ impl ThunkContext {
         context
     }
 
+    /// Sets the current graph,
+    /// 
+    pub fn set_state(&mut self, state: impl Into<AttributeGraph>) {
+        self.graph = state.into();
+    }
+
     /// Returns a new context with state,
     ///
     pub fn with_block(&self, block: &Block) -> Self {
         let mut context = self.clone();
         context.block = block.clone();
         context
+    }
+
+    /// Sets the current block,
+    /// 
+    pub fn set_block(&mut self, block: &Block) {
+        self.block = block.clone();
     }
 
     /// Returns a new context with the current state committed to the
@@ -363,6 +375,12 @@ impl ThunkContext {
         async_enabled.entity = Some(entity);
         async_enabled.handle = Some(handle);
         async_enabled
+    }
+
+    /// Sets the entity,
+    /// 
+    pub fn set_entity(&mut self, entity: Entity) {
+        self.entity = Some(entity);
     }
 
     /// Enables a guest on this context's entity, returns true if the guest was dispatched,

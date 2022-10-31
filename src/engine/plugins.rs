@@ -128,14 +128,17 @@ impl<'a> Plugins<'a> {
                 if let Some(mut _rx) = cancel_source.take() {
                     let (_tx, rx) = oneshot::channel::<()>();
 
-                    context = context.enable_async(e, handle.clone());
+                    context.set_entity(e);
 
                     let thunk = thunks.get(&e).expect("should have a thunk");
                     let graph = graphs.get(&e).expect("should exist");
                     let block = blocks.get(&e).expect("should exist");
 
+                    context.set_state(graph.clone());
+                    context.set_block(block);
+
                     let mut operation = Operation::empty(handle.clone())
-                        .start_with(thunk, &context.with_state(graph.clone()).with_block(block));
+                        .start_with(thunk, &context);
                     {
                         let _rx = &mut _rx;
                         select! {
