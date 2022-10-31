@@ -121,6 +121,7 @@ impl Plugin for Request {
                     }
                 }
 
+                tc.copy_previous();
                 Some(tc)
             }
         })
