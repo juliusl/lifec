@@ -11,52 +11,14 @@ pub trait EventNode {
     /// Edits an event node,
     ///
     fn edit_event(&mut self, ui: &Ui, event: EventStatus);
+
+    /// Shows event buttons,
+    /// 
+    fn event_buttons(&mut self, ui: &Ui, event: EventStatus);
 }
 
 impl EventNode for Node {
-    fn edit_event(&mut self, ui: &Ui, event: EventStatus) {
-        if let Some(state) = self.appendix.state(&event.entity()) {
-            if !state.control_symbol.is_empty() {
-                ui.text(format!("engine: {}", state.control_symbol));
-            }
-        }
-
-        match self.connection_state {
-            Some(connection_state) if connection_state.is_spawned() => {
-                let source = connection_state.source();
-                if let Some(general) = self.appendix.general(&source) {
-                    general.display_ui(ui);
-                }
-                ui.text(format!(
-                    "id: {} (Source: {})",
-                    event.entity().id(),
-                    source.id()
-                ));
-            }
-            _ => {
-                if let Some(general) = self.appendix.general(&event.entity()) {
-                    general.display_ui(ui);
-                }
-                ui.text(format!("id: {}", event.entity().id()));
-            }
-        }
-
-        if let Some(adhoc) = self.adhoc.as_ref() {
-            let tag = adhoc.tag();
-            if !tag.as_ref().is_empty() {
-                ui.text(format!("tag: {}", tag.as_ref()));
-            }
-        }
-
-        ui.text(format!("status: {event}"));
-
-        if let Some(cursor) = self.cursor.as_ref() {
-            ui.text(format!("cursor - {}", cursor));
-        }
-        if let Some(transition) = self.transition.as_ref() {
-            ui.text(format!("transition: {:?}", transition));
-        }
-
+    fn event_buttons(&mut self, ui: &Ui, event: EventStatus) {
         match event {
             EventStatus::Inactive(_) => {
                 if ui.button(format!("Start {}", event.entity().id())) {
@@ -108,6 +70,52 @@ impl EventNode for Node {
             }
             _ => {}
         }
+    }
+
+    fn edit_event(&mut self, ui: &Ui, event: EventStatus) {
+        if let Some(state) = self.appendix.state(&event.entity()) {
+            if !state.control_symbol.is_empty() {
+                ui.text(format!("engine: {}", state.control_symbol));
+            }
+        }
+
+        match self.connection_state {
+            Some(connection_state) if connection_state.is_spawned() => {
+                let source = connection_state.source();
+                if let Some(general) = self.appendix.general(&source) {
+                    general.display_ui(ui);
+                }
+                ui.text(format!(
+                    "id: {} (Source: {})",
+                    event.entity().id(),
+                    source.id()
+                ));
+            }
+            _ => {
+                if let Some(general) = self.appendix.general(&event.entity()) {
+                    general.display_ui(ui);
+                }
+                ui.text(format!("id: {}", event.entity().id()));
+            }
+        }
+
+        if let Some(adhoc) = self.adhoc.as_ref() {
+            let tag = adhoc.tag();
+            if !tag.as_ref().is_empty() {
+                ui.text(format!("tag: {}", tag.as_ref()));
+            }
+        }
+
+        ui.text(format!("status: {event}"));
+
+        if let Some(cursor) = self.cursor.as_ref() {
+            ui.text(format!("cursor - {}", cursor));
+        }
+        if let Some(transition) = self.transition.as_ref() {
+            ui.text(format!("transition: {:?}", transition));
+        }
+
+       self.event_buttons(ui, event);
 
         // Thunk state
         if let Some(sequence) = self.sequence.as_ref() {
