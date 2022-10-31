@@ -18,24 +18,62 @@ pub type NodeCommandHandler = fn(&mut Events, Entity);
 ///
 #[derive(SystemData)]
 pub struct Events<'a> {
+    /// Controls the event tick rate,
+    /// 
     tick_control: Write<'a, TickControl>,
+    /// Appendix stores metadata on entities,
+    /// 
     appendix: Read<'a, Arc<Appendix>>,
+    /// Channel to send error contexts,
+    /// 
     send_errors: Read<'a, tokio::sync::mpsc::Sender<ErrorContext>, EventRuntime>,
+    /// Channel to broadcast completed plugin calls,
+    /// 
     send_completed: Read<'a, tokio::sync::broadcast::Sender<Entity>, EventRuntime>,
+    /// Map of custom node command handlers,
+    /// 
     handlers: Read<'a, HashMap<String, NodeCommandHandler>>,
+    /// Plugins system data,
+    /// 
     plugins: Plugins<'a>,
+    /// Entity storage,
+    /// 
     entities: Entities<'a>,
+    /// Event transition storage,
+    /// 
     transitions: ReadStorage<'a, Transition>,
+    /// Profiler termination points for adhoc operations,
+    /// 
     profilers: ReadStorage<'a, Profiler>,
+    /// Adhoc operation config,
+    /// 
     adhocs: ReadStorage<'a, Adhoc>,
+    /// Block data,
+    /// 
     blocks: ReadStorage<'a, Block>,
+    /// Entity cursors,
+    /// 
     cursors: WriteStorage<'a, Cursor>,
+    /// Sequences of entities,
+    /// 
     sequences: WriteStorage<'a, Sequence>,
+    /// Execution limits,
+    /// 
     limits: WriteStorage<'a, Limit>,
+    /// Event config,
+    /// 
     events: WriteStorage<'a, Event>,
+    /// Connection storage, 
+    /// 
     connections: WriteStorage<'a, Connection>,
+    /// Operation storage,
+    /// 
     operations: WriteStorage<'a, Operation>,
+    /// Connection state storage,
+    /// 
     connection_states: WriteStorage<'a, ConnectionState>,
+    /// Yielding storage,
+    /// 
     yielding: WriteStorage<'a, Yielding>,
 }
 
@@ -249,7 +287,7 @@ impl<'a> Events<'a> {
         status
     }
 
-    /// Returns a vector of cursors,
+    /// Returns a vec of cursors,
     ///
     pub fn scan_cursors(&self) -> Vec<Cursor> {
         let Events {
