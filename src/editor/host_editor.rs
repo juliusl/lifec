@@ -1,14 +1,13 @@
 use atlier::system::App;
 use hdrhistogram::Histogram;
 use imgui::{ChildWindow, SliderFlags, StyleVar, Ui, Window};
-use specs::{Entities, Entity, Join, Read, ReadStorage, System};
+use specs::{Entity, Read, System};
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
 use tokio::time::Instant;
 use tracing::{event, Level};
 
-use crate::guest::Guest;
-use crate::prelude::{EventRuntime, PluginFeatures};
+use crate::prelude::EventRuntime;
 use crate::{
     prelude::{Events, Node},
     state::AttributeGraph,
@@ -50,9 +49,6 @@ pub struct HostEditor {
     /// Command to reset state on all events,
     ///
     reset: Option<()>,
-    /// Guests within the current host,
-    /// 
-    guests: HashMap<Entity, Guest>,
 }
 
 impl Hash for HostEditor {
@@ -138,18 +134,6 @@ impl App for HostEditor {
         let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
         self.events_window("Events", ui);
 
-        if self.guests.len() > 1 {
-            println!("{}", self.guests.len());
-        }
-
-        for (_, guest) in self.guests.iter() {
-            let Guest { guest_host, owner } = guest;
-            
-            let title = format!("Guest {}", owner.id());
-            let events = guest_host.world().system_data::<PluginFeatures>();
-            events.host_editor().events_window(title, ui);
-        }
-
         window_padding.end();
         frame_padding.end();
     }
@@ -161,11 +145,9 @@ impl<'a> System<'a> for HostEditor {
     type SystemData = (
         Events<'a>,
         Read<'a, tokio::sync::watch::Sender<HostEditor>, EventRuntime>,
-        Entities<'a>,
-        ReadStorage<'a, Guest>,
     );
 
-    fn run(&mut self, (mut events, watcher, entities, guests): Self::SystemData) {
+    fn run(&mut self, (mut events, watcher): Self::SystemData) {
         // General event runtime state
         self.is_paused = !events.can_continue();
         self.is_stopped = events.should_exit();
@@ -211,7 +193,6 @@ impl<'a> System<'a> for HostEditor {
         }
 
         // Handle node commands
-        // TODO: Can record/serialize this
         let mut mutations = HashMap::<Entity, HashMap<Entity, AttributeGraph>>::default();
         for mut node in self.nodes.drain(..) {
             if let Some(command) = node.command.take() {
@@ -243,15 +224,6 @@ impl<'a> System<'a> for HostEditor {
         // Get latest adhoc profiler state,
         //
         self.adhoc_profilers = events.adhoc_profilers();
-
-        // Adds guests to host's set,
-        //
-        for (entity, guest) in (&entities, &guests).join() {
-            if !self.guests.contains_key(&entity) {
-                self.guests.insert(entity, guest.clone());
-                event!(Level::DEBUG, "Guest {}, added to host editor", entity.id());
-            }
-        }
 
         // Update watcher
         //
@@ -425,7 +397,6 @@ impl Default for HostEditor {
             pause: Default::default(),
             reset: Default::default(),
             nodes: Default::default(),
-            guests: Default::default(),
         }
     }
 }

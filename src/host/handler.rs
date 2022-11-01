@@ -95,9 +95,9 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
                 listener.on_error_context(&error);
             }
 
-            if let Some(Guest { owner, guest_host }) = plugin_messages.try_next_guest() {
+            if let Some(guest) = plugin_messages.try_next_guest() {
                 guests
-                    .insert(owner, Guest { owner, guest_host })
+                    .insert(guest.owner, guest)
                     .expect("should be able to insert guest");
             }
 

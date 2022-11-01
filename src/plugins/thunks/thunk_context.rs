@@ -385,9 +385,9 @@ impl ThunkContext {
 
     /// Enables a guest on this context's entity, returns true if the guest was dispatched,
     /// 
-    pub fn enable_guest(&self, guest_host: Arc<Host>) -> bool {
+    pub fn enable_guest(&self, host: Host) -> bool {
         if let (Some(owner), Some(guest_dispatcher)) = (self.entity, self.guest_dispatcher.as_ref()) {
-            match guest_dispatcher.try_send(Guest{ owner, guest_host }) {
+            match guest_dispatcher.try_send(Guest::new(owner, host)) {
                 Ok(_) => {
                     true
                 },

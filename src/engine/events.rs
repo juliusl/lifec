@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     editor::{Appendix, Node, NodeStatus},
-    prelude::*,
+    prelude::*
 };
 
 use tracing::{event, Level};

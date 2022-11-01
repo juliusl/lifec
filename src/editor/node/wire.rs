@@ -18,7 +18,7 @@ use super::NodeCommand;
 impl WireObject for NodeCommand {
     fn encode<BlobImpl>(&self, world: &specs::World, encoder: &mut reality::wire::Encoder<BlobImpl>)
     where
-        BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone,
+        BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
     {
         let appendix = world.read_resource::<Arc<Appendix>>();
 
@@ -189,7 +189,7 @@ impl WireObject for NodeCommand {
                 }
                 0x70 => {
                     if let Some(epos) = frames[idx..].iter().position(|p| p.op() == 0x71) {
-                        let range = pos..pos + epos + 1;
+                        let range = pos..pos + epos + 1; // + 1 to include op 0x71
                         index.insert(format!("{idx}"), vec![range]);
                         pos += epos + 1;
                     }
@@ -219,7 +219,7 @@ fn encode_node_command<BlobImpl>(
     encoder: &mut Encoder<BlobImpl>,
 ) -> Frame
 where
-    BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone,
+    BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
 {
     let mut frame = FrameBuilder::default();
     frame.write(Data::Operation(op), None::<&mut BlobImpl>).ok();
@@ -360,7 +360,7 @@ mod tests {
 
         // Test sending wire data,
         //
-        protocol.send::<NodeCommand, File, _>(
+        protocol.send::<NodeCommand, _, _>(
             write_stream(".test/control"),
             write_stream(".test/frames"),
             write_stream(".test/blob"),
@@ -380,6 +380,10 @@ mod tests {
         for command in protocol.decode::<NodeCommand>() {
             eprintln!("{:#?}", command);
         }
+
+        protocol.ensure_encoder::<NodeCommand>().clear();
+
+        assert!(protocol.decode::<NodeCommand>().is_empty());
     }
 
 

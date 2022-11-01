@@ -53,6 +53,9 @@ pub use tick_control::TickControl;
 mod yielding;
 pub use yielding::Yielding;
 
+mod runner;
+pub use runner::Runner;
+
 use tracing::Level;
 
 /// An engine is a sequence of events, this component manages

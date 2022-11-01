@@ -1,5 +1,5 @@
 use super::thunks::{ErrorContext, SecureClient, StatusUpdate};
-use crate::{guest::Guest, prelude::*, engine::Yielding};
+use crate::{guest::Guest, prelude::*, engine::{Yielding, Runner}};
 use hyper::Client;
 use hyper_tls::HttpsConnector;
 use specs::{shred::SetupHandler, Entity, System, World};
@@ -199,12 +199,11 @@ impl SetupHandler<SecureClient> for EventRuntime {
 
 impl<'a> System<'a> for EventRuntime {
     type SystemData = (
-        Entities<'a>, 
         Events<'a>, 
-        WriteStorage<'a, NodeCommand>
+        Runner<'a>,
     );
 
-    fn run(&mut self, (entities, mut events, mut commands): Self::SystemData) {
+    fn run(&mut self, (mut events, mut runner): Self::SystemData) {
         if !events.should_exit() && events.can_continue() {
             events.tick();
         } else {
@@ -213,7 +212,7 @@ impl<'a> System<'a> for EventRuntime {
         }
 
         // Handle any node commands,
-        for (_, command) in (&entities, commands.drain()).join() {
+        for (_, command) in runner.take_commands() {
             events.handle_node_command(command);
         }
     }
