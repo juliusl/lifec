@@ -45,11 +45,16 @@ impl WireObject for NodeCommand {
                 let entity = world.entities().entity(graph.entity_id());
                 let frame = encode_node_command(0x70, entity, appendix.deref().clone(), encoder);
                 encoder.frames.push(frame);
-                let symbol = graph.clone().index().root().name().to_string();
+                let mut index = graph.clone();
+                let index = index.index();
+                let symbol = index.root().name().to_string();
+                encoder.interner.add_ident(&symbol);
+
+                let frame = Frame::add(index.root().name(), index.root().value(), &mut encoder.blob_device);
+                encoder.frames.push(frame);
                 for (name, values) in graph.values() {
                     for value in values {
                         encoder.interner.add_ident(&name);
-                        encoder.interner.add_ident(&symbol);
                         match &value {
                             Value::Symbol(symbol) => {
                                 encoder.interner.add_ident(symbol);
@@ -115,14 +120,10 @@ impl WireObject for NodeCommand {
                                 attr.symbol(interner),
                                 attr.read_value(interner, blob_device),
                             ) {
+                                (Some(name), None, Some(value)) => {
+                                    attributes.push(Attribute::new(entity.id(), &name, value));
+                                }
                                 (Some(name), Some(symbol), Some(value)) => {
-                                    if attributes.is_empty() {
-                                        if name.is_empty() {
-                                            attributes.push(Attribute::new(entity.id(), &symbol, Value::Empty));
-                                        } else {
-                                            attributes.push(Attribute::new(entity.id(), &name, Value::Symbol(symbol.to_string())));
-                                        }
-                                    }
                                     let mut attr = Attribute::new(
                                         entity.id(),
                                         format!("{symbol}::{name}"),
