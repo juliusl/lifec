@@ -72,12 +72,12 @@ impl ConnectionState {
 #[derive(Component, Debug, Clone, PartialEq)]
 #[storage(VecStorage)]
 pub struct Connection {
-    /// Map of spawned entities and the source they are spawned from,
-    spawned: HashMap<Entity, Entity>,
     /// Set of entities of incoming connections,
     from: HashSet<Entity>,
     /// Owner of this connection,
     to: Entity,
+    /// Map of spawned entities and the source they are spawned from,
+    spawned: HashMap<Entity, Entity>,
     /// Map of the connection state,
     connection_state: HashMap<ConnectionState, Activity>,
     /// Histogram of performance per connection,

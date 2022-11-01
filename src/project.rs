@@ -232,6 +232,7 @@ pub fn default_world() -> World {
     world.register::<Sequence>();
     world.register::<Activity>();
     world.register::<Profiler>();
+    world.register::<Connection>();
     world.register::<Operation>();
     world.register::<RunmdFile>();
     world.register::<Yielding>();
