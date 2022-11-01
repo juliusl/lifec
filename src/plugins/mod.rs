@@ -27,6 +27,7 @@ pub use thunks::StatusUpdate;
 mod testing;
 pub use testing::Chaos;
 pub use testing::Test;
+pub use testing::TestHost;
 
 mod process;
 pub use process::Process;

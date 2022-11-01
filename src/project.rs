@@ -4,6 +4,7 @@ use crate::engine::Adhoc;
 use crate::engine::NodeCommandHandler;
 use crate::engine::Profiler;
 use crate::engine::Yielding;
+use crate::guest::Guest;
 use crate::prelude::*;
 
 mod source;
@@ -207,6 +208,7 @@ pub fn default_runtime() -> Runtime {
     runtime.install_with_custom::<Watch>("");
     runtime.install_with_custom::<Publish>("");
     runtime.install_with_custom::<Chaos>("");
+    runtime.install_with_custom::<TestHost>("");
     runtime
 }
 
@@ -228,6 +230,7 @@ pub fn default_world() -> World {
     world.register::<Event>();
     world.register::<Cursor>();
     world.register::<Engine>();
+    world.register::<Guest>();
     world.register::<Runtime>();
     world.register::<Sequence>();
     world.register::<Activity>();

@@ -383,11 +383,17 @@ impl ThunkContext {
         self.entity = Some(entity);
     }
 
+    /// Returns the entity,
+    /// 
+    pub fn entity(&self) -> Option<Entity> {
+        self.entity.clone()
+    }
+
     /// Enables a guest on this context's entity, returns true if the guest was dispatched,
     /// 
-    pub fn enable_guest(&self, host: Host) -> bool {
-        if let (Some(owner), Some(guest_dispatcher)) = (self.entity, self.guest_dispatcher.as_ref()) {
-            match guest_dispatcher.try_send(Guest::new(owner, host)) {
+    pub fn enable_guest(&self, guest: Guest) -> bool {
+        if let (Some(_), Some(guest_dispatcher)) = (self.entity, self.guest_dispatcher.as_ref()) {
+            match guest_dispatcher.try_send(guest) {
                 Ok(_) => {
                     true
                 },

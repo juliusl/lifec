@@ -22,7 +22,8 @@ impl ListenerSetup {
 
 /// Wrapper struct over an event listener that implements a system to handle events,
 ///
-struct EventHandler<L: Listener> {
+#[derive(Default)]
+pub struct EventHandler<L: Listener> {
     listener: Option<L>,
 }
 

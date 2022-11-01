@@ -37,7 +37,10 @@ fn main() {
     + .operation print-2
     : .println Hello Print Operation c 3
     : .chaos
+    : .test_host
 
+    + .operation start_test_host
+    : .test_host
 
     + test .operation print-2
     : .println Hello Print Operation c 4

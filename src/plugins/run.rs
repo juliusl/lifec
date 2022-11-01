@@ -52,7 +52,6 @@ where
                     let mut host = Host::from(world);
                     let _ = host.prepare::<P>();
 
-
                     let result = {
                         let mut workspace_oeprations =
                             host.world().system_data::<Operations>();

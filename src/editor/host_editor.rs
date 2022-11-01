@@ -122,6 +122,14 @@ impl HostEditor {
                 });
             });
     }
+
+    /// Takes nodes from the host editor,
+    ///
+    pub fn take_nodes(&mut self) -> Vec<Node> {
+        self.nodes
+            .drain(..)
+            .collect()
+    }
 }
 
 impl App for HostEditor {
@@ -194,15 +202,24 @@ impl<'a> System<'a> for HostEditor {
 
         // Handle node commands
         let mut mutations = HashMap::<Entity, HashMap<Entity, AttributeGraph>>::default();
-        for mut node in self.nodes.drain(..) {
+        for mut node in self.take_nodes() {
             if let Some(command) = node.command.take() {
-                match events.plugins().features().broker().try_send_node_command(command.clone(), None) {
+                match events
+                    .plugins()
+                    .features()
+                    .broker()
+                    .try_send_node_command(command.clone(), None)
+                {
                     Ok(_) => {
                         event!(Level::DEBUG, "Sent node command {:?}", command);
-                    },
+                    }
                     Err(err) => {
-                        event!(Level::ERROR, "Could not send node command {err}, {:?}", command);
-                    },
+                        event!(
+                            Level::ERROR,
+                            "Could not send node command {err}, {:?}",
+                            command
+                        );
+                    }
                 }
             }
 

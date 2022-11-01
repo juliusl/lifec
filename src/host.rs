@@ -27,6 +27,7 @@ pub mod async_ext;
 
 mod handler;
 use handler::ListenerSetup;
+pub use handler::EventHandler;
 
 mod host_settings;
 pub use host_settings::HostSettings;

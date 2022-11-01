@@ -1,6 +1,7 @@
 use specs::SystemData;
 use specs::prelude::*;
 
+use crate::guest::Guest;
 use crate::prelude::NodeCommand;
 
 /// Runner system data,
@@ -9,7 +10,10 @@ use crate::prelude::NodeCommand;
 pub struct Runner<'a> {
     /// Entities
     /// 
-    entities: Entities<'a>,
+    pub entities: Entities<'a>,
+    /// Guests,
+    /// 
+    pub guests: WriteStorage<'a, Guest>,
     /// Node commands,
     /// 
     commands: WriteStorage<'a, NodeCommand>,
@@ -20,5 +24,11 @@ impl<'a> Runner<'a> {
     /// 
     pub fn take_commands(&mut self) -> Vec<(Entity, NodeCommand)> {
         (&self.entities, self.commands.drain()).join().collect()
+    }
+
+    /// Returns an iterator over guests,
+    /// 
+    pub fn guests(&self) -> impl Iterator<Item = &Guest> {
+        (&self.entities, &self.guests).join().map(|(_, g)| g)
     }
 }
