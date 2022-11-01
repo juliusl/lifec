@@ -1,11 +1,17 @@
-use std::{sync::Arc, ops::Deref};
+use std::{ops::Deref, sync::Arc};
 
-use atlier::system::{Value, Attribute};
-use reality::{wire::{WireObject, FrameIndex, Encoder, FrameBuilder, Data, Frame}, BlockIndex, Elements};
-use specs::{WorldExt, Component, shred::ResourceId, Entity};
+use atlier::system::{Attribute, Value};
+use reality::{
+    wire::{Data, Encoder, Frame, FrameBuilder, FrameIndex, WireObject},
+    BlockIndex, Elements,
+};
+use specs::{shred::ResourceId, Component, Entity, WorldExt};
 use tracing::{event, Level};
 
-use crate::{prelude::Appendix, state::{AttributeIndex, AttributeGraph}};
+use crate::{
+    prelude::Appendix,
+    state::{AttributeGraph, AttributeIndex},
+};
 
 use super::NodeCommand;
 
@@ -50,7 +56,11 @@ impl WireObject for NodeCommand {
                 let symbol = index.root().name().to_string();
                 encoder.interner.add_ident(&symbol);
 
-                let frame = Frame::add(index.root().name(), index.root().value(), &mut encoder.blob_device);
+                let frame = Frame::add(
+                    index.root().name(),
+                    index.root().value(),
+                    &mut encoder.blob_device,
+                );
                 encoder.frames.push(frame);
                 for (name, values) in graph.values() {
                     for value in values {
@@ -58,15 +68,13 @@ impl WireObject for NodeCommand {
                         match &value {
                             Value::Symbol(symbol) => {
                                 encoder.interner.add_ident(symbol);
-                            },
+                            }
                             Value::Complex(complex) => {
                                 for c in complex.iter() {
                                     encoder.interner.add_ident(c);
                                 }
-                            },
-                            _ => {
-
                             }
+                            _ => {}
                         }
                         let frame = Frame::define(&name, &symbol, &value, &mut encoder.blob_device)
                             .with_parity(entity);
@@ -174,16 +182,16 @@ impl WireObject for NodeCommand {
         let mut pos = 0;
         for (idx, frame) in frames.iter().enumerate() {
             match frame.op() {
-                0x10 | 0x20 | 0x30 | 0x40 | 0x50 | 0x60  => {
-                    let range = pos..pos +1;
+                0x10 | 0x20 | 0x30 | 0x40 | 0x50 | 0x60 => {
+                    let range = pos..pos + 1;
                     index.insert(format!("{idx}"), vec![range]);
                     pos += 1;
-                },
+                }
                 0x70 => {
                     if let Some(epos) = frames[idx..].iter().position(|p| p.op() == 0x71) {
-                        let range = pos..pos+epos+1;
+                        let range = pos..pos + epos + 1;
                         index.insert(format!("{idx}"), vec![range]);
-                        pos += epos+1; 
+                        pos += epos + 1;
                     }
                 }
                 0x80 => {
@@ -191,8 +199,7 @@ impl WireObject for NodeCommand {
                     index.insert(format!("{idx}"), vec![range]);
                     pos += 2;
                 }
-                _ => {
-                }
+                _ => {}
             }
         }
         index
@@ -240,18 +247,19 @@ where
     frame.with_parity(entity)
 }
 
-
 mod tests {
-    use crate::prelude::Project;
+    use crate::prelude::{Project};
 
     #[test]
     #[tracing_test::traced_test]
-    fn test() {
+    fn test_protocol() {
+        std::fs::remove_dir_all(".test").ok();
+        use std::{fs::File, path::PathBuf};
         use super::NodeCommand;
-        use reality::wire::WireObject;
         use crate::prelude::{Appendix, Editor, Host};
         use crate::state::{AttributeGraph, AttributeIndex};
         use reality::wire::Protocol;
+        use reality::wire::WireObject;
         use reality::Parser;
         use specs::WorldExt;
         use std::sync::Arc;
@@ -284,6 +292,8 @@ mod tests {
 
         let mut protocol = Protocol::new(Parser::new_with(host.into()));
 
+        // Record node command as wire objects in a protocol,
+        //
         protocol.encoder::<NodeCommand>(|world, encoder| {
             let entity = world.entities().entity(4);
             encoder.encode(&NodeCommand::Activate(entity), world);
@@ -297,32 +307,87 @@ mod tests {
             let entity = world.entities().entity(4);
             encoder.encode(&NodeCommand::Activate(entity), world);
 
-
             let entity = world.entities().entity(4);
-            encoder.encode(&NodeCommand::Custom("test_node_command".to_string(), entity), world);
-
+            encoder.encode(
+                &NodeCommand::Custom("test_node_command".to_string(), entity),
+                world,
+            );
 
             let entity = world.entities().entity(5);
-            let mut graph = world.read_component::<AttributeGraph>().get(entity).expect("should have graph").clone();
-            graph.with_symbol("test value", "test test");
+            let mut graph = world
+                .read_component::<AttributeGraph>()
+                .get(entity)
+                .expect("should have graph")
+                .clone();
+            graph.with_symbol("testvalue", "test test").with_binary(
+                "testbin",
+                b"vec![0x0a, 0x12]lorem ipsum testsetsetsetet".to_vec(),
+            );
             encoder.encode(&NodeCommand::Update(graph.to_owned()), world);
 
             for frame in encoder.frames.iter() {
                 eprintln!("{:#}", frame);
             }
 
-            encoder.frame_index = NodeCommand::build_index(&encoder.interner,  encoder.frames_slice());
+            encoder.frame_index =
+                NodeCommand::build_index(&encoder.interner, encoder.frames_slice());
         });
 
+        fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
+            move || {
+                std::fs::OpenOptions::new()
+                    .create_new(true)
+                    .write(true)
+                    .open(name)
+                    .ok()
+                    .unwrap()
+            }
+        }
+    
+        fn read_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
+            move || {
+                std::fs::OpenOptions::new()
+                    .read(true)
+                    .open(name)
+                    .ok()
+                    .unwrap()
+            }
+        }
+
+
+        let test_dir = PathBuf::from(".test");
+        std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
+
+        // Test sending wire data,
+        //
+        protocol.send::<NodeCommand, File, _>(
+            write_stream(".test/control"),
+            write_stream(".test/frames"),
+            write_stream(".test/blob"),
+        );
+        for command in protocol.decode::<NodeCommand>() {
+            eprintln!("{:#?}", command);
+        }
+
+        // Test receiving wire object
+        //
+        let mut protocol = Protocol::empty();
+        protocol.receive::<NodeCommand, _, _>(
+            read_stream(".test/control"), 
+            read_stream(".test/frames"), 
+            read_stream(".test/blob")
+        );
         for command in protocol.decode::<NodeCommand>() {
             eprintln!("{:#?}", command);
         }
     }
 
+
+
     #[derive(Default)]
     struct Test;
 
     impl Project for Test {
-        fn interpret(world: &specs::World, block: &reality::Block) {}
+        fn interpret(_: &specs::World, _: &reality::Block) {}
     }
 }
