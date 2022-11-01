@@ -1,11 +1,12 @@
 
-use std::collections::HashMap;
+use std::{collections::{HashMap, hash_map::DefaultHasher}, hash::{Hash, Hasher}};
 
 use atlier::system::{Extension};
 use specs::{WorldExt, Entity};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
+use tracing::{event, Level};
 
-use crate::engine::Engines;
+use crate::{engine::Engines, prelude::WorkspaceConfig, state::AttributeGraph};
 
 use super::Appendix;
 
@@ -46,6 +47,38 @@ impl Extension for WorkspaceEditor {
                 }
                 ui.new_line();
                 ui.separator();
+            }
+        }
+
+        {
+            let config = world.system_data::<WorkspaceConfig>();
+            let mut hasher = DefaultHasher::new();
+            let mut configs = config.scan_root();
+            configs.hash(&mut hasher);
+            let previous = hasher.finish();
+
+            for config in configs.iter_mut() {
+                let id = config.root().name().to_string();
+                for (name, value) in config.properties_mut().iter_properties_mut() {
+                    value.edit(|value| {
+                        AttributeGraph::edit_value(format!("{name} {id}"), value, ui);
+                    }, 
+                    |list| {
+                        for (idx, value) in list.iter_mut().enumerate() {
+                            AttributeGraph::edit_value(format!("{name} {id}.{idx}"), value, ui);
+                        }
+                    }, || {
+                        None
+                    });
+                }
+            }
+
+            let mut hasher = DefaultHasher::new();
+            configs.hash(&mut hasher);
+            let current = hasher.finish();
+
+            if current != previous {
+                event!(Level::INFO, "Changed");
             }
         }
 

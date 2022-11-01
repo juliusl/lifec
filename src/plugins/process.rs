@@ -266,6 +266,7 @@ impl BlockObject for Process {
             .optional("env")
             .optional("arg")
             .optional("flag")
+            .optional("redirect")
     }
 
     fn documentation(&self, _property: impl AsRef<str>) -> Option<reality::Documentation> {

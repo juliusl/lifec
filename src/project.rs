@@ -134,14 +134,15 @@ where
             }
         };
 
+        world.insert(Some(workspace.clone()));
+        
         // Apply config defined in root block
         {
             let mut config_data = world.system_data::<WorkspaceConfig>();
-            config_data.apply(&workspace);
+            config_data.apply();
         }
 
         // Finalize world
-        world.insert(Some(workspace.clone()));
         world.insert(Self::node_handlers());
 
         return world;

@@ -1,4 +1,4 @@
-use crate::{guest::Guest, prelude::*};
+use crate::{engine::Yielding, guest::Guest, prelude::*};
 use specs::{shred::DynamicSystemData, DispatcherBuilder, System, World, Write};
 
 type EnableListener = fn(&World, &mut DispatcherBuilder);
@@ -41,12 +41,14 @@ where
 
 impl<'a, L: Listener> System<'a> for EventHandler<L> {
     type SystemData = (
+        Entities<'a>,
         PluginListener<'a>,
         Write<'a, tokio::sync::broadcast::Receiver<Entity>, EventRuntime>,
         Write<'a, tokio::sync::mpsc::Receiver<ErrorContext>, EventRuntime>,
         Write<'a, Option<L>>,
         WriteStorage<'a, Guest>,
-        Events<'a>,
+        WriteStorage<'a, NodeCommand>,
+        WriteStorage<'a, Yielding>,
     );
 
     fn setup(&mut self, world: &mut World) {
@@ -58,12 +60,14 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
     fn run(
         &mut self,
         (
+            entities,
             mut plugin_messages,
             mut completed_plugins,
             mut errors,
             mut listener,
             mut guests,
-            mut events,
+            mut commands,
+            mut yieldings,
         ): Self::SystemData,
     ) {
         if let Some(listener) = listener.as_mut() {
@@ -98,7 +102,30 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
             }
 
             if let Some((command, yielding)) = plugin_messages.try_next_node_command() {
-                events.handle_node_command(command, yielding);
+                match command {
+                    NodeCommand::Activate(entity)
+                    | NodeCommand::Reset(entity)
+                    | NodeCommand::Pause(entity)
+                    | NodeCommand::Resume(entity)
+                    | NodeCommand::Cancel(entity)
+                    | NodeCommand::Spawn(entity)
+                    | NodeCommand::Custom(_, entity) => {
+                        commands
+                            .insert(entity, command)
+                            .expect("should be able to insert");
+                        if let Some(yielding) = yielding {
+                            yieldings
+                                .insert(entity, yielding)
+                                .expect("should be able to insert");
+                        }
+                    }
+                    NodeCommand::Update(graph) => {
+                        let entity = entities.entity(graph.entity_id());
+                        commands
+                            .insert(entity, NodeCommand::Update(graph.clone()))
+                            .expect("should be able to insert");
+                    }
+                }
             }
         }
     }

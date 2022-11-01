@@ -50,6 +50,12 @@ impl Appendix {
     pub fn name<'a>(&'a self, entity: &'a Entity) -> Option<&'a str> {
         self.general(entity).and_then(|g| Some(g.name.as_str()))
     }
+
+    /// Returns a name for an entity,
+    /// 
+    pub fn control_symbol<'a>(&'a self, entity: &'a Entity) -> Option<String> {
+        self.state(entity).and_then(|g| Some(g.control_symbol.to_string()))
+    }
 }
 
 impl Hash for Appendix {

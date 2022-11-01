@@ -198,14 +198,23 @@ impl SetupHandler<SecureClient> for EventRuntime {
 }
 
 impl<'a> System<'a> for EventRuntime {
-    type SystemData = Events<'a>;
+    type SystemData = (
+        Entities<'a>, 
+        Events<'a>, 
+        WriteStorage<'a, NodeCommand>
+    );
 
-    fn run(&mut self, mut events: Self::SystemData) {
+    fn run(&mut self, (entities, mut events, mut commands): Self::SystemData) {
         if !events.should_exit() && events.can_continue() {
             events.tick();
         } else {
             // If a rate limit is set, this will update the freq w/o changing the last tick
             events.handle_rate_limits();
+        }
+
+        // Handle any node commands,
+        for (_, command) in (&entities, commands.drain()).join() {
+            events.handle_node_command(command);
         }
     }
 }

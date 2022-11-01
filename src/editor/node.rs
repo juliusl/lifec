@@ -25,6 +25,8 @@ pub use status::NodeStatus;
 mod performance;
 pub use performance::Profiler;
 
+pub mod wire;
+
 /// Type alias for an edit node ui function,
 ///
 pub type EditNode = fn(&mut Node, &Ui);

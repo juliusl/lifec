@@ -18,12 +18,11 @@ mod events;
 pub use events::EventRuntime;
 
 mod thunks;
-pub use thunks::Config;
+pub use thunks::Thunk;
+pub use thunks::ThunkContext;
 pub use thunks::ErrorContext;
 pub use thunks::SecureClient;
 pub use thunks::StatusUpdate;
-pub use thunks::Thunk;
-pub use thunks::ThunkContext;
 
 mod testing;
 pub use testing::Chaos;

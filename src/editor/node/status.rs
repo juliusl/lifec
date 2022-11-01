@@ -6,9 +6,9 @@ use crate::{engine::EngineStatus, prelude::EventStatus};
 ///
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
 pub enum NodeStatus {
-    /// 
+    /// Engine status,
     Engine(EngineStatus),
-    /// These are event nodes
+    /// Event status,
     Event(EventStatus),
     /// This is a termination point for event nodes that are adhoc operations
     Profiler,

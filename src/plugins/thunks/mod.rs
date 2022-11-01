@@ -1,5 +1,4 @@
 use hyper::client::HttpConnector;
-use reality::BlockProperties;
 use specs::{storage::DenseVecStorage, Component, Entity};
 
 mod error;
@@ -65,23 +64,6 @@ impl Into<General> for &Thunk {
         General {
             name: self.0.to_string(),
         }
-    }
-}
-
-/// Config for a thunk context
-#[derive(Component, Clone)]
-#[storage(DenseVecStorage)]
-pub struct Config(BlockProperties);
-
-impl Debug for Config {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Config").field(&self.0).finish()
-    }
-}
-
-impl AsRef<Config> for Config {
-    fn as_ref(&self) -> &Config {
-        self
     }
 }
 

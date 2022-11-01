@@ -1003,8 +1003,8 @@ impl<'a> Events<'a> {
     }
 
     /// Handles the node command,
-    ///
-    pub fn handle_node_command(&mut self, command: NodeCommand, yielding: Option<Yielding>) {
+    /// 
+    pub fn handle_node_command(&mut self, command: NodeCommand) {
         match command {
             crate::editor::NodeCommand::Activate(event) => {
                 if self.activate(event) {
@@ -1034,10 +1034,6 @@ impl<'a> Events<'a> {
             crate::editor::NodeCommand::Spawn(event) => {
                 let spawned = self.spawn(event);
 
-                if let Some(yielding) = yielding {
-                    self.yielding.insert(spawned, yielding).expect("should be able to insert");
-                }
-
                 if self.activate(spawned) {
                     event!(Level::DEBUG, "Spawning event {}", event.id());
                 }
@@ -1054,7 +1050,7 @@ impl<'a> Events<'a> {
                     entity.id()
                 );
 
-                if let Some(handler) = self.handlers.get(name) {
+                if let Some(handler) = self.handlers.get(&name) {
                     handler(self, entity);
                 }
             }

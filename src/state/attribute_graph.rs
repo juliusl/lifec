@@ -37,6 +37,18 @@ impl AttributeGraph {
         }
     }
 
+    /// Returns a reference to index,
+    /// 
+    pub fn index(&mut self) -> &BlockIndex {
+        &self.index
+    }
+
+    /// Returns a mutable reference to index,
+    /// 
+    pub fn index_mut(&mut self) -> &mut BlockIndex {
+        &mut self.index
+    }
+
     /// Applies a config to the graph's control values,
     ///
     /// Stores the applied block properties,
@@ -373,6 +385,7 @@ impl App for AttributeGraph {
 
     fn edit_ui(&mut self, ui: &imgui::Ui) {
         let id = self.entity_id();
+   
         for (name, property) in self.resolve_properties_mut().iter_properties_mut() {
             property.edit(
                 move |value| Self::edit_value(format!("{name} {id}"), value, ui),

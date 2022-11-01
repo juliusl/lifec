@@ -6,9 +6,9 @@ pub use runmd::RunmdFile;
 use specs::{Read, ReadStorage, SystemData};
 use specs::prelude::*;
 
-use crate::prelude::{Runtime, Host, Sequencer};
+use crate::prelude::{Runtime, Host, Sequencer, Editor};
 
-use super::{Workspace, Project, default_world};
+use super::{Workspace, Project, default_world, Listener};
 
 /// System data for workspace source and resources used to parse the world,
 /// 
@@ -38,12 +38,15 @@ impl<'a> WorkspaceSource<'a> {
 
     /// Compiles a new host from workspace source,
     /// 
-    pub fn new_host(&self) -> Host {
+    pub fn new_host<P>(&self) -> Host 
+    where
+        P: Project
+    {
         let WorkspaceSource(.., workspace, _, files) = self;
 
         let workspace = workspace.deref().clone().expect("should have a workspace");
 
-        let world = Adhoc::compile_workspace(
+        let world = P::compile_workspace(
             &workspace, 
             files.join(), 
             Some(self.new_parser())
@@ -51,19 +54,31 @@ impl<'a> WorkspaceSource<'a> {
 
         let mut host = Host::from(world);
         host.link_sequences();
-
-        host.prepare::<Adhoc>();
+        host.build_appendix();
         host
     }
-}
 
-/// Ad-hoc project used internally by WorkspaceSource for compiling a host in an adhoc manner
-/// 
-#[derive(Default)]
-struct Adhoc;
+    /// Returns a host with a listener enabled,
+    /// 
+    pub fn new_host_with_listener<P, L>(&self) -> Host 
+    where
+        P: Project,
+        L: Listener,
+    {
+        let WorkspaceSource(.., workspace, _, files) = self;
 
-impl Project for Adhoc {
-    fn interpret(_: &World, _: &reality::Block) {
-        //
+        let workspace = workspace.deref().clone().expect("should have a workspace");
+
+        let world = P::compile_workspace(
+            &workspace, 
+            files.join(), 
+            Some(self.new_parser())
+        );
+
+        let mut host = Host::from(world);
+        host.link_sequences();
+        host.build_appendix();
+        host.enable_listener::<L>();
+        host
     }
 }

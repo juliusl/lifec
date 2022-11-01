@@ -8,7 +8,7 @@ edition = "2021"
 
 # Add's support for built-in editors
 atlier = { git = "https://github.com/juliusl/atlier.git", branch="pr/v1" }
-reality = { git = "https://github.com/juliusl/reality.git" }
+reality = { git = "https://github.com/juliusl/reality.git", branch="pr/protocol" }
 imgui = "0.8.2" 
 specs = { version = "0.18.0", features = ["default", "derive", "shred-derive"] }
 rand = "0.8.5"

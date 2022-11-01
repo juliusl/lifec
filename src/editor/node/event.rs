@@ -13,7 +13,7 @@ pub trait EventNode {
     fn edit_event(&mut self, ui: &Ui, event: EventStatus);
 
     /// Shows event buttons,
-    /// 
+    ///
     fn event_buttons(&mut self, ui: &Ui, event: EventStatus);
 }
 
@@ -115,11 +115,12 @@ impl EventNode for Node {
             ui.text(format!("transition: {:?}", transition));
         }
 
-       self.event_buttons(ui, event);
+        self.event_buttons(ui, event);
 
         // Thunk state
         if let Some(sequence) = self.sequence.as_ref() {
             TreeNode::new(format!("Thunks {}", event.entity().id())).build(ui, || {
+       
                 for (i, s) in sequence.iter_entities().enumerate() {
                     if let Some(name) = self.appendix.name(&s) {
                         TreeNode::new(format!("{i} - {name}")).build(ui, || {
@@ -130,6 +131,13 @@ impl EventNode for Node {
                                     .cloned()
                                     .unwrap_or(state.graph.clone().unwrap());
                                 let previous = graph.clone();
+
+                                TreeNode::new(format!("Control values {}", i)).build(ui, || {
+                                    for (name, value) in graph.index_mut().control_values_mut().iter_mut() {
+                                        AttributeGraph::edit_value(name, value, ui);
+                                    }
+                                });
+                                
                                 for (name, property) in
                                     graph.resolve_properties_mut().iter_properties_mut()
                                 {
