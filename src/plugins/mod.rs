@@ -327,3 +327,59 @@ where
         })
     }
 }
+
+/// Prelude for building protocol implementations and plugins,
+/// 
+pub mod protocol_prelude {
+    /// Helpers for writing concrete implementations for each stream required by the protocol,
+    /// 
+    pub use crate::plugins::async_protocol_helpers::*;
+    /// Wire protocol that defines the concept of a "wire object",
+    /// 
+    pub use reality::wire::Protocol;
+}
+
+/// Helpers for building different transport implementations for protocol,
+/// 
+pub mod async_protocol_helpers {
+    use std::future::Future;
+    use tokio::io::{AsyncWrite, AsyncRead};
+
+    /// Strongly typed, Monad for a function that creates a writable stream
+    ///
+    pub fn write_stream<Writer, F>(
+        name: &'static str,
+        writer_impl: impl FnOnce(&'static str) -> F,
+    ) -> impl FnOnce() -> F
+    where
+        Writer: AsyncWrite + Unpin,
+        F: Future<Output = Writer>,
+    {
+        stream::<Writer, F>(name, writer_impl)
+    }
+
+    /// Strongly-typed, Monad for a function that creates a readable stream,
+    ///
+    pub fn read_stream<Reader, F>(
+        name: &'static str, 
+        reader_impl: impl FnOnce(&'static str) -> F
+    ) -> impl FnOnce() -> F
+    where
+        Reader: AsyncRead + Unpin,
+        F: Future<Output = Reader>,
+    {
+        stream::<Reader, F>(name, reader_impl)
+    }
+
+    /// Monad for a function that creates a stream,
+    ///
+    pub fn stream<IO, F>(
+        name: &'static str,
+        stream_impl: impl FnOnce(&'static str) -> F,
+    ) -> impl FnOnce() -> F
+    where
+        F: Future<Output = IO>,
+    {
+        move || stream_impl(name)
+    }
+}
