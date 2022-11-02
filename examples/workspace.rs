@@ -41,6 +41,7 @@ fn main() {
 
     + .operation start_test_host
     : .test_host
+    : .test_host_sender
 
     + test .operation print-2
     : .println Hello Print Operation c 4

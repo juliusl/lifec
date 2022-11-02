@@ -1,11 +1,15 @@
-use std::sync::Arc;
+use std::{fs::File, sync::Arc, path::PathBuf};
 
-use reality::{BlockObject, BlockProperties};
+use reality::{wire::Protocol, BlockObject, BlockProperties};
 use specs::RunNow;
+use tracing::{event, Level};
 
 use crate::{
     guest::Guest,
-    prelude::{Appendix, Editor, EventRuntime, Host, Listener, Plugin, Project, Sequencer}, host::EventHandler,
+    host::EventHandler,
+    prelude::{
+        Appendix, Editor, EventRuntime, Host, Listener, NodeCommand, Plugin, Project, Sequencer, Plugins,
+    },
 };
 
 #[derive(Default)]
@@ -28,7 +32,9 @@ impl Listener for TestHost {
 
     fn on_error_context(&mut self, _: &crate::prelude::ErrorContext) {}
 
-    fn on_completed_event(&mut self, _: &specs::Entity) {}
+    fn on_completed_event(&mut self, e: &specs::Entity) {
+        event!(Level::DEBUG, "Guest plugin -- {}", e.id());
+    }
 
     fn on_start_command(&mut self, _: &crate::prelude::Start) {}
 }
@@ -52,12 +58,52 @@ impl Plugin for TestHost {
                     host.world_mut().insert(Arc::new(appendix));
                 }
                 let _ = host.prepare::<TestHost>();
+
                 let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |host| {
                     EventRuntime::default().run_now(host.world());
                     EventHandler::<TestHost>::default().run_now(host.world());
+
+                    let test_dir = PathBuf::from(".test");
+                    std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
+                    
+                    if test_dir.join("control").exists() {
+                        fn read_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
+                            move || {
+                                match std::fs::OpenOptions::new()
+                                    .read(true)
+                                    .open(name) {
+                                        Ok(file) => {
+                                            file
+                                        },
+                                        Err(err) => {
+                                            panic!("{name} {err}")
+                                        },
+                                    }
+                            }
+                        }
+    
+                        let mut protocol = Protocol::empty();
+                        protocol.receive::<NodeCommand, _, _>(
+                            read_stream(".test/control"),
+                            read_stream(".test/frames"),
+                            read_stream(".test/blob"),
+                        );
+                        let mut handled = false;
+                        for command in protocol.decode::<NodeCommand>() {
+                            host.world()
+                                .system_data::<Plugins>()
+                                .features()
+                                .broker()
+                                .try_send_node_command(command.clone(), None)
+                                .ok();
+                            handled = true;
+                        }
+                        if handled {
+                            std::fs::remove_dir_all(".test").ok();
+                        }
+                    }
                 });
                 tc.enable_guest(guest);
-
                 Some(tc)
             }
         })

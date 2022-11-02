@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use specs::{Component, Dispatcher, Entity, RunNow, VecStorage};
+use specs::{Component, Entity, RunNow, VecStorage};
 
 use crate::prelude::{Host, HostEditor, PluginFeatures, Plugins, Project, ThunkContext};
 
@@ -17,7 +17,7 @@ pub struct Guest {
     stateless: Run,
 }
 
-pub type Run =  fn(&Host);
+pub type Run =  fn(&mut Host);
 
 impl Guest {
     /// Returns a new guest component,
@@ -69,8 +69,8 @@ impl Guest {
 
     /// Stateless run
     /// 
-    pub fn run(&self) {
-        (self.stateless)(&self.host)
+    pub fn run(&mut self) {
+        (self.stateless)(&mut self.host)
     }
 }
 

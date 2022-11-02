@@ -1,4 +1,4 @@
-use crate::{prelude::*, project::Listener};
+use crate::{engine::Runner, prelude::*, project::Listener};
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use reality::wire::Protocol;
@@ -26,8 +26,8 @@ pub use editor::Editor;
 pub mod async_ext;
 
 mod handler;
-use handler::ListenerSetup;
 pub use handler::EventHandler;
+use handler::ListenerSetup;
 
 mod host_settings;
 pub use host_settings::HostSettings;
@@ -42,7 +42,7 @@ pub struct Host {
     ///
     world: Option<World>,
     /// Protocol for converting wire objects into frames,
-    /// 
+    ///
     protocol: Option<Protocol>,
     /// Workspace to use that provides environment related values, work_dir, uri, etc..
     ///
@@ -59,19 +59,46 @@ pub struct Host {
 ///
 impl Host {
     /// Returns protocol if exists,
-    /// 
+    ///
     pub fn protocol(&self) -> Option<&Protocol> {
         self.protocol.as_ref()
     }
 
     /// Returns protocol mut if exists,
-    /// 
+    ///
     pub fn protocol_mut(&mut self) -> Option<&mut Protocol> {
         self.protocol.as_mut()
     }
 
+    /// Encodes commands to protocol,
+    ///
+    /// returns true if any commands were encoded,
+    ///
+    pub fn encode_commands(&mut self) -> bool {
+        if let Some(mut protocol) = self.protocol.take() {
+            let commands = {
+                let mut events = protocol.as_ref().system_data::<Runner>();
+                events.take_commands()
+            };
+
+            let encoding = !commands.is_empty();
+
+            protocol.encoder::<NodeCommand>(move |world, encoder| {
+                for (_, command) in commands {
+                    encoder.encode(&command, world);
+                }
+            });
+
+            self.protocol = Some(protocol);
+
+            encoding
+        } else {
+            false
+        }
+    }
+
     /// Consumes the host world and converts to a protocol,
-    /// 
+    ///
     pub fn enable_protocol(&mut self) {
         if let Some(world) = self.world.take() {
             self.protocol = Some(Protocol::from(world));
@@ -150,7 +177,7 @@ impl Host {
             .filter_map(|e| e.ok())
             .filter(|e| e.file_name().to_string_lossy().ends_with(".runmd"))
             .filter(|e| e.file_name().to_string_lossy() != ".runmd")
-            .filter(|e| e.file_type().and_then(|f| Ok(f.is_file())).ok() == Some(true))        
+            .filter(|e| e.file_type().and_then(|f| Ok(f.is_file())).ok() == Some(true))
         {
             let file_name = e.file_name();
             event!(Level::DEBUG, "Found file {:?}", &file_name);
@@ -158,19 +185,31 @@ impl Host {
             if let Some(src) = tokio::fs::read_to_string(&file_name).await.ok() {
                 let file = RunmdFile {
                     source: Some(src),
-                    symbol: file_name.to_str().expect("should be a string").trim_end_matches(".runmd").to_string()
+                    symbol: file_name
+                        .to_str()
+                        .expect("should be a string")
+                        .trim_end_matches(".runmd")
+                        .to_string(),
                 };
                 files.push(file);
                 event!(Level::TRACE, "Added {:?}", &file_name);
             } else {
-                event!(Level::WARN, "Could not read file {:?}, Skipping", &file_name);
+                event!(
+                    Level::WARN,
+                    "Could not read file {:?}, Skipping",
+                    &file_name
+                );
             }
         }
 
         let mut host = Self {
             workspace: Workspace::default(),
             start: None,
-            world: Some(P::compile_workspace(&Workspace::default(), files.iter(), None)),
+            world: Some(P::compile_workspace(
+                &Workspace::default(),
+                files.iter(),
+                None,
+            )),
             protocol: None,
             listener_setup: None,
         };
@@ -430,7 +469,7 @@ impl Host {
             // Exits by shutting down the inner tokio runtime
             self.exit();
         } else {
-            panic!( "A start setting was not set for host")
+            panic!("A start setting was not set for host")
         }
     }
 

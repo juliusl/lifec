@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     editor::{Appendix, Node, NodeStatus},
-    prelude::*
+    prelude::*,
 };
 
 use tracing::{event, Level};
@@ -19,67 +19,71 @@ pub type NodeCommandHandler = fn(&mut Events, Entity);
 #[derive(SystemData)]
 pub struct Events<'a> {
     /// Controls the event tick rate,
-    /// 
+    ///
     tick_control: Write<'a, TickControl>,
     /// Appendix stores metadata on entities,
-    /// 
+    ///
     appendix: Read<'a, Arc<Appendix>>,
     /// Channel to send error contexts,
-    /// 
+    ///
     send_errors: Read<'a, tokio::sync::mpsc::Sender<ErrorContext>, EventRuntime>,
     /// Channel to broadcast completed plugin calls,
-    /// 
+    ///
     send_completed: Read<'a, tokio::sync::broadcast::Sender<Entity>, EventRuntime>,
     /// Map of custom node command handlers,
-    /// 
+    ///
     handlers: Read<'a, HashMap<String, NodeCommandHandler>>,
     /// Plugins system data,
-    /// 
+    ///
     plugins: Plugins<'a>,
     /// Entity storage,
-    /// 
+    ///
     entities: Entities<'a>,
     /// Event transition storage,
-    /// 
+    ///
     transitions: ReadStorage<'a, Transition>,
     /// Profiler termination points for adhoc operations,
-    /// 
+    ///
     profilers: ReadStorage<'a, Profiler>,
     /// Adhoc operation config,
-    /// 
+    ///
     adhocs: ReadStorage<'a, Adhoc>,
     /// Block data,
-    /// 
+    ///
     blocks: ReadStorage<'a, Block>,
+    /// Node statuses
+    ///
+    node_statuses: WriteStorage<'a, NodeStatus>,
     /// Entity cursors,
-    /// 
+    ///
     cursors: WriteStorage<'a, Cursor>,
     /// Sequences of entities,
-    /// 
+    ///
     sequences: WriteStorage<'a, Sequence>,
     /// Execution limits,
-    /// 
+    ///
     limits: WriteStorage<'a, Limit>,
     /// Event config,
-    /// 
+    ///
     events: WriteStorage<'a, Event>,
-    /// Connection storage, 
-    /// 
+    /// Connection storage,
+    ///
     connections: WriteStorage<'a, Connection>,
     /// Operation storage,
-    /// 
+    ///
     operations: WriteStorage<'a, Operation>,
     /// Connection state storage,
-    /// 
+    ///
     connection_states: WriteStorage<'a, ConnectionState>,
     /// Yielding storage,
-    /// 
+    ///
     yielding: WriteStorage<'a, Yielding>,
 }
 
 /// Enumeration of event statuses,
 ///
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[storage(DenseVecStorage)]
 pub enum EventStatus {
     /// Means that the operation is empty has no activity
     ///
@@ -141,7 +145,7 @@ impl Display for EventStatus {
 
 impl<'a> Events<'a> {
     /// Returns plugins data,
-    /// 
+    ///
     pub fn plugins(&self) -> &Plugins<'a> {
         &self.plugins
     }
@@ -330,13 +334,11 @@ impl<'a> Events<'a> {
 
                     if let Some(Yielding(yielding, _)) = self.yielding.remove(*ready) {
                         match yielding.send(result) {
-                            Ok(_) => {
-                                Some(clone)
-                            },
+                            Ok(_) => Some(clone),
                             Err(err) => {
                                 event!(Level::ERROR, "Could not send to yielding channel");
                                 Some(err)
-                            },
+                            }
                         }
                     } else {
                         Some(clone)
@@ -684,15 +686,19 @@ impl<'a> Events<'a> {
     }
 
     /// Deletes an entity,
-    /// 
+    ///
     pub fn delete(&mut self, entity: Entity) {
         match self.entities.delete(entity) {
             Ok(_) => {
                 event!(Level::DEBUG, "Deleted spawned entity, {}", entity.id());
-            },
+            }
             Err(err) => {
-                event!(Level::ERROR, "Could not delete entity {}, {err}", entity.id());
-            },
+                event!(
+                    Level::ERROR,
+                    "Could not delete entity {}, {err}",
+                    entity.id()
+                );
+            }
         }
     }
 
@@ -946,18 +952,18 @@ impl<'a> Events<'a> {
             .collect::<Vec<_>>()
     }
 
-    /// Returns an iterator over event nodes,
+    /// Returns current event nodes,
     ///
     pub fn nodes(&'a self) -> Vec<Node> {
         self.scan()
             .iter()
-            .filter_map(|e| self.node(e.entity()))
+            .filter_map(|e| self.event_node(e.entity()))
             .collect::<Vec<_>>()
     }
 
     /// Returns a node,
     ///
-    pub fn node(&self, event: Entity) -> Option<Node> {
+    pub fn event_node(&self, event: Entity) -> Option<Node> {
         let Events {
             appendix,
             entities,
@@ -1003,7 +1009,7 @@ impl<'a> Events<'a> {
     }
 
     /// Handles the node command,
-    /// 
+    ///
     pub fn handle_node_command(&mut self, command: NodeCommand) {
         match command {
             crate::editor::NodeCommand::Activate(event) => {
@@ -1054,6 +1060,17 @@ impl<'a> Events<'a> {
                     handler(self, entity);
                 }
             }
+        }
+    }
+
+    /// Takes a sample of the current node state by adding the node status as a component to each entity,
+    ///
+    pub fn sample_nodes(&mut self) {
+        for node in self.nodes() {
+            let status = node.status;
+            self.node_statuses
+                .insert(status.entity(), status)
+                .expect("should be able to insert");
         }
     }
 }

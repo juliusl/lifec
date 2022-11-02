@@ -70,9 +70,9 @@ impl Sequencer for Host {
                 // Unpack adhoc operations, link to profiler
                 // Since adhoc operations are not part of an engine, they need a connection so
                 // that activity can be measured.
-                let profiler = entities.create();
+                let adhoc_profiler = entities.create();
                 profilers
-                    .insert(profiler, Profiler::default())
+                    .insert(adhoc_profiler, Profiler::default())
                     .expect("should be able to insert component");
 
                 let mut profiler_connections = HashSet::<Entity>::default();
@@ -81,7 +81,7 @@ impl Sequencer for Host {
                     profiler_connections.insert(entity);
                 }
                 connections
-                    .insert(profiler, Connection::new(profiler_connections, profiler))
+                    .insert(adhoc_profiler, Connection::new(profiler_connections, adhoc_profiler))
                     .expect("should be able to insert connection");
 
                 // Process cursors

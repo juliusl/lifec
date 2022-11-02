@@ -1,10 +1,11 @@
-use specs::Entity;
+use specs::{Entity, Component, DenseVecStorage};
 
 use crate::{engine::EngineStatus, prelude::EventStatus};
 
 /// Enumeration of node statuses,
 ///
-#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Component, Hash, PartialEq, Eq, Clone, Copy)]
+#[storage(DenseVecStorage)]
 pub enum NodeStatus {
     /// Engine status,
     Engine(EngineStatus),

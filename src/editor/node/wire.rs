@@ -9,11 +9,73 @@ use specs::{shred::ResourceId, Component, Entity, WorldExt};
 use tracing::{event, Level};
 
 use crate::{
-    prelude::Appendix,
+    prelude::{Appendix, EventStatus},
     state::{AttributeGraph, AttributeIndex},
 };
 
-use super::NodeCommand;
+use super::{NodeCommand, NodeStatus};
+
+impl WireObject for NodeStatus {
+    fn encode<BlobImpl>(&self, world: &specs::World, encoder: &mut Encoder<BlobImpl>)
+    where
+        BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default 
+    {
+        let appendix = world.read_resource::<Arc<Appendix>>();
+        let appendix =  appendix.deref().clone();
+        match self {
+            NodeStatus::Event(event) => {
+                match event {
+                    crate::prelude::EventStatus::Scheduled(entity) => encode_node_command(0x10, *entity, appendix, encoder),
+                    crate::prelude::EventStatus::New(entity) => encode_node_command(0x20, *entity, appendix, encoder),
+                    crate::prelude::EventStatus::InProgress(entity) => encode_node_command(0x30, *entity, appendix, encoder),
+                    crate::prelude::EventStatus::Paused(entity) => encode_node_command(0x40, *entity, appendix, encoder),
+                    crate::prelude::EventStatus::Ready(entity) => encode_node_command(0x50, *entity, appendix, encoder),
+                    crate::prelude::EventStatus::Completed(entity) => encode_node_command(0x60, *entity, appendix, encoder),
+                    crate::prelude::EventStatus::Cancelled(entity) => encode_node_command(0x70, *entity, appendix, encoder),
+                    crate::prelude::EventStatus::Inactive(entity) => encode_node_command(0x80, *entity, appendix, encoder),
+                };
+            },
+            _ => {
+
+            },
+        }
+    }
+
+    fn decode(protocol: &reality::wire::Protocol, _: &reality::wire::Interner, _: &std::io::Cursor<Vec<u8>>, frames: &[Frame]) -> Self {
+        let frame = frames.get(0).expect("should only be 1 frame");
+        let entity = frame.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
+        match frame.op() {
+            0x10 => NodeStatus::Event(EventStatus::Scheduled(entity)),
+            0x20 => NodeStatus::Event(EventStatus::New(entity)),
+            0x30 => NodeStatus::Event(EventStatus::InProgress(entity)),
+            0x40 => NodeStatus::Event(EventStatus::Paused(entity)),
+            0x50 => NodeStatus::Event(EventStatus::Ready(entity)), 
+            0x60 => NodeStatus::Event(EventStatus::Completed(entity)),
+            0x70 => NodeStatus::Event(EventStatus::Cancelled(entity)),
+            0x80 => NodeStatus::Event(EventStatus::Inactive(entity)), 
+            _ => {
+                panic!("Unrecognized frame")
+            }
+        }
+    }
+
+    fn build_index(_: &reality::wire::Interner, frames: &[Frame]) -> FrameIndex {
+        let mut frame_index = FrameIndex::default();
+
+        let mut pos = 0;
+        for (idx, _) in frames.iter().enumerate() {
+            let range = pos..pos + 1; // + 1 to include op 0x71
+            frame_index.insert(format!("{idx}-node-status"), vec![range]);
+            pos += 1;
+        }
+
+        frame_index
+    }
+
+    fn resource_id() -> ResourceId {
+        ResourceId::new::<<NodeStatus as Component>::Storage>()
+    }
+}
 
 impl WireObject for NodeCommand {
     fn encode<BlobImpl>(&self, world: &specs::World, encoder: &mut reality::wire::Encoder<BlobImpl>)

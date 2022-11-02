@@ -56,6 +56,15 @@ pub use yielding::Yielding;
 mod runner;
 pub use runner::Runner;
 
+mod profilers;
+pub use profilers::Profilers;
+
+mod performance;
+pub use performance::Performance;
+
+mod cleanup;
+pub use cleanup::Cleanup;
+
 use tracing::Level;
 
 /// An engine is a sequence of events, this component manages

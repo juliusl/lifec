@@ -1,12 +1,14 @@
 use atlier::system::App;
 use hdrhistogram::Histogram;
 use imgui::{ChildWindow, SliderFlags, StyleVar, Ui, Window};
+use reality::wire::{Protocol, WireObject};
 use specs::{Entity, Read, System};
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
 use tokio::time::Instant;
 use tracing::{event, Level};
 
+use crate::engine::Performance;
 use crate::prelude::EventRuntime;
 use crate::{
     prelude::{Events, Node},
@@ -126,9 +128,7 @@ impl HostEditor {
     /// Takes nodes from the host editor,
     ///
     pub fn take_nodes(&mut self) -> Vec<Node> {
-        self.nodes
-            .drain(..)
-            .collect()
+        self.nodes.drain(..).collect()
     }
 }
 
@@ -393,6 +393,30 @@ impl HostEditor {
                         ui.new_line();
                     }
                 }
+                token.end();
+            }
+
+            let tab = ui.tab_item("Debug");
+            if let Some(token) = tab {
+                let mut protocol = Protocol::empty();
+                let profilers = self.adhoc_profilers.iter().cloned().collect::<Vec<_>>();
+
+                protocol.encoder::<Performance>(move |w, e| {
+                    for node in profilers.iter()
+                        .filter_map(|p| p.connection.clone())
+                        .map(|p| Performance::samples(100, &[50.0, 60.0, 90.0, 99.0], &p))
+                        .flatten()
+                    {
+                        e.encode(&node, w);
+                    }
+
+                    e.frame_index = Performance::build_index(&e.interner, &e.frames);
+                });
+
+                for f in protocol.decode::<Performance>() {
+                    ui.text(format!("{:#?}", f));
+                }
+
                 token.end();
             }
 

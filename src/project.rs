@@ -209,6 +209,7 @@ pub fn default_runtime() -> Runtime {
     runtime.install_with_custom::<Publish>("");
     runtime.install_with_custom::<Chaos>("");
     runtime.install_with_custom::<TestHost>("");
+    runtime.install_with_custom::<TestHostSender>("");
     runtime
 }
 
@@ -239,6 +240,7 @@ pub fn default_world() -> World {
     world.register::<Operation>();
     world.register::<RunmdFile>();
     world.register::<Yielding>();
+    world.register::<EventStatus>();
     world.register::<Transition>();
     world.register::<ThunkContext>();
     world.register::<AttributeGraph>();

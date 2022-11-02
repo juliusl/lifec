@@ -111,8 +111,6 @@ impl Extension for WorkspaceEditor {
                 guest_editor.events_window(format!("Guest {}", guest.owner.id()), ui);
 
                 guest_editor.run_now(guest.host().world());
-
-                guest.run();
             }
         }
     }
@@ -126,6 +124,7 @@ impl Extension for WorkspaceEditor {
             } = world.system_data::<Runner>();
 
             for (_, guest) in (&entities, &mut guests).join() {
+                guest.run();
                 guest.host_mut().world_mut().maintain();
             }
         }

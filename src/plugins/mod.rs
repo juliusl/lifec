@@ -28,6 +28,7 @@ mod testing;
 pub use testing::Chaos;
 pub use testing::Test;
 pub use testing::TestHost;
+pub use testing::TestHostSender;
 
 mod process;
 pub use process::Process;
