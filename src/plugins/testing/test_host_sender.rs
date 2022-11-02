@@ -7,7 +7,7 @@ use crate::{
     guest::Guest,
     host::EventHandler,
     prelude::{
-        Appendix, Editor, Host, NodeCommand, Plugin, Project, Sequencer,
+        Appendix, Editor, Host, NodeCommand, Plugin, Project, Sequencer, RunmdFile,
     },
 };
 
@@ -27,7 +27,30 @@ impl Plugin for TestHostSender {
             let tc = context.clone();
             async {
                 let root = tc.workspace().expect("Should have a workspace");
-                let world = TestHost::compile_workspace(root, [].iter(), None);
+                let world = TestHost::compile_workspace(root, [
+                    RunmdFile::new_src(
+                        "listener", 
+                        r#"
+                        ```
+                        + .engine
+                        : .start start
+                        : .start cooldown
+                        : .loop
+                        ```
+
+                        ``` start
+                        + .runtime
+                        : .watch .world/test.io/test_host
+                        : .create file
+                        : .listen test_host
+                        ```
+
+                        ``` cooldown
+                        + .runtime
+                        : .timer 1s
+                        ```
+                        "#)
+                ].iter(), None);
                 let mut host = Host::from(world);
                 host.link_sequences();
                 host.enable_listener::<TestHost>();
@@ -41,7 +64,7 @@ impl Plugin for TestHostSender {
                     EventHandler::<TestHost>::default().run_now(host.world());
 
                     if host.encode_commands() {
-                        let test_dir = PathBuf::from(".test");
+                        let test_dir = PathBuf::from(".world/test.io/test_host");
                         std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
                         
                         fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
@@ -55,11 +78,32 @@ impl Plugin for TestHostSender {
                             }
                         }
     
+                        // protocol.send_async::<NodeCommand, _>(
+                        //     &mut tokio::fs::OpenOptions::new()
+                        //         .create(true)
+                        //         .write(true)
+                        //         .open(".test/control").await
+                        //         .ok()
+                        //         .unwrap(),
+                        //     &mut tokio::fs::OpenOptions::new()
+                        //         .create(true)
+                        //         .write(true)
+                        //         .open(".test/control").await
+                        //         .ok()
+                        //         .unwrap(),
+                        //     &mut tokio::fs::OpenOptions::new()
+                        //         .create(true)
+                        //         .write(true)
+                        //         .open(".test/control").await
+                        //         .ok()
+                        //         .unwrap(),
+                        // );
+
                         if let Some(protocol) = host.protocol_mut() {
                             protocol.send::<NodeCommand, _, _>(
-                                write_stream(".test/control"),
-                                write_stream(".test/frames"),
-                                write_stream(".test/blob"),
+                                write_stream(".world/test.io/test_host/control"),
+                                write_stream(".world/test.io/test_host/frames"),
+                                write_stream(".world/test.io/test_host/blob"),
                             );
                         }
                     }

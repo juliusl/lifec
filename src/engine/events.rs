@@ -329,23 +329,21 @@ impl<'a> Events<'a> {
             EventStatus::Ready(ready) => {
                 let mut result = self.get_result(*ready);
 
-                let result = if let Some(result) = result.take() {
-                    let clone = result.clone();
+                let result = result.take();
 
-                    if let Some(Yielding(yielding, _)) = self.yielding.remove(*ready) {
+                if let Some(Yielding(yielding, _)) = self.yielding.remove(*ready) {
+                    if let Some(result) = result.clone() {
                         match yielding.send(result) {
-                            Ok(_) => Some(clone),
-                            Err(err) => {
+                            Ok(_) => {
+                            },
+                            Err(_) => {
                                 event!(Level::ERROR, "Could not send to yielding channel");
-                                Some(err)
                             }
                         }
                     } else {
-                        Some(clone)
+                        drop(yielding);
                     }
-                } else {
-                    None
-                };
+                }
 
                 let next_entities = self.get_next_entities(*ready);
 

@@ -320,6 +320,14 @@ impl AttributeIndex for AttributeGraph {
             properties.set(name, BlockProperty::Single(value.clone()));
         }
     }
+
+    fn properties(&self) -> &BlockProperties {
+        self.resolve_properties()
+    }
+
+    fn properties_mut(&mut self) -> &mut BlockProperties {
+        self.resolve_properties_mut()
+    }
 }
 
 impl AttributeGraph {

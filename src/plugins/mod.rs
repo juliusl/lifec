@@ -18,11 +18,11 @@ mod events;
 pub use events::EventRuntime;
 
 mod thunks;
-pub use thunks::Thunk;
-pub use thunks::ThunkContext;
 pub use thunks::ErrorContext;
 pub use thunks::SecureClient;
 pub use thunks::StatusUpdate;
+pub use thunks::Thunk;
+pub use thunks::ThunkContext;
 
 mod testing;
 pub use testing::Chaos;
@@ -55,6 +55,10 @@ pub use watch::Watch;
 
 mod run;
 pub use run::Run;
+
+mod dispatch;
+pub use dispatch::Dispatch;
+pub use dispatch::Listen;
 
 mod request;
 pub use request::Request;
