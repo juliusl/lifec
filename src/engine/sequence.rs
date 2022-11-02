@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt::Display;
 
 use specs::storage::DefaultVecStorage;
@@ -6,20 +7,20 @@ use specs::{Component, Entity};
 use crate::prelude::*;
 
 /// A component for a collection of entities that are processed in sequence,
-/// 
+///
 /// In addition, determines the behavior to take after a sequence completes. The goal
-/// of this component is to be an entity-only representation. 
-/// 
+/// of this component is to be an entity-only representation.
+///
 /// The execution behavior is determined by the components on the entities themselves.
-/// 
+///
 #[derive(Component, Debug, Default, Clone, Hash, PartialEq, Eq)]
 #[storage(DefaultVecStorage)]
 pub struct Sequence(
     /// Sequence, a list of entities w/ events that are called in sequence,
-    /// 
+    ///
     Vec<Entity>,
     /// Cursor, if set, this entity will be called after the sequence completes,
-    /// 
+    ///
     Option<Cursor>,
 );
 
@@ -43,7 +44,7 @@ impl Display for Sequence {
 impl From<Vec<Entity>> for Sequence {
     /// Note: Reverses the order, assuming vec was built with .push(), this is
     /// because underneath the hood we'll pop off of this vector,
-    /// 
+    ///
     fn from(mut vec: Vec<Entity>) -> Self {
         vec.reverse();
 
@@ -53,7 +54,7 @@ impl From<Vec<Entity>> for Sequence {
 
 impl Sequence {
     /// Returns true if there are no events in the sequence,
-    /// 
+    ///
     pub fn is_empty(&self) -> bool {
         let Self(events, ..) = self;
 
@@ -61,7 +62,7 @@ impl Sequence {
     }
 
     /// Adds an entity to this sequence,
-    /// 
+    ///
     pub fn add(&mut self, entity: Entity) {
         let Self(events, ..) = self;
         events.reverse();
@@ -70,14 +71,14 @@ impl Sequence {
     }
 
     /// Pushs an entity to the top of this sequence,
-    /// 
+    ///
     pub fn push(&mut self, entity: Entity) {
         let Self(events, ..) = self;
         events.push(entity);
     }
 
     /// Returns the next entity in this sequence,
-    /// 
+    ///
     pub fn next(&mut self) -> Option<Entity> {
         let Self(events, ..) = self;
 
@@ -86,13 +87,13 @@ impl Sequence {
 
     /// Returns a copy of the next entity in this sequence,
     /// w/o altering the sequence,
-    /// 
+    ///
     pub fn peek(&self) -> Option<Entity> {
         self.clone().0.pop()
     }
 
     /// Returns the copy of the last entity in this sequence, before the cursor,
-    /// 
+    ///
     pub fn last(&self) -> Option<Entity> {
         let mut clone = self.clone();
         clone.0.reverse();
@@ -124,12 +125,8 @@ impl Sequence {
                     }
                 }
                 Cursor::Fork(forks) => {
-                    let forks = forks
-                        .iter()
-                        .filter(|f| **f != entity)
-                        .cloned()
-                        .collect::<Vec<_>>();
-                    clone.1 = Some(Cursor::Fork(forks));
+                    let forks = forks.iter().filter(|f| **f != entity).cloned();
+                    clone.1 = Some(Cursor::Fork(BTreeSet::from_iter(forks)));
                     clone
                 }
             },
@@ -149,10 +146,14 @@ impl Sequence {
     pub fn set_cursor(&mut self, cursor: Entity) {
         match self.1.as_mut() {
             Some(c) => match c {
-                Cursor::Next(next) => self.1 = Some(Cursor::Fork(vec![*next, cursor])),
+                Cursor::Next(next) => {
+                    self.1 = Some(Cursor::Fork(BTreeSet::from_iter(
+                        vec![*next, cursor].iter().cloned(),
+                    )))
+                }
                 Cursor::Fork(forks) => {
                     let mut forks = forks.clone();
-                    forks.push(cursor);
+                    forks.insert(cursor);
                     self.1 = Some(Cursor::Fork(forks));
                 }
             },

@@ -436,7 +436,7 @@ impl<'a> Events<'a> {
                 Cursor::Next(next) => {
                     vec![*next]
                 }
-                Cursor::Fork(forks) => forks.to_vec(),
+                Cursor::Fork(forks) => forks.iter().cloned().collect::<Vec<_>>(),
             }
         } else {
             vec![]

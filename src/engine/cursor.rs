@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, collections::BTreeSet};
 
 use specs::{Component, Entity, VecStorage};
 
@@ -12,7 +12,7 @@ pub enum Cursor {
     Next(Entity),
     /// Cursor that points to many entities,
     ///
-    Fork(Vec<Entity>),
+    Fork(BTreeSet<Entity>),
 }
 
 impl Display for Cursor {
