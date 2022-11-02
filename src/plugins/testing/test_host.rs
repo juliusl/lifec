@@ -1,4 +1,4 @@
-use std::{sync::Arc, path::PathBuf};
+use std::{path::PathBuf, sync::Arc};
 
 use reality::{BlockObject, BlockProperties};
 use specs::RunNow;
@@ -8,7 +8,7 @@ use crate::{
     guest::Guest,
     host::EventHandler,
     prelude::{
-        Appendix, Editor, EventRuntime, Host, Listener, Plugin, Project, Sequencer, RunmdFile,
+        Appendix, Editor, EventRuntime, Host, Listener, Plugin, Project, RunmdFile, Sequencer,
     },
 };
 
@@ -48,31 +48,34 @@ impl Plugin for TestHost {
         context.task(|_| {
             let tc = context.clone();
             async {
-                let root = tc.workspace().expect("Should have a workspace");
-                let world = TestHost::compile_workspace(root, [
-                    RunmdFile::new_src(
-                        "listener", 
-                        r#"
-                        ```
-                        + .engine
-                        : .start start
-                        : .start cooldown
-                        : .loop
-                        ```
+                let mut root = tc.workspace().expect("Should have a workspace").clone();
+                root.cache_file(&RunmdFile::new_src(
+                    "listener",
+                    r#"
+                    ```
+                    + .engine
+                    : .start start
+                    : .start cooldown
+                    : .loop
+                    ```
 
-                        ``` start
-                        + .runtime
-                        : .watch test_host
-                        : .create file
-                        : .listen test_host
-                        ```
+                    ``` start
+                    + .runtime
+                    : .watch test_host
+                    : .create file
+                    : .listen test_host
+                    ```
 
-                        ``` cooldown
-                        + .runtime
-                        : .timer 1s
-                        ```
-                        "#)
-                ].iter(), None);
+                    ``` cooldown
+                    + .runtime
+                    : .timer 1s
+                    ```
+                    "#,
+                ));
+
+                let world = root
+                    .compile::<TestHost>()
+                    .expect("should be able to compile");
                 let mut host = Host::from(world);
                 host.link_sequences();
                 host.enable_listener::<TestHost>();
@@ -87,46 +90,6 @@ impl Plugin for TestHost {
                 let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |host| {
                     EventRuntime::default().run_now(host.world());
                     EventHandler::<TestHost>::default().run_now(host.world());
-
-                    // let test_dir = PathBuf::from(".test");
-                    // std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
-                    
-                    // if test_dir.join("control").exists() {
-                    //     fn read_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
-                    //         move || {
-                    //             match std::fs::OpenOptions::new()
-                    //                 .read(true)
-                    //                 .open(name) {
-                    //                     Ok(file) => {
-                    //                         file
-                    //                     },
-                    //                     Err(err) => {
-                    //                         panic!("{name} {err}")
-                    //                     },
-                    //                 }
-                    //         }
-                    //     }
-    
-                    //     let mut protocol = Protocol::empty();
-                    //     protocol.receive::<NodeCommand, _, _>(
-                    //         read_stream(".test/control"),
-                    //         read_stream(".test/frames"),
-                    //         read_stream(".test/blob"),
-                    //     );
-                    //     let mut handled = false;
-                    //     for command in protocol.decode::<NodeCommand>() {
-                    //         host.world()
-                    //             .system_data::<Plugins>()
-                    //             .features()
-                    //             .broker()
-                    //             .try_send_node_command(command.clone(), None)
-                    //             .ok();
-                    //         handled = true;
-                    //     }
-                    //     if handled {
-                    //         std::fs::remove_dir_all(".test").ok();
-                    //     }
-                    // }
                 });
                 tc.enable_guest(guest);
                 Some(tc)

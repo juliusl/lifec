@@ -7,7 +7,7 @@ use crate::{
     guest::Guest,
     host::EventHandler,
     prelude::{
-        Appendix, Editor, Host, NodeCommand, Plugin, Project, Sequencer, RunmdFile,
+        Appendix, Editor, Host, NodeCommand, Plugin, Sequencer, RunmdFile,
     },
 };
 
@@ -26,31 +26,34 @@ impl Plugin for TestHostSender {
         context.task(|_| {
             let tc = context.clone();
             async {
-                let root = tc.workspace().expect("Should have a workspace");
-                let world = TestHost::compile_workspace(root, [
-                    RunmdFile::new_src(
-                        "listener", 
-                        r#"
-                        ```
-                        + .engine
-                        : .start start
-                        : .start cooldown
-                        : .loop
-                        ```
+                let mut root = tc.workspace().expect("Should have a workspace").clone();
+                root.cache_file(&RunmdFile::new_src(
+                    "listener",
+                    r#"
+                    ```
+                    + .engine
+                    : .start start
+                    : .start cooldown
+                    : .loop
+                    ```
 
-                        ``` start
-                        + .runtime
-                        : .watch test_host
-                        : .create file
-                        : .listen test_host
-                        ```
+                    ``` start
+                    + .runtime
+                    : .watch test_host
+                    : .create file
+                    : .listen test_host
+                    ```
 
-                        ``` cooldown
-                        + .runtime
-                        : .timer 1s
-                        ```
-                        "#)
-                ].iter(), None);
+                    ``` cooldown
+                    + .runtime
+                    : .timer 1s
+                    ```
+                    "#,
+                ));
+
+                let world = root
+                    .compile::<TestHost>()
+                    .expect("should be able to compile");
                 let mut host = Host::from(world);
                 host.link_sequences();
                 host.enable_listener::<TestHost>();
@@ -77,27 +80,6 @@ impl Plugin for TestHostSender {
                                     .unwrap()
                             }
                         }
-    
-                        // protocol.send_async::<NodeCommand, _>(
-                        //     &mut tokio::fs::OpenOptions::new()
-                        //         .create(true)
-                        //         .write(true)
-                        //         .open(".test/control").await
-                        //         .ok()
-                        //         .unwrap(),
-                        //     &mut tokio::fs::OpenOptions::new()
-                        //         .create(true)
-                        //         .write(true)
-                        //         .open(".test/control").await
-                        //         .ok()
-                        //         .unwrap(),
-                        //     &mut tokio::fs::OpenOptions::new()
-                        //         .create(true)
-                        //         .write(true)
-                        //         .open(".test/control").await
-                        //         .ok()
-                        //         .unwrap(),
-                        // );
 
                         if let Some(protocol) = host.protocol_mut() {
                             protocol.send::<NodeCommand, _, _>(

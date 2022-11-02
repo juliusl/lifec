@@ -1,47 +1,12 @@
+use crate::plugins::protocol_prelude::*;
+
 use reality::{BlockObject, BlockProperties};
 use tracing::{event, Level};
 
-use super::{AttributeIndex, NodeCommand, Plugin};
+use super::{Plugin, NodeCommand, AttributeIndex};
 
-use crate::plugins::protocol_prelude::*;
-
-pub struct Dispatch;
-
-impl Plugin for Dispatch {
-    fn symbol() -> &'static str {
-        "dispatch"
-    }
-
-    fn call(context: &mut super::ThunkContext) -> Option<super::AsyncContext> {
-        context.task(|_| {
-            let tc = context.clone();
-            async {
-                let tokio_file = |name| async move {
-                    tokio::fs::OpenOptions::new()
-                        .create(true)
-                        .write(true)
-                        .open(name)
-                        .await
-                        .ok()
-                        .unwrap()
-                };
-
-                let mut protocol = Protocol::empty();
-
-                protocol
-                    .send_async::<NodeCommand, _, _>(
-                        stream("control", tokio_file),
-                        stream("rames", tokio_file),
-                        stream("blob", tokio_file),
-                    )
-                    .await;
-
-                Some(tc)
-            }
-        })
-    }
-}
-
+/// Plugin for listening to node commands,
+/// 
 #[derive(Default)]
 pub struct Listen;
 
@@ -92,11 +57,12 @@ impl Plugin for Listen {
                     .await;
 
                 for command in protocol.decode::<NodeCommand>() {
+                    event!(Level::TRACE, "Dispatching node command");
                     tc.dispatch_node_command(command);
                 }
-                std::fs::remove_file(cleanup_dir.join("control")).ok();
-                std::fs::remove_file(cleanup_dir.join("frames")).ok();
-                std::fs::remove_file(cleanup_dir.join("blob")).ok();
+                tokio::fs::remove_file(cleanup_dir.join("control")).await.ok();
+                tokio::fs::remove_file(cleanup_dir.join("frames")).await.ok();
+                tokio::fs::remove_file(cleanup_dir.join("blob")).await.ok();
 
                 Some(tc)
             }

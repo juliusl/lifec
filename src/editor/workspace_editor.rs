@@ -108,7 +108,7 @@ impl Extension for WorkspaceEditor {
             for guest in runner.guests() {
                 let mut guest_editor = guest.guest_editor();
 
-                guest_editor.events_window(format!("Guest {}", guest.owner.id()), ui);
+                guest_editor.events_window(format!("Guest {} - Events", guest.owner.id()), ui);
 
                 guest_editor.run_now(guest.host().world());
             }

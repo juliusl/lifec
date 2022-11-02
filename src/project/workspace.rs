@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use std::path::PathBuf;
+use std::{collections::BTreeMap, path::PathBuf};
 
 mod config;
 pub use config::Config as WorkspaceConfig;
@@ -48,6 +48,8 @@ pub struct Workspace {
     tenant: Option<String>,
     /// Name of the path,
     path: Option<String>,
+    /// Map of cached files,
+    cached_files: BTreeMap<String, RunmdFile>,
 }
 
 impl Workspace {
@@ -68,6 +70,7 @@ impl Workspace {
             host: host.as_ref().to_string(),
             tenant: None,
             path: None,
+            cached_files: BTreeMap::default(),
         }
     }
 
@@ -75,6 +78,32 @@ impl Workspace {
     ///
     pub fn set_root_runmd(&mut self, runmd: impl AsRef<str>) {
         self.root_runmd = Some(runmd.as_ref().to_string());
+    }
+
+    /// Caches a file,
+    ///
+    pub fn cache_file(&mut self, runmd_file: &RunmdFile) {
+        self.cached_files
+            .insert(runmd_file.symbol.to_string(), runmd_file.clone());
+    }
+
+    /// Returns a cached file,
+    /// 
+    pub fn cached_file(&self, symbol: impl AsRef<str>) -> Option<&RunmdFile> {
+        self.cached_files.get(symbol.as_ref())
+    }
+
+    /// If the root_runmd is set, compiles the workspace w/ the cached files and returns a world,
+    /// 
+    pub fn compile<P>(&self) -> Option<World>
+    where
+        P: Project
+    {
+        if let Some(_) = self.root_runmd() {
+            Some(P::compile_workspace(self, self.cached_files.iter().map(|(_, f)| f), None))
+        } else {
+            None
+        }
     }
 
     /// Returns the root runmd to use for this workspace,
@@ -113,7 +142,8 @@ impl Workspace {
                 Some(format!("{}.{tenant}.{host}/{path}", block.symbol()))
             }
             _ => None,
-        }.and_then(|uri| {
+        }
+        .and_then(|uri| {
             if let Some(tag) = self.tag.as_ref() {
                 Some(format!("{uri}#{tag}"))
             } else {
@@ -141,6 +171,7 @@ impl Workspace {
             host: self.host.to_string(),
             tenant: Some(tenant.as_ref().to_string()),
             path: None,
+            cached_files: BTreeMap::default(),
         }
     }
 
@@ -165,6 +196,7 @@ impl Workspace {
                 host: self.host.to_string(),
                 tenant: Some(tenant.to_string()),
                 path: Some(path.as_ref().to_string()),
+                cached_files: BTreeMap::default(),
             })
         } else {
             event!(Level::ERROR, "Trying to create a path without a tenant");
@@ -185,19 +217,19 @@ impl Workspace {
     }
 
     /// Returns the path property of the workspace,
-    /// 
+    ///
     pub fn get_path(&self) -> Option<&String> {
         self.path.as_ref()
     }
 
     /// Returns the host property of the workspace,
-    /// 
+    ///
     pub fn get_host(&self) -> &String {
         &self.host
     }
 
     /// Returns the tenant property of the workspace,
-    /// 
+    ///
     pub fn get_tenant(&self) -> Option<&String> {
         self.tenant.as_ref()
     }
@@ -540,7 +572,6 @@ mod tests {
             operation.expect("should have an operation").wait();
 
             operation_data.dispatch_operation("print", None, None);
-
         }
         dispatcher.dispatch(host.world());
         dispatcher.dispatch(host.world());

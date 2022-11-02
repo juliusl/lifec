@@ -56,9 +56,8 @@ pub use watch::Watch;
 mod run;
 pub use run::Run;
 
-mod dispatch;
-pub use dispatch::Dispatch;
-pub use dispatch::Listen;
+mod listen;
+pub use listen::Listen;
 
 mod request;
 pub use request::Request;

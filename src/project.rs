@@ -104,17 +104,20 @@ where
             let entity = parser.get_block("", symbol).entity();
             let entities = parser.as_ref().entities();
             let entity = entities.entity(entity);
+            let runmd_file = RunmdFile {
+                symbol: symbol.to_string(),
+                source: source.clone(),
+            };
             parser
                 .as_ref()
                 .write_component()
                 .insert(
                     entity,
-                    RunmdFile {
-                        symbol: symbol.to_string(),
-                        source: source.clone(),
-                    },
+                    runmd_file.clone(),
                 )
                 .expect("should be able to insert");
+            
+            workspace.cache_file(&runmd_file);
         }
 
         // Parse the root file without the implicit symbol set
