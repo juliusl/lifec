@@ -123,9 +123,13 @@ impl WireObject for Performance {
         {
             // todo parity
             // 24..32
-            let bucket_len = [0; 8].copy_from_slice(&data[24..32]);
+            let mut bucket_len = [0; 8];
+            bucket_len.copy_from_slice(&data[24..32]);
+            let mut bucket_len = bytemuck::cast::<[u8; 8], u64>(bucket_len);
             // 32..40
-            let percentile_len = [0; 8].copy_from_slice(&data[32..40]);
+            let mut percentile_len = [0; 8];
+            percentile_len.copy_from_slice(&data[32..40]);
+            let mut percentile_len = bytemuck::cast::<[u8; 8], u64>(percentile_len);
 
             for frame in frames {
                 match frame.op() {
@@ -136,6 +140,10 @@ impl WireObject for Performance {
                             let mut _c = [0; 4];
                             _c.copy_from_slice(c);
                             performance.buckets.push(bytemuck::cast::<[u8; 4], f32>(_c));
+                            bucket_len -= 1;
+                            if bucket_len == 0 {
+                                break;
+                            }
                         }
                     }
                     0x12 => {
@@ -151,6 +159,11 @@ impl WireObject for Performance {
                                 bytemuck::cast::<[u8; 8], u64>(p),
                                 bytemuck::cast::<[u8; 8], u64>(pv),
                             ));
+
+                            percentile_len -= 1;
+                            if percentile_len == 0 {
+                                break;
+                            }
                         }
                     }
                     _ => {}
