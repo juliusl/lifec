@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, path::PathBuf};
 
 use reality::{BlockObject, BlockProperties};
 use specs::RunNow;
@@ -62,7 +62,7 @@ impl Plugin for TestHost {
 
                         ``` start
                         + .runtime
-                        : .watch .world/test.io/test_host
+                        : .watch test_host
                         : .create file
                         : .listen test_host
                         ```
@@ -82,6 +82,8 @@ impl Plugin for TestHost {
                 }
                 let _ = host.prepare::<TestHost>();
 
+                let test_dir = PathBuf::from(".world/test.io/test_host");
+                std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
                 let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |host| {
                     EventRuntime::default().run_now(host.world());
                     EventHandler::<TestHost>::default().run_now(host.world());

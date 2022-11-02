@@ -40,7 +40,7 @@ impl Plugin for TestHostSender {
 
                         ``` start
                         + .runtime
-                        : .watch .world/test.io/test_host
+                        : .watch test_host
                         : .create file
                         : .listen test_host
                         ```

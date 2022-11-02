@@ -1,8 +1,7 @@
-
 use reality::{BlockObject, BlockProperties};
 use tracing::{event, Level};
 
-use super::{NodeCommand, Plugin, AttributeIndex};
+use super::{AttributeIndex, NodeCommand, Plugin};
 
 use crate::plugins::protocol_prelude::*;
 
@@ -44,7 +43,7 @@ impl Plugin for Dispatch {
 }
 
 #[derive(Default)]
-pub struct Listen; 
+pub struct Listen;
 
 impl Plugin for Listen {
     fn symbol() -> &'static str {
@@ -55,31 +54,31 @@ impl Plugin for Listen {
         context.task(|_| {
             let tc = context.clone();
             async {
-
-                let listen_dir = tc.search().find_symbol("listen").expect("should have a listen symbol");
-                let work_dir = tc.work_dir().expect("should have a work dir").join(listen_dir);
+                let listen_dir = tc
+                    .search()
+                    .find_symbol("listen")
+                    .expect("should have a listen symbol");
+                let work_dir = tc
+                    .work_dir()
+                    .expect("should have a work dir")
+                    .join(listen_dir);
                 let cleanup_dir = work_dir.clone();
 
                 match tokio::fs::create_dir_all(&work_dir).await {
-                    Ok(_) => {},
+                    Ok(_) => {}
                     Err(err) => {
                         event!(Level::ERROR, "Could create work dir {:?}, {err}", &work_dir);
-                    },
+                    }
                 }
 
                 let tokio_file = |name| async move {
                     let path = work_dir.join(name);
-                    match tokio::fs::OpenOptions::new()
-                        .read(true)
-                        .open(&path)
-                        .await {
-                            Ok(file) => {
-                                file
-                            },
-                            Err(err) => {
-                                panic!("Error opening file {:?} {err}", &path);
-                            },
+                    match tokio::fs::OpenOptions::new().read(true).open(&path).await {
+                        Ok(file) => file,
+                        Err(err) => {
+                            panic!("Error opening file {:?} {err}", &path);
                         }
+                    }
                 };
 
                 let mut protocol = Protocol::empty();
@@ -107,12 +106,10 @@ impl Plugin for Listen {
 
 impl BlockObject for Listen {
     fn query(&self) -> reality::BlockProperties {
-        BlockProperties::default()
-            .require("listen")
+        BlockProperties::default().require("listen")
     }
 
     fn parser(&self) -> Option<reality::CustomAttribute> {
         Some(Self::as_custom_attr())
     }
 }
- 

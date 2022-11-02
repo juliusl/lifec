@@ -207,8 +207,10 @@ pub fn default_runtime() -> Runtime {
     runtime.install_with_custom::<Println>("");
     runtime.install_with_custom::<Watch>("");
     runtime.install_with_custom::<Publish>("");
-    runtime.install_with_custom::<Chaos>("");
     runtime.install_with_custom::<Listen>("");
+    
+    // Plugins for testing
+    runtime.install_with_custom::<Chaos>("");
     runtime.install_with_custom::<TestHost>("");
     runtime.install_with_custom::<TestHostSender>("");
     runtime
