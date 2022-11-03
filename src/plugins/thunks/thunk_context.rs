@@ -3,7 +3,7 @@ use crate::guest::Guest;
 use crate::prelude::{attributes::Fmt, *};
 use hyper::{Body, Response};
 use reality::Block;
-use specs::{Component, DenseVecStorage, Entity};
+use specs::Entity;
 use std::fmt::Debug;
 use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::{

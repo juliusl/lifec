@@ -1,6 +1,5 @@
 use atlier::system::App;
-use hdrhistogram::Histogram;
-use imgui::{ChildWindow, SliderFlags, StyleVar, Ui, Window};
+use imgui::{ChildWindow, StyleVar, Ui, Window};
 use reality::wire::{Protocol, WireObject};
 use specs::{Entity, Read, System};
 use std::collections::{BTreeMap, HashMap};
@@ -27,9 +26,6 @@ pub struct HostEditor {
     /// Adhoc profiler nodes,
     ///
     adhoc_profilers: Vec<Node>,
-    /// Histogram of tick rate,
-    ///
-    tick_rate: Histogram<u64>,
     /// Timestamp of last refresh,
     ///
     last_refresh: Instant,
@@ -158,8 +154,6 @@ impl<'a> System<'a> for HostEditor {
     fn run(&mut self, (mut events, watcher): Self::SystemData) {
         if self.last_refresh.elapsed().as_millis() < 16 {
             return;
-        } else {
-            self.tick_rate.clear();
         }
 
         // General event runtime state
@@ -188,17 +182,6 @@ impl<'a> System<'a> for HostEditor {
             events.set_rate_limit(limit);
         } else {
             events.clear_rate_limit();
-        }
-
-        // Update tick rate histogram,
-        //
-        if !events.should_exit() && events.can_continue() {
-            match self.tick_rate.record(events.tick_rate()) {
-                Ok(_) => {}
-                Err(err) => {
-                    event!(Level::ERROR, "Error recording tick rate, {err}");
-                }
-            }
         }
 
         // Handle node commands
@@ -280,7 +263,6 @@ impl HostEditor {
         ui.same_line();
         if ui.button("Reset All") {
             self.reset = Some(());
-            self.tick_rate.clear();
         }
 
         if self.is_stopped {
@@ -323,49 +305,9 @@ impl HostEditor {
         }
     }
 
-    /// Tools to monitor and adjust tick rate,
-    ///
-    fn tick_rate_tools(&mut self, ui: &Ui) {
-        if self.tick_limit.is_none() {
-            if ui.button("Enable rate limit") {
-                self.tick_limit = Some(0);
-            }
-        } else if let Some(tick_limit) = self.tick_limit.as_mut() {
-            ui.set_next_item_width(100.0);
-            imgui::Slider::new("Rate limit (hz)", 0, 100)
-                .flags(SliderFlags::ALWAYS_CLAMP)
-                .build(ui, tick_limit);
-
-            ui.same_line();
-            if ui.button("Disable limit") {
-                self.tick_limit.take();
-            }
-        }
-        ui.new_line();
-
-        imgui::PlotLines::new(
-            ui,
-            "Tick rate (Hz)",
-            self.tick_rate
-                .iter_recorded()
-                .map(|v| v.value_iterated_to() as f32)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )
-        .graph_size([0.0, 75.0])
-        .build();
-        ui.text(format!(
-            "Max: {} hz",
-            self.tick_rate.value_at_percentile(50.0)
-        ));
-    }
-
     /// Performance related tools and information
     ///
     fn performance_section(&mut self, ui: &Ui) {
-        // self.tick_rate_tools(ui);
-        // ui.new_line();
-
         ui.text("Performance");
         ui.spacing();
         if let Some(tab_bar) = ui.tab_bar("Performance Tabs") {
@@ -431,7 +373,6 @@ impl HostEditor {
 impl Default for HostEditor {
     fn default() -> Self {
         Self {
-            tick_rate: Histogram::<u64>::new(2).expect("should be able to create"),
             adhoc_profilers: vec![],
             is_paused: Default::default(),
             is_stopped: false,
