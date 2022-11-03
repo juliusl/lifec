@@ -1,6 +1,8 @@
+use std::fmt::Display;
+
 use specs::{Component, Entity, HashMapStorage};
 
-use crate::state::AttributeGraph;
+use crate::state::{AttributeGraph, AttributeIndex};
 
 use super::Node;
 
@@ -35,6 +37,29 @@ pub enum NodeCommand {
     /// This allows for extending capabilities of the node,
     ///
     Custom(String, Entity),
+}
+
+impl NodeCommand {
+    /// Returns a custom node command,
+    /// 
+    pub fn custom(name: impl AsRef<str>, node: Entity) -> Self {
+        NodeCommand::Custom(name.as_ref().to_string(), node)
+    }
+}
+
+impl Display for NodeCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NodeCommand::Activate(e) => write!(f, "activate {}", e.id()),
+            NodeCommand::Reset(e) => write!(f, "reset {}", e.id()),
+            NodeCommand::Pause(e) => write!(f, "pause {}", e.id()),
+            NodeCommand::Resume(e) => write!(f, "resume {}", e.id()),
+            NodeCommand::Cancel(e) => write!(f, "cancel {}", e.id()),
+            NodeCommand::Spawn(e) => write!(f, "spawn {}", e.id()),
+            NodeCommand::Update(g) => write!(f, "update {}", g.entity_id()),
+            NodeCommand::Custom(name, e) => write!(f, "custom.{name} {}", e.id()),
+        }
+    }
 }
 
 /// Extension for Node struct to dispatch commands,

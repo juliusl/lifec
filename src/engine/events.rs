@@ -109,6 +109,9 @@ pub enum EventStatus {
     /// Means that the event has not been activated yet
     ///
     Inactive(Entity),
+    /// Means that the event has been disposed of
+    /// 
+    Disposed(Entity),
 }
 
 impl EventStatus {
@@ -123,7 +126,8 @@ impl EventStatus {
             | EventStatus::Ready(e)
             | EventStatus::Completed(e)
             | EventStatus::Cancelled(e)
-            | EventStatus::Inactive(e) => *e,
+            | EventStatus::Inactive(e)
+            | EventStatus::Disposed(e) => *e,
         }
     }
 }
@@ -139,6 +143,7 @@ impl Display for EventStatus {
             EventStatus::Cancelled(_) => write!(f, "cancelled"),
             EventStatus::Inactive(_) => write!(f, "inactive"),
             EventStatus::Paused(_) => write!(f, "paused"),
+            EventStatus::Disposed(_) => write!(f, "disposed"),
         }
     }
 }
@@ -244,33 +249,33 @@ impl<'a> Events<'a> {
             ..
         } = self;
 
-        let (event, operation) = (events, operations.maybe())
-            .join()
-            .get(entity, entities)
-            .expect("should have a value");
+        if let Some((event, operation)) = (events, operations.maybe()).join().get(entity, entities)
+        {
+            if tick_control.is_paused(entity) {
+                return EventStatus::Paused(entity);
+            }
 
-        if tick_control.is_paused(entity) {
-            return EventStatus::Paused(entity);
-        }
-
-        if event.is_active() {
-            if let Some(operation) = operation {
-                if operation.is_ready() {
-                    EventStatus::Ready(entity)
-                } else if operation.is_completed() {
-                    EventStatus::Completed(entity)
-                } else if operation.is_empty() {
-                    EventStatus::Scheduled(entity)
-                } else if operation.is_cancelled() {
-                    EventStatus::Cancelled(entity)
+            if event.is_active() {
+                if let Some(operation) = operation {
+                    if operation.is_ready() {
+                        EventStatus::Ready(entity)
+                    } else if operation.is_completed() {
+                        EventStatus::Completed(entity)
+                    } else if operation.is_empty() {
+                        EventStatus::Scheduled(entity)
+                    } else if operation.is_cancelled() {
+                        EventStatus::Cancelled(entity)
+                    } else {
+                        EventStatus::InProgress(entity)
+                    }
                 } else {
-                    EventStatus::InProgress(entity)
+                    EventStatus::New(entity)
                 }
             } else {
-                EventStatus::New(entity)
+                EventStatus::Inactive(entity)
             }
         } else {
-            EventStatus::Inactive(entity)
+            EventStatus::Disposed(entity)
         }
     }
 
@@ -333,8 +338,7 @@ impl<'a> Events<'a> {
                 if let Some(Yielding(yielding, _)) = self.yielding.remove(*ready) {
                     if let Some(result) = result.clone() {
                         match yielding.send(result) {
-                            Ok(_) => {
-                            },
+                            Ok(_) => {}
                             Err(_) => {
                                 event!(Level::ERROR, "Could not send to yielding channel");
                             }
@@ -697,9 +701,33 @@ impl<'a> Events<'a> {
         }
     }
 
+    /// Cleans up an event connection,
+    /// 
+    pub fn cleanup_connection(&mut self, event: Entity) {
+        let mut disposed = vec![];
+        if let Some(connection) = self.connections.get(event) {
+            for (s, _, _) in connection.iter_spawned() {
+                match self.status(*s) {
+                    EventStatus::Disposed(_) => {
+                        disposed.push(*s);         
+                    },
+                    _ => {}
+                }
+            }
+        }
+
+        if let Some(connection) = self.connections.get_mut(event) {
+            for d in disposed.iter() {
+                connection.remove_spawned(d);
+            }
+        }
+    }
+
     /// Returns an iterator over spawned events,
     ///
-    pub fn scan_spawned_events(&self) -> impl Iterator<Item = (&Entity, &Entity)> {
+    /// The tuple layout is, (spawned entity, source entity, owner)
+    ///
+    pub fn iter_spawned_events(&self) -> impl Iterator<Item = (&Entity, &Entity, &Entity)> {
         let Self {
             entities,
             connections,
@@ -1044,7 +1072,7 @@ impl<'a> Events<'a> {
             crate::editor::NodeCommand::Custom(name, entity) => {
                 event!(
                     Level::DEBUG,
-                    "Custom command {name} received for {}",
+                    "Handling custom command {name} for {}",
                     entity.id()
                 );
 

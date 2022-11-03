@@ -15,7 +15,11 @@ impl ListenerSetup {
         L: Listener,
     {
         Self(|world, builder| {
-            builder.add(EventHandler::new(L::create(world)), "", &[]);
+            builder.add(
+                EventHandler::new(L::create(world)),
+                "listener",
+                &["event_runtime", "cleanup"],
+            );
         })
     }
 }
@@ -103,6 +107,7 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
             }
 
             if let Some((command, yielding)) = plugin_messages.try_next_node_command() {
+                event!(Level::DEBUG, "Received command, {command}");
                 match command {
                     NodeCommand::Activate(entity)
                     | NodeCommand::Reset(entity)

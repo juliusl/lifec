@@ -263,5 +263,9 @@ pub fn default_node_handlers() -> HashMap<String, NodeCommandHandler> {
        events.delete(entity); 
     });
 
+    handlers.insert("cleanup_connection".to_string(), |events, entity| {
+        events.cleanup_connection(entity); 
+     });
+
     handlers
 }

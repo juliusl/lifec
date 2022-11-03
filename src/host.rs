@@ -1,4 +1,8 @@
-use crate::{engine::{Runner, Performance}, prelude::*, project::Listener};
+use crate::{
+    engine::{Cleanup, Performance, Runner},
+    prelude::*,
+    project::Listener,
+};
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use reality::wire::Protocol;
@@ -98,9 +102,9 @@ impl Host {
     }
 
     /// Encodes performance to protocol,
-    /// 
+    ///
     /// returns true if performances were encoded
-    /// 
+    ///
     pub fn encode_performance(&mut self) -> bool {
         if let Some(mut protocol) = self.protocol.take() {
             let performances = {
@@ -143,7 +147,9 @@ impl Host {
     pub fn dispatcher_builder<'a, 'b>() -> DispatcherBuilder<'a, 'b> {
         let dispatcher_builder = DispatcherBuilder::new();
 
-        dispatcher_builder.with(EventRuntime::default(), "event_runtime", &[])
+        dispatcher_builder
+            .with(EventRuntime::default(), "event_runtime", &[])
+            .with(Cleanup::default(), "cleanup", &["event_runtime"])
     }
 
     /// Enables a project listener on the host when the dispatcher is prepared,

@@ -33,6 +33,7 @@ impl WireObject for NodeStatus {
                     crate::prelude::EventStatus::Completed(entity) => encode_node_command(0x60, *entity, appendix, encoder),
                     crate::prelude::EventStatus::Cancelled(entity) => encode_node_command(0x70, *entity, appendix, encoder),
                     crate::prelude::EventStatus::Inactive(entity) => encode_node_command(0x80, *entity, appendix, encoder),
+                    crate::prelude::EventStatus::Disposed(entity) => encode_node_command(0x90, *entity, appendix, encoder),
                 };
             },
             _ => {
