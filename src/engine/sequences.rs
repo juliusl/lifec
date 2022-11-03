@@ -58,7 +58,7 @@ impl<'a> Sequences<'a> {
     /// Build event transitions for an engine,
     ///
     pub fn build_engine(&mut self, engine: Entity) {
-        if let Some((block, engine, sequence)) = (&self.blocks, &self.engines, &self.sequences)
+        if let Some((block, engine)) = (&self.blocks, &self.engines)
             .join()
             .get(engine, &self.entities)
         {
@@ -84,7 +84,49 @@ impl<'a> Sequences<'a> {
                         .expect("should be able to insert connection");
                 }
             }
+        }
+    }
 
+    /// Links event transitions for each engine and build connection components,
+    ///
+    pub fn build_engines(&mut self) {
+        let engines = self.scan_engines();
+
+        // Setup connections/transitions
+        for engine in engines.iter() {
+            self.build_engine(*engine);
+        }
+
+        self.setup_adhoc_profiler();
+
+        // Process cursors
+        for (_, connection) in (&self.entities, &self.connections).join() {
+            for (from, to) in connection.connections() {
+                if let Some(sequence) = self.sequences.get_mut(*from) {
+                    sequence.set_cursor(*to);
+                }
+            }
+        }
+
+        // Unpack built cursors
+        for (entity, _, sequence) in (&self.entities, &self.events, &self.sequences).join() {
+            if let Some(cursor) = sequence.cursor() {
+                self.cursors
+                    .insert(entity, cursor.clone())
+                    .expect("should be able to insert cursor");
+            }
+        }
+
+        for engine in engines.iter() {
+            self.configure_lifecycles(*engine);
+        }
+    }
+
+    pub fn configure_lifecycles(&mut self, engine: Entity) {
+        if let Some((engine, sequence)) = (&self.engines, &self.sequences)
+            .join()
+            .get(engine, &self.entities)
+        {
             if let Some(last) = sequence.last() {
                 if let Some(cursor) = sequence.cursor().cloned() {
                     // Translate engine cursors into events
@@ -155,35 +197,6 @@ impl<'a> Sequences<'a> {
                         .insert(last, cursor)
                         .expect("should be able to insert cursor");
                 }
-            }
-        }
-    }
-
-    /// Links event transitions for each engine and build connection components,
-    ///
-    pub fn build_engines(&mut self) {
-        let engines = self.scan_engines();
-
-        // Setup connections/transitions
-        for engine in engines {
-            self.build_engine(engine);
-        }
-
-        // Process cursors
-        for (_, connection) in (&self.entities, &self.connections).join() {
-            for (from, to) in connection.connections() {
-                if let Some(sequence) = self.sequences.get_mut(*from) {
-                    sequence.set_cursor(*to);
-                }
-            }
-        }
-
-        // Unpack built cursors
-        for (entity, _, sequence) in (&self.entities, &self.events, &self.sequences).join() {
-            if let Some(cursor) = sequence.cursor() {
-                self.cursors
-                    .insert(entity, cursor.clone())
-                    .expect("should be able to insert cursor");
             }
         }
     }

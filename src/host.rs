@@ -1,4 +1,4 @@
-use crate::{engine::Runner, prelude::*, project::Listener};
+use crate::{engine::{Runner, Performance}, prelude::*, project::Listener};
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use reality::wire::Protocol;
@@ -86,6 +86,33 @@ impl Host {
             protocol.encoder::<NodeCommand>(move |world, encoder| {
                 for (_, command) in commands {
                     encoder.encode(&command, world);
+                }
+            });
+
+            self.protocol = Some(protocol);
+
+            encoding
+        } else {
+            false
+        }
+    }
+
+    /// Encodes performance to protocol,
+    /// 
+    /// returns true if performances were encoded
+    /// 
+    pub fn encode_performance(&mut self) -> bool {
+        if let Some(mut protocol) = self.protocol.take() {
+            let performances = {
+                let mut runner = protocol.as_ref().system_data::<Runner>();
+                runner.take_performance()
+            };
+
+            let encoding = !performances.is_empty();
+
+            protocol.encoder::<Performance>(move |world, encoder| {
+                for performance in performances {
+                    encoder.encode(&performance, world);
                 }
             });
 

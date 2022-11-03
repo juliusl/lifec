@@ -46,6 +46,9 @@ fn main() {
     + test .operation print-2
     : .println Hello Print Operation c 4
     : .chaos
+
+    + .operation read-performance
+    : .monitor test_host
     ```
     "#,
     );

@@ -17,9 +17,6 @@ impl Sequencer for Host {
             // Build engine events and setup connections between them
             // Process engine lifecycles and connect connections between them
             sequences.build_engines();
-
-            // Setup profilers for each adhoc operations
-            sequences.setup_adhoc_profiler();
         });
     }
 }

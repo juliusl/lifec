@@ -13,10 +13,12 @@ pub struct Guest {
     pub owner: Entity,
     /// Host w/ protocol enabled,
     host: Host,
-    /// Setup
+    /// Run function
     stateless: Run,
 }
 
+/// Runs systems without a dispatcher,
+/// 
 pub type Run =  fn(&mut Host);
 
 impl Guest {

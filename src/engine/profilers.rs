@@ -1,7 +1,7 @@
 use specs::prelude::*;
 use specs::{Entities, SystemData, WriteStorage};
 
-use super::{Events, Performance, Profiler};
+use super::{Performance, Profiler, Connection};
 
 /// System data for profilers/performance related data,
 ///
@@ -10,9 +10,9 @@ pub struct Profilers<'a> {
     /// Entities
     /// 
     entities: Entities<'a>,
-    /// Events system data
+    /// Connections
     /// 
-    events: Events<'a>,
+    connections: ReadStorage<'a, Connection>,
     /// Profilers,
     /// 
     profilers: WriteStorage<'a, Profiler>,
@@ -25,9 +25,7 @@ impl<'a> Profilers<'a> {
     /// Collect profiling data, results are stored as entities
     /// 
     pub fn profile(&mut self) {
-        let nodes = self.events.nodes();
-
-        for connection in nodes.iter().filter_map(|n| n.connection.as_ref()) {
+        for connection in self.connections.join() {
             let profiler = self
                 .profilers
                 .get(connection.entity())

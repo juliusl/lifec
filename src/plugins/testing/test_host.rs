@@ -1,10 +1,11 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{fs::File, path::PathBuf, sync::Arc};
 
 use reality::{BlockObject, BlockProperties};
 use specs::RunNow;
 use tracing::{event, Level};
 
 use crate::{
+    engine::{Performance, Profilers},
     guest::Guest,
     host::EventHandler,
     prelude::{
@@ -90,6 +91,32 @@ impl Plugin for TestHost {
                 let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |host| {
                     EventRuntime::default().run_now(host.world());
                     EventHandler::<TestHost>::default().run_now(host.world());
+
+                    host.world().system_data::<Profilers>().profile();
+
+                    if host.encode_performance() {
+                        let test_dir = PathBuf::from(".world/test.io/test_host/performance");
+                        std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
+
+                        fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
+                            move || {
+                                std::fs::OpenOptions::new()
+                                    .create(true)
+                                    .write(true)
+                                    .open(name)
+                                    .ok()
+                                    .unwrap()
+                            }
+                        }
+
+                        if let Some(protocol) = host.protocol_mut() {
+                            protocol.send::<Performance, _, _>(
+                                write_stream(".world/test.io/test_host/performance/control"),
+                                write_stream(".world/test.io/test_host/performance/frames"),
+                                write_stream(".world/test.io/test_host/performance/blob"),
+                            );
+                        }
+                    }
                 });
                 tc.enable_guest(guest);
                 Some(tc)
