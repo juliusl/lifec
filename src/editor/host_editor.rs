@@ -26,9 +26,6 @@ pub struct HostEditor {
     /// Adhoc profiler nodes,
     ///
     adhoc_nodes: Vec<Node>,
-    /// Timestamp of last refresh,
-    ///
-    last_refresh: Instant,
     /// True if the event runtime is paused,
     ///
     is_paused: bool,
@@ -50,7 +47,6 @@ impl Hash for HostEditor {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.nodes.hash(state);
         self.adhoc_nodes.hash(state);
-        self.last_refresh.hash(state);
         self.is_paused.hash(state);
         self.is_stopped.hash(state);
         self.tick.hash(state);
@@ -136,9 +132,6 @@ impl<'a> System<'a> for HostEditor {
     );
 
     fn run(&mut self, (mut events, watcher): Self::SystemData) {
-        if self.last_refresh.elapsed().as_millis() < 16 {
-            return;
-        }
 
         // General event runtime state
         self.is_paused = !events.can_continue();
@@ -214,8 +207,6 @@ impl<'a> System<'a> for HostEditor {
                 false
             }
         });
-
-        self.last_refresh = Instant::now();
     }
 }
 
@@ -354,7 +345,6 @@ impl Default for HostEditor {
             adhoc_nodes: vec![],
             is_paused: Default::default(),
             is_stopped: false,
-            last_refresh: Instant::now(),
             tick: Default::default(),
             pause: Default::default(),
             reset: Default::default(),

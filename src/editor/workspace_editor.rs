@@ -1,13 +1,11 @@
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
     hash::{Hash, Hasher},
-    time::Duration,
 };
 
 use atlier::system::Extension;
 use specs::{Entity, Join, RunNow, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
-use tokio::time::Instant;
 use tracing::{event, Level};
 
 use crate::{
@@ -26,21 +24,8 @@ pub struct WorkspaceEditor {
     enable_demo: bool,
     /// Appendix
     appendix: Appendix,
-    /// Last run
-    last_run: Option<Instant>,
 }
 
-impl WorkspaceEditor {
-    /// Returns true if can run,
-    /// 
-    pub fn can_run(&self) -> bool {
-        if let Some(last) = self.last_run.as_ref() {
-            last.elapsed() <= Duration::from_millis(16)
-        } else {
-            true
-        }
-    }
-}
 
 impl Extension for WorkspaceEditor {
     fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui<'_>) {
@@ -127,18 +112,12 @@ impl Extension for WorkspaceEditor {
 
                 guest_editor.events_window(format!("Guest {} - Events", guest.owner.id()), ui);
 
-                if self.can_run() {
-                    guest_editor.run_now(guest.host().world());
-                }
+                guest_editor.run_now(guest.host().world());
             }
         }
     }
 
     fn on_run(&'_ mut self, world: &specs::World) {
-        if !self.can_run() {
-            return;
-        }
-
         {
             let Runner {
                 entities,
@@ -150,8 +129,6 @@ impl Extension for WorkspaceEditor {
                 guest.run();
                 guest.host_mut().world_mut().maintain();
             }
-
-            self.last_run = Some(tokio::time::Instant::now());
         }
     }
 }
@@ -161,7 +138,6 @@ impl From<Appendix> for WorkspaceEditor {
         Self {
             enable_demo: false,
             appendix,
-            last_run: None,
         }
     }
 }
