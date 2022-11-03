@@ -35,9 +35,6 @@ pub struct HostEditor {
     /// True if there is no more activity for the runtime to process,
     ///
     is_stopped: bool,
-    /// Sets a tick limit,
-    ///
-    tick_limit: Option<u64>,
     /// Command to execute a serialized tick (step),
     ///
     tick: Option<()>,
@@ -56,7 +53,6 @@ impl Hash for HostEditor {
         self.last_refresh.hash(state);
         self.is_paused.hash(state);
         self.is_stopped.hash(state);
-        self.tick_limit.hash(state);
         self.tick.hash(state);
         self.pause.hash(state);
         self.reset.hash(state);
@@ -80,18 +76,6 @@ impl HostEditor {
     ///
     pub fn reset_events(&mut self) {
         self.reset = Some(());
-    }
-
-    /// Dispatch a command to set tick limit,
-    ///
-    pub fn set_tick_limit(&mut self, hz: u64) {
-        self.tick_limit = Some(hz);
-    }
-
-    /// Disable tick limit,
-    ///
-    pub fn disable_tick_limit(&mut self) {
-        self.tick_limit.take();
     }
 
     /// Shows events window,
@@ -176,12 +160,6 @@ impl<'a> System<'a> for HostEditor {
 
         if let Some(_) = self.reset.take() {
             events.reset_all();
-        }
-
-        if let Some(limit) = self.tick_limit {
-            events.set_rate_limit(limit);
-        } else {
-            events.clear_rate_limit();
         }
 
         // Handle node commands
@@ -376,7 +354,6 @@ impl Default for HostEditor {
             adhoc_nodes: vec![],
             is_paused: Default::default(),
             is_stopped: false,
-            tick_limit: Default::default(),
             last_refresh: Instant::now(),
             tick: Default::default(),
             pause: Default::default(),
