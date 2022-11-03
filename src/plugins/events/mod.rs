@@ -1,5 +1,9 @@
 use super::thunks::{ErrorContext, SecureClient, StatusUpdate};
-use crate::{guest::Guest, prelude::*, engine::{Yielding, State}};
+use crate::{
+    engine::{State, Yielding},
+    guest::Guest,
+    prelude::*,
+};
 use hyper::Client;
 use hyper_tls::HttpsConnector;
 use specs::{shred::SetupHandler, Entity, System, World};
@@ -13,9 +17,9 @@ pub struct EventRuntime;
 /// Setup for tokio runtime, (Not to be confused with crate::Runtime)
 impl SetupHandler<tokio::runtime::Runtime> for EventRuntime {
     fn setup(world: &mut specs::World) {
-        world.insert(tokio::runtime::Runtime::new().unwrap());
-
-        // TODO: setup shutdown hook
+        if !world.has_value::<tokio::runtime::Runtime>() {
+            world.insert(tokio::runtime::Runtime::new().unwrap());
+        }
     }
 }
 
