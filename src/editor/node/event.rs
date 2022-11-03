@@ -18,60 +18,6 @@ pub trait EventNode {
 }
 
 impl EventNode for Node {
-    fn event_buttons(&mut self, ui: &Ui, event: EventStatus) {
-        match event {
-            EventStatus::Inactive(_) => {
-                if ui.button(format!("Start {}", event.entity().id())) {
-                    self.activate(event.entity());
-                }
-
-                if self.is_adhoc() {
-                    ui.same_line();
-                    if ui.button(format!("Spawn {}", event.entity().id())) {
-                        self.spawn(event.entity());
-                    }
-                }
-
-                ui.same_line();
-                if ui.button(format!("Pause {}", event.entity().id())) {
-                    self.pause(event.entity());
-                }
-            }
-            EventStatus::Paused(_) => {
-                if ui.button(format!("Resume {}", event.entity().id())) {
-                    self.resume(event.entity());
-                }
-                ui.same_line();
-                if ui.button(format!("Cancel {}", event.entity().id())) {
-                    self.pause(event.entity());
-                }
-            }
-            EventStatus::InProgress(_) => {
-                if ui.button(format!("Pause {}", event.entity().id())) {
-                    self.pause(event.entity());
-                }
-
-                ui.same_line();
-                if ui.button(format!("Cancel {}", event.entity().id())) {
-                    self.cancel(event.entity());
-                }
-            }
-            EventStatus::Cancelled(_) | EventStatus::Completed(_) => {
-                if ui.button(format!("Reset {}", event.entity().id())) {
-                    self.reset(event.entity());
-                }
-
-                if self.is_spawned() && {
-                    ui.same_line();
-                    ui.button(format!("Delete {}", event.entity().id()))
-                } {
-                    self.custom("delete_spawned", event.entity());
-                }
-            }
-            _ => {}
-        }
-    }
-
     fn edit_event(&mut self, ui: &Ui, event: EventStatus) {
         if let Some(state) = self.appendix.state(&event.entity()) {
             if !state.control_symbol.is_empty() {
@@ -120,7 +66,6 @@ impl EventNode for Node {
         // Thunk state
         if let Some(sequence) = self.sequence.as_ref() {
             TreeNode::new(format!("Thunks {}", event.entity().id())).build(ui, || {
-       
                 for (i, s) in sequence.iter_entities().enumerate() {
                     if let Some(name) = self.appendix.name(&s) {
                         TreeNode::new(format!("{i} - {name}")).build(ui, || {
@@ -178,6 +123,60 @@ impl EventNode for Node {
                     }
                 }
             });
+        }
+    }
+
+    fn event_buttons(&mut self, ui: &Ui, event: EventStatus) {
+        match event {
+            EventStatus::Inactive(_) => {
+                if ui.button(format!("Start {}", event.entity().id())) {
+                    self.activate(event.entity());
+                }
+
+                if self.is_adhoc() {
+                    ui.same_line();
+                    if ui.button(format!("Spawn {}", event.entity().id())) {
+                        self.spawn(event.entity());
+                    }
+                }
+
+                ui.same_line();
+                if ui.button(format!("Pause {}", event.entity().id())) {
+                    self.pause(event.entity());
+                }
+            }
+            EventStatus::Paused(_) => {
+                if ui.button(format!("Resume {}", event.entity().id())) {
+                    self.resume(event.entity());
+                }
+                ui.same_line();
+                if ui.button(format!("Cancel {}", event.entity().id())) {
+                    self.pause(event.entity());
+                }
+            }
+            EventStatus::InProgress(_) => {
+                if ui.button(format!("Pause {}", event.entity().id())) {
+                    self.pause(event.entity());
+                }
+
+                ui.same_line();
+                if ui.button(format!("Cancel {}", event.entity().id())) {
+                    self.cancel(event.entity());
+                }
+            }
+            EventStatus::Cancelled(_) | EventStatus::Completed(_) => {
+                if ui.button(format!("Reset {}", event.entity().id())) {
+                    self.reset(event.entity());
+                }
+
+                if self.is_spawned() && {
+                    ui.same_line();
+                    ui.button(format!("Delete {}", event.entity().id()))
+                } {
+                    self.custom("delete_spawned", event.entity());
+                }
+            }
+            _ => {}
         }
     }
 }

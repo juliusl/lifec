@@ -392,7 +392,7 @@ impl Host {
     /// Returns true if the host should exit,
     ///
     pub fn should_exit(&self) -> bool {
-        let events = self.world().system_data::<Events>();
+        let events = self.world().system_data::<State>();
 
         events.should_exit()
     }

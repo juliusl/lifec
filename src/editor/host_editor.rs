@@ -10,7 +10,7 @@ use tracing::{event, Level};
 use crate::engine::Performance;
 use crate::prelude::EventRuntime;
 use crate::{
-    prelude::{Events, Node},
+    prelude::{State, Node},
     state::AttributeGraph,
 };
 
@@ -25,7 +25,7 @@ pub struct HostEditor {
     nodes: Vec<Node>,
     /// Adhoc profiler nodes,
     ///
-    adhoc_profilers: Vec<Node>,
+    adhoc_nodes: Vec<Node>,
     /// Timestamp of last refresh,
     ///
     last_refresh: Instant,
@@ -52,7 +52,7 @@ pub struct HostEditor {
 impl Hash for HostEditor {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.nodes.hash(state);
-        self.adhoc_profilers.hash(state);
+        self.adhoc_nodes.hash(state);
         self.last_refresh.hash(state);
         self.is_paused.hash(state);
         self.is_stopped.hash(state);
@@ -147,7 +147,7 @@ impl App for HostEditor {
 
 impl<'a> System<'a> for HostEditor {
     type SystemData = (
-        Events<'a>,
+        State<'a>,
         Read<'a, tokio::sync::watch::Sender<HostEditor>, EventRuntime>,
     );
 
@@ -214,7 +214,7 @@ impl<'a> System<'a> for HostEditor {
 
         // Get latest node state,
         //
-        for mut node in events.nodes() {
+        for mut node in events.event_nodes() {
             if let Some(mutations) = mutations.remove(&node.status.entity()) {
                 node.mutations = mutations;
             }
@@ -224,7 +224,7 @@ impl<'a> System<'a> for HostEditor {
 
         // Get latest adhoc profiler state,
         //
-        self.adhoc_profilers = events.adhoc_profilers();
+        self.adhoc_nodes = events.adhoc_nodes();
 
         // Update watcher
         //
@@ -333,7 +333,7 @@ impl HostEditor {
             }
             if let Some(token) = tab {
                 // This is the performance of adhoc operation events
-                for node in self.adhoc_profilers.iter() {
+                for node in self.adhoc_nodes.iter() {
                     if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
                         ui.new_line();
                     }
@@ -344,7 +344,7 @@ impl HostEditor {
             let tab = ui.tab_item("Debug");
             if let Some(token) = tab {
                 let mut protocol = Protocol::empty();
-                let profilers = self.adhoc_profilers.iter().cloned().collect::<Vec<_>>();
+                let profilers = self.adhoc_nodes.iter().cloned().collect::<Vec<_>>();
 
                 protocol.encoder::<Performance>(move |w, e| {
                     for node in profilers.iter()
@@ -373,7 +373,7 @@ impl HostEditor {
 impl Default for HostEditor {
     fn default() -> Self {
         Self {
-            adhoc_profilers: vec![],
+            adhoc_nodes: vec![],
             is_paused: Default::default(),
             is_stopped: false,
             tick_limit: Default::default(),

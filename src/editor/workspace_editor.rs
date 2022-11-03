@@ -11,7 +11,7 @@ use tokio::time::Instant;
 use tracing::{event, Level};
 
 use crate::{
-    engine::{Engines, Runner},
+    engine::{State, Runner},
     prelude::WorkspaceConfig,
     state::AttributeGraph,
 };
@@ -50,7 +50,7 @@ impl Extension for WorkspaceEditor {
         }
 
         {
-            let engines = world.system_data::<Engines>();
+            let engines = world.system_data::<State>();
 
             for e in engines.scan_engines() {
                 match e {
@@ -68,6 +68,7 @@ impl Extension for WorkspaceEditor {
                             ui.text(format!("id: {}", e.id()));
                         }
                     }
+                    crate::engine::EngineStatus::Disposed(_) => {},
                 }
                 ui.new_line();
                 ui.separator();

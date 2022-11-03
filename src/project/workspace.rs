@@ -488,7 +488,7 @@ mod tests {
 
         let mut dispatcher = host.prepare::<Test>();
         {
-            let mut events = host.world().system_data::<Events>();
+            let mut events = host.world().system_data::<State>();
 
             // Test that activating an event gets picked up by .scan()
             let event = host.world().entities().entity(2);
@@ -533,7 +533,7 @@ mod tests {
 
         let mut dispatcher = host.prepare::<Test>();
         {
-            let mut events = host.world().system_data::<Events>();
+            let mut events = host.world().system_data::<State>();
 
             // Test that activating an event gets picked up by .scan()
             let event = host.world().entities().entity(2);

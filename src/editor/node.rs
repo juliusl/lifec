@@ -15,6 +15,9 @@ use crate::{
 mod event;
 pub use event::EventNode;
 
+mod engine;
+pub use engine::EngineNode;
+
 mod commands;
 pub use commands::CommandDispatcher;
 pub use commands::NodeCommand;
@@ -118,7 +121,7 @@ impl App for Node {
         } else {
             match self.status {
                 // TODO:
-                NodeStatus::Engine(_) | NodeStatus::Profiler => {}
+                NodeStatus::Engine(_) | NodeStatus::Profiler(_) | NodeStatus::Empty => {}
                 NodeStatus::Event(status) => {
                     self.edit_event(ui, status);
                 }

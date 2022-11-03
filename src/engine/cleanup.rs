@@ -3,7 +3,7 @@ use tracing::{event, Level};
 
 use crate::prelude::NodeCommand;
 
-use super::{Events, EventStatus};
+use super::{State, EventStatus};
 
 /// System for cleaning up completed spawned entities,
 ///
@@ -11,7 +11,7 @@ use super::{Events, EventStatus};
 pub struct Cleanup;
 
 impl<'a> System<'a> for Cleanup {
-    type SystemData = Events<'a>;
+    type SystemData = State<'a>;
 
     fn run(&mut self, events: Self::SystemData) {
         for (spawned, _, owner) in events.iter_spawned_events() {

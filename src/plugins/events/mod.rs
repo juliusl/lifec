@@ -242,7 +242,7 @@ impl SetupHandler<SecureClient> for EventRuntime {
 }
 
 impl<'a> System<'a> for EventRuntime {
-    type SystemData = (Events<'a>, Runner<'a>);
+    type SystemData = (State<'a>, Runner<'a>);
 
     fn run(&mut self, (mut events, mut runner): Self::SystemData) {
         if !events.should_exit() && events.can_continue() {
