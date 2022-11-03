@@ -9,7 +9,7 @@ pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 use tracing::{event, Level};
 
 use crate::{
-    engine::{Engines, Runner},
+    engine::State,
     prelude::WorkspaceConfig,
     state::AttributeGraph,
 };
@@ -34,9 +34,9 @@ impl Extension for WorkspaceEditor {
         }
 
         {
-            let engines = world.system_data::<Engines>();
+            let engines = world.system_data::<State>();
 
-            for e in engines.scan_engines() {
+            for e in engines.scan_engine_status() {
                 match e {
                     crate::engine::EngineStatus::Inactive(e) => {
                         if let Some(name) = self.appendix.name(&e) {
@@ -104,8 +104,8 @@ impl Extension for WorkspaceEditor {
         // }
 
         {
-            let runner = world.system_data::<Runner>();
-            for guest in runner.guests() {
+            let state = world.system_data::<State>();
+            for guest in state.guests() {
                 let mut guest_editor = guest.guest_editor();
 
                 guest_editor.events_window(format!("Guest {} - Events", guest.owner.id()), ui);
@@ -117,11 +117,11 @@ impl Extension for WorkspaceEditor {
 
     fn on_run(&'_ mut self, world: &specs::World) {
         {
-            let Runner {
+            let State {
                 entities,
                 mut guests,
                 ..
-            } = world.system_data::<Runner>();
+            } = world.system_data::<State>();
 
             for (_, guest) in (&entities, &mut guests).join() {
                 guest.run();

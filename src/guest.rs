@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use specs::{Component, Entity, RunNow, VecStorage};
 
-use crate::prelude::{Host, HostEditor, PluginFeatures, Plugins, Project, ThunkContext};
+use crate::{prelude::{Host, HostEditor, PluginFeatures, Project, ThunkContext}, engine::State};
 
 /// Guest host as a component,
 ///
@@ -40,7 +40,7 @@ impl Guest {
     /// Gets a guest thunk context,
     ///
     pub fn guest_context(&mut self) -> ThunkContext {
-        let features = self.host.world().system_data::<Plugins>();
+        let features = self.host.world().system_data::<State>();
 
         features.initialize_context(self.owner, None)
     }

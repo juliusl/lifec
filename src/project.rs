@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::engine::Adhoc;
+use crate::engine::ConnectionState;
 use crate::engine::NodeCommandHandler;
 use crate::engine::Profiler;
 use crate::engine::Yielding;
@@ -244,6 +245,7 @@ pub fn default_world() -> World {
     world.register::<Activity>();
     world.register::<Profiler>();
     world.register::<Connection>();
+    world.register::<ConnectionState>();
     world.register::<Operation>();
     world.register::<RunmdFile>();
     world.register::<Yielding>();

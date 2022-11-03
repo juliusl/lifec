@@ -1,6 +1,5 @@
 use crate::{
-    engine::Sequences,
-    prelude::*,
+    prelude::*, engine::State,
 };
 
 /// Extension of Host to handle linking engine sequences together
@@ -13,10 +12,10 @@ pub trait Sequencer {
 
 impl Sequencer for Host {
     fn link_sequences(&mut self) {
-        self.world_mut().exec( |mut sequences: Sequences | {
+        self.world_mut().exec( |mut state: State | {
             // Build engine events and setup connections between them
             // Process engine lifecycles and connect connections between them
-            sequences.build_engines();
+            state.build_engines();
         });
     }
 }

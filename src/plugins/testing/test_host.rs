@@ -5,7 +5,7 @@ use specs::RunNow;
 use tracing::{event, Level};
 
 use crate::{
-    engine::{Performance, Profilers},
+    engine::{Performance, State},
     guest::Guest,
     host::EventHandler,
     prelude::{
@@ -92,7 +92,7 @@ impl Plugin for TestHost {
                     EventRuntime::default().run_now(host.world());
                     EventHandler::<TestHost>::default().run_now(host.world());
 
-                    host.world().system_data::<Profilers>().profile();
+                    host.world().system_data::<State>().profile();
 
                     if host.encode_performance() {
                         let test_dir = PathBuf::from(".world/test.io/test_host/performance");

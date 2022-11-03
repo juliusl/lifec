@@ -9,12 +9,14 @@ use crate::{prelude::*, guest::Guest, engine::Yielding};
 ///
 #[derive(SystemData)]
 pub struct PluginListener<'a> { 
-    status_updates: Write<'a, Receiver<StatusUpdate>, EventRuntime>,
-    runmd_files: Write<'a, Receiver<RunmdFile>, EventRuntime>,
-    operations: Write<'a, Receiver<Operation>, EventRuntime>,
-    starts: Write<'a, Receiver<Start>, EventRuntime>,
-    guests: Write<'a, Receiver<Guest>, EventRuntime>,
-    nodes: Write<'a, Receiver<(NodeCommand, Option<Yielding>)>, EventRuntime>,
+    pub status_updates: Write<'a, Receiver<StatusUpdate>, EventRuntime>,
+    pub runmd_files: Write<'a, Receiver<RunmdFile>, EventRuntime>,
+    pub operations: Write<'a, Receiver<Operation>, EventRuntime>,
+    pub starts: Write<'a, Receiver<Start>, EventRuntime>,
+    pub guests: Write<'a, Receiver<Guest>, EventRuntime>,
+    pub nodes: Write<'a, Receiver<(NodeCommand, Option<Yielding>)>, EventRuntime>,
+    pub completed_entities: Write<'a, tokio::sync::broadcast::Receiver<Entity>, EventRuntime>,
+    pub errors: Write<'a, tokio::sync::mpsc::Receiver<ErrorContext>, EventRuntime>,
 }
 
 impl<'a> PluginListener<'a> {

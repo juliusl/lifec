@@ -37,7 +37,7 @@ pub type DisplayNode = fn(&Node, &Ui);
 
 /// Struct for visualizing and commanding node-like entities,
 ///
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Node {
     /// Status of the current node,
     ///
@@ -118,7 +118,7 @@ impl App for Node {
         } else {
             match self.status {
                 // TODO:
-                NodeStatus::Engine(_) | NodeStatus::Profiler => {}
+                NodeStatus::Engine(_) | NodeStatus::Profiler(_) | NodeStatus::Empty => {}
                 NodeStatus::Event(status) => {
                     self.edit_event(ui, status);
                 }

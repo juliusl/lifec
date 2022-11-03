@@ -1,6 +1,6 @@
 use specs::{Component, HashMapStorage, System};
 
-use super::Profilers;
+use super::State;
 
 /// Component to create a terminal point for adhoc events to point to,
 ///
@@ -27,7 +27,7 @@ impl Default for Profiler {
 }
 
 impl<'a> System<'a> for Profiler {
-    type SystemData = Profilers<'a>;
+    type SystemData = State<'a>;
 
     fn run(&mut self, mut profilers: Self::SystemData) {       
         profilers.profile();

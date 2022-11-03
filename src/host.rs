@@ -1,4 +1,4 @@
-use crate::{engine::{Runner, Performance}, prelude::*, project::Listener};
+use crate::{engine::{Performance, State}, prelude::*, project::Listener};
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use reality::wire::Protocol;
@@ -77,7 +77,7 @@ impl Host {
     pub fn encode_commands(&mut self) -> bool {
         if let Some(mut protocol) = self.protocol.take() {
             let commands = {
-                let mut events = protocol.as_ref().system_data::<Runner>();
+                let mut events = protocol.as_ref().system_data::<State>();
                 events.take_commands()
             };
 
@@ -104,7 +104,7 @@ impl Host {
     pub fn encode_performance(&mut self) -> bool {
         if let Some(mut protocol) = self.protocol.take() {
             let performances = {
-                let mut runner = protocol.as_ref().system_data::<Runner>();
+                let mut runner = protocol.as_ref().system_data::<State>();
                 runner.take_performance()
             };
 
@@ -386,7 +386,7 @@ impl Host {
     /// Returns true if the host should exit,
     ///
     pub fn should_exit(&self) -> bool {
-        let events = self.world().system_data::<Events>();
+        let events = self.world().system_data::<State>();
 
         events.should_exit()
     }

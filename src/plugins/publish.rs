@@ -83,7 +83,7 @@ mod tests {
             r#"
     ``` test
     + .engine
-    : .event publish
+    : .start publish
     : .exit
     ```
 
@@ -118,7 +118,7 @@ mod tests {
 
             host.world_mut().maintain();
             count += 1;
-            if count > 10 {
+            if count > 200 {
                 break;
             }
         }

@@ -1,5 +1,5 @@
+use crate::engine::State;
 use crate::prelude::*;
-use crate::engine::Plugins;
 use specs::World;
 use tokio::sync::oneshot::Sender;
 use tokio::task::JoinHandle;
@@ -25,7 +25,7 @@ where
     ) -> (JoinHandle<ThunkContext>, Sender<()>) {
         let thunk_context = thunk_context.commit();
 
-        let plugins = self.as_ref().system_data::<Plugins>();
+        let plugins = self.as_ref().system_data::<State>();
 
         plugins.start_sequence(&calls, Some(&thunk_context)).into()
     }

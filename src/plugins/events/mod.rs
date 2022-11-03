@@ -1,5 +1,5 @@
 use super::thunks::{ErrorContext, SecureClient, StatusUpdate};
-use crate::{guest::Guest, prelude::*, engine::{Yielding, Runner}};
+use crate::{guest::Guest, prelude::*, engine::{Yielding, State}};
 use hyper::Client;
 use hyper_tls::HttpsConnector;
 use specs::{shred::SetupHandler, Entity, System, World};
@@ -198,22 +198,19 @@ impl SetupHandler<SecureClient> for EventRuntime {
 }
 
 impl<'a> System<'a> for EventRuntime {
-    type SystemData = (
-        Events<'a>, 
-        Runner<'a>,
-    );
+    type SystemData = State<'a>;
 
-    fn run(&mut self, (mut events, mut runner): Self::SystemData) {
-        if !events.should_exit() && events.can_continue() {
-            events.tick();
+    fn run(&mut self, mut state: Self::SystemData) {
+        if !state.should_exit() && state.can_continue() {
+            state.tick();
         } else {
             // If a rate limit is set, this will update the freq w/o changing the last tick
-            events.handle_rate_limits();
+            state.handle_rate_limits();
         }
 
         // Handle any node commands,
-        for (_, command) in runner.take_commands() {
-            events.handle_node_command(command);
+        for (_, command) in state.take_commands() {
+            state.handle_node_command(command);
         }
     }
 }

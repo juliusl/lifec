@@ -1,51 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
-use reality::Block;
-use specs::prelude::*;
-use specs::{Entity, Join, Read, SystemData};
+use specs::{Entity, Join};
 
-use super::{Adhoc, Connection, Cursor, Engine, Event, Limit, Profiler, Sequence};
+use super::{Connection, Cursor, Profiler, State};
 
-/// System data for configuring sequences for engines and events,
-///
-#[derive(SystemData)]
-pub struct Sequences<'a> {
-    /// Entity map
-    ///
-    entity_map: Read<'a, HashMap<String, Entity>>,
-    /// Entities,
-    ///
-    entities: Entities<'a>,
-    /// Block storage,
-    ///
-    blocks: ReadStorage<'a, Block>,
-    /// Engine storage,
-    ///
-    engines: ReadStorage<'a, Engine>,
-    /// Event storage,
-    ///
-    events: ReadStorage<'a, Event>,
-    /// Adhoc configurations,
-    ///
-    adhocs: ReadStorage<'a, Adhoc>,
-    /// Profiler storage,
-    ///
-    profilers: WriteStorage<'a, Profiler>,
-    /// Engine limits,
-    ///
-    limits: WriteStorage<'a, Limit>,
-    /// Sequence storage,
-    ///
-    sequences: WriteStorage<'a, Sequence>,
-    /// Connection storage,
-    ///
-    connections: WriteStorage<'a, Connection>,
-    /// Cursor storage,
-    ///
-    cursors: WriteStorage<'a, Cursor>,
-}
-
-impl<'a> Sequences<'a> {
+impl<'a> State<'a> {
     /// Scan for engines,
     ///
     pub fn scan_engines(&self) -> Vec<Entity> {
@@ -204,7 +163,7 @@ impl<'a> Sequences<'a> {
     /// Setup adhoc profiler connections,
     ///
     pub fn setup_adhoc_profiler(&mut self) {
-        let Sequences {
+        let State {
             entities,
             profilers,
             connections,

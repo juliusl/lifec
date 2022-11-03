@@ -4,10 +4,10 @@ use tracing::{event, Level};
 use crate::engine::Performance;
 use crate::plugins::protocol_prelude::*;
 
-use super::{Plugin, AttributeIndex};
+use super::{AttributeIndex, Plugin};
 
 /// Plugin to read performance data from protocol,
-/// 
+///
 #[derive(Default)]
 pub struct Monitor;
 
@@ -58,12 +58,18 @@ impl Plugin for Monitor {
                     )
                     .await;
 
-                for performance in protocol.decode::<Performance>() {
+                for (idx, performance) in protocol.decode::<Performance>().iter().enumerate() {
                     // TODO
-                    tokio::fs::write("test_out", format!("{:#?}", performance)).await.ok();
+                    tokio::fs::write(format!("test_out_{idx}.ron"), format!("{:#?}", performance))
+                        .await
+                        .ok();
                 }
-                tokio::fs::remove_file(cleanup_dir.join("control")).await.ok();
-                tokio::fs::remove_file(cleanup_dir.join("frames")).await.ok();
+                tokio::fs::remove_file(cleanup_dir.join("control"))
+                    .await
+                    .ok();
+                tokio::fs::remove_file(cleanup_dir.join("frames"))
+                    .await
+                    .ok();
                 tokio::fs::remove_file(cleanup_dir.join("blob")).await.ok();
 
                 Some(tc)
@@ -74,8 +80,7 @@ impl Plugin for Monitor {
 
 impl BlockObject for Monitor {
     fn query(&self) -> reality::BlockProperties {
-        BlockProperties::default()
-            .require("monitor")
+        BlockProperties::default().require("monitor")
     }
 
     fn parser(&self) -> Option<reality::CustomAttribute> {

@@ -1,27 +1,8 @@
-use specs::prelude::*;
-use specs::{Entities, SystemData, WriteStorage};
+use specs::Join;
 
-use super::{Performance, Profiler, Connection};
+use super::{Performance, State};
 
-/// System data for profilers/performance related data,
-///
-#[derive(SystemData)]
-pub struct Profilers<'a> {
-    /// Entities
-    /// 
-    entities: Entities<'a>,
-    /// Connections
-    /// 
-    connections: ReadStorage<'a, Connection>,
-    /// Profilers,
-    /// 
-    profilers: WriteStorage<'a, Profiler>,
-    /// Performance storage,
-    /// 
-    performance: WriteStorage<'a, Performance>,
-}
-
-impl<'a> Profilers<'a> {
+impl<'a> State<'a> {
     /// Collect profiling data, results are stored as entities
     /// 
     pub fn profile(&mut self) {
@@ -39,7 +20,7 @@ impl<'a> Profilers<'a> {
             );
 
             for sample in samples {
-                self.performance
+                self.samples
                     .insert(self.entities.create(), sample)
                     .expect("should be able to insert sample");
             }

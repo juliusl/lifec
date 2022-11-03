@@ -1,4 +1,4 @@
-use crate::{engine::Yielding, guest::Guest, prelude::*};
+use crate::{engine::{State}, prelude::*};
 use specs::{shred::DynamicSystemData, DispatcherBuilder, System, World, Write};
 
 type EnableListener = fn(&World, &mut DispatcherBuilder);
@@ -43,13 +43,8 @@ where
 impl<'a, L: Listener> System<'a> for EventHandler<L> {
     type SystemData = (
         Entities<'a>,
-        PluginListener<'a>,
-        Write<'a, tokio::sync::broadcast::Receiver<Entity>, EventRuntime>,
-        Write<'a, tokio::sync::mpsc::Receiver<ErrorContext>, EventRuntime>,
+        State<'a>,
         Write<'a, Option<L>>,
-        WriteStorage<'a, Guest>,
-        WriteStorage<'a, NodeCommand>,
-        WriteStorage<'a, Yielding>,
     );
 
     fn setup(&mut self, world: &mut World) {
@@ -60,49 +55,40 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
 
     fn run(
         &mut self,
-        (
-            entities,
-            mut plugin_messages,
-            mut completed_plugins,
-            mut errors,
-            mut listener,
-            mut guests,
-            mut commands,
-            mut yieldings,
-        ): Self::SystemData,
+        (entities, mut state, mut listener): Self::SystemData,
     ) {
         if let Some(listener) = listener.as_mut() {
-            if let Some(operation) = plugin_messages.try_next_operation() {
+            if let Some(operation) = state.plugin_listeners().try_next_operation() {
                 listener.on_operation(operation);
             }
 
-            if let Some(runmd) = plugin_messages.try_next_runmd_file() {
+            if let Some(runmd) = state.plugin_listeners().try_next_runmd_file() {
                 listener.on_runmd(&runmd);
             }
 
-            if let Some(start) = plugin_messages.try_next_start_command() {
+            if let Some(start) = state.plugin_listeners().try_next_start_command() {
                 listener.on_start_command(&start);
             }
 
-            if let Some(status_update) = plugin_messages.try_next_status_update() {
+            if let Some(status_update) = state.plugin_listeners().try_next_status_update() {
                 listener.on_status_update(&status_update);
             }
 
-            if let Some(entity) = completed_plugins.try_recv().ok() {
+            if let Some(entity) = state.plugin_listeners().completed_entities.try_recv().ok() {
                 listener.on_completed_event(&entity);
             }
 
-            if let Some(error) = errors.try_recv().ok() {
+            if let Some(error) =state.plugin_listeners().errors.try_recv().ok() {
                 listener.on_error_context(&error);
             }
 
-            if let Some(guest) = plugin_messages.try_next_guest() {
-                guests
+            if let Some(guest) = state.plugin_listeners().try_next_guest() {
+                state.guests
                     .insert(guest.owner, guest)
                     .expect("should be able to insert guest");
             }
 
-            if let Some((command, yielding)) = plugin_messages.try_next_node_command() {
+            if let Some((command, yielding)) = state.plugin_listeners().try_next_node_command() {
                 match command {
                     NodeCommand::Activate(entity)
                     | NodeCommand::Reset(entity)
@@ -111,18 +97,18 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
                     | NodeCommand::Cancel(entity)
                     | NodeCommand::Spawn(entity)
                     | NodeCommand::Custom(_, entity) => {
-                        commands
+                        state.commands
                             .insert(entity, command)
                             .expect("should be able to insert");
                         if let Some(yielding) = yielding {
-                            yieldings
+                            state.yielding
                                 .insert(entity, yielding)
                                 .expect("should be able to insert");
                         }
                     }
                     NodeCommand::Update(graph) => {
                         let entity = entities.entity(graph.entity_id());
-                        commands
+                        state.commands
                             .insert(entity, NodeCommand::Update(graph.clone()))
                             .expect("should be able to insert");
                     }

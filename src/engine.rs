@@ -30,16 +30,6 @@ mod plugins;
 pub use plugins::PluginBroker;
 pub use plugins::PluginFeatures;
 pub use plugins::PluginListener;
-pub use plugins::Plugins;
-
-mod events;
-pub use events::EventStatus;
-pub use events::Events;
-pub use events::NodeCommandHandler;
-
-mod engines;
-pub use engines::EngineStatus;
-pub use engines::Engines;
 
 mod lifecycle;
 pub use lifecycle::Lifecycle;
@@ -53,20 +43,21 @@ pub use tick_control::TickControl;
 mod yielding;
 pub use yielding::Yielding;
 
-mod runner;
-pub use runner::Runner;
-
-mod profilers;
-pub use profilers::Profilers;
-
 mod performance;
 pub use performance::Performance;
 
 mod cleanup;
 pub use cleanup::Cleanup;
 
-mod sequences;
-pub use sequences::Sequences;
+mod state;
+pub use state::State;
+pub use state::NodeCommandHandler;
+
+mod engine_status;
+pub use engine_status::EngineStatus;
+
+mod event_status;
+pub use event_status::EventStatus;
 
 use tracing::Level;
 
@@ -363,12 +354,7 @@ impl SpecialAttribute for Engine {
 }
 
 impl Interpreter for Engine {
-    fn initialize(&self, world: &mut specs::World) {
-        world.register::<Event>();
-        world.register::<Sequence>();
-        world.register::<Connection>();
-        world.register::<Activity>();
-    }
+    fn initialize(&self, _: &mut specs::World) { }
 
     /// Handles interpreting blocks and setting up sequences
     ///
@@ -504,6 +490,7 @@ impl Into<General> for &Engine {
 }
 
 #[test]
+#[tracing_test::traced_test]
 fn test_engine() {
     use specs::WorldExt;
 
@@ -514,6 +501,9 @@ fn test_engine() {
     let mut world = specs::World::new();
     world.register::<Runtime>();
     world.register::<Event>();
+    world.register::<Engine>();
+    world.register::<Thunk>();
+    world.register::<Sequence>();
     world.insert(runtime);
 
     let parser = Parser::new_with(world)
@@ -524,8 +514,8 @@ fn test_engine() {
         r#"
     ``` test
     + .engine 
-    : .event step_one 
-    : .event step_two 
+    : .start step_one 
+    : .start step_two 
     ```
 
     ``` step_one test
@@ -591,9 +581,11 @@ fn test_engine() {
                 let index = index.get(e);
                 eprintln!("{:#?}", index);
 
-                let event = world.read_component::<Event>();
-                let event = event.get(e).expect("should have been added");
-                eprintln!("{event}");
+                let events = world.read_component::<Event>();
+
+                for e in events.as_slice() {
+                    eprintln!("{:#?}", e);
+                }
             }
         }
 

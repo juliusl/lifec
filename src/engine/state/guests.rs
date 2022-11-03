@@ -1,32 +1,14 @@
-use specs::SystemData;
 use specs::prelude::*;
 use tracing::Level;
 use tracing::event;
 
+use crate::engine::Performance;
 use crate::guest::Guest;
 use crate::prelude::NodeCommand;
 
-use super::Performance;
+use super::State;
 
-/// Runner system data,
-/// 
-#[derive(SystemData)]
-pub struct Runner<'a> {
-    /// Entities
-    /// 
-    pub entities: Entities<'a>,
-    /// Guests,
-    /// 
-    pub guests: WriteStorage<'a, Guest>,
-    /// Node commands,
-    /// 
-    commands: WriteStorage<'a, NodeCommand>,
-    /// Current node statuses,
-    /// 
-    samples: WriteStorage<'a, Performance>,
-}
-
-impl<'a> Runner<'a> {
+impl<'a> State<'a> {
     /// Take commands from storage,
     /// 
     pub fn take_commands(&mut self) -> Vec<(Entity, NodeCommand)> {

@@ -95,6 +95,7 @@ fn test_runtime() {
     let mut world = specs::World::new();
     world.register::<Runtime>();
     world.register::<Event>();
+    world.register::<Thunk>();
     world.insert(runtime);
 
     let parser = Parser::new_with(world).with_special_attr::<Runtime>();

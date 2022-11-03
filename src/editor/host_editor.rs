@@ -8,10 +8,10 @@ use std::hash::Hash;
 use tokio::time::Instant;
 use tracing::{event, Level};
 
-use crate::engine::Performance;
+use crate::engine::{Performance, State};
 use crate::prelude::EventRuntime;
 use crate::{
-    prelude::{Events, Node},
+    prelude::Node,
     state::AttributeGraph,
 };
 
@@ -151,7 +151,7 @@ impl App for HostEditor {
 
 impl<'a> System<'a> for HostEditor {
     type SystemData = (
-        Events<'a>,
+        State<'a>,
         Read<'a, tokio::sync::watch::Sender<HostEditor>, EventRuntime>,
     );
 
@@ -205,7 +205,6 @@ impl<'a> System<'a> for HostEditor {
         for mut node in self.take_nodes() {
             if let Some(command) = node.command.take() {
                 match events
-                    .plugins()
                     .features()
                     .broker()
                     .try_send_node_command(command.clone(), None)

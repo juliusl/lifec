@@ -325,6 +325,7 @@ mod tests {
         use reality::BlockProperty;
         use specs::WorldExt;
         use tracing::Level;
+        use crate::engine::State;
 
         let mut workspace = Workspace::new("test.io", None);
         workspace.set_root_runmd(
@@ -488,20 +489,20 @@ mod tests {
 
         let mut dispatcher = host.prepare::<Test>();
         {
-            let mut events = host.world().system_data::<Events>();
+            let mut state = host.world().system_data::<State>();
 
             // Test that activating an event gets picked up by .scan()
             let event = host.world().entities().entity(2);
-            events.activate(event);
+            state.activate(event);
 
             // TODO - add assertions
-            let event_state = events.scan();
+            let event_state = state.scan_event_status();
             assert_eq!(event_state.get(0), Some(&EventStatus::New(event)));
-            events.handle(event_state);
+            state.handle(event_state);
 
             for i in 0..9 {
                 tracing::event!(Level::DEBUG, "Tick {i}");
-                events.serialized_tick();
+                state.serialized_tick();
             }
         }
 
@@ -529,20 +530,20 @@ mod tests {
 
         let mut dispatcher = host.prepare::<Test>();
         {
-            let mut events = host.world().system_data::<Events>();
+            let mut state = host.world().system_data::<State>();
 
             // Test that activating an event gets picked up by .scan()
             let event = host.world().entities().entity(2);
-            events.activate(event);
+            state.activate(event);
 
             // TODO - add assertions
-            let event_state = events.scan();
+            let event_state = state.scan_event_status();
             assert_eq!(event_state.get(0), Some(&EventStatus::New(event)));
-            events.handle(event_state);
+            state.handle(event_state);
 
             for i in 0..9 {
                 tracing::event!(Level::DEBUG, "Tick {i}");
-                events.serialized_tick();
+                state.serialized_tick();
             }
         }
 
@@ -563,15 +564,15 @@ mod tests {
         dispatcher.dispatch(host.world());
 
         {
-            let mut operation_data = host.world().system_data::<Operations>();
-            let operation = operation_data.execute_operation("print", None, None);
+            let mut state = host.world().system_data::<State>();
+            let operation = state.execute_operation("print", None, None);
             operation.expect("should have an operation").wait();
 
             let operation =
-                operation_data.execute_operation("print", Some("test".to_string()), None);
+                state.execute_operation("print", Some("test".to_string()), None);
             operation.expect("should have an operation").wait();
 
-            operation_data.dispatch_operation("print", None, None);
+            state.dispatch_operation("print", None, None);
         }
         dispatcher.dispatch(host.world());
         dispatcher.dispatch(host.world());
