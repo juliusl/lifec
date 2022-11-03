@@ -1,4 +1,4 @@
-use specs::{Component, DenseVecStorage};
+use specs::{Component, HashMapStorage};
 
 /// Enumeration of transition strategy between events,
 /// 
@@ -23,7 +23,7 @@ use specs::{Component, DenseVecStorage};
 /// 
 /// 
 #[derive(Component, Default, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[storage(DenseVecStorage)]
+#[storage(HashMapStorage)]
 pub enum Transition {
     /// Default transition, cancel any ongoing tasks and replace w/ the incoming task
     /// 

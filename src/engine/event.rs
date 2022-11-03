@@ -2,13 +2,13 @@ use std::fmt::Display;
 
 use crate::{prelude::*, editor::General};
 use reality::Block;
-use specs::{Component, DenseVecStorage, Entity};
+use specs::{Component, Entity};
 use tracing::{event, Level};
 
 /// The event component allows an entity to spawn a task for thunks, w/ a tokio runtime instance
 ///
 #[derive(Debug, Component, Clone, Hash, PartialEq, Eq)]
-#[storage(DenseVecStorage)]
+#[storage(VecStorage)]
 pub struct Event(
     /// Name of this event
     pub String,

@@ -2,15 +2,13 @@ use std::time::Instant;
 
 use crate::plugins::*;
 use logos::{Lexer, Logos};
-use specs::storage::DenseVecStorage;
 use tokio::task::JoinHandle;
 
 use super::thunks::CancelToken;
 
 /// Timer plugin,
 ///
-#[derive(Default, Component, Clone)]
-#[storage(DenseVecStorage)]
+#[derive(Default, Clone)]
 pub struct Timer;
 
 impl Plugin for Timer {

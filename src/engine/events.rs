@@ -200,9 +200,8 @@ impl<'a> Events<'a> {
     /// Resets Completed/Cancelled events
     ///
     pub fn reset_all(&mut self) {
-        let statuses = self.scan();
-
-        for status in statuses.iter() {
+        let statuses = self.scan().collect::<Vec<_>>();
+        for status in statuses {
             self.reset(status.entity());
         }
     }
@@ -277,18 +276,18 @@ impl<'a> Events<'a> {
 
     /// Scans event status and returns a vector of entites w/ their status,
     ///
-    pub fn scan(&self) -> Vec<EventStatus> {
+    pub fn scan(&self) -> impl Iterator<Item = EventStatus> + '_ {
         let Events {
             entities, events, ..
         } = self;
 
-        let mut status = vec![];
+        // let mut status = vec![];
 
-        for (entity, _) in (entities, events).join() {
-            status.push(self.status(entity));
-        }
+        // for (entity, _) in (entities, events).join() {
+        //     status.push(self.status(entity));
+        // }
 
-        status
+        (entities, events).join().map(|(e, _)| self.status(e))
     }
 
     /// Returns a vec of cursors,
@@ -311,9 +310,9 @@ impl<'a> Events<'a> {
 
     /// Handles a vec of events,
     ///
-    pub fn handle(&mut self, events: Vec<EventStatus>) {
-        for event in events.iter() {
-            self.handle_event(event)
+    pub fn handle(&mut self) {
+        for event in self.scan().collect::<Vec<_>>() {
+            self.handle_event(&event)
         }
     }
 
@@ -416,15 +415,13 @@ impl<'a> Events<'a> {
             }
         }
 
-        let event_state = self.scan();
-        self.handle(event_state);
+        self.handle();
     }
 
     /// Scans event data and handles any ready transitions, does not block,
     ///
     pub fn tick(&mut self) {
-        let event_state = self.scan();
-        self.handle(event_state);
+        self.handle();
     }
 
     /// Returns next entities this event points to,
@@ -720,9 +717,7 @@ impl<'a> Events<'a> {
     /// Returns true if there will no more activity,
     ///
     pub fn should_exit(&self) -> bool {
-        let event_data = self.scan();
-
-        event_data.iter().all(|e| match e {
+        self.scan().all(|e| match e {
             EventStatus::Inactive(_) | EventStatus::Completed(_) | EventStatus::Cancelled(_) => {
                 true
             }
@@ -954,7 +949,6 @@ impl<'a> Events<'a> {
     ///
     pub fn nodes(&'a self) -> Vec<Node> {
         self.scan()
-            .iter()
             .filter_map(|e| self.event_node(e.entity()))
             .collect::<Vec<_>>()
     }

@@ -1,13 +1,13 @@
 use std::{fmt::Display, time::Instant};
 
-use specs::{Component, DenseVecStorage};
+use specs::{Component, VecStorage};
 
 use crate::prelude::ErrorContext;
 
 /// Component to track activity state changes,
 ///
 #[derive(Debug, Clone, Component, PartialEq, Eq, Hash)]
-#[storage(DenseVecStorage)]
+#[storage(VecStorage)]
 pub enum Activity {
     /// Scheduled to run,
     ///

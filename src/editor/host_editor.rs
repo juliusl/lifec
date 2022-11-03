@@ -156,6 +156,12 @@ impl<'a> System<'a> for HostEditor {
     );
 
     fn run(&mut self, (mut events, watcher): Self::SystemData) {
+        if self.last_refresh.elapsed().as_millis() < 16 {
+            return;
+        } else {
+            self.tick_rate.clear();
+        }
+
         // General event runtime state
         self.is_paused = !events.can_continue();
         self.is_stopped = events.should_exit();
@@ -193,11 +199,6 @@ impl<'a> System<'a> for HostEditor {
                     event!(Level::ERROR, "Error recording tick rate, {err}");
                 }
             }
-        }
-
-        if self.last_refresh.elapsed().as_secs() > 1 {
-            self.tick_rate.clear();
-            self.last_refresh = Instant::now();
         }
 
         // Handle node commands
@@ -252,6 +253,8 @@ impl<'a> System<'a> for HostEditor {
                 false
             }
         });
+
+        self.last_refresh = Instant::now();
     }
 }
 
@@ -360,8 +363,8 @@ impl HostEditor {
     /// Performance related tools and information
     ///
     fn performance_section(&mut self, ui: &Ui) {
-        self.tick_rate_tools(ui);
-        ui.new_line();
+        // self.tick_rate_tools(ui);
+        // ui.new_line();
 
         ui.text("Performance");
         ui.spacing();

@@ -495,9 +495,13 @@ mod tests {
             events.activate(event);
 
             // TODO - add assertions
-            let event_state = events.scan();
-            assert_eq!(event_state.get(0), Some(&EventStatus::New(event)));
-            events.handle(event_state);
+            {
+                let mut event_state = events.scan();
+                assert_eq!(event_state.next(), Some(EventStatus::New(event)));
+            }
+            {
+                events.handle();
+            }
 
             for i in 0..9 {
                 tracing::event!(Level::DEBUG, "Tick {i}");
@@ -535,10 +539,14 @@ mod tests {
             let event = host.world().entities().entity(2);
             events.activate(event);
 
-            // TODO - add assertions
-            let event_state = events.scan();
-            assert_eq!(event_state.get(0), Some(&EventStatus::New(event)));
-            events.handle(event_state);
+            {
+                // TODO - add assertions
+                let mut event_state = events.scan();
+                assert_eq!(event_state.next(), Some(EventStatus::New(event)));
+            }
+
+
+            events.handle();
 
             for i in 0..9 {
                 tracing::event!(Level::DEBUG, "Tick {i}");

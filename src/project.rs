@@ -249,7 +249,6 @@ pub fn default_world() -> World {
     world.register::<Yielding>();
     world.register::<EventStatus>();
     world.register::<Transition>();
-    world.register::<ThunkContext>();
     world.register::<AttributeGraph>();
     world.insert(None::<Workspace>);
     world

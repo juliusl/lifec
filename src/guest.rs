@@ -1,13 +1,13 @@
 use std::hash::Hash;
 
-use specs::{Component, Entity, RunNow, VecStorage};
+use specs::{Component, Entity, RunNow, HashMapStorage};
 
 use crate::prelude::{Host, HostEditor, PluginFeatures, Plugins, Project, ThunkContext};
 
 /// Guest host as a component,
 ///
 #[derive(Component)]
-#[storage(VecStorage)]
+#[storage(HashMapStorage)]
 pub struct Guest {
     /// Owner of the guest host,
     pub owner: Entity,

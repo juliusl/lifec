@@ -1,5 +1,6 @@
 use hyper::client::HttpConnector;
-use specs::{storage::DenseVecStorage, Component, Entity};
+use specs::VecStorage;
+use specs::{Component, Entity};
 
 mod error;
 pub use error::ErrorContext;
@@ -16,7 +17,7 @@ use tokio::task::JoinHandle;
 
 /// Thunk is a function that can be passed around for the system to call later
 #[derive(Component, Clone)]
-#[storage(DenseVecStorage)]
+#[storage(VecStorage)]
 pub struct Thunk(
     // Symbol that represents this thunk
     pub &'static str,

@@ -6,8 +6,7 @@ use crate::prelude::*;
 
 /// The process component executes a command and records the output
 /// 
-#[derive(Debug, Clone, Default, Component)]
-#[storage(DenseVecStorage)]
+#[derive(Debug, Clone, Default)]
 pub struct Process;
 
 impl Plugin for Process {

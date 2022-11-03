@@ -2,7 +2,7 @@ use crate::prelude::*;
 use atlier::system::{Attribute, Value};
 use imgui::Ui;
 use reality::BlockProperties;
-use specs::{storage::HashMapStorage, Component};
+use specs::Component;
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     hash::{Hash, Hasher},
@@ -13,7 +13,7 @@ use std::{
 /// Implements AttributeIndex
 ///
 #[derive(Debug, Default, Component, Clone, Hash, Eq, PartialEq, PartialOrd)]
-#[storage(HashMapStorage)]
+#[storage(VecStorage)]
 pub struct AttributeGraph {
     /// Block index,
     ///

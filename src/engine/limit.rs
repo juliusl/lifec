@@ -1,9 +1,9 @@
-use specs::{Component, DenseVecStorage};
+use specs::{Component, HashMapStorage};
 
 /// Component to indicate a limit,
 /// 
 #[derive(Debug, Clone, Component)]
-#[storage(DenseVecStorage)]
+#[storage(HashMapStorage)]
 pub struct Limit(pub usize);
 
 impl Limit {

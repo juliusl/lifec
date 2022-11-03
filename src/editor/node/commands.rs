@@ -1,4 +1,4 @@
-use specs::{Component, DenseVecStorage, Entity};
+use specs::{Component, Entity, HashMapStorage};
 
 use crate::state::AttributeGraph;
 
@@ -7,7 +7,7 @@ use super::Node;
 /// Enumeration of node commands,
 ///
 #[derive(Component, Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
-#[storage(DenseVecStorage)]
+#[storage(HashMapStorage)]
 pub enum NodeCommand {
     /// Command to activate this node,
     ///
