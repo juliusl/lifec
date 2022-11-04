@@ -110,6 +110,17 @@ impl Plugin for Request {
                         }
                     }
 
+                    // Allow previous plugins to configure headers
+                    if let Some(previous) = tc.previous() {
+                        for name in previous.find_symbol_values("header") {
+                            if let Some(header_value) = tc.search().find_symbol(&name) {
+                                let header_value = tc.format(header_value);
+    
+                                request = request.header(name, header_value);
+                            }
+                        }
+                    }
+
                     let body = tc
                         .search()
                         .find_binary("body")
