@@ -40,6 +40,15 @@ impl Plugin for Request {
             p.define_child(last, var_name, Value::Symbol(c));
         });
 
+        parser.add_custom_with("accept", |p, c| {
+            let last = p
+                .last_child_entity()
+                .expect("should have added an entity for the process");
+
+            p.define_child(last, "header", "accept");
+            p.define_child(last, "accept", Value::Symbol(c));
+        });
+
         parser.add_custom_with("get", |p, _| {
             let last = p
                 .last_child_entity()
