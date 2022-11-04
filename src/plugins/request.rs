@@ -1,10 +1,10 @@
-use hyper::{Body, Request as HttpRequest};
-use reality::{BlockObject, BlockProperties};
-use tracing::{event, Level};
 use crate::{
     prelude::{AsyncContext, Plugin, ThunkContext, Value},
     state::AttributeIndex,
 };
+use hyper::{Body, Request as HttpRequest};
+use reality::{BlockObject, BlockProperties};
+use tracing::{event, Level};
 
 /// Type for installing a lifec plugin implementation. This plugin makes
 /// https requests, with a hyper secure client.
@@ -23,7 +23,7 @@ impl Plugin for Request {
 
     fn compile(parser: &mut crate::prelude::AttributeParser) {
         /*
-        Example Usage: 
+        Example Usage:
             : Accept .header text/json
             or
             : Accept .symbol {media_type}
@@ -32,38 +32,50 @@ impl Plugin for Request {
         parser.add_custom_with("header", |p, c| {
             let var_name = p.symbol().expect("Requires a var name").to_string();
 
-            let last = p.last_child_entity().expect("should have added an entity for the process");
+            let last = p
+                .last_child_entity()
+                .expect("should have added an entity for the process");
 
             p.define_child(last, "header", Value::Symbol(var_name.to_string()));
             p.define_child(last, var_name, Value::Symbol(c));
         });
 
         parser.add_custom_with("get", |p, _| {
-            let last = p.last_child_entity().expect("should have added an entity for the process");
+            let last = p
+                .last_child_entity()
+                .expect("should have added an entity for the process");
 
             p.define_child(last, "method", "GET");
         });
 
         parser.add_custom_with("post", |p, _| {
-            let last = p.last_child_entity().expect("should have added an entity for the process");
+            let last = p
+                .last_child_entity()
+                .expect("should have added an entity for the process");
 
             p.define_child(last, "method", "POST");
         });
 
         parser.add_custom_with("put", |p, _| {
-            let last = p.last_child_entity().expect("should have added an entity for the process");
+            let last = p
+                .last_child_entity()
+                .expect("should have added an entity for the process");
 
             p.define_child(last, "method", "PUT");
         });
 
         parser.add_custom_with("head", |p, _| {
-            let last = p.last_child_entity().expect("should have added an entity for the process");
+            let last = p
+                .last_child_entity()
+                .expect("should have added an entity for the process");
 
             p.define_child(last, "method", "HEAD");
         });
 
         parser.add_custom_with("delete", |p, _| {
-            let last = p.last_child_entity().expect("should have added an entity for the process");
+            let last = p
+                .last_child_entity()
+                .expect("should have added an entity for the process");
 
             p.define_child(last, "method", "DELETE");
         });
@@ -89,7 +101,7 @@ impl Plugin for Request {
                     if let Some(method) = tc.search().find_symbol("method") {
                         request = request.method(method.as_str());
                     }
-              
+
                     for name in tc.search().find_symbol_values("header") {
                         if let Some(header_value) = tc.search().find_symbol(&name) {
                             let header_value = tc.format(header_value);
@@ -107,16 +119,23 @@ impl Plugin for Request {
                     event!(Level::TRACE, "{:#?}", request);
 
                     match request.body(body) {
-                        Ok(request) => match client.request(request).await {
-                            Ok(resp) => {
-                                tc.cache_response(resp);
-                            },
-                            Err(err) => {
-                                eprintln!("request: error sending request {err}");
+                        Ok(request) => {
+                            let uri = request.uri().clone();
+                            match client.request(request).await {
+                                Ok(resp) => {
+                                    tc.cache_response(resp);
+                                }
+                                Err(err) => {
+                                    event!(
+                                        Level::ERROR,
+                                        "request: error sending request {err}, {:?}",
+                                        uri
+                                    );
+                                }
                             }
-                        },
+                        }
                         Err(err) => {
-                            eprintln!("request: error creating request {err}");
+                            event!(Level::ERROR, "request: error creating request {err}");
                         }
                     }
                 }

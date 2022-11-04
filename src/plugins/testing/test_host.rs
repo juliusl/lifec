@@ -5,7 +5,7 @@ use specs::RunNow;
 use tracing::{event, Level};
 
 use crate::{
-    engine::{Performance, Profilers},
+    engine::{Performance, Profilers, Cleanup},
     guest::Guest,
     host::EventHandler,
     prelude::{
@@ -90,6 +90,7 @@ impl Plugin for TestHost {
                 std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
                 let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |host| {
                     EventRuntime::default().run_now(host.world());
+                    Cleanup::default().run_now(host.world());
                     EventHandler::<TestHost>::default().run_now(host.world());
 
                     host.world().system_data::<Profilers>().profile();

@@ -4,7 +4,6 @@ use reality::wire::{Protocol, WireObject};
 use specs::{Entity, Read, System};
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
-use tokio::time::Instant;
 use tracing::{event, Level};
 
 use crate::engine::Performance;
@@ -132,7 +131,6 @@ impl<'a> System<'a> for HostEditor {
     );
 
     fn run(&mut self, (mut events, watcher): Self::SystemData) {
-
         // General event runtime state
         self.is_paused = !events.can_continue();
         self.is_stopped = events.should_exit();
