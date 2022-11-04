@@ -25,8 +25,6 @@ impl Listener for TestHost {
         TestHost::default()
     }
 
-    fn on_runmd(&mut self, _: &crate::prelude::RunmdFile) {}
-
     fn on_status_update(&mut self, _: &crate::prelude::StatusUpdate) {}
 
     fn on_operation(&mut self, _: crate::prelude::Operation) {}
@@ -36,8 +34,6 @@ impl Listener for TestHost {
     fn on_completed_event(&mut self, e: &specs::Entity) {
         event!(Level::DEBUG, "Guest plugin -- {}", e.id());
     }
-
-    fn on_start_command(&mut self, _: &crate::prelude::Start) {}
 }
 
 impl Plugin for TestHost {

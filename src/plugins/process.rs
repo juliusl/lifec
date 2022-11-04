@@ -268,8 +268,8 @@ impl BlockObject for Process {
             .optional("redirect")
     }
 
-    fn documentation(&self, _property: impl AsRef<str>) -> Option<reality::Documentation> {
-        let documentation = match _property.as_ref() {
+    fn documentation(&self, property: impl AsRef<str>) -> Option<reality::Documentation> {
+        let documentation = match property.as_ref() {
             "process" => {
                 Documentation::summary("Command to execute on the current operating system")
                     .custom_attr()

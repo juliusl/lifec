@@ -121,6 +121,7 @@ impl Editor for Host {
                         entity,
                         General {
                             name: "profiler".to_string(),
+                            expression: format!("profiler-{}", entity.id()),
                         },
                     )
                 }

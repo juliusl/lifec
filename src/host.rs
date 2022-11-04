@@ -21,9 +21,6 @@ pub use commands::Commands;
 mod sequencer;
 pub use sequencer::Sequencer;
 
-mod executor;
-pub use executor::Executor;
-
 mod editor;
 pub use editor::Editor;
 

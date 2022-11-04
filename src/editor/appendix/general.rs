@@ -6,6 +6,8 @@ use atlier::system::App;
 pub struct General {
     /// Name of this entity,
     pub name: String,
+    /// Expression to find this entity,
+    pub expression: String,
 }
 
 impl App for General {
@@ -18,6 +20,6 @@ impl App for General {
     }
 
     fn display_ui(&self, ui: &imgui::Ui) {
-        ui.text(format!("name: {}", self.name));
+        ui.text(format!("{}", self.name));
     }
 }

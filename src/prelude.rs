@@ -23,7 +23,6 @@ pub use crate::engine::Sequence;
 pub use crate::engine::Transition;
 pub use crate::host::Commands;
 pub use crate::host::Editor;
-pub use crate::host::Executor;
 pub use crate::host::Host;
 pub use crate::host::Inspector;
 pub use crate::host::Sequencer;

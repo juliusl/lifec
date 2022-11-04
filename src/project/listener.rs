@@ -12,10 +12,6 @@ where
     ///
     fn create(world: &World) -> Self;
 
-    /// Called when a runmd file is received,
-    ///
-    fn on_runmd(&mut self, runmd: &RunmdFile);
-
     /// Called when a status update is received,
     ///
     fn on_status_update(&mut self, status_update: &StatusUpdate);
@@ -31,8 +27,4 @@ where
     /// Called when a plugin completes,
     ///
     fn on_completed_event(&mut self, entity: &Entity);
-
-    /// Called when a start command is received,
-    ///
-    fn on_start_command(&mut self, start_command: &Start);
 }

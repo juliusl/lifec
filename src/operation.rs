@@ -73,7 +73,7 @@ impl Operation {
 
     /// Starts a task with a thunk and returns it w/ self,
     ///
-    pub fn start_with(&self, Thunk(_, func): &Thunk, context: &mut ThunkContext) -> Self
+    pub fn start_with(&self, Thunk(_, _, func): &Thunk, context: &mut ThunkContext) -> Self
     {
         if self.result.is_some() {
             event!(
@@ -89,7 +89,7 @@ impl Operation {
 
     /// Replaces any ongoing task by cancelling the previous task, and setting a new one
     /// 
-    pub fn replace(&mut self, Thunk(symbol, func): &Thunk, context: &mut ThunkContext) {
+    pub fn replace(&mut self, Thunk(symbol, _, func): &Thunk, context: &mut ThunkContext) {
         event!(Level::DEBUG, "Replacing operation for {symbol} for entity {}", context.state().entity_id());
         self.cancel(); 
 

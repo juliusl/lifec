@@ -209,14 +209,6 @@ pub trait Plugin {
                     .expect("should be able to insert thunk component");
 
                 parser.define_child(child, Self::symbol(), Value::Symbol(content));
-                parser.define_child(child, "plugin_symbol", Self::symbol());
-                parser.define_child(child, "event_id", entity.id() as usize);
-                if !Self::description().is_empty() {
-                    parser.define_child(child.clone(), "description", Self::description());
-                }
-                if !Self::caveats().is_empty() {
-                    parser.define_child(child.clone(), "caveats", Self::caveats());
-                }
 
                 Self::compile(parser);
             }

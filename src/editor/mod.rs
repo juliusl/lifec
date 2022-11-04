@@ -4,6 +4,9 @@ pub use workspace_editor::WorkspaceEditor;
 mod host_editor;
 pub use host_editor::HostEditor;
 
+mod canvas;
+pub use canvas::Canvas;
+
 mod node;
 pub use node::Node;
 pub use node::NodeStatus;

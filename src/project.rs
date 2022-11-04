@@ -259,12 +259,12 @@ pub fn default_world() -> World {
 pub fn default_node_handlers() -> HashMap<String, NodeCommandHandler> {
     let mut handlers = HashMap::<String, NodeCommandHandler>::default();
 
-    handlers.insert("delete_spawned".to_string(), |events, entity| {
-       events.delete(entity); 
+    handlers.insert("delete_spawned".to_string(), |state, entity| {
+        state.delete(entity); 
     });
 
-    handlers.insert("cleanup_connection".to_string(), |events, entity| {
-        events.cleanup_connection(entity); 
+    handlers.insert("cleanup_connection".to_string(), |state, entity| {
+        state.cleanup_connection(entity); 
      });
 
     handlers

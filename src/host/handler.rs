@@ -80,14 +80,6 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
                 listener.on_operation(operation);
             }
 
-            if let Some(runmd) = plugin_messages.try_next_runmd_file() {
-                listener.on_runmd(&runmd);
-            }
-
-            if let Some(start) = plugin_messages.try_next_start_command() {
-                listener.on_start_command(&start);
-            }
-
             if let Some(status_update) = plugin_messages.try_next_status_update() {
                 listener.on_status_update(&status_update);
             }

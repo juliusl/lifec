@@ -18,19 +18,19 @@ pub use features::Features as PluginFeatures;
 /// System data for plugins,
 ///
 #[derive(SystemData)]
-pub struct Plugins<'a>(
-    PluginFeatures<'a>,
-    Entities<'a>,
-    ReadStorage<'a, Thunk>,
-    ReadStorage<'a, Block>,
-    WriteStorage<'a, AttributeGraph>,
-);
+pub struct Plugins<'a> { 
+    features: PluginFeatures<'a>,
+    entities: Entities<'a>,
+    thunks: ReadStorage<'a, Thunk>,
+    blocks: ReadStorage<'a, Block>,
+    graphs: WriteStorage<'a, AttributeGraph>,
+}
 
 impl<'a> Plugins<'a> {
     /// Returns a reference to plugin features,
     /// 
     pub fn features(&self) -> &PluginFeatures<'a> {
-        let Plugins(features, ..) = self;
+        let Plugins { features, .. } = self;
 
         features
     }
@@ -38,7 +38,7 @@ impl<'a> Plugins<'a> {
     /// Updates a graph,
     /// 
     pub fn update_graph(&mut self, graph: AttributeGraph) -> bool {
-        let Plugins(_, entities, .., graphs) = self;
+        let Plugins { entities, graphs, .. } = self;
         let entity = entities.entity(graph.entity_id());
         if let Some(_) = graphs.insert(entity, graph).expect("should be able to insert") {
             true
@@ -50,7 +50,7 @@ impl<'a> Plugins<'a> {
     /// Returns a new context,
     /// 
     pub fn new_context(&self) -> ThunkContext {
-        let Plugins(_, entities, ..)  = self;
+        let Plugins { entities, .. } = self;
 
         let entity = entities.create();
 
@@ -64,10 +64,10 @@ impl<'a> Plugins<'a> {
         entity: Entity,
         initial_context: Option<&ThunkContext>,
     ) -> ThunkContext {
-        let Plugins(plugin_features, .., blocks, graphs) = self;
+        let Plugins { features, blocks, graphs, .. }  = self;
 
         let mut context =
-            plugin_features.enable(entity, initial_context.unwrap_or(&ThunkContext::default()));
+            features.enable(entity, initial_context.unwrap_or(&ThunkContext::default()));
 
         if let Some(block) = blocks.get(entity) {
             context = context.with_block(block);
@@ -87,34 +87,34 @@ impl<'a> Plugins<'a> {
         sequence: &Sequence,
         initial_context: Option<&ThunkContext>,
     ) -> Operation {
-        let Plugins(plugin_features, .., thunk_components, block_components, graph_components) =
+        let Plugins { features, thunks, blocks, graphs, .. } =
             self;
 
         let sequence = sequence.clone();
-        let handle = plugin_features.handle();
+        let handle = features.handle();
         let entity = sequence.peek().expect("should have at least 1 entity");
 
         let thunk_context = self.initialize_context(entity, initial_context);
 
-        let mut thunks = HashMap::<Entity, Thunk>::default();
-        let mut graphs = HashMap::<Entity, AttributeGraph>::default();
-        let mut blocks = HashMap::<Entity, Block>::default();
+        let mut thunk_map = HashMap::<Entity, Thunk>::default();
+        let mut graph_map = HashMap::<Entity, AttributeGraph>::default();
+        let mut block_map = HashMap::<Entity, Block>::default();
         for call in sequence.iter_entities() {
-            let thunk = thunk_components
+            let thunk = thunks
                 .get(call)
                 .expect("should have a thunk")
                 .clone();
-            let graph = graph_components
+            let graph = graphs
                 .get(call)
                 .expect("should have a graph")
                 .clone();
-            let block = block_components
+            let block = blocks
                 .get(call)
                 .expect("should have a block")
                 .clone();
-            thunks.insert(call, thunk);
-            graphs.insert(call, graph);
-            blocks.insert(call, block);
+            thunk_map.insert(call, thunk);
+            graph_map.insert(call, graph);
+            block_map.insert(call, block);
         }
 
         let (tx, rx) = tokio::sync::oneshot::channel::<()>();
@@ -130,9 +130,9 @@ impl<'a> Plugins<'a> {
 
                     context.set_entity(e);
 
-                    let thunk = thunks.get(&e).expect("should have a thunk");
-                    let graph = graphs.get(&e).expect("should exist");
-                    let block = blocks.get(&e).expect("should exist");
+                    let thunk = thunk_map.get(&e).expect("should have a thunk");
+                    let graph = graph_map.get(&e).expect("should exist");
+                    let block = block_map.get(&e).expect("should exist");
 
                     context.set_state(graph.clone());
                     context.set_block(block);

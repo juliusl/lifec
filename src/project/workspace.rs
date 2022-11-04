@@ -307,14 +307,12 @@ mod tests {
             event!(Level::TRACE, "Completed event - {}", e.id());
         }
 
-        fn on_runmd(&mut self, _: &RunmdFile) {}
         fn on_operation(&mut self, mut operation: Operation) {
             if let Some(result) = operation.wait() {
                 event!(Level::TRACE, "{:#?}", result.state().values());
             }
         }
         fn on_error_context(&mut self, _: &ErrorContext) {}
-        fn on_start_command(&mut self, _: &Start) {}
     }
 
     #[test]

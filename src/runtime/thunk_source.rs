@@ -18,6 +18,12 @@ pub struct ThunkSource {
 }
 
 impl ThunkSource {
+    pub fn thunk(&self) -> Thunk {
+        self.thunk
+    }
+}
+
+impl ThunkSource {
     /// Returns a new event source,
     /// 
     pub fn new<P>() -> Self 

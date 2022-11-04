@@ -498,6 +498,7 @@ impl Into<General> for &Engine {
     fn into(self) -> General {
         General {
             name: self.name.to_string(),
+            expression: self.name.to_string(),
         }
     }
 }

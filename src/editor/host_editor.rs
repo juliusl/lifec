@@ -1,5 +1,8 @@
 use atlier::system::App;
-use imgui::{ChildWindow, StyleVar, Ui, Window};
+use imgui::{
+    ChildWindow, StyleVar, TableColumnFlags, TableColumnSetup, TableFlags, TreeNodeFlags, Ui,
+    Window,
+};
 use reality::wire::{Protocol, WireObject};
 use specs::{Entity, Read, System};
 use std::collections::{BTreeMap, HashMap};
@@ -9,11 +12,11 @@ use tracing::{event, Level};
 use crate::engine::Performance;
 use crate::prelude::EventRuntime;
 use crate::{
-    prelude::{State, Node},
+    prelude::{Node, State},
     state::AttributeGraph,
 };
 
-use super::Profiler;
+use super::{Canvas, Profiler};
 
 /// Tool for viewing and interacting with a host,
 ///
@@ -40,6 +43,8 @@ pub struct HostEditor {
     /// Command to reset state on all events,
     ///
     reset: Option<()>,
+
+    canvas: Canvas,
 }
 
 impl Hash for HostEditor {
@@ -75,28 +80,29 @@ impl HostEditor {
 
     /// Shows events window,
     ///
-    pub fn events_window(&mut self, title: impl AsRef<str>, ui: &Ui) {
-        Window::new(title)
-            .size([1400.0, 700.0], imgui::Condition::Appearing)
+    pub fn events_window(&mut self, suffix: impl AsRef<str>, ui: &Ui) {
+        let suffix = suffix.as_ref();
+        Window::new(format!("Events {suffix}"))
+            .size([1500.0, 700.0], imgui::Condition::Appearing)
             .build(ui, || {
                 // Toolbar for controlling event runtime
                 self.tool_bar(ui);
 
-                // Left-Section for viewing current events and some informatino on each,
+                ui.spacing();
                 ui.separator();
-                ChildWindow::new(&format!("Event Section"))
-                    .size([500.0, 0.0])
-                    .always_auto_resize(true)
+                ChildWindow::new(&format!("Events List {suffix}"))
+                    .size([900.0, 0.0])
                     .build(ui, || {
-                        // TODO: Can add additional view formats for this, ex: table view
                         self.event_list(ui);
                     });
 
-                // Right section for viewing performance related information,
                 ui.same_line();
-                ChildWindow::new(&format!("Performance Section")).build(ui, || {
-                    self.performance_section(ui);
-                });
+                ChildWindow::new(&format!("Performance {suffix}"))
+                    .size([0.0, 0.0])
+                    .border(true)
+                    .build(ui, || {
+                        self.performance_section(ui);
+                    });
             });
     }
 
@@ -115,8 +121,8 @@ impl App for HostEditor {
     fn edit_ui(&mut self, ui: &imgui::Ui) {
         let window_padding = ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
         let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
-        self.events_window("Events", ui);
-
+        self.events_window("", ui);
+        // self.canvas.edit_ui(ui);
         window_padding.end();
         frame_padding.end();
     }
@@ -262,13 +268,61 @@ impl HostEditor {
         }
 
         for (title, nodes) in events {
-            if imgui::CollapsingHeader::new(format!("Engine: {title}")).build(ui) {
-                for node in nodes {
-                    node.edit_ui(ui);
-                    ui.new_line();
-                    ui.separator();
-                }
-            }
+            let tree_flags = TreeNodeFlags::SPAN_FULL_WIDTH
+                | TreeNodeFlags::FRAME_PADDING
+                | TreeNodeFlags::NO_TREE_PUSH_ON_OPEN;
+
+            imgui::TreeNode::new(format!("Engine: {title}"))
+                .flags(tree_flags)
+                .build(ui, || {
+                    /// Name column definition
+                    ///
+                    fn name_column(ui: &Ui) {
+                        let mut table_column_setup = TableColumnSetup::new("Name");
+                        table_column_setup.flags =
+                            TableColumnFlags::NO_HIDE | TableColumnFlags::WIDTH_FIXED;
+                        ui.table_setup_column_with(table_column_setup);
+                    }
+
+                    /// Property column definition
+                    ///
+                    fn property_column(name: &'static str, ui: &Ui) {
+                        let mut table_column_setup = TableColumnSetup::new(name);
+                        table_column_setup.flags = TableColumnFlags::DEFAULT_HIDE;
+                        ui.table_setup_column_with(table_column_setup);
+                    }
+
+                    /// Controls column definition
+                    ///
+                    fn controls_column(ui: &Ui) {
+                        let mut table_column_setup = TableColumnSetup::new("Controls");
+                        table_column_setup.flags =
+                            TableColumnFlags::NO_CLIP | TableColumnFlags::WIDTH_STRETCH;
+                        ui.table_setup_column_with(table_column_setup);
+                    }
+
+                    let table_flags = TableFlags::BORDERS_V
+                        | TableFlags::RESIZABLE
+                        | TableFlags::SIZING_STRETCH_PROP
+                        | TableFlags::HIDEABLE;
+
+                    if let Some(_) = ui.begin_table_with_flags("", 5, table_flags) {
+                        name_column(ui);
+                        property_column("Status", ui);
+                        property_column("Transition", ui);
+                        property_column("Cursor", ui);
+                        controls_column(ui);
+                        ui.table_headers_row();
+
+                        for node in nodes {
+                            ui.table_next_row();
+                            ui.table_next_column();
+                            node.edit_ui(ui);
+                        }
+                    }
+                });
+            ui.spacing();
+            ui.separator();
         }
     }
 
@@ -314,7 +368,8 @@ impl HostEditor {
                 let profilers = self.adhoc_nodes.iter().cloned().collect::<Vec<_>>();
 
                 protocol.encoder::<Performance>(move |w, e| {
-                    for node in profilers.iter()
+                    for node in profilers
+                        .iter()
                         .filter_map(|p| p.connection.clone())
                         .map(|p| Performance::samples(100, &[50.0, 60.0, 90.0, 99.0], &p))
                         .flatten()
@@ -347,6 +402,7 @@ impl Default for HostEditor {
             pause: Default::default(),
             reset: Default::default(),
             nodes: Default::default(),
+            canvas: Default::default(),
         }
     }
 }

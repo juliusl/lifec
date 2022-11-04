@@ -4,7 +4,7 @@ use crate::{engine::EngineStatus, prelude::EventStatus};
 
 /// Enumeration of node statuses,
 ///
-#[derive(Component, Default, Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Component, Debug, Default, Hash, PartialEq, Eq, Clone, Copy)]
 #[storage(DenseVecStorage)]
 pub enum NodeStatus {
     /// Engine status,

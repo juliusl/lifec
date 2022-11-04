@@ -39,7 +39,7 @@ impl AttributeGraph {
 
     /// Returns a reference to index,
     /// 
-    pub fn index(&mut self) -> &BlockIndex {
+    pub fn index(&self) -> &BlockIndex {
         &self.index
     }
 

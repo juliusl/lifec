@@ -12,7 +12,6 @@ use tokio::{
     runtime::Handle,
     select,
     sync::{
-        self,
         mpsc::Sender,
         oneshot::{self, channel},
     },
@@ -69,18 +68,12 @@ pub struct ThunkContext {
 
     /// Sender for status updates for the thunk
     status_updates: Option<Sender<StatusUpdate>>,
-    /// Dispatcher for runmd
-    dispatcher: Option<Sender<RunmdFile>>,
     /// Dispatcher for operations
     operation_dispatcher: Option<Sender<Operation>>,
-    /// Dispatcher for start commands
-    start_command_dispatcher: Option<Sender<Start>>,
     /// Dispatcher for sending a guest, 
     guest_dispatcher: Option<Sender<Guest>>,
     /// Dispatcher for sending a node command, 
     node_dispatcher: Option<Sender<(NodeCommand, Option<Yielding>)>>,
-    /// Channel to send bytes to a listening char_device
-    char_device: Option<Sender<(u32, u8)>>,
     /// Watches for changes to the world's HostEditor,
     host_editor_watcher: Option<tokio::sync::watch::Receiver<HostEditor>>,
     /// UDP socket,
@@ -116,10 +109,7 @@ impl Clone for ThunkContext {
             local_tcp_addr: self.local_tcp_addr.clone(),
             local_udp_addr: self.local_udp_addr.clone(),
             status_updates: self.status_updates.clone(),
-            dispatcher: self.dispatcher.clone(),
             operation_dispatcher: self.operation_dispatcher.clone(),
-            start_command_dispatcher: self.start_command_dispatcher.clone(),
-            char_device: self.char_device.clone(),
             udp_socket: self.udp_socket.clone(),
             host_editor_watcher: self.host_editor_watcher.clone(),
             guest_dispatcher: self.guest_dispatcher.clone(),
@@ -144,11 +134,8 @@ impl Debug for ThunkContext {
             .field("local_tcp_addr", &self.local_tcp_addr)
             .field("local_udp_addr", &self.local_udp_addr)
             .field("status_updates", &self.status_updates)
-            .field("dispatcher", &self.dispatcher)
             .field("operation_dispatcher", &self.operation_dispatcher)
-            .field("start_command_dispatcher", &self.start_command_dispatcher)
             .field("guest_dispatcher", &self.guest_dispatcher)
-            .field("char_device", &self.char_device)
             .field("udp_socket", &self.udp_socket)
             .field("response_cache", &self.response_cache)
             .field("body_cache", &self.body_cache)
@@ -417,16 +404,6 @@ impl ThunkContext {
         self
     }
 
-    /// Returns a context w/ a dispatcher
-    ///
-    /// Plugins using this context will be able to dispatch attribute graphs to the underlying
-    /// runtime.
-    ///
-    pub fn enable_dispatcher(&mut self, dispatcher: Sender<RunmdFile>) -> &mut ThunkContext {
-        self.dispatcher = Some(dispatcher);
-        self
-    }
-
     /// Returns a context w/ an operation dispatcher
     ///
     /// Plugins using this context will be able to dispatch operations for the underlying system to
@@ -450,16 +427,6 @@ impl ThunkContext {
         self
     }
 
-    /// Returns a context w/ the start command dispatcher enabled
-    ///
-    pub fn enable_start_command_dispatcher(
-        &mut self,
-        start_commands: Sender<Start>,
-    ) -> &mut ThunkContext {
-        self.start_command_dispatcher = Some(start_commands);
-        self
-    }
-
     /// Returns a context w/ the guest sender enabled
     /// 
     pub fn enable_guest_dispatcher(&mut self, guest: Sender<Guest>) -> &mut ThunkContext{
@@ -472,16 +439,6 @@ impl ThunkContext {
     pub fn enable_node_dispatcher(&mut self, nodes: Sender<(NodeCommand, Option<Yielding>)>) -> &mut ThunkContext{
         self.node_dispatcher = Some(nodes);
         self
-    }
-
-    /// Enables output to a char_device, a plugin can use to output bytes to.
-    ///
-    /// The implementation of the char_device, can choose how to handle this output,
-    /// but in general this is mainly useful for tty type of situations. For example,
-    /// the Process and Remote plugins write to this device.
-    ///
-    pub fn enable_output(&mut self, tx: Sender<(u32, u8)>) {
-        self.char_device = Some(tx);
     }
 
     /// Enable a workspace for this context,
@@ -652,21 +609,6 @@ impl ThunkContext {
         }
     }
 
-    /// Sends a character to a the char_device if it exists
-    ///
-    /// Caveat: If `enable_output`/`enable_async` haven't been called this is a no-op
-    ///
-    pub async fn send_char(&self, c: u8) {
-        if let Some(entity) = self.entity {
-            if let Some(char_device) = &self.char_device {
-                match char_device.send((entity.id(), c)).await {
-                    Ok(_) => event!(Level::TRACE, "sent char for {:?}", entity),
-                    Err(err) => event!(Level::ERROR, "error sending char, {err}, {:?}", entity),
-                }
-            }
-        }
-    }
-
     /// Returns a secure http client. By default this context will only
     /// support http using a secure client,
     ///
@@ -685,35 +627,6 @@ impl ThunkContext {
     ///
     pub fn handle(&self) -> Option<Handle> {
         self.handle.as_ref().and_then(|h| Some(h.clone()))
-    }
-
-    /// Dipatches .runmd to a listener capable of interpreting and creating blocks at runtime
-    ///
-    /// Note: Since thunk context is clonable, it's easy to inject into other libraries such as logos and poem.
-    /// For example, if running a runtime within a plugin that hosts a web api, you can use this method within
-    /// request handlers to dispatch blocks to the hosting runtime.
-    ///
-    pub async fn dispatch(&self, symbol: impl AsRef<str>, source: impl AsRef<str>) {
-        if let Some(dispatcher) = &self.dispatcher {
-            dispatcher
-                .send(RunmdFile::new_src(symbol, source.as_ref().to_string()))
-                .await
-                .ok();
-        }
-    }
-
-    /// Dispatches a start command,
-    ///
-    pub async fn dispatch_start_command(&self, start_command: Start) {
-        if let Some(dispatcher) = &self.start_command_dispatcher {
-            dispatcher.send(start_command).await.ok();
-        }
-    }
-
-    /// Returns the underlying dispatch transmitter
-    ///
-    pub fn dispatcher(&self) -> Option<sync::mpsc::Sender<RunmdFile>> {
-        self.dispatcher.clone()
     }
 
     /// Returns a node dispatcher,

@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
+use crate::prelude::Thunk;
 use crate::prelude::{AttributeParser, BlockObject, CustomAttribute, Plugin, SpecialAttribute};
 use specs::{Component, DefaultVecStorage, WorldExt};
 use tracing::event;
@@ -17,6 +18,12 @@ pub struct Runtime {
     plugins: BTreeMap<String, ThunkSource>,
     /// Set of custom attributes to use, added from install()
     custom_attributes: BTreeMap<String, CustomAttribute>,
+}
+
+impl Runtime {
+    pub fn iter_thunks(&self) -> Vec<Thunk> {
+        self.plugins.iter().map(|(_, t)| t.thunk()).collect()
+    }
 }
 
 impl SpecialAttribute for Runtime {

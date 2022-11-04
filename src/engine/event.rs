@@ -119,6 +119,7 @@ impl Into<General> for &Event {
     fn into(self) -> General {
         General { 
             name: self.0.to_string(),
+            expression: format!("::{}", self.0)
         }
     }
 }

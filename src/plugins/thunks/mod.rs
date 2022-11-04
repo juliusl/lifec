@@ -16,12 +16,14 @@ use std::hash::Hash;
 use tokio::task::JoinHandle;
 
 /// Thunk is a function that can be passed around for the system to call later
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Copy)]
 #[storage(VecStorage)]
 pub struct Thunk(
-    // Symbol that represents this thunk
+    /// Symbol that represents this thunk
     pub &'static str,
-    // thunk fn
+    /// Description
+    pub &'static str,
+    /// thunk fn
     pub fn(&mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
 );
 
@@ -36,7 +38,7 @@ impl Thunk {
     where
         P: Plugin + ?Sized,
     {
-        Self(P::symbol(), P::call)
+        Self(P::symbol(), P::description(), P::call)
     }
 }
 
@@ -64,6 +66,7 @@ impl Into<General> for &Thunk {
     fn into(self) -> General {
         General {
             name: self.0.to_string(),
+            expression: format!("{}", self.0),
         }
     }
 }

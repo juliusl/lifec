@@ -114,7 +114,7 @@ impl WireObject for NodeCommand {
                 let entity = world.entities().entity(graph.entity_id());
                 let frame = encode_node_command(0x70, entity, appendix.deref().clone(), encoder);
                 encoder.frames.push(frame);
-                let mut index = graph.clone();
+                let index = graph.clone();
                 let index = index.index();
                 let symbol = index.root().name().to_string();
                 encoder.interner.add_ident(&symbol);

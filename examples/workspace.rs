@@ -2,13 +2,15 @@ use lifec::prelude::*;
 use tracing_subscriber::EnvFilter;
 
 /// Example showing opening an editor for a workspace,
-/// 
+///
 fn main() {
     tracing_subscriber::fmt::Subscriber::builder()
-        .with_env_filter(EnvFilter::builder()
-        .with_default_directive("lifec=debug".parse().expect("should parse"))
-        .from_env()
-        .expect("should work"))
+        .with_env_filter(
+            EnvFilter::builder()
+                .with_default_directive("lifec=debug".parse().expect("should parse"))
+                .from_env()
+                .expect("should work"),
+        )
         .compact()
         .init();
     let mut workspace = Workspace::new("test.io", None);
@@ -166,8 +168,6 @@ impl Listener for Test {
         println!("Completed event - {}", e.id());
     }
 
-    fn on_runmd(&mut self, _: &RunmdFile) {}
     fn on_operation(&mut self, _: Operation) {}
     fn on_error_context(&mut self, _: &ErrorContext) {}
-    fn on_start_command(&mut self, _: &Start) {}
 }

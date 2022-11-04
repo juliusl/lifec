@@ -1,5 +1,4 @@
-use atlier::system::App;
-use imgui::{TreeNode, Ui};
+use imgui::{TreeNode, TreeNodeFlags, Ui};
 
 use crate::{prelude::EventStatus, state::AttributeGraph};
 
@@ -19,56 +18,73 @@ pub trait EventNode {
 
 impl EventNode for Node {
     fn edit_event(&mut self, ui: &Ui, event: EventStatus) {
-        if let Some(state) = self.appendix.state(&event.entity()) {
-            if !state.control_symbol.is_empty() {
-                ui.text(format!("engine: {}", state.control_symbol));
-            }
-        }
-
-        match self.connection_state {
+        let tree_node = match self.connection_state {
             Some(connection_state) if connection_state.is_spawned() => {
                 let source = connection_state.source();
-                if let Some(general) = self.appendix.general(&source) {
-                    general.display_ui(ui);
-                }
-                ui.text(format!(
-                    "id: {} (Source: {})",
-                    event.entity().id(),
-                    source.id()
-                ));
+                let tree_node = TreeNode::new(format!("{:?}", event.entity()))
+                    .label::<String, _>(format!("{}", self.appendix.name(&source).unwrap_or("--")))
+                    .flags(TreeNodeFlags::SPAN_FULL_WIDTH | TreeNodeFlags::FRAME_PADDING)
+                    .push(ui);
+                // ui.table_next_column();
+                // if let Some(general) = self.appendix.general(&source) {
+                //     general.display_ui(ui);
+                // }
+                tree_node
             }
             _ => {
-                if let Some(general) = self.appendix.general(&event.entity()) {
-                    general.display_ui(ui);
-                }
-                ui.text(format!("id: {}", event.entity().id()));
+                let tree_node = TreeNode::new(format!("{:?}", event.entity()))
+                    .label::<String, _>(format!(
+                        "{}",
+                        self.appendix.name(&event.entity()).unwrap_or("--")
+                    ))
+                    .flags(TreeNodeFlags::SPAN_FULL_WIDTH | TreeNodeFlags::FRAME_PADDING)
+                    .push(ui);
+                // ui.table_next_column();
+                // if let Some(general) = self.appendix.general(&event.entity()) {
+                //     general.display_ui(ui);
+                // }
+                tree_node
             }
-        }
+        };
 
-        if let Some(adhoc) = self.adhoc.as_ref() {
-            let tag = adhoc.tag();
-            if !tag.as_ref().is_empty() {
-                ui.text(format!("tag: {}", tag.as_ref()));
-            }
-        }
+        // if let Some(adhoc) = self.adhoc.as_ref() {
+        //     let tag = adhoc.tag();
+        //     if !tag.as_ref().is_empty() {
+        //         ui.text(format!("tag: {}", tag.as_ref()));
+        //     }
+        // }
 
-        ui.text(format!("status: {event}"));
+        ui.table_next_column();
+        ui.text(format!("{event}"));
 
-        if let Some(cursor) = self.cursor.as_ref() {
-            ui.text(format!("cursor - {}", cursor));
-        }
+        ui.table_next_column();
         if let Some(transition) = self.transition.as_ref() {
-            ui.text(format!("transition: {:?}", transition));
+            ui.text(format!("{:?}", transition));
+        } else {
+            ui.text_disabled("--");
         }
 
+        ui.table_next_column();
+        if let Some(cursor) = self.cursor.as_ref() {
+            ui.text(format!("{}", cursor));
+        }
+
+        ui.table_next_column();
         self.event_buttons(ui, event);
 
-        // Thunk state
-        if let Some(sequence) = self.sequence.as_ref() {
-            TreeNode::new(format!("Thunks {}", event.entity().id())).build(ui, || {
+        if let Some(tree_node) = tree_node {
+            // Thunk state
+            if let Some(sequence) = self.sequence.as_ref() {
                 for (i, s) in sequence.iter_entities().enumerate() {
+                    ui.table_next_row();
+                    ui.table_next_column();
                     if let Some(name) = self.appendix.name(&s) {
-                        TreeNode::new(format!("{i} - {name}")).build(ui, || {
+                        let tree_node = TreeNode::new(format!("{:?}", s))
+                            .label::<String, _>(format!("{name}"))
+                            .flags(TreeNodeFlags::SPAN_FULL_WIDTH)
+                            .push(ui);
+
+                        if let Some(tree_node) = tree_node {
                             if let Some(state) = self.appendix.state(&s) {
                                 let mut graph = self
                                     .mutations
@@ -77,12 +93,7 @@ impl EventNode for Node {
                                     .unwrap_or(state.graph.clone().unwrap());
                                 let previous = graph.clone();
 
-                                TreeNode::new(format!("Control values {}", i)).build(ui, || {
-                                    for (name, value) in graph.index_mut().control_values_mut().iter_mut() {
-                                        AttributeGraph::edit_value(name, value, ui);
-                                    }
-                                });
-                                
+                                ui.table_set_column_index(4);
                                 for (name, property) in
                                     graph.resolve_properties_mut().iter_properties_mut()
                                 {
@@ -119,59 +130,63 @@ impl EventNode for Node {
                                     self.command = Some(NodeCommand::Update(graph.clone()));
                                 }
                             }
-                        });
+
+                            tree_node.pop();
+                        }
                     }
                 }
-            });
+            }
+
+            tree_node.pop();
         }
     }
 
     fn event_buttons(&mut self, ui: &Ui, event: EventStatus) {
         match event {
             EventStatus::Inactive(_) => {
-                if ui.button(format!("Start {}", event.entity().id())) {
+                if ui.small_button(format!("Start {:2}", event.entity().id())) {
                     self.activate(event.entity());
                 }
 
                 if self.is_adhoc() {
                     ui.same_line();
-                    if ui.button(format!("Spawn {}", event.entity().id())) {
+                    if ui.small_button(format!("Spawn {:2}", event.entity().id())) {
                         self.spawn(event.entity());
                     }
                 }
 
                 ui.same_line();
-                if ui.button(format!("Pause {}", event.entity().id())) {
+                if ui.small_button(format!("Pause {:2}", event.entity().id())) {
                     self.pause(event.entity());
                 }
             }
             EventStatus::Paused(_) => {
-                if ui.button(format!("Resume {}", event.entity().id())) {
+                if ui.small_button(format!("Resume {:2}", event.entity().id())) {
                     self.resume(event.entity());
                 }
                 ui.same_line();
-                if ui.button(format!("Cancel {}", event.entity().id())) {
+                if ui.small_button(format!("Cancel {:2}", event.entity().id())) {
                     self.pause(event.entity());
                 }
             }
             EventStatus::InProgress(_) => {
-                if ui.button(format!("Pause {}", event.entity().id())) {
+                if ui.small_button(format!("Pause {:2}", event.entity().id())) {
                     self.pause(event.entity());
                 }
 
                 ui.same_line();
-                if ui.button(format!("Cancel {}", event.entity().id())) {
+                if ui.small_button(format!("Cancel {:2}", event.entity().id())) {
                     self.cancel(event.entity());
                 }
             }
             EventStatus::Cancelled(_) | EventStatus::Completed(_) => {
-                if ui.button(format!("Reset {}", event.entity().id())) {
+                if ui.small_button(format!("Reset {:2}", event.entity().id())) {
                     self.reset(event.entity());
                 }
 
                 if self.is_spawned() && {
                     ui.same_line();
-                    ui.button(format!("Delete {}", event.entity().id()))
+                    ui.small_button(format!("Delete {:2}", event.entity().id()))
                 } {
                     self.custom("delete_spawned", event.entity());
                 }
