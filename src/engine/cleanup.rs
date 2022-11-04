@@ -1,4 +1,4 @@
-use specs::System;
+use specs::{System, Entities};
 use tracing::{event, Level};
 
 use crate::prelude::NodeCommand;
@@ -11,12 +11,12 @@ use super::{State, EventStatus};
 pub struct Cleanup;
 
 impl<'a> System<'a> for Cleanup {
-    type SystemData = State<'a>;
+    type SystemData = (Entities<'a>, State<'a>);
 
-    fn run(&mut self, events: Self::SystemData) {
+    fn run(&mut self, (entities, events): Self::SystemData) {
         for (spawned, _, owner) in events.iter_spawned_events() {
             match events.status(*spawned) {
-                EventStatus::Completed(_) | EventStatus::Cancelled(_) => {
+                EventStatus::Completed(_) | EventStatus::Cancelled(_) if entities.is_alive(*spawned) => {
                     match events.plugins().features().broker().try_send_node_command(
                         NodeCommand::custom("delete_spawned", *spawned),
                         None,
@@ -29,7 +29,7 @@ impl<'a> System<'a> for Cleanup {
                         }
                     }
                 }
-                EventStatus::Disposed(_) => {
+                EventStatus::Disposed(_) if entities.is_alive(*owner)  => {
                     match events.plugins().features().broker().try_send_node_command(
                         NodeCommand::custom("cleanup_connection", *owner),
                         None,
