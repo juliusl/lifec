@@ -116,13 +116,21 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
                     | NodeCommand::Cancel(entity)
                     | NodeCommand::Spawn(entity)
                     | NodeCommand::Custom(_, entity) => {
-                        commands
-                            .insert(entity, command)
-                            .expect("should be able to insert");
-                        if let Some(yielding) = yielding {
-                            yieldings
-                                .insert(entity, yielding)
-                                .expect("should be able to insert");
+                        match commands.insert(entity, command.clone()) {
+                            Ok(_) => {
+                                if let Some(yielding) = yielding {
+                                    yieldings
+                                        .insert(entity, yielding)
+                                        .expect("should be able to insert");
+                                }
+                            }
+                            Err(err) => {
+                                event!(
+                                    Level::ERROR,
+                                    "Couldn't insert command {command}, {err} {}",
+                                    entity.id()
+                                );
+                            }
                         }
                     }
                     NodeCommand::Update(graph) => {
