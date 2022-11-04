@@ -74,7 +74,7 @@ impl Debugger {
                     ui.new_line();
                     if !control_values.is_empty() {
                         ui.text("Control Values");
-                        ui.disabled(true, || {
+                        ui.disabled(false, || {
                             for (name, value) in control_values.iter() {
                                 AttributeGraph::edit_value(format!("{name}"), &mut value.clone(), None, ui);
                             }
@@ -82,13 +82,13 @@ impl Debugger {
                     }
              
                     ui.text("Input");
-                    ui.disabled(true, || {
+                    ui.disabled(false, || {
                         for (i, (name, property)) in query.clone().iter_properties_mut().enumerate()
                         {
                             property.edit(
                                 move |value| {
                                     AttributeGraph::edit_value(
-                                        format!("{name} {i}"),
+                                        format!("{name} {i}.{}.{}", event.id(), thunk.id()),
                                         value,
                                         None,
                                         ui,
@@ -99,7 +99,7 @@ impl Debugger {
                                     ui.group(|| {
                                         for (idx, value) in values.iter_mut().enumerate() {
                                             AttributeGraph::edit_value(
-                                                format!("{name} {i}-{idx}"),
+                                                format!("{name} {i}-{idx}.{}.{}", event.id(), thunk.id()),
                                                 value,
                                                 None,
                                                 ui,
@@ -116,26 +116,26 @@ impl Debugger {
                     ui.new_line();
                     ui.text("Output");
                     if let Some(returns) = returns {
-                        ui.disabled(true, || {
+                        ui.disabled(false, || {
                             for (i, (name, property)) in
                                 returns.clone().iter_properties_mut().enumerate()
                             {
                                 property.edit(
                                     move |value| {
                                         AttributeGraph::edit_value(
-                                            format!("{name} {i}"),
+                                            format!("{name} c_{i}.{}.{}", event.id(), thunk.id()),
                                             value,
                                             None,
                                             ui,
                                         )
                                     },
                                     move |values| {
-                                        imgui::ListBox::new(format!("{name} {i}")).build(
+                                        imgui::ListBox::new(format!("{name} c_{i}.{}.{}", event.id(), thunk.id())).build(
                                             ui,
                                             || {
                                                 for (idx, value) in values.iter_mut().enumerate() {
                                                     AttributeGraph::edit_value(
-                                                        format!("{name} {i}-{idx}"),
+                                                        format!("{name} c_{i}-{idx}.{}.{}", event.id(), thunk.id()),
                                                         value,
                                                         None,
                                                         ui,
@@ -192,10 +192,10 @@ impl Listener for Debugger {
     }
 
     fn on_error_context(&mut self, _: &crate::prelude::ErrorContext) {
-        //
+        // TODO -- Display errors and fixes
     }
 
     fn on_completed_event(&mut self, _: &specs::Entity) {
-        //
+        // TODO -- Could use this to bring completions to the top? 
     }
 }

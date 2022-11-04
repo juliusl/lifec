@@ -1,9 +1,11 @@
 use std::{fmt::Display, ops::Deref};
 
 use atlier::system::Extension;
+use copypasta::{ClipboardContext, ClipboardProvider};
 use imgui::{TableColumnFlags, TableColumnSetup, TableFlags, Ui, Window};
 use specs::{Join, RunNow, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
+use tracing::{event, Level};
 
 use crate::{
     engine::Runner,
@@ -20,6 +22,8 @@ pub struct WorkspaceEditor {
     enable_demo: bool,
     /// Appendix
     appendix: Appendix,
+    /// Clipboard context to enable copy/paste
+    clipboard: Option<ClipboardContext>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,6 +48,31 @@ impl Extension for WorkspaceEditor {
                 if self.enable_demo {
                     ui.show_demo_window(&mut self.enable_demo);
                 }
+
+                if let Some(text) = ui.clipboard_text() {
+                    if let Some(clipboard_context) = self.clipboard.as_mut() {
+                        match clipboard_context.set_contents(text) {
+                            Ok(_) => {
+                                ui.set_clipboard_text(String::default());
+                            },
+                            Err(err) => {
+                                event!(Level::ERROR, "Could not set clipboard contents, {err}");
+                            },
+                        }
+                    } else {
+                        match ClipboardContext::new() {
+                            Ok(ctx) => {
+                                self.clipboard = Some(ctx);
+                            },
+                            Err(err) => {
+                                event!(Level::ERROR, "Error creating clipboard context {err}");
+                            },
+                        }
+                    }
+                }
+
+                ui.spacing();
+                ui.separator();
 
                 let runtime = world.read_resource::<Runtime>();
 
@@ -186,6 +215,7 @@ impl From<Appendix> for WorkspaceEditor {
         Self {
             enable_demo: false,
             appendix,
+            clipboard: None,
         }
     }
 }
