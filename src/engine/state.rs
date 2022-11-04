@@ -607,10 +607,17 @@ impl<'a> State<'a> {
             .insert(spawned, event.clone())
             .expect("should be able to insert");
 
-        // Enable cursor on spawned
+        // Enable cursor on spawned,
         if let Some(cursor) = self.cursors.get(source) {
             self.cursors
                 .insert(spawned, cursor.clone())
+                .expect("should be able to insert");
+        }
+
+        // Remove yielding and add it to this spawned event,
+        if let Some(yielding) = self.yielding.remove(source) {
+            self.yielding
+                .insert(spawned, yielding)
                 .expect("should be able to insert");
         }
 
@@ -1046,7 +1053,7 @@ impl<'a> State<'a> {
     }
 
     /// Returns the status for an engine,
-    /// 
+    ///
     pub fn engine_status(&self, engine: Entity) -> EngineStatus {
         let Self {
             entities,
@@ -1073,7 +1080,7 @@ impl<'a> State<'a> {
     }
 
     /// Returns a vector of engine nodes,
-    /// 
+    ///
     pub fn engine_nodes(&self) -> Vec<Node> {
         self.scan_engines()
             .filter_map(|e| self.engine_node(e.entity()))
@@ -1081,7 +1088,7 @@ impl<'a> State<'a> {
     }
 
     /// Returns the current engine node for an entity,
-    /// 
+    ///
     pub fn engine_node(&self, engine: Entity) -> Option<Node> {
         let State {
             appendix,
