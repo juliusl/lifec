@@ -1,8 +1,13 @@
-use crate::{prelude::*, project::Listener};
+use crate::{
+    engine::{Cleanup, Performance, Runner},
+    prelude::*,
+    project::Listener,
+};
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
+use reality::wire::Protocol;
 use specs::{Dispatcher, DispatcherBuilder, Entity, World, WorldExt};
-use std::{error::Error, path::PathBuf, str::from_utf8, sync::Arc};
+use std::{error::Error, path::PathBuf, str::from_utf8};
 
 mod inspector;
 pub use inspector::Inspector;
@@ -25,10 +30,8 @@ pub use editor::Editor;
 pub mod async_ext;
 
 mod handler;
+pub use handler::EventHandler;
 use handler::ListenerSetup;
-
-mod runner;
-pub use runner::Runner;
 
 mod host_settings;
 pub use host_settings::HostSettings;
@@ -42,6 +45,9 @@ pub struct Host {
     /// The compiled specs World,
     ///
     world: Option<World>,
+    /// Protocol for converting wire objects into frames,
+    ///
+    protocol: Option<Protocol>,
     /// Workspace to use that provides environment related values, work_dir, uri, etc..
     ///
     workspace: Workspace,
@@ -56,6 +62,80 @@ pub struct Host {
 /// ECS configuration,
 ///
 impl Host {
+    /// Returns protocol if exists,
+    ///
+    pub fn protocol(&self) -> Option<&Protocol> {
+        self.protocol.as_ref()
+    }
+
+    /// Returns protocol mut if exists,
+    ///
+    pub fn protocol_mut(&mut self) -> Option<&mut Protocol> {
+        self.protocol.as_mut()
+    }
+
+    /// Encodes commands to protocol,
+    ///
+    /// returns true if any commands were encoded,
+    ///
+    pub fn encode_commands(&mut self) -> bool {
+        if let Some(mut protocol) = self.protocol.take() {
+            let commands = {
+                let mut events = protocol.as_ref().system_data::<Runner>();
+                events.take_commands()
+            };
+
+            let encoding = !commands.is_empty();
+
+            protocol.encoder::<NodeCommand>(move |world, encoder| {
+                for (_, command) in commands {
+                    encoder.encode(&command, world);
+                }
+            });
+
+            self.protocol = Some(protocol);
+
+            encoding
+        } else {
+            false
+        }
+    }
+
+    /// Encodes performance to protocol,
+    ///
+    /// returns true if performances were encoded
+    ///
+    pub fn encode_performance(&mut self) -> bool {
+        if let Some(mut protocol) = self.protocol.take() {
+            let performances = {
+                let mut runner = protocol.as_ref().system_data::<Runner>();
+                runner.take_performance()
+            };
+
+            let encoding = !performances.is_empty();
+
+            protocol.encoder::<Performance>(move |world, encoder| {
+                for performance in performances {
+                    encoder.encode(&performance, world);
+                }
+            });
+
+            self.protocol = Some(protocol);
+
+            encoding
+        } else {
+            false
+        }
+    }
+
+    /// Consumes the host world and converts to a protocol,
+    ///
+    pub fn enable_protocol(&mut self) {
+        if let Some(world) = self.world.take() {
+            self.protocol = Some(Protocol::from(world));
+        }
+    }
+
     /// Returns a new dispatcher builder with core
     /// systems included.
     ///
@@ -67,7 +147,9 @@ impl Host {
     pub fn dispatcher_builder<'a, 'b>() -> DispatcherBuilder<'a, 'b> {
         let dispatcher_builder = DispatcherBuilder::new();
 
-        dispatcher_builder.with(EventRuntime::default(), "event_runtime", &[])
+        dispatcher_builder
+            .with(EventRuntime::default(), "event_runtime", &[])
+            .with(Cleanup::default(), "cleanup", &["event_runtime"])
     }
 
     /// Enables a project listener on the host when the dispatcher is prepared,
@@ -79,22 +161,28 @@ impl Host {
         self.listener_setup = Some(ListenerSetup::new::<L>());
     }
 
-    /// Get an Arc reference to the world,
-    ///
-    pub fn world_ref(&self) -> Arc<&World> {
-        Arc::new(self.world.as_ref().expect("should exist"))
-    }
-
     /// Returns a immutable reference to the world,
     ///
     pub fn world(&self) -> &World {
-        self.world.as_ref().expect("World should exist")
+        if let Some(world) = self.world.as_ref() {
+            world
+        } else if let Some(protocol) = self.protocol.as_ref() {
+            protocol.as_ref()
+        } else {
+            panic!("Uninitialized host")
+        }
     }
 
     /// Returns a mutable reference to the world,
     ///
     pub fn world_mut(&mut self) -> &mut World {
-        self.world.as_mut().expect("World should exist")
+        if let Some(world) = self.world.as_mut() {
+            world
+        } else if let Some(protocol) = self.protocol.as_mut() {
+            protocol.as_mut()
+        } else {
+            panic!("Uninitialized host")
+        }
     }
 
     /// Return the workspace for the host,
@@ -122,7 +210,7 @@ impl Host {
             .filter_map(|e| e.ok())
             .filter(|e| e.file_name().to_string_lossy().ends_with(".runmd"))
             .filter(|e| e.file_name().to_string_lossy() != ".runmd")
-            .filter(|e| e.file_type().and_then(|f| Ok(f.is_file())).ok() == Some(true))        
+            .filter(|e| e.file_type().and_then(|f| Ok(f.is_file())).ok() == Some(true))
         {
             let file_name = e.file_name();
             event!(Level::DEBUG, "Found file {:?}", &file_name);
@@ -130,19 +218,32 @@ impl Host {
             if let Some(src) = tokio::fs::read_to_string(&file_name).await.ok() {
                 let file = RunmdFile {
                     source: Some(src),
-                    symbol: file_name.to_str().expect("should be a string").trim_end_matches(".runmd").to_string()
+                    symbol: file_name
+                        .to_str()
+                        .expect("should be a string")
+                        .trim_end_matches(".runmd")
+                        .to_string(),
                 };
                 files.push(file);
                 event!(Level::TRACE, "Added {:?}", &file_name);
             } else {
-                event!(Level::WARN, "Could not read file {:?}, Skipping", &file_name);
+                event!(
+                    Level::WARN,
+                    "Could not read file {:?}, Skipping",
+                    &file_name
+                );
             }
         }
 
         let mut host = Self {
             workspace: Workspace::default(),
             start: None,
-            world: Some(P::compile_workspace(&Workspace::default(), files.iter(), None)),
+            world: Some(P::compile_workspace(
+                &Workspace::default(),
+                files.iter(),
+                None,
+            )),
+            protocol: None,
             listener_setup: None,
         };
 
@@ -212,6 +313,7 @@ impl Host {
             workspace,
             start: None,
             world: Some(P::compile(content, None)),
+            protocol: None,
             listener_setup: None,
         };
 
@@ -279,6 +381,7 @@ impl Host {
             workspace: workspace.clone(),
             start: None,
             world: Some(P::compile_workspace(&workspace, files.iter(), None)),
+            protocol: None,
             listener_setup: None,
         };
 
@@ -289,7 +392,7 @@ impl Host {
     /// Returns true if the host should exit,
     ///
     pub fn should_exit(&self) -> bool {
-        let events = self.world().system_data::<Events>();
+        let events = self.world().system_data::<State>();
 
         events.should_exit()
     }
@@ -399,7 +502,7 @@ impl Host {
             // Exits by shutting down the inner tokio runtime
             self.exit();
         } else {
-            panic!( "A start setting was not set for host")
+            panic!("A start setting was not set for host")
         }
     }
 
@@ -443,6 +546,7 @@ impl From<World> for Host {
             workspace: Workspace::default(),
             start: None,
             world: Some(world),
+            protocol: None,
             listener_setup: None,
         }
     }

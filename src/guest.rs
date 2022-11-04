@@ -1,19 +1,79 @@
-use std::sync::Arc;
 use std::hash::Hash;
 
-use specs::{Component, VecStorage, Entity};
+use specs::{Component, Entity, RunNow, HashMapStorage};
 
-use crate::prelude::Host;
+use crate::prelude::{Host, HostEditor, PluginFeatures, Plugins, Project, ThunkContext};
 
 /// Guest host as a component,
-/// 
-#[derive(Component, Clone)]
-#[storage(VecStorage)]
-pub struct Guest { 
+///
+#[derive(Component)]
+#[storage(HashMapStorage)]
+pub struct Guest {
     /// Owner of the guest host,
-    pub owner: Entity, 
-    /// Reference to the guest host,
-    pub guest_host: Arc<Host>,
+    pub owner: Entity,
+    /// Host w/ protocol enabled,
+    host: Host,
+    /// Run function
+    stateless: Run,
+}
+
+/// Runs systems without a dispatcher,
+/// 
+pub type Run =  fn(&mut Host);
+
+impl Guest {
+    /// Returns a new guest component,
+    ///
+    pub fn new<P>(owner: Entity, mut host: Host, stateless: Run) -> Self
+    where
+        P: Project,
+    {
+        host.enable_protocol();
+        let guest = Self {
+            owner,
+            host,
+            stateless,
+        };
+        guest
+    }
+
+    /// Gets a guest thunk context,
+    ///
+    pub fn guest_context(&mut self) -> ThunkContext {
+        let features = self.host.world().system_data::<Plugins>();
+
+        features.initialize_context(self.owner, None)
+    }
+
+    /// Returns a host editor for this guest,
+    ///
+    pub fn guest_editor(&self) -> HostEditor {
+        let features = self.host.world().system_data::<PluginFeatures>();
+
+        let mut host_editor = features.host_editor();
+
+        host_editor.run_now(self.host.world());
+
+        host_editor
+    }
+
+    /// Returns a host,
+    ///
+    pub fn host(&self) -> &Host {
+        &self.host
+    }
+
+    /// Returns a mutable host reference,
+    ///
+    pub fn host_mut(&mut self) -> &mut Host {
+        &mut self.host
+    }
+
+    /// Stateless run
+    /// 
+    pub fn run(&mut self) {
+        (self.stateless)(&mut self.host)
+    }
 }
 
 impl PartialEq for Guest {
@@ -28,6 +88,4 @@ impl Hash for Guest {
     }
 }
 
-impl Eq for Guest {
-    
-}
+impl Eq for Guest {}

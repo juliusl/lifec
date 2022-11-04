@@ -3,7 +3,7 @@ use crate::guest::Guest;
 use crate::prelude::{attributes::Fmt, *};
 use hyper::{Body, Response};
 use reality::Block;
-use specs::{Component, DenseVecStorage, Entity};
+use specs::Entity;
 use std::fmt::Debug;
 use std::{future::Future, net::SocketAddr, path::PathBuf, sync::Arc};
 use tokio::{
@@ -38,8 +38,7 @@ use super::{CancelSource, CancelToken, ErrorContext, SecureClient, StatusUpdate}
 /// that context will keep it's async deps for subsequent calls. This ensures that as long as a plugin only makes changes
 /// to the context once, on subsequent calls of the plugin, the context will remain the same.
 ///
-#[derive(Component, Default)]
-#[storage(DenseVecStorage)]
+#[derive(Default)]
 pub struct ThunkContext {
     /// # State Properties
 
@@ -383,11 +382,17 @@ impl ThunkContext {
         self.entity = Some(entity);
     }
 
+    /// Returns the entity,
+    /// 
+    pub fn entity(&self) -> Option<Entity> {
+        self.entity.clone()
+    }
+
     /// Enables a guest on this context's entity, returns true if the guest was dispatched,
     /// 
-    pub fn enable_guest(&self, guest_host: Arc<Host>) -> bool {
-        if let (Some(owner), Some(guest_dispatcher)) = (self.entity, self.guest_dispatcher.as_ref()) {
-            match guest_dispatcher.try_send(Guest{ owner, guest_host }) {
+    pub fn enable_guest(&self, guest: Guest) -> bool {
+        if let (Some(_), Some(guest_dispatcher)) = (self.entity, self.guest_dispatcher.as_ref()) {
+            match guest_dispatcher.try_send(guest) {
                 Ok(_) => {
                     true
                 },

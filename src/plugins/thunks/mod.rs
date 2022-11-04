@@ -1,6 +1,6 @@
 use hyper::client::HttpConnector;
-use reality::BlockProperties;
-use specs::{storage::DenseVecStorage, Component, Entity};
+use specs::VecStorage;
+use specs::{Component, Entity};
 
 mod error;
 pub use error::ErrorContext;
@@ -17,7 +17,7 @@ use tokio::task::JoinHandle;
 
 /// Thunk is a function that can be passed around for the system to call later
 #[derive(Component, Clone)]
-#[storage(DenseVecStorage)]
+#[storage(VecStorage)]
 pub struct Thunk(
     // Symbol that represents this thunk
     pub &'static str,
@@ -65,23 +65,6 @@ impl Into<General> for &Thunk {
         General {
             name: self.0.to_string(),
         }
-    }
-}
-
-/// Config for a thunk context
-#[derive(Component, Clone)]
-#[storage(DenseVecStorage)]
-pub struct Config(BlockProperties);
-
-impl Debug for Config {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Config").field(&self.0).finish()
-    }
-}
-
-impl AsRef<Config> for Config {
-    fn as_ref(&self) -> &Config {
-        self
     }
 }
 

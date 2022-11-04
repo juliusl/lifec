@@ -2,7 +2,7 @@ use crate::prelude::*;
 use atlier::system::{Attribute, Value};
 use imgui::Ui;
 use reality::BlockProperties;
-use specs::{storage::HashMapStorage, Component};
+use specs::Component;
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
     hash::{Hash, Hasher},
@@ -13,7 +13,7 @@ use std::{
 /// Implements AttributeIndex
 ///
 #[derive(Debug, Default, Component, Clone, Hash, Eq, PartialEq, PartialOrd)]
-#[storage(HashMapStorage)]
+#[storage(VecStorage)]
 pub struct AttributeGraph {
     /// Block index,
     ///
@@ -35,6 +35,18 @@ impl AttributeGraph {
             child: None,
             applied: vec![],
         }
+    }
+
+    /// Returns a reference to index,
+    /// 
+    pub fn index(&mut self) -> &BlockIndex {
+        &self.index
+    }
+
+    /// Returns a mutable reference to index,
+    /// 
+    pub fn index_mut(&mut self) -> &mut BlockIndex {
+        &mut self.index
     }
 
     /// Applies a config to the graph's control values,
@@ -308,6 +320,14 @@ impl AttributeIndex for AttributeGraph {
             properties.set(name, BlockProperty::Single(value.clone()));
         }
     }
+
+    fn properties(&self) -> &BlockProperties {
+        self.resolve_properties()
+    }
+
+    fn properties_mut(&mut self) -> &mut BlockProperties {
+        self.resolve_properties_mut()
+    }
 }
 
 impl AttributeGraph {
@@ -373,6 +393,7 @@ impl App for AttributeGraph {
 
     fn edit_ui(&mut self, ui: &imgui::Ui) {
         let id = self.entity_id();
+   
         for (name, property) in self.resolve_properties_mut().iter_properties_mut() {
             property.edit(
                 move |value| Self::edit_value(format!("{name} {id}"), value, ui),

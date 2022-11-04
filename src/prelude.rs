@@ -13,7 +13,7 @@ pub use crate::engine::Cursor;
 pub use crate::engine::Engine;
 pub use crate::engine::Event;
 pub use crate::engine::EventStatus;
-pub use crate::engine::Events;
+pub use crate::engine::State;
 pub use crate::engine::Limit;
 pub use crate::engine::PluginBroker;
 pub use crate::engine::PluginFeatures;

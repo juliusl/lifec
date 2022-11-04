@@ -4,6 +4,7 @@ use crate::engine::Adhoc;
 use crate::engine::NodeCommandHandler;
 use crate::engine::Profiler;
 use crate::engine::Yielding;
+use crate::guest::Guest;
 use crate::prelude::*;
 
 mod source;
@@ -103,17 +104,20 @@ where
             let entity = parser.get_block("", symbol).entity();
             let entities = parser.as_ref().entities();
             let entity = entities.entity(entity);
+            let runmd_file = RunmdFile {
+                symbol: symbol.to_string(),
+                source: source.clone(),
+            };
             parser
                 .as_ref()
                 .write_component()
                 .insert(
                     entity,
-                    RunmdFile {
-                        symbol: symbol.to_string(),
-                        source: source.clone(),
-                    },
+                    runmd_file.clone(),
                 )
                 .expect("should be able to insert");
+            
+            workspace.cache_file(&runmd_file);
         }
 
         // Parse the root file without the implicit symbol set
@@ -134,14 +138,15 @@ where
             }
         };
 
+        world.insert(Some(workspace.clone()));
+        
         // Apply config defined in root block
         {
             let mut config_data = world.system_data::<WorkspaceConfig>();
-            config_data.apply(&workspace);
+            config_data.apply();
         }
 
         // Finalize world
-        world.insert(Some(workspace.clone()));
         world.insert(Self::node_handlers());
 
         return world;
@@ -205,7 +210,13 @@ pub fn default_runtime() -> Runtime {
     runtime.install_with_custom::<Println>("");
     runtime.install_with_custom::<Watch>("");
     runtime.install_with_custom::<Publish>("");
+    runtime.install_with_custom::<Listen>("");
+    runtime.install_with_custom::<Monitor>("");
+    
+    // Plugins for testing
     runtime.install_with_custom::<Chaos>("");
+    runtime.install_with_custom::<TestHost>("");
+    runtime.install_with_custom::<TestHostSender>("");
     runtime
 }
 
@@ -227,15 +238,17 @@ pub fn default_world() -> World {
     world.register::<Event>();
     world.register::<Cursor>();
     world.register::<Engine>();
+    world.register::<Guest>();
     world.register::<Runtime>();
     world.register::<Sequence>();
     world.register::<Activity>();
     world.register::<Profiler>();
+    world.register::<Connection>();
     world.register::<Operation>();
     world.register::<RunmdFile>();
     world.register::<Yielding>();
+    world.register::<EventStatus>();
     world.register::<Transition>();
-    world.register::<ThunkContext>();
     world.register::<AttributeGraph>();
     world.insert(None::<Workspace>);
     world
@@ -249,6 +262,10 @@ pub fn default_node_handlers() -> HashMap<String, NodeCommandHandler> {
     handlers.insert("delete_spawned".to_string(), |events, entity| {
        events.delete(entity); 
     });
+
+    handlers.insert("cleanup_connection".to_string(), |events, entity| {
+        events.cleanup_connection(entity); 
+     });
 
     handlers
 }

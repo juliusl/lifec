@@ -37,11 +37,18 @@ fn main() {
     + .operation print-2
     : .println Hello Print Operation c 3
     : .chaos
+    : .test_host
 
+    + .operation start_test_host
+    : .test_host
+    : .test_host_sender
 
     + test .operation print-2
     : .println Hello Print Operation c 4
     : .chaos
+
+    + .operation read-performance
+    : .monitor test_host
     ```
     "#,
     );
@@ -65,7 +72,7 @@ fn main() {
 
         ``` receive
         + .runtime
-        : .println hello receive a {name}
+        : .println hello receive a {name}, {description}
         : .fmt name, description
         : .chaos
         ```

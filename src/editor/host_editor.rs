@@ -1,16 +1,15 @@
 use atlier::system::App;
-use hdrhistogram::Histogram;
-use imgui::{ChildWindow, SliderFlags, StyleVar, Ui, Window};
-use specs::{Entities, Entity, Join, Read, ReadStorage, System};
+use imgui::{ChildWindow, StyleVar, Ui, Window};
+use reality::wire::{Protocol, WireObject};
+use specs::{Entity, Read, System};
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
-use tokio::time::Instant;
 use tracing::{event, Level};
 
-use crate::guest::Guest;
-use crate::prelude::{EventRuntime, PluginFeatures};
+use crate::engine::Performance;
+use crate::prelude::EventRuntime;
 use crate::{
-    prelude::{Events, Node},
+    prelude::{State, Node},
     state::AttributeGraph,
 };
 
@@ -25,22 +24,13 @@ pub struct HostEditor {
     nodes: Vec<Node>,
     /// Adhoc profiler nodes,
     ///
-    adhoc_profilers: Vec<Node>,
-    /// Histogram of tick rate,
-    ///
-    tick_rate: Histogram<u64>,
-    /// Timestamp of last refresh,
-    ///
-    last_refresh: Instant,
+    adhoc_nodes: Vec<Node>,
     /// True if the event runtime is paused,
     ///
     is_paused: bool,
     /// True if there is no more activity for the runtime to process,
     ///
     is_stopped: bool,
-    /// Sets a tick limit,
-    ///
-    tick_limit: Option<u64>,
     /// Command to execute a serialized tick (step),
     ///
     tick: Option<()>,
@@ -50,19 +40,14 @@ pub struct HostEditor {
     /// Command to reset state on all events,
     ///
     reset: Option<()>,
-    /// Guests within the current host,
-    /// 
-    guests: HashMap<Entity, Guest>,
 }
 
 impl Hash for HostEditor {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.nodes.hash(state);
-        self.adhoc_profilers.hash(state);
-        self.last_refresh.hash(state);
+        self.adhoc_nodes.hash(state);
         self.is_paused.hash(state);
         self.is_stopped.hash(state);
-        self.tick_limit.hash(state);
         self.tick.hash(state);
         self.pause.hash(state);
         self.reset.hash(state);
@@ -86,18 +71,6 @@ impl HostEditor {
     ///
     pub fn reset_events(&mut self) {
         self.reset = Some(());
-    }
-
-    /// Dispatch a command to set tick limit,
-    ///
-    pub fn set_tick_limit(&mut self, hz: u64) {
-        self.tick_limit = Some(hz);
-    }
-
-    /// Disable tick limit,
-    ///
-    pub fn disable_tick_limit(&mut self) {
-        self.tick_limit.take();
     }
 
     /// Shows events window,
@@ -126,6 +99,12 @@ impl HostEditor {
                 });
             });
     }
+
+    /// Takes nodes from the host editor,
+    ///
+    pub fn take_nodes(&mut self) -> Vec<Node> {
+        self.nodes.drain(..).collect()
+    }
 }
 
 impl App for HostEditor {
@@ -138,18 +117,6 @@ impl App for HostEditor {
         let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
         self.events_window("Events", ui);
 
-        if self.guests.len() > 1 {
-            println!("{}", self.guests.len());
-        }
-
-        for (_, guest) in self.guests.iter() {
-            let Guest { guest_host, owner } = guest;
-            
-            let title = format!("Guest {}", owner.id());
-            let events = guest_host.world().system_data::<PluginFeatures>();
-            events.host_editor().events_window(title, ui);
-        }
-
         window_padding.end();
         frame_padding.end();
     }
@@ -159,13 +126,11 @@ impl App for HostEditor {
 
 impl<'a> System<'a> for HostEditor {
     type SystemData = (
-        Events<'a>,
+        State<'a>,
         Read<'a, tokio::sync::watch::Sender<HostEditor>, EventRuntime>,
-        Entities<'a>,
-        ReadStorage<'a, Guest>,
     );
 
-    fn run(&mut self, (mut events, watcher, entities, guests): Self::SystemData) {
+    fn run(&mut self, (mut events, watcher): Self::SystemData) {
         // General event runtime state
         self.is_paused = !events.can_continue();
         self.is_stopped = events.should_exit();
@@ -188,40 +153,26 @@ impl<'a> System<'a> for HostEditor {
             events.reset_all();
         }
 
-        if let Some(limit) = self.tick_limit {
-            events.set_rate_limit(limit);
-        } else {
-            events.clear_rate_limit();
-        }
-
-        // Update tick rate histogram,
-        //
-        if !events.should_exit() && events.can_continue() {
-            match self.tick_rate.record(events.tick_rate()) {
-                Ok(_) => {}
-                Err(err) => {
-                    event!(Level::ERROR, "Error recording tick rate, {err}");
-                }
-            }
-        }
-
-        if self.last_refresh.elapsed().as_secs() > 1 {
-            self.tick_rate.clear();
-            self.last_refresh = Instant::now();
-        }
-
         // Handle node commands
-        // TODO: Can record/serialize this
         let mut mutations = HashMap::<Entity, HashMap<Entity, AttributeGraph>>::default();
-        for mut node in self.nodes.drain(..) {
+        for mut node in self.take_nodes() {
             if let Some(command) = node.command.take() {
-                match events.plugins().features().broker().try_send_node_command(command.clone(), None) {
+                match events
+                    .plugins()
+                    .features()
+                    .broker()
+                    .try_send_node_command(command.clone(), None)
+                {
                     Ok(_) => {
                         event!(Level::DEBUG, "Sent node command {:?}", command);
-                    },
+                    }
                     Err(err) => {
-                        event!(Level::ERROR, "Could not send node command {err}, {:?}", command);
-                    },
+                        event!(
+                            Level::ERROR,
+                            "Could not send node command {err}, {:?}",
+                            command
+                        );
+                    }
                 }
             }
 
@@ -232,7 +183,7 @@ impl<'a> System<'a> for HostEditor {
 
         // Get latest node state,
         //
-        for mut node in events.nodes() {
+        for mut node in events.event_nodes() {
             if let Some(mutations) = mutations.remove(&node.status.entity()) {
                 node.mutations = mutations;
             }
@@ -242,16 +193,7 @@ impl<'a> System<'a> for HostEditor {
 
         // Get latest adhoc profiler state,
         //
-        self.adhoc_profilers = events.adhoc_profilers();
-
-        // Adds guests to host's set,
-        //
-        for (entity, guest) in (&entities, &guests).join() {
-            if !self.guests.contains_key(&entity) {
-                self.guests.insert(entity, guest.clone());
-                event!(Level::DEBUG, "Guest {}, added to host editor", entity.id());
-            }
-        }
+        self.adhoc_nodes = events.adhoc_nodes();
 
         // Update watcher
         //
@@ -288,7 +230,6 @@ impl HostEditor {
         ui.same_line();
         if ui.button("Reset All") {
             self.reset = Some(());
-            self.tick_rate.clear();
         }
 
         if self.is_stopped {
@@ -331,49 +272,9 @@ impl HostEditor {
         }
     }
 
-    /// Tools to monitor and adjust tick rate,
-    ///
-    fn tick_rate_tools(&mut self, ui: &Ui) {
-        if self.tick_limit.is_none() {
-            if ui.button("Enable rate limit") {
-                self.tick_limit = Some(0);
-            }
-        } else if let Some(tick_limit) = self.tick_limit.as_mut() {
-            ui.set_next_item_width(100.0);
-            imgui::Slider::new("Rate limit (hz)", 0, 100)
-                .flags(SliderFlags::ALWAYS_CLAMP)
-                .build(ui, tick_limit);
-
-            ui.same_line();
-            if ui.button("Disable limit") {
-                self.tick_limit.take();
-            }
-        }
-        ui.new_line();
-
-        imgui::PlotLines::new(
-            ui,
-            "Tick rate (Hz)",
-            self.tick_rate
-                .iter_recorded()
-                .map(|v| v.value_iterated_to() as f32)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )
-        .graph_size([0.0, 75.0])
-        .build();
-        ui.text(format!(
-            "Max: {} hz",
-            self.tick_rate.value_at_percentile(50.0)
-        ));
-    }
-
     /// Performance related tools and information
     ///
     fn performance_section(&mut self, ui: &Ui) {
-        self.tick_rate_tools(ui);
-        ui.new_line();
-
         ui.text("Performance");
         ui.spacing();
         if let Some(tab_bar) = ui.tab_bar("Performance Tabs") {
@@ -399,11 +300,35 @@ impl HostEditor {
             }
             if let Some(token) = tab {
                 // This is the performance of adhoc operation events
-                for node in self.adhoc_profilers.iter() {
+                for node in self.adhoc_nodes.iter() {
                     if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
                         ui.new_line();
                     }
                 }
+                token.end();
+            }
+
+            let tab = ui.tab_item("Debug");
+            if let Some(token) = tab {
+                let mut protocol = Protocol::empty();
+                let profilers = self.adhoc_nodes.iter().cloned().collect::<Vec<_>>();
+
+                protocol.encoder::<Performance>(move |w, e| {
+                    for node in profilers.iter()
+                        .filter_map(|p| p.connection.clone())
+                        .map(|p| Performance::samples(100, &[50.0, 60.0, 90.0, 99.0], &p))
+                        .flatten()
+                    {
+                        e.encode(&node, w);
+                    }
+
+                    e.frame_index = Performance::build_index(&e.interner, &e.frames);
+                });
+
+                for f in protocol.decode::<Performance>() {
+                    ui.text(format!("{:#?}", f));
+                }
+
                 token.end();
             }
 
@@ -415,17 +340,13 @@ impl HostEditor {
 impl Default for HostEditor {
     fn default() -> Self {
         Self {
-            tick_rate: Histogram::<u64>::new(2).expect("should be able to create"),
-            adhoc_profilers: vec![],
+            adhoc_nodes: vec![],
             is_paused: Default::default(),
             is_stopped: false,
-            tick_limit: Default::default(),
-            last_refresh: Instant::now(),
             tick: Default::default(),
             pause: Default::default(),
             reset: Default::default(),
             nodes: Default::default(),
-            guests: Default::default(),
         }
     }
 }

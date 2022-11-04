@@ -72,12 +72,12 @@ impl ConnectionState {
 #[derive(Component, Debug, Clone, PartialEq)]
 #[storage(VecStorage)]
 pub struct Connection {
-    /// Map of spawned entities and the source they are spawned from,
-    spawned: HashMap<Entity, Entity>,
     /// Set of entities of incoming connections,
     from: HashSet<Entity>,
     /// Owner of this connection,
     to: Entity,
+    /// Map of spawned entities and the source they are spawned from,
+    spawned: HashMap<Entity, Entity>,
     /// Map of the connection state,
     connection_state: HashMap<ConnectionState, Activity>,
     /// Histogram of performance per connection,
@@ -112,8 +112,10 @@ impl Connection {
 
     /// Returns an iterator over a tuple of spawned events and their source from this connection,
     /// 
-    pub fn iter_spawned(&self) -> impl Iterator<Item = (&Entity, &Entity)> {
-        self.spawned.iter()
+    /// Tuple layout is (spawned, source, )
+    /// 
+    pub fn iter_spawned(&self) -> impl Iterator<Item = (&Entity, &Entity, &Entity)> {
+        self.spawned.iter().map(|(spawned, source)| (spawned, source, &self.to))
     }
 
     /// Returns the entity this connection points to,
@@ -134,6 +136,12 @@ impl Connection {
         if self.from.contains(&source) {
             self.spawned.insert(spawned, source);
         }
+    }
+
+    /// Removes a spawned entity,
+    /// 
+    pub fn remove_spawned(&mut self, spawned: &Entity) {
+        self.spawned.remove(spawned);
     }
 
     /// Returns an iterator over each connection,

@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use atlier::system::{Attribute, Value};
+use reality::BlockProperties;
 
 /// V2 - Revising interface w/ attributes
 ///
@@ -36,6 +37,14 @@ pub trait AttributeIndex {
     /// Returns a map of indexed values,
     ///
     fn values(&self) -> BTreeMap<String, Vec<Value>>;
+
+    /// Returns a reference to state as a block properties struct,
+    /// 
+    fn properties(&self) -> &BlockProperties;
+
+    /// Returns a mutable reference to state as a block properties struct,
+    /// 
+    fn properties_mut(&mut self) -> &mut BlockProperties;
 
     /// Finds all text values with name,
     ///

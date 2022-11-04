@@ -13,11 +13,119 @@ pub trait EventNode {
     fn edit_event(&mut self, ui: &Ui, event: EventStatus);
 
     /// Shows event buttons,
-    /// 
+    ///
     fn event_buttons(&mut self, ui: &Ui, event: EventStatus);
 }
 
 impl EventNode for Node {
+    fn edit_event(&mut self, ui: &Ui, event: EventStatus) {
+        if let Some(state) = self.appendix.state(&event.entity()) {
+            if !state.control_symbol.is_empty() {
+                ui.text(format!("engine: {}", state.control_symbol));
+            }
+        }
+
+        match self.connection_state {
+            Some(connection_state) if connection_state.is_spawned() => {
+                let source = connection_state.source();
+                if let Some(general) = self.appendix.general(&source) {
+                    general.display_ui(ui);
+                }
+                ui.text(format!(
+                    "id: {} (Source: {})",
+                    event.entity().id(),
+                    source.id()
+                ));
+            }
+            _ => {
+                if let Some(general) = self.appendix.general(&event.entity()) {
+                    general.display_ui(ui);
+                }
+                ui.text(format!("id: {}", event.entity().id()));
+            }
+        }
+
+        if let Some(adhoc) = self.adhoc.as_ref() {
+            let tag = adhoc.tag();
+            if !tag.as_ref().is_empty() {
+                ui.text(format!("tag: {}", tag.as_ref()));
+            }
+        }
+
+        ui.text(format!("status: {event}"));
+
+        if let Some(cursor) = self.cursor.as_ref() {
+            ui.text(format!("cursor - {}", cursor));
+        }
+        if let Some(transition) = self.transition.as_ref() {
+            ui.text(format!("transition: {:?}", transition));
+        }
+
+        self.event_buttons(ui, event);
+
+        // Thunk state
+        if let Some(sequence) = self.sequence.as_ref() {
+            TreeNode::new(format!("Thunks {}", event.entity().id())).build(ui, || {
+                for (i, s) in sequence.iter_entities().enumerate() {
+                    if let Some(name) = self.appendix.name(&s) {
+                        TreeNode::new(format!("{i} - {name}")).build(ui, || {
+                            if let Some(state) = self.appendix.state(&s) {
+                                let mut graph = self
+                                    .mutations
+                                    .get(&s)
+                                    .cloned()
+                                    .unwrap_or(state.graph.clone().unwrap());
+                                let previous = graph.clone();
+
+                                TreeNode::new(format!("Control values {}", i)).build(ui, || {
+                                    for (name, value) in graph.index_mut().control_values_mut().iter_mut() {
+                                        AttributeGraph::edit_value(name, value, ui);
+                                    }
+                                });
+                                
+                                for (name, property) in
+                                    graph.resolve_properties_mut().iter_properties_mut()
+                                {
+                                    property.edit(
+                                        move |value| {
+                                            AttributeGraph::edit_value(
+                                                format!("{name} {i}"),
+                                                value,
+                                                ui,
+                                            )
+                                        },
+                                        move |values| {
+                                            imgui::ListBox::new(format!("{name} {i}")).build(
+                                                ui,
+                                                || {
+                                                    for (idx, value) in
+                                                        values.iter_mut().enumerate()
+                                                    {
+                                                        AttributeGraph::edit_value(
+                                                            format!("{name} {i}-{idx}"),
+                                                            value,
+                                                            ui,
+                                                        );
+                                                    }
+                                                },
+                                            );
+                                        },
+                                        || None,
+                                    );
+                                }
+
+                                if graph != previous {
+                                    self.mutations.insert(s, graph.clone());
+                                    self.command = Some(NodeCommand::Update(graph.clone()));
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+        }
+    }
+
     fn event_buttons(&mut self, ui: &Ui, event: EventStatus) {
         match event {
             EventStatus::Inactive(_) => {
@@ -69,107 +177,6 @@ impl EventNode for Node {
                 }
             }
             _ => {}
-        }
-    }
-
-    fn edit_event(&mut self, ui: &Ui, event: EventStatus) {
-        if let Some(state) = self.appendix.state(&event.entity()) {
-            if !state.control_symbol.is_empty() {
-                ui.text(format!("engine: {}", state.control_symbol));
-            }
-        }
-
-        match self.connection_state {
-            Some(connection_state) if connection_state.is_spawned() => {
-                let source = connection_state.source();
-                if let Some(general) = self.appendix.general(&source) {
-                    general.display_ui(ui);
-                }
-                ui.text(format!(
-                    "id: {} (Source: {})",
-                    event.entity().id(),
-                    source.id()
-                ));
-            }
-            _ => {
-                if let Some(general) = self.appendix.general(&event.entity()) {
-                    general.display_ui(ui);
-                }
-                ui.text(format!("id: {}", event.entity().id()));
-            }
-        }
-
-        if let Some(adhoc) = self.adhoc.as_ref() {
-            let tag = adhoc.tag();
-            if !tag.as_ref().is_empty() {
-                ui.text(format!("tag: {}", tag.as_ref()));
-            }
-        }
-
-        ui.text(format!("status: {event}"));
-
-        if let Some(cursor) = self.cursor.as_ref() {
-            ui.text(format!("cursor - {}", cursor));
-        }
-        if let Some(transition) = self.transition.as_ref() {
-            ui.text(format!("transition: {:?}", transition));
-        }
-
-       self.event_buttons(ui, event);
-
-        // Thunk state
-        if let Some(sequence) = self.sequence.as_ref() {
-            TreeNode::new(format!("Thunks {}", event.entity().id())).build(ui, || {
-                for (i, s) in sequence.iter_entities().enumerate() {
-                    if let Some(name) = self.appendix.name(&s) {
-                        TreeNode::new(format!("{i} - {name}")).build(ui, || {
-                            if let Some(state) = self.appendix.state(&s) {
-                                let mut graph = self
-                                    .mutations
-                                    .get(&s)
-                                    .cloned()
-                                    .unwrap_or(state.graph.clone().unwrap());
-                                let previous = graph.clone();
-                                for (name, property) in
-                                    graph.resolve_properties_mut().iter_properties_mut()
-                                {
-                                    property.edit(
-                                        move |value| {
-                                            AttributeGraph::edit_value(
-                                                format!("{name} {i}"),
-                                                value,
-                                                ui,
-                                            )
-                                        },
-                                        move |values| {
-                                            imgui::ListBox::new(format!("{name} {i}")).build(
-                                                ui,
-                                                || {
-                                                    for (idx, value) in
-                                                        values.iter_mut().enumerate()
-                                                    {
-                                                        AttributeGraph::edit_value(
-                                                            format!("{name} {i}-{idx}"),
-                                                            value,
-                                                            ui,
-                                                        );
-                                                    }
-                                                },
-                                            );
-                                        },
-                                        || None,
-                                    );
-                                }
-
-                                if graph != previous {
-                                    self.mutations.insert(s, graph.clone());
-                                    self.command = Some(NodeCommand::Update(graph.clone()));
-                                }
-                            }
-                        });
-                    }
-                }
-            });
         }
     }
 }

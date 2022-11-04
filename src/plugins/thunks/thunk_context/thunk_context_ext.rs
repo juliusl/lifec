@@ -46,4 +46,12 @@ impl AttributeIndex for ThunkContext {
     fn values(&self) -> std::collections::BTreeMap<String, Vec<atlier::system::Value>> {
         self.state().values()
     }
+
+    fn properties(&self) -> &BlockProperties {
+        self.state().properties()
+    }
+
+    fn properties_mut(&mut self) -> &mut BlockProperties {
+        self.state_mut().properties_mut()
+    }
 }

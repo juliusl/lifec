@@ -141,6 +141,7 @@ impl Plugin for Watch {
                     .state()
                     .find_symbol("watch")
                     .expect("should have a file path value");
+                let file = tc.work_dir().expect("should have a work dir").join(file);
 
                 // Creating a reference so the watcher doesn't get dropped while we wait
                 // for the event that we're looking for
@@ -158,7 +159,7 @@ impl Plugin for Watch {
                         watcher
                     }
                     (Err(err), watcher) => {
-                        event!(Level::ERROR, "Could not watch {file}, {err}");
+                        event!(Level::ERROR, "Could not watch {:?}, {err}", file);
                         watcher
                     }
                 };
