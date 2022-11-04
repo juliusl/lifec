@@ -102,6 +102,7 @@ impl EventNode for Node {
                                             AttributeGraph::edit_value(
                                                 format!("{name} {i}"),
                                                 value,
+                                                None,
                                                 ui,
                                             )
                                         },
@@ -115,6 +116,7 @@ impl EventNode for Node {
                                                         AttributeGraph::edit_value(
                                                             format!("{name} {i}-{idx}"),
                                                             value,
+                                                            None,
                                                             ui,
                                                         );
                                                     }

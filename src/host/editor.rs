@@ -2,14 +2,14 @@ use std::{ops::Deref, sync::Arc};
 
 use specs::Write;
 
-use crate::{editor::State, engine::Profiler, prelude::*};
+use crate::{editor::State, engine::Profiler, prelude::*, debugger::Debugger};
 
 /// Extension trait for Host, that provides functions for opening a GUI editor,
 ///
 pub trait Editor {
     /// Opens this host app with the runtime editor extension,
     ///
-    fn open_runtime_editor<P>(self)
+    fn open_runtime_editor<P>(self, enable_debugger: bool)
     where
         P: Project;
 
@@ -26,12 +26,19 @@ pub trait Editor {
 }
 
 impl Editor for Host {
-    fn open_runtime_editor<P>(mut self)
+    fn open_runtime_editor<P>(mut self, enable_debugger: bool)
     where
         P: Project,
     {
+        self.prepare::<P>();
         self.build_appendix();
         let appendix = self.world().read_resource::<Appendix>().deref().clone();
+
+        self.world_mut().insert(None::<Debugger>);
+        if enable_debugger {
+            self.enable_listener::<Debugger>();
+        }
+
         self.open::<P, _>(WorkspaceEditor::from(appendix))
     }
 

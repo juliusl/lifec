@@ -46,6 +46,12 @@ pub trait AttributeIndex {
     /// 
     fn properties_mut(&mut self) -> &mut BlockProperties;
 
+    /// Returns a map of control values,
+    /// 
+    /// Control values are defined at the block level and are used when the index for root of the index does not have a value,
+    /// 
+    fn control_values(&self) -> &BTreeMap<String, Value>;
+
     /// Finds all text values with name,
     ///
     fn find_text_values(&self, with_name: impl AsRef<str>) -> Vec<String> {

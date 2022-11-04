@@ -2,15 +2,14 @@ use std::{fs::File, path::PathBuf, sync::Arc};
 
 use reality::{BlockObject, BlockProperties};
 use specs::RunNow;
-use tracing::{event, Level};
 
 use crate::{
     engine::{Performance, Profilers, Cleanup},
     guest::Guest,
     host::EventHandler,
     prelude::{
-        Appendix, Editor, EventRuntime, Host, Listener, Plugin, Project, RunmdFile, Sequencer,
-    },
+        Appendix, Editor, EventRuntime, Host, Plugin, Project, RunmdFile, Sequencer,
+    }, debugger::Debugger,
 };
 
 #[derive(Default)]
@@ -18,22 +17,6 @@ pub struct TestHost;
 
 impl Project for TestHost {
     fn interpret(_: &specs::World, _: &reality::Block) {}
-}
-
-impl Listener for TestHost {
-    fn create(_: &specs::World) -> Self {
-        TestHost::default()
-    }
-
-    fn on_status_update(&mut self, _: &crate::prelude::StatusUpdate) {}
-
-    fn on_operation(&mut self, _: crate::prelude::Operation) {}
-
-    fn on_error_context(&mut self, _: &crate::prelude::ErrorContext) {}
-
-    fn on_completed_event(&mut self, e: &specs::Entity) {
-        event!(Level::DEBUG, "Guest plugin -- {}", e.id());
-    }
 }
 
 impl Plugin for TestHost {
@@ -74,20 +57,21 @@ impl Plugin for TestHost {
                     .compile::<TestHost>()
                     .expect("should be able to compile");
                 let mut host = Host::from(world);
+                host.prepare::<TestHost>();
                 host.link_sequences();
-                host.enable_listener::<TestHost>();
                 host.build_appendix();
+                host.enable_listener::<Debugger>();
+                host.prepare::<TestHost>();
+
                 if let Some(appendix) = host.world_mut().remove::<Appendix>() {
                     host.world_mut().insert(Arc::new(appendix));
                 }
-                let _ = host.prepare::<TestHost>();
-
                 let test_dir = PathBuf::from(".world/test.io/test_host");
                 std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
                 let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |host| {
                     EventRuntime::default().run_now(host.world());
                     Cleanup::default().run_now(host.world());
-                    EventHandler::<TestHost>::default().run_now(host.world());
+                    EventHandler::<Debugger>::default().run_now(host.world());
 
                     host.world().system_data::<Profilers>().profile();
 

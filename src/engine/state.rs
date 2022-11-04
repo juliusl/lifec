@@ -519,7 +519,7 @@ impl<'a> State<'a> {
                 previous
             };
 
-            let operation = plugins.start_sequence(sequence, previous);
+            let operation = plugins.start_sequence(event, sequence, previous);
 
             if let Some(existing) = operations.get_mut(event) {
                 existing.set_task(operation);

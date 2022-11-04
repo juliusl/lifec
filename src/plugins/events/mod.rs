@@ -1,6 +1,6 @@
 use super::thunks::{ErrorContext, SecureClient, StatusUpdate};
 use crate::{
-    engine::{Runner, Yielding},
+    engine::{Runner, Yielding, Completion},
     guest::Guest,
     prelude::*,
 };
@@ -61,6 +61,28 @@ impl SetupHandler<sync::mpsc::Receiver<Guest>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Receiver<Guest>>() {
             let (tx, rx) = mpsc::channel::<Guest>(30);
+            world.insert(tx);
+            world.insert(rx);
+        }
+    }
+}
+
+/// Setup for tokio-mulitple-producers single-consumer channel for completion
+impl SetupHandler<sync::mpsc::Sender<Completion>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        if !world.has_value::<sync::mpsc::Sender<Completion>>() {
+            let (tx, rx) = mpsc::channel::<Completion>(30);
+            world.insert(tx);
+            world.insert(rx);
+        }
+    }
+}
+
+/// Setup for tokio-mulitple-producers single-consumer channel for completion
+impl SetupHandler<sync::mpsc::Receiver<Completion>> for EventRuntime {
+    fn setup(world: &mut specs::World) {
+        if !world.has_value::<sync::mpsc::Receiver<Completion>>() {
+            let (tx, rx) = mpsc::channel::<Completion>(30);
             world.insert(tx);
             world.insert(rx);
         }
@@ -134,28 +156,6 @@ impl SetupHandler<sync::broadcast::Sender<Entity>> for EventRuntime {
 }
 
 /// Setup for tokio-mulitple-producers single-consumer channel for status updates
-impl SetupHandler<sync::mpsc::Sender<RunmdFile>> for EventRuntime {
-    fn setup(world: &mut specs::World) {
-        if !world.has_value::<sync::mpsc::Sender<RunmdFile>>() {
-            let (tx, rx) = mpsc::channel::<RunmdFile>(10);
-            world.insert(tx);
-            world.insert(rx);
-        }
-    }
-}
-
-/// Setup for tokio-mulitple-producers single-consumer channel for status updates
-impl SetupHandler<sync::mpsc::Receiver<RunmdFile>> for EventRuntime {
-    fn setup(world: &mut specs::World) {
-        if !world.has_value::<sync::mpsc::Receiver<RunmdFile>>() {
-            let (tx, rx) = mpsc::channel::<RunmdFile>(10);
-            world.insert(tx);
-            world.insert(rx);
-        }
-    }
-}
-
-/// Setup for tokio-mulitple-producers single-consumer channel for status updates
 impl SetupHandler<sync::mpsc::Sender<ErrorContext>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Sender<ErrorContext>>() {
@@ -193,28 +193,6 @@ impl SetupHandler<sync::mpsc::Sender<Operation>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Sender<Operation>>() {
             let (tx, rx) = mpsc::channel::<Operation>(10);
-            world.insert(tx);
-            world.insert(rx);
-        }
-    }
-}
-
-/// Setup for tokio-mulitple-producers single-consumer channel for host start command
-impl SetupHandler<sync::mpsc::Receiver<Start>> for EventRuntime {
-    fn setup(world: &mut specs::World) {
-        if !world.has_value::<sync::mpsc::Receiver<Start>>() {
-            let (tx, rx) = mpsc::channel::<Start>(10);
-            world.insert(tx);
-            world.insert(rx);
-        }
-    }
-}
-
-/// Setup for tokio-mulitple-producers single-consumer channel for host start command
-impl SetupHandler<sync::mpsc::Sender<Start>> for EventRuntime {
-    fn setup(world: &mut specs::World) {
-        if !world.has_value::<sync::mpsc::Sender<Start>>() {
-            let (tx, rx) = mpsc::channel::<Start>(10);
             world.insert(tx);
             world.insert(rx);
         }

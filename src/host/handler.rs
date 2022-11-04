@@ -84,6 +84,10 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
                 listener.on_status_update(&status_update);
             }
 
+            if let Some(completion) = plugin_messages.try_next_completion() {
+                listener.on_completion(completion);
+            }
+
             if let Some(entity) = completed_plugins.try_recv().ok() {
                 listener.on_completed_event(&entity);
             }

@@ -8,7 +8,7 @@ use crate::{
     host::EventHandler,
     prelude::{
         Appendix, Editor, Host, NodeCommand, Plugin, Sequencer, RunmdFile,
-    },
+    }, debugger::Debugger,
 };
 
 use super::TestHost;
@@ -55,16 +55,16 @@ impl Plugin for TestHostSender {
                     .compile::<TestHost>()
                     .expect("should be able to compile");
                 let mut host = Host::from(world);
+                host.prepare::<TestHost>();
                 host.link_sequences();
-                host.enable_listener::<TestHost>();
                 host.build_appendix();
+                host.enable_listener::<Debugger>();
+                host.prepare::<TestHost>();
                 if let Some(appendix) = host.world_mut().remove::<Appendix>() {
                     host.world_mut().insert(Arc::new(appendix));
                 }
-                let _ = host.prepare::<TestHost>();
-
                 let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |host| {
-                    EventHandler::<TestHost>::default().run_now(host.world());
+                    EventHandler::<Debugger>::default().run_now(host.world());
 
                     if host.encode_commands() {
                         let test_dir = PathBuf::from(".world/test.io/test_host");

@@ -4,11 +4,12 @@ use imgui::{
     Window,
 };
 use reality::wire::{Protocol, WireObject};
-use specs::{Entity, Read, System};
+use specs::{Entity, Read, System, Write};
 use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
 use tracing::{event, Level};
 
+use crate::debugger::Debugger;
 use crate::engine::Performance;
 use crate::prelude::EventRuntime;
 use crate::{
@@ -20,7 +21,7 @@ use super::{Canvas, Profiler};
 
 /// Tool for viewing and interacting with a host,
 ///
-#[derive(Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 pub struct HostEditor {
     /// Current nodes,
     ///
@@ -45,6 +46,9 @@ pub struct HostEditor {
     reset: Option<()>,
 
     canvas: Canvas,
+    /// If debugger is enabled, it will be displayed in the host editor window,
+    /// 
+    debugger: Option<Debugger>,
 }
 
 impl Hash for HostEditor {
@@ -90,19 +94,31 @@ impl HostEditor {
 
                 ui.spacing();
                 ui.separator();
-                ChildWindow::new(&format!("Events List {suffix}"))
-                    .size([900.0, 0.0])
-                    .build(ui, || {
-                        self.event_list(ui);
-                    });
+                ui.group(|| {
+                    ChildWindow::new(&format!("Events List {suffix}"))
+                        .size([900.0, 400.0])
+                        .border(true)
+                        .build(ui, || {
+                            self.event_list(ui);
+                        });
 
-                ui.same_line();
-                ChildWindow::new(&format!("Performance {suffix}"))
-                    .size([0.0, 0.0])
-                    .border(true)
-                    .build(ui, || {
-                        self.performance_section(ui);
-                    });
+                    ui.same_line();
+                    ChildWindow::new(&format!("Performance {suffix}"))
+                        .size([-1.0, 400.0])
+                        .border(true)
+                        .build(ui, || {
+                            self.performance_section(ui);
+                        });
+                });
+
+                if let Some(debugger) = self.debugger.as_ref() {
+                    ChildWindow::new(&format!("Debugger {suffix}"))
+                        .size([0.0, -1.0])
+                        .border(true)
+                        .build(ui, || {
+                            debugger.display_ui(ui);
+                        });
+                }
             });
     }
 
@@ -134,9 +150,12 @@ impl<'a> System<'a> for HostEditor {
     type SystemData = (
         State<'a>,
         Read<'a, tokio::sync::watch::Sender<HostEditor>, EventRuntime>,
+        Write<'a, Option<Debugger>>,
     );
 
-    fn run(&mut self, (mut events, watcher): Self::SystemData) {
+    fn run(&mut self, (mut events, watcher, debugger): Self::SystemData) {
+        self.debugger = debugger.clone();
+
         // General event runtime state
         self.is_paused = !events.can_continue();
         self.is_stopped = events.should_exit();
@@ -280,7 +299,7 @@ impl HostEditor {
                     fn name_column(ui: &Ui) {
                         let mut table_column_setup = TableColumnSetup::new("Name");
                         table_column_setup.flags =
-                            TableColumnFlags::NO_HIDE | TableColumnFlags::WIDTH_FIXED;
+                            TableColumnFlags::NO_HIDE;
                         ui.table_setup_column_with(table_column_setup);
                     }
 
@@ -301,9 +320,9 @@ impl HostEditor {
                         ui.table_setup_column_with(table_column_setup);
                     }
 
-                    let table_flags = TableFlags::BORDERS_V
+                    let table_flags = TableFlags::BORDERS_INNER_V
                         | TableFlags::RESIZABLE
-                        | TableFlags::SIZING_STRETCH_PROP
+                        | TableFlags::SIZING_FIXED_FIT
                         | TableFlags::HIDEABLE;
 
                     if let Some(_) = ui.begin_table_with_flags("", 5, table_flags) {
@@ -388,21 +407,6 @@ impl HostEditor {
             }
 
             tab_bar.end();
-        }
-    }
-}
-
-impl Default for HostEditor {
-    fn default() -> Self {
-        Self {
-            adhoc_nodes: vec![],
-            is_paused: Default::default(),
-            is_stopped: false,
-            tick: Default::default(),
-            pause: Default::default(),
-            reset: Default::default(),
-            nodes: Default::default(),
-            canvas: Default::default(),
         }
     }
 }

@@ -13,6 +13,8 @@ use super::{Commands, Host, Editor};
 #[derive(Debug, Default, Args)]
 #[clap(arg_required_else_help = true)]
 pub struct HostSettings {
+    #[clap(long, action, default_value_t = false)]
+    pub debug: bool,
     /// Root directory, defaults to current directory
     ///
     #[clap(long)]
@@ -91,7 +93,7 @@ impl HostSettings {
             Some(Commands::Open) => {
                 if let Some(host) = self.create_host::<P>().await {
                     tokio::task::block_in_place(|| {
-                        host.open_runtime_editor::<P>();
+                        host.open_runtime_editor::<P>(self.debug);
                     })
                 }
             }

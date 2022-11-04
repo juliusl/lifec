@@ -38,13 +38,13 @@ impl AttributeGraph {
     }
 
     /// Returns a reference to index,
-    /// 
+    ///
     pub fn index(&self) -> &BlockIndex {
         &self.index
     }
 
     /// Returns a mutable reference to index,
-    /// 
+    ///
     pub fn index_mut(&mut self) -> &mut BlockIndex {
         &mut self.index
     }
@@ -328,12 +328,21 @@ impl AttributeIndex for AttributeGraph {
     fn properties_mut(&mut self) -> &mut BlockProperties {
         self.resolve_properties_mut()
     }
+
+    fn control_values(&self) -> &BTreeMap<String, Value> {
+        self.index.control_values()
+    }
 }
 
 impl AttributeGraph {
     /// Edit value,
     ///
-    pub fn edit_value(name: impl AsRef<str>, value: &mut Value, ui: &Ui) {
+    pub fn edit_value(
+        name: impl AsRef<str>,
+        value: &mut Value,
+        workspace: Option<Workspace>,
+        ui: &Ui,
+    ) {
         match value {
             atlier::system::Value::Empty => {
                 ui.label_text(name, "empty");
@@ -376,7 +385,11 @@ impl AttributeGraph {
                 *b = clone[1];
                 *c = clone[2];
             }
-            atlier::system::Value::BinaryVector(_) => {}
+            atlier::system::Value::BinaryVector(_) => {
+                if let Some(_) = workspace {
+                    if ui.button(format!("Save {} to file", name.as_ref())) {}
+                }
+            }
             atlier::system::Value::Reference(_) => {}
             atlier::system::Value::Symbol(s) => {
                 ui.input_text(name, s).build();
@@ -393,14 +406,14 @@ impl App for AttributeGraph {
 
     fn edit_ui(&mut self, ui: &imgui::Ui) {
         let id = self.entity_id();
-   
+
         for (name, property) in self.resolve_properties_mut().iter_properties_mut() {
             property.edit(
-                move |value| Self::edit_value(format!("{name} {id}"), value, ui),
+                move |value| Self::edit_value(format!("{name} {id}"), value, None, ui),
                 move |values| {
                     imgui::ListBox::new(format!("{name} {id}")).build(ui, || {
                         for (idx, value) in values.iter_mut().enumerate() {
-                            Self::edit_value(format!("{name} {id}-{idx}"), value, ui);
+                            Self::edit_value(format!("{name} {id}-{idx}"), value, None, ui);
                         }
                     });
                 },

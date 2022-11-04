@@ -4,7 +4,7 @@ use reality::Block;
 use specs::{prelude::*, Entities, Entity, ReadStorage, SystemData};
 use tokio::{select, sync::oneshot};
 
-use crate::prelude::*;
+use crate::{prelude::*, engine::Completion};
 
 mod listener;
 pub use listener::PluginListener;
@@ -84,6 +84,7 @@ impl<'a> Plugins<'a> {
     ///
     pub fn start_sequence(
         &self,
+        event: Entity,
         sequence: &Sequence,
         initial_context: Option<&ThunkContext>,
     ) -> Operation {
@@ -144,7 +145,21 @@ impl<'a> Plugins<'a> {
                         select! {
                             result = operation.task(rx) => {
                                 match result {
-                                    Some(mut result) => context = result.consume(),
+                                    Some(mut result) => { 
+                                        let mut completion = Completion {
+                                            event,
+                                            thunk: e,
+                                            control_values: context.control_values().clone(),
+                                            query: context.properties().clone(),
+                                            returns: None,
+                                        };
+
+                                        context = result.consume();
+
+                                        completion.returns = Some(context.properties().clone());
+
+                                        context.dispatch_completion(completion);
+                                    }
                                     None => {
                                     }
                                 }

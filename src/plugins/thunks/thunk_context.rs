@@ -1,4 +1,4 @@
-use crate::engine::Yielding;
+use crate::engine::{Yielding, Completion};
 use crate::guest::Guest;
 use crate::prelude::{attributes::Fmt, *};
 use hyper::{Body, Response};
@@ -74,6 +74,8 @@ pub struct ThunkContext {
     guest_dispatcher: Option<Sender<Guest>>,
     /// Dispatcher for sending a node command, 
     node_dispatcher: Option<Sender<(NodeCommand, Option<Yielding>)>>,
+    /// Dispatcher for sending a node command, 
+    completion_dispatcher: Option<Sender<Completion>>,
     /// Watches for changes to the world's HostEditor,
     host_editor_watcher: Option<tokio::sync::watch::Receiver<HostEditor>>,
     /// UDP socket,
@@ -114,6 +116,7 @@ impl Clone for ThunkContext {
             host_editor_watcher: self.host_editor_watcher.clone(),
             guest_dispatcher: self.guest_dispatcher.clone(),
             node_dispatcher: self.node_dispatcher.clone(),
+            completion_dispatcher: self.completion_dispatcher.clone(),
             response_cache: None,
             body_cache: None,
         }
@@ -441,6 +444,11 @@ impl ThunkContext {
         self
     }
 
+    pub fn enable_completion_dispatcher(&mut self, completions: Sender<Completion>) -> &mut ThunkContext {
+        self.completion_dispatcher = Some(completions);
+        self
+    }
+
     /// Enable a workspace for this context,
     ///
     pub fn enable_workspace(&mut self, workspace: Workspace) {
@@ -633,6 +641,20 @@ impl ThunkContext {
     /// 
     pub fn node_dispatcher(&self) -> Option<Sender<(NodeCommand, Option<Yielding>)>> {
         self.node_dispatcher.clone()
+    }
+
+    /// Dispatches a completion,
+    /// 
+    pub fn dispatch_completion(&self, completion: Completion) {
+        if let Some(disp) = self.completion_dispatcher.as_ref() {
+            match disp.try_send(completion) {
+                Ok(_) => {
+                },
+                Err(err) => {
+                    event!(Level::ERROR, "Could not dispatch {err}");
+                },
+            }
+        }
     }
 
     /// Sends a node command, if the command was a spawn command assumes yielding and returns a receiver to get the result on completion,

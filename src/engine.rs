@@ -8,6 +8,9 @@ pub use profiler::Profiler;
 mod adhoc;
 pub use adhoc::Adhoc;
 
+mod completion;
+pub use completion::Completion;
+
 mod event;
 pub use event::Event;
 

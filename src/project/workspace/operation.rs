@@ -20,7 +20,7 @@ pub struct Operations<'a> {
 impl<'a> Operations<'a> {
     /// Returns a map of operations and their
     ///
-    pub fn scan_root(&self) -> Vec<(Adhoc, Sequence)> {
+    pub fn scan_root(&self) -> Vec<(Entity, Adhoc, Sequence)> {
         let Operations {
             entities,
             blocks,
@@ -43,7 +43,7 @@ impl<'a> Operations<'a> {
                 let operation_entity = entities.entity(operation_entity);
 
                 if let Some((adhoc, operation)) = (adhocs, sequences).join().get(operation_entity, entities) {
-                    operations.push((adhoc.clone(), operation.clone()));
+                    operations.push((operation_entity, adhoc.clone(), operation.clone()));
                 }
             }
         }
@@ -63,7 +63,7 @@ impl<'a> Operations<'a> {
 
         let Operations { plugins, .. } = self;
 
-        if let Some((_, sequence)) = operations.iter().find(|(adhoc, _)| {
+        if let Some((entity, _, sequence)) = operations.iter().find(|(_, adhoc, _)| {
             let matches_operation_name = adhoc.name().as_ref() == operation.as_ref();
 
             if let Some(tag) = tag.as_ref() {
@@ -72,7 +72,7 @@ impl<'a> Operations<'a> {
                 matches_operation_name
             }
         }) {
-            return Some(plugins.start_sequence(sequence, context));
+            return Some(plugins.start_sequence(*entity, sequence, context));
         }
 
         None

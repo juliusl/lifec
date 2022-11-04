@@ -126,10 +126,8 @@ fn main() {
         : opname .symbol print
 
         + .runtime
-        : .println hello execute 2
-        : .run print-2
-        : .chaos
-        : .run {opname}
+        : .println hello execute 2 {opname}
+        : .fmt opname
         : .chaos
         ```
         "#,
@@ -141,9 +139,8 @@ fn main() {
     let world = Test::compile_workspace(&workspace, files.iter(), None);
 
     let mut host = Host::from(world);
-    host.enable_listener::<Test>();
     host.link_sequences();
-    host.open_runtime_editor::<Test>()
+    host.open_runtime_editor::<Test>(true)
 }
 
 #[derive(Default)]
@@ -153,21 +150,4 @@ impl Project for Test {
     fn interpret(_: &specs::World, _: &reality::Block) {
         // no-op
     }
-}
-
-impl Listener for Test {
-    fn create(_: &World) -> Self {
-        Test {}
-    }
-
-    fn on_status_update(&mut self, status_update: &StatusUpdate) {
-        event!(Level::TRACE, "Received status_update {:?}", status_update);
-    }
-
-    fn on_completed_event(&mut self, e: &Entity) {
-        println!("Completed event - {}", e.id());
-    }
-
-    fn on_operation(&mut self, _: Operation) {}
-    fn on_error_context(&mut self, _: &ErrorContext) {}
 }

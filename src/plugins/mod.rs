@@ -208,6 +208,7 @@ pub trait Plugin {
                     .insert(child, Thunk::from_plugin::<Self>())
                     .expect("should be able to insert thunk component");
 
+                parser.define_child(child, "event_id", Value::Int(entity.id() as i32));
                 parser.define_child(child, Self::symbol(), Value::Symbol(content));
 
                 Self::compile(parser);

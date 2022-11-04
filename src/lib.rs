@@ -10,3 +10,4 @@ pub mod project;
 pub mod runtime;
 pub mod state;
 pub mod guest;
+pub mod debugger;

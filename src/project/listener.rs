@@ -1,6 +1,6 @@
 use specs::shred::Resource;
 
-use crate::prelude::*;
+use crate::{prelude::*, engine::Completion};
 
 /// Event handler trait for messages brokered from the runtime,
 ///
@@ -19,6 +19,10 @@ where
     /// Called when a completed operation is received,
     ///
     fn on_operation(&mut self, operation: Operation);
+
+    /// Called when a completion is received,
+    /// 
+    fn on_completion(&mut self, completion: Completion);
 
     /// Called when an error context is received,
     ///
