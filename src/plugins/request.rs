@@ -115,8 +115,12 @@ impl Plugin for Request {
                         for name in previous.find_symbol_values("header") {
                             if let Some(header_value) = tc.search().find_symbol(&name) {
                                 let header_value = tc.format(header_value);
-    
-                                request = request.header(name, header_value);
+
+                                if let Some(headers) = request.headers_ref() {
+                                    if !headers.contains_key(&name) {
+                                        request = request.header(name, header_value);
+                                    }
+                                }
                             }
                         }
                     }
