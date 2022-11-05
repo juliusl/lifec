@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fmt::Display,
     ops::Deref,
 };
@@ -186,7 +186,6 @@ impl Extension for WorkspaceEditor {
         {
             let runner = world.system_data::<Runner>();
             for guest in runner.guests() {
-
                 let mut guest_editor = guest.guest_editor();
                 let title = format!(
                     "Guest {}",
@@ -194,10 +193,10 @@ impl Extension for WorkspaceEditor {
                         .name(&guest.owner)
                         .unwrap_or(format!("{}", guest.owner.id()).as_str())
                 );
-                
+
                 Window::new("Workspace editor")
-                .menu_bar(true)
-                .build(ui, || {
+                    .menu_bar(true)
+                    .build(ui, || {
                         ui.menu_bar(|| {
                             ui.menu("Windows", || {
                                 ui.menu("Guests", || {
@@ -214,8 +213,8 @@ impl Extension for WorkspaceEditor {
                                 });
                             })
                         })
-                });
-                
+                    });
+
                 guest_editor.events_window(
                     format!(
                         "Guest {}",
@@ -225,8 +224,9 @@ impl Extension for WorkspaceEditor {
                     ),
                     ui,
                 );
-                guest_editor.run_now(guest.host().world());
+                guest_editor.run_now(guest.protocol().as_ref());
             }
+       
         }
     }
 
@@ -234,13 +234,13 @@ impl Extension for WorkspaceEditor {
         {
             let Runner {
                 entities,
-                mut guests,
+                guests,
                 ..
             } = world.system_data::<Runner>();
 
-            for (_, guest) in (&entities, &mut guests).join() {
+            for (_, guest) in (&entities, &guests).join() {
                 guest.run();
-                guest.host_mut().world_mut().maintain();
+                guest.maintain();
             }
         }
     }

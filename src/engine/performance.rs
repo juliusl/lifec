@@ -5,7 +5,7 @@ pub mod wire;
 
 /// Component for a sample of performance related data,
 ///
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone)]
 #[storage(DenseVecStorage)]
 pub struct Performance {
     /// Resolution to use when bucketing the histogram,

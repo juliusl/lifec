@@ -4,12 +4,11 @@ use reality::{BlockObject, BlockProperties};
 use specs::RunNow;
 
 use crate::{
-    engine::{Performance, Profilers, Cleanup},
+    debugger::Debugger,
+    engine::{Cleanup, Performance, Profilers},
     guest::Guest,
     host::EventHandler,
-    prelude::{
-        Appendix, Editor, EventRuntime, Host, Plugin, Project, RunmdFile, Sequencer,
-    }, debugger::Debugger,
+    prelude::{Appendix, Editor, EventRuntime, Host, Plugin, Project, RunmdFile, Sequencer},
 };
 
 #[derive(Default)]
@@ -48,7 +47,7 @@ impl Plugin for TestHost {
 
                     ``` cooldown
                     + .runtime
-                    : .timer 1s
+                    : .timer 500ms
                     ```
                     "#,
                 ));
@@ -68,14 +67,14 @@ impl Plugin for TestHost {
                 }
                 let test_dir = PathBuf::from(".world/test.io/test_host");
                 std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
-                let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |host| {
-                    EventRuntime::default().run_now(host.world());
-                    Cleanup::default().run_now(host.world());
-                    EventHandler::<Debugger>::default().run_now(host.world());
+                let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |guest| {
+                    EventRuntime::default().run_now(guest.protocol().as_ref());
+                    Cleanup::default().run_now(guest.protocol().as_ref());
+                    EventHandler::<Debugger>::default().run_now(guest.protocol().as_ref());
 
-                    host.world().system_data::<Profilers>().profile();
+                    guest.protocol().as_ref().system_data::<Profilers>().profile();
 
-                    if host.encode_performance() {
+                    if guest.encode_performance() {
                         let test_dir = PathBuf::from(".world/test.io/test_host/performance");
                         std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
 
@@ -90,13 +89,14 @@ impl Plugin for TestHost {
                             }
                         }
 
-                        if let Some(protocol) = host.protocol_mut() {
+                        guest.update_protocol(|protocol| {
                             protocol.send::<Performance, _, _>(
                                 write_stream(".world/test.io/test_host/performance/control"),
                                 write_stream(".world/test.io/test_host/performance/frames"),
                                 write_stream(".world/test.io/test_host/performance/blob"),
                             );
-                        }
+                            true
+                        });
                     }
                 });
                 tc.enable_guest(guest);

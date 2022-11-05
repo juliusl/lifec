@@ -1,21 +1,20 @@
-use std::{fs::File, sync::Arc, path::PathBuf};
+use std::{fs::File, path::PathBuf, sync::Arc};
 
 use reality::{BlockObject, BlockProperties};
 use specs::RunNow;
 
 use crate::{
+    debugger::Debugger,
+    engine::Performance,
     guest::Guest,
     host::EventHandler,
-    prelude::{
-        Appendix, Editor, Host, NodeCommand, Plugin, Sequencer, RunmdFile,
-    }, debugger::Debugger,
+    prelude::{Appendix, Editor, Host, NodeCommand, Plugin, RunmdFile, Sequencer},
 };
 
 use super::TestHost;
 
 #[derive(Default)]
 pub struct TestHostSender;
-
 
 impl Plugin for TestHostSender {
     fn symbol() -> &'static str {
@@ -63,13 +62,13 @@ impl Plugin for TestHostSender {
                 if let Some(appendix) = host.world_mut().remove::<Appendix>() {
                     host.world_mut().insert(Arc::new(appendix));
                 }
-                let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |host| {
-                    EventHandler::<Debugger>::default().run_now(host.world());
+                let mut guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |guest| {
+                    EventHandler::<Debugger>::default().run_now(guest.protocol().as_ref());
 
-                    if host.encode_commands() {
+                    if guest.encode_commands() {
                         let test_dir = PathBuf::from(".world/test.io/test_host");
                         std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
-                        
+
                         fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
                             move || {
                                 std::fs::OpenOptions::new()
@@ -81,15 +80,56 @@ impl Plugin for TestHostSender {
                             }
                         }
 
-                        if let Some(protocol) = host.protocol_mut() {
+                        if guest.update_protocol(|protocol| {
                             protocol.send::<NodeCommand, _, _>(
                                 write_stream(".world/test.io/test_host/control"),
                                 write_stream(".world/test.io/test_host/frames"),
                                 write_stream(".world/test.io/test_host/blob"),
                             );
-                        }
+
+                            true
+                        }) {}
                     }
+
+                    let workspace = guest.workspace().clone();
+                    if guest.update_protocol(move |protocol| {
+                        fn read_stream<'a>(name: &'a PathBuf) -> impl FnOnce() -> File + 'a {
+                            move || {
+                                std::fs::OpenOptions::new()
+                                    .read(true)
+                                    .open(name)
+                                    .ok()
+                                    .unwrap()
+                            }
+                        }
+
+                        let work_dir = workspace
+                            .work_dir()
+                            .join(".world/test.io/test_host")
+                            .join("performance");
+                        let control = work_dir.join("control");
+                        let frames = work_dir.join("frames");
+                        let blob = work_dir.join("blob");
+
+                        if control.exists() && frames.exists() && blob.exists() {
+                            protocol.clear::<Performance>();
+                            protocol.receive::<Performance, _, _>(
+                                read_stream(&control),
+                                read_stream(&frames),
+                                read_stream(&blob),
+                            );
+
+                            std::fs::remove_file(control).ok();
+                            std::fs::remove_file(frames).ok();
+                            std::fs::remove_file(blob).ok();
+                            true
+                        } else {
+                            false
+                        }
+                    }) {}
                 });
+
+                guest.enable_remote();
                 tc.enable_guest(guest);
                 Some(tc)
             }

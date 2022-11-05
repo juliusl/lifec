@@ -32,3 +32,20 @@ where
     ///
     fn on_completed_event(&mut self, entity: &Entity);
 }
+
+
+impl Listener for () {
+    fn create(_: &World) -> Self {
+        ()
+    }
+
+    fn on_status_update(&mut self, _: &StatusUpdate) {}
+
+    fn on_operation(&mut self, _: Operation) {}
+
+    fn on_completion(&mut self, _: Completion) {}
+
+    fn on_error_context(&mut self, _: &ErrorContext) {}
+
+    fn on_completed_event(&mut self, _: &Entity) {}
+}

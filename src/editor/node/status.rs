@@ -13,6 +13,7 @@ pub enum NodeStatus {
     Event(EventStatus),
     /// This is a termination point for event nodes that are adhoc operations
     Profiler(Entity),
+    /// Empty node,
     #[default]
     Empty,
 }

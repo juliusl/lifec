@@ -19,9 +19,9 @@ pub struct Debugger {
     ///
     appendix: Appendix,
     /// Map of completions,
-    /// 
+    ///
     /// TODO: This could get massive, so probably need a way to clear it out
-    /// 
+    ///
     completions: BTreeMap<(Entity, Entity), Completion>,
     /// Command dispatcher,
     ///
@@ -44,19 +44,19 @@ impl App for Debugger {
 
 impl Debugger {
     /// Returns the debugger's appendix,
-    /// 
+    ///
     pub fn appendix(&self) -> &Appendix {
         &self.appendix
     }
 
     /// Sets the appendix,
-    /// 
+    ///
     pub fn set_appendix(&mut self, appendix: Appendix) {
         self.appendix = appendix;
     }
 
     /// Displays a tree view of completion history,
-    /// 
+    ///
     pub fn completion_tree(&self, ui: &Ui) {
         for (
             _,
@@ -82,11 +82,16 @@ impl Debugger {
                         ui.text("Control Values");
                         ui.disabled(false, || {
                             for (name, value) in control_values.iter() {
-                                AttributeGraph::edit_value(format!("{name}"), &mut value.clone(), None, ui);
+                                AttributeGraph::edit_value(
+                                    format!("{name}"),
+                                    &mut value.clone(),
+                                    None,
+                                    ui,
+                                );
                             }
                         });
                     }
-             
+
                     ui.text("Input");
                     ui.disabled(false, || {
                         for (i, (name, property)) in query.clone().iter_properties_mut().enumerate()
@@ -105,7 +110,11 @@ impl Debugger {
                                     ui.group(|| {
                                         for (idx, value) in values.iter_mut().enumerate() {
                                             AttributeGraph::edit_value(
-                                                format!("{name} {i}-{idx}.{}.{}", event.id(), thunk.id()),
+                                                format!(
+                                                    "{name} {i}-{idx}.{}.{}",
+                                                    event.id(),
+                                                    thunk.id()
+                                                ),
                                                 value,
                                                 None,
                                                 ui,
@@ -136,19 +145,25 @@ impl Debugger {
                                         )
                                     },
                                     move |values| {
-                                        imgui::ListBox::new(format!("{name} c_{i}.{}.{}", event.id(), thunk.id())).build(
-                                            ui,
-                                            || {
-                                                for (idx, value) in values.iter_mut().enumerate() {
-                                                    AttributeGraph::edit_value(
-                                                        format!("{name} c_{i}-{idx}.{}.{}", event.id(), thunk.id()),
-                                                        value,
-                                                        None,
-                                                        ui,
-                                                    );
-                                                }
-                                            },
-                                        );
+                                        imgui::ListBox::new(format!(
+                                            "{name} c_{i}.{}.{}",
+                                            event.id(),
+                                            thunk.id()
+                                        ))
+                                        .build(ui, || {
+                                            for (idx, value) in values.iter_mut().enumerate() {
+                                                AttributeGraph::edit_value(
+                                                    format!(
+                                                        "{name} c_{i}-{idx}.{}.{}",
+                                                        event.id(),
+                                                        thunk.id()
+                                                    ),
+                                                    value,
+                                                    None,
+                                                    ui,
+                                                );
+                                            }
+                                        });
                                     },
                                     || None,
                                 );
@@ -202,6 +217,6 @@ impl Listener for Debugger {
     }
 
     fn on_completed_event(&mut self, _: &specs::Entity) {
-        // TODO -- Could use this to bring completions to the top? 
+        // TODO -- Could use this to bring completions to the top?
     }
 }

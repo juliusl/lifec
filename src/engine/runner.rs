@@ -1,3 +1,4 @@
+
 use specs::SystemData;
 use specs::prelude::*;
 use tracing::Level;
@@ -35,10 +36,10 @@ impl<'a> Runner<'a> {
 
     /// Takes performance from world state,
     /// 
-    pub fn take_performance(&mut self) -> Vec<Performance> {
+    pub fn take_performance(&mut self) -> Vec<(Entity, Performance)> {
         let mut samples = vec![];
         for (entity, sample) in (&self.entities, self.samples.drain()).join() {
-            samples.push(sample);
+            samples.push((entity, sample));
             match self.entities.delete(entity) {
                 Ok(_) => {
                     

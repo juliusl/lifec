@@ -140,7 +140,10 @@ impl WireObject for Performance {
                             let mut _c = [0; 4];
                             _c.copy_from_slice(c);
                             performance.buckets.push(bytemuck::cast::<[u8; 4], f32>(_c));
-                            bucket_len -= 1;
+                            
+                            if bucket_len > 0 {
+                                bucket_len -= 1;
+                            }
                             if bucket_len == 0 {
                                 break;
                             }

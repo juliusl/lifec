@@ -1,5 +1,5 @@
 use crate::engine::{Yielding, Completion};
-use crate::guest::Guest;
+use crate::guest::{Guest, RemoteProtocol};
 use crate::prelude::{attributes::Fmt, *};
 use hyper::{Body, Response};
 use reality::Block;
@@ -78,6 +78,9 @@ pub struct ThunkContext {
     completion_dispatcher: Option<Sender<Completion>>,
     /// Watches for changes to the world's HostEditor,
     host_editor_watcher: Option<tokio::sync::watch::Receiver<HostEditor>>,
+    /// Remote protocol
+    remote: Option<RemoteProtocol>,
+
     /// UDP socket,
     ///
     /// Notes: Since UDP is connectionless, it can be shared, cloned, and stored in the
@@ -117,6 +120,7 @@ impl Clone for ThunkContext {
             guest_dispatcher: self.guest_dispatcher.clone(),
             node_dispatcher: self.node_dispatcher.clone(),
             completion_dispatcher: self.completion_dispatcher.clone(),
+            remote: None,
             response_cache: None,
             body_cache: None,
         }
@@ -394,6 +398,18 @@ impl ThunkContext {
         } else {
             false
         }
+    }
+
+    /// Enables the remote protocol on this thunk,
+    /// 
+    pub fn enable_remote(&mut self, remote: RemoteProtocol) {
+        self.remote = Some(remote);
+    }
+
+    /// Returns a remote protocol,
+    /// 
+    pub fn remote(&self) -> Option<RemoteProtocol> {
+        self.remote.clone()
     }
 
     /// Returns a context w/ an https client

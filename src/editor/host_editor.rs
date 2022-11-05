@@ -3,26 +3,30 @@ use imgui::{
     ChildWindow, StyleVar, TableColumnFlags, TableColumnSetup, TableFlags, TreeNodeFlags, Ui,
     Window,
 };
-use reality::wire::{Protocol, WireObject};
 use specs::{Entity, Read, System, Write};
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap};
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
+use std::sync::Arc;
 use tracing::{event, Level};
 
 use crate::debugger::Debugger;
-use crate::engine::Performance;
+use crate::guest::RemoteProtocol;
 use crate::prelude::EventRuntime;
 use crate::{
     prelude::{Node, State},
     state::AttributeGraph,
 };
 
-use super::{Canvas, Profiler};
+use super::{Appendix, Canvas, Profiler};
 
 /// Tool for viewing and interacting with a host,
 ///
-#[derive(Default, Clone, PartialEq)]
+#[derive(Default)]
 pub struct HostEditor {
+    /// Appendix,
+    ///
+    appendix: Option<Arc<Appendix>>,
     /// Current nodes,
     ///
     nodes: Vec<Node>,
@@ -53,6 +57,28 @@ pub struct HostEditor {
     /// If debugger is enabled, it will be displayed in the host editor window,
     ///
     debugger: Option<Debugger>,
+    /// Remote protocol,
+    ///
+    remote: Option<RemoteProtocol>,
+}
+
+impl Clone for HostEditor {
+    fn clone(&self) -> Self {
+        Self {
+            appendix: self.appendix.clone(),
+            nodes: self.nodes.clone(),
+            adhoc_nodes: self.adhoc_nodes.clone(),
+            is_event_window_opened: self.is_event_window_opened.clone(),
+            is_paused: self.is_paused.clone(),
+            is_stopped: self.is_stopped.clone(),
+            tick: self.tick.clone(),
+            pause: self.pause.clone(),
+            reset: self.reset.clone(),
+            canvas: self.canvas.clone(),
+            debugger: self.debugger.clone(),
+            remote: None,
+        }
+    }
 }
 
 impl Hash for HostEditor {
@@ -69,6 +95,12 @@ impl Hash for HostEditor {
 }
 
 impl HostEditor {
+    /// Sets the remote protocol,
+    ///
+    pub fn set_remote(&mut self, remote: RemoteProtocol) {
+        self.remote = Some(remote);
+    }
+
     /// Opens event window,
     ///
     pub fn open_event_window(&mut self) {
@@ -82,7 +114,7 @@ impl HostEditor {
     }
 
     /// Returns true if the events window should be open,
-    /// 
+    ///
     pub fn events_window_opened(&self) -> bool {
         self.is_event_window_opened
     }
@@ -175,19 +207,19 @@ impl App for HostEditor {
         Window::new("Workspace editor")
             .menu_bar(true)
             .build(ui, || {
-                    ui.menu_bar(|| {
-                        ui.menu("Windows", || {
-                            ui.menu("Host editor", || {
-                                let event_window_opened = self.is_event_window_opened;
-                                if imgui::MenuItem::new("Events window")
-                                    .selected(self.is_event_window_opened)
-                                    .build(ui)
-                                {
-                                    self.is_event_window_opened = !event_window_opened;
-                                }
-                            });
-                        })
+                ui.menu_bar(|| {
+                    ui.menu("Windows", || {
+                        ui.menu("Host editor", || {
+                            let event_window_opened = self.is_event_window_opened;
+                            if imgui::MenuItem::new("Events window")
+                                .selected(self.is_event_window_opened)
+                                .build(ui)
+                            {
+                                self.is_event_window_opened = !event_window_opened;
+                            }
+                        });
                     })
+                })
             });
     }
 
@@ -201,40 +233,41 @@ impl<'a> System<'a> for HostEditor {
         Write<'a, Option<Debugger>>,
     );
 
-    fn run(&mut self, (mut events, watcher, debugger): Self::SystemData) {
+    fn run(&mut self, (mut state, watcher, debugger): Self::SystemData) {
+        self.appendix = Some(state.appendix().clone());
         self.debugger = debugger.clone();
 
         if let Some(debugger) = self.debugger.as_mut() {
-            debugger.set_appendix((*events.appendix()).clone());
+            debugger.set_appendix((*state.appendix()).clone());
         }
 
         // General event runtime state
-        self.is_paused = !events.can_continue();
-        self.is_stopped = events.should_exit();
+        self.is_paused = !state.can_continue();
+        self.is_stopped = state.should_exit();
 
         // Handle commands from window
         //
         if let Some(_) = self.tick.take() {
-            events.serialized_tick();
+            state.serialized_tick();
         }
 
         if let Some(_) = self.pause.take() {
-            if events.can_continue() {
-                events.pause();
+            if state.can_continue() {
+                state.pause();
             } else {
-                events.resume();
+                state.resume();
             }
         }
 
         if let Some(_) = self.reset.take() {
-            events.reset_all();
+            state.reset_all();
         }
 
         // Handle node commands
         let mut mutations = HashMap::<Entity, HashMap<Entity, AttributeGraph>>::default();
         for mut node in self.take_nodes() {
             if let Some(command) = node.command.take() {
-                match events
+                match state
                     .plugins()
                     .features()
                     .broker()
@@ -260,7 +293,7 @@ impl<'a> System<'a> for HostEditor {
 
         // Get latest node state,
         //
-        for mut node in events.event_nodes() {
+        for mut node in state.event_nodes() {
             if let Some(mutations) = mutations.remove(&node.status.entity()) {
                 node.mutations = mutations;
             }
@@ -270,12 +303,20 @@ impl<'a> System<'a> for HostEditor {
 
         // Get latest adhoc profiler state,
         //
-        self.adhoc_nodes = events.adhoc_nodes();
+        self.adhoc_nodes = state.adhoc_nodes();
 
         // Update watcher
         //
         watcher.send_if_modified(|current| {
-            if current != self {
+            let mut hasher = DefaultHasher::default();
+            current.hash(&mut hasher);
+            let current_hash = hasher.finish();
+
+            let mut hasher = DefaultHasher::default();
+            self.hash(&mut hasher);
+            let next_hash = hasher.finish();
+
+            if current_hash != next_hash {
                 *current = self.clone();
                 true
             } else {
@@ -402,59 +443,45 @@ impl HostEditor {
         ui.text("Performance");
         ui.spacing();
         if let Some(tab_bar) = ui.tab_bar("Performance Tabs") {
-            let tab = ui.tab_item("Engine events");
-            if ui.is_item_hovered() {
-                ui.tooltip_text("Performance histograms of event transitions");
-            }
-            if let Some(token) = tab {
-                // This is the performance of engine operation events
-                for node in self.nodes.iter() {
-                    // TODO: Make these configurable
-                    if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
-                        ui.new_line();
-                    }
+            if let Some(remote) = self.remote.as_ref() {
+                let tab = ui.tab_item("Remote");
+                if ui.is_item_hovered() {
+                    ui.tooltip_text("Performance histograms of connected remote");
                 }
-
-                token.end();
-            }
-
-            let tab = ui.tab_item("Operations");
-            if ui.is_item_hovered() {
-                ui.tooltip_text("Performance histograms of adhoc operation execution");
-            }
-            if let Some(token) = tab {
-                // This is the performance of adhoc operation events
-                for node in self.adhoc_nodes.iter() {
-                    if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
-                        ui.new_line();
-                    }
+                if let Some(token) = tab {
+                    remote.borrow().histogram(ui, 0, &[]);
+                    token.end();
                 }
-                token.end();
-            }
-
-            let tab = ui.tab_item("Debug");
-            if let Some(token) = tab {
-                let mut protocol = Protocol::empty();
-                let profilers = self.adhoc_nodes.iter().cloned().collect::<Vec<_>>();
-
-                protocol.encoder::<Performance>(move |w, e| {
-                    for node in profilers
-                        .iter()
-                        .filter_map(|p| p.connection.clone())
-                        .map(|p| Performance::samples(100, &[50.0, 60.0, 90.0, 99.0], &p))
-                        .flatten()
-                    {
-                        e.encode(&node, w);
+            } else {
+                let tab = ui.tab_item("Engine events");
+                if ui.is_item_hovered() {
+                    ui.tooltip_text("Performance histograms of event transitions");
+                }
+                if let Some(token) = tab {
+                    // This is the performance of engine operation events
+                    for node in self.nodes.iter() {
+                        // TODO: Make these configurable
+                        if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
+                            ui.new_line();
+                        }
                     }
 
-                    e.frame_index = Performance::build_index(&e.interner, &e.frames);
-                });
-
-                for f in protocol.decode::<Performance>() {
-                    ui.text(format!("{:#?}", f));
+                    token.end();
                 }
 
-                token.end();
+                let tab = ui.tab_item("Operations");
+                if ui.is_item_hovered() {
+                    ui.tooltip_text("Performance histograms of adhoc operation execution");
+                }
+                if let Some(token) = tab {
+                    // This is the performance of adhoc operation events
+                    for node in self.adhoc_nodes.iter() {
+                        if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
+                            ui.new_line();
+                        }
+                    }
+                    token.end();
+                }
             }
 
             tab_bar.end();

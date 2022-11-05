@@ -18,31 +18,52 @@ use super::{NodeCommand, NodeStatus};
 impl WireObject for NodeStatus {
     fn encode<BlobImpl>(&self, world: &specs::World, encoder: &mut Encoder<BlobImpl>)
     where
-        BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default 
+        BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
     {
         let appendix = world.read_resource::<Arc<Appendix>>();
-        let appendix =  appendix.deref().clone();
+        let appendix = appendix.deref().clone();
         match self {
             NodeStatus::Event(event) => {
                 match event {
-                    crate::prelude::EventStatus::Scheduled(entity) => encode_node_command(0x10, *entity, appendix, encoder),
-                    crate::prelude::EventStatus::New(entity) => encode_node_command(0x20, *entity, appendix, encoder),
-                    crate::prelude::EventStatus::InProgress(entity) => encode_node_command(0x30, *entity, appendix, encoder),
-                    crate::prelude::EventStatus::Paused(entity) => encode_node_command(0x40, *entity, appendix, encoder),
-                    crate::prelude::EventStatus::Ready(entity) => encode_node_command(0x50, *entity, appendix, encoder),
-                    crate::prelude::EventStatus::Completed(entity) => encode_node_command(0x60, *entity, appendix, encoder),
-                    crate::prelude::EventStatus::Cancelled(entity) => encode_node_command(0x70, *entity, appendix, encoder),
-                    crate::prelude::EventStatus::Inactive(entity) => encode_node_command(0x80, *entity, appendix, encoder),
-                    crate::prelude::EventStatus::Disposed(entity) => encode_node_command(0x90, *entity, appendix, encoder),
+                    crate::prelude::EventStatus::Scheduled(entity) => {
+                        encode_node_command(0x10, *entity, appendix, encoder)
+                    }
+                    crate::prelude::EventStatus::New(entity) => {
+                        encode_node_command(0x20, *entity, appendix, encoder)
+                    }
+                    crate::prelude::EventStatus::InProgress(entity) => {
+                        encode_node_command(0x30, *entity, appendix, encoder)
+                    }
+                    crate::prelude::EventStatus::Paused(entity) => {
+                        encode_node_command(0x40, *entity, appendix, encoder)
+                    }
+                    crate::prelude::EventStatus::Ready(entity) => {
+                        encode_node_command(0x50, *entity, appendix, encoder)
+                    }
+                    crate::prelude::EventStatus::Completed(entity) => {
+                        encode_node_command(0x60, *entity, appendix, encoder)
+                    }
+                    crate::prelude::EventStatus::Cancelled(entity) => {
+                        encode_node_command(0x70, *entity, appendix, encoder)
+                    }
+                    crate::prelude::EventStatus::Inactive(entity) => {
+                        encode_node_command(0x80, *entity, appendix, encoder)
+                    }
+                    crate::prelude::EventStatus::Disposed(entity) => {
+                        encode_node_command(0x90, *entity, appendix, encoder)
+                    }
                 };
-            },
-            _ => {
-
-            },
+            }
+            _ => {}
         }
     }
 
-    fn decode(protocol: &reality::wire::Protocol, _: &reality::wire::Interner, _: &std::io::Cursor<Vec<u8>>, frames: &[Frame]) -> Self {
+    fn decode(
+        protocol: &reality::wire::Protocol,
+        _: &reality::wire::Interner,
+        _: &std::io::Cursor<Vec<u8>>,
+        frames: &[Frame],
+    ) -> Self {
         let frame = frames.get(0).expect("should only be 1 frame");
         let entity = frame.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
         match frame.op() {
@@ -50,10 +71,11 @@ impl WireObject for NodeStatus {
             0x20 => NodeStatus::Event(EventStatus::New(entity)),
             0x30 => NodeStatus::Event(EventStatus::InProgress(entity)),
             0x40 => NodeStatus::Event(EventStatus::Paused(entity)),
-            0x50 => NodeStatus::Event(EventStatus::Ready(entity)), 
+            0x50 => NodeStatus::Event(EventStatus::Ready(entity)),
             0x60 => NodeStatus::Event(EventStatus::Completed(entity)),
             0x70 => NodeStatus::Event(EventStatus::Cancelled(entity)),
-            0x80 => NodeStatus::Event(EventStatus::Inactive(entity)), 
+            0x80 => NodeStatus::Event(EventStatus::Inactive(entity)),
+            0x90 => NodeStatus::Event(EventStatus::Disposed(entity)),
             _ => {
                 panic!("Unrecognized frame")
             }
@@ -162,9 +184,13 @@ impl WireObject for NodeCommand {
                 encoder.frames.push(frame);
             }
             NodeCommand::Swap { owner, from, to } => {
-                // TODO - 0x90, 0x91, 0x92
-                unimplemented!("Not implemented")
-            },
+                let owner = encode_node_command(0x90, *owner, appendix.deref().clone(), encoder);
+                let from = encode_node_command(0x91, *from, appendix.deref().clone(), encoder);
+                let to = encode_node_command(0x92, *to, appendix.deref().clone(), encoder);
+                encoder.frames.push(owner);
+                encoder.frames.push(from);
+                encoder.frames.push(to);
+            }
         }
     }
 
@@ -230,6 +256,30 @@ impl WireObject for NodeCommand {
                             panic!("Name is required, {:?}", frames.get(1))
                         }
                     }
+                    0x90 => {
+                        let owner = frame
+                            .get_entity(protocol.as_ref(), protocol.assert_entity_generation());
+                        let from = frames
+                            .get(1)
+                            .and_then(|f| {
+                                Some(f.get_entity(
+                                    protocol.as_ref(),
+                                    protocol.assert_entity_generation(),
+                                ))
+                            })
+                            .expect("should have a frame for from");
+                        let to = frames
+                            .get(2)
+                            .and_then(|f| {
+                                Some(f.get_entity(
+                                    protocol.as_ref(),
+                                    protocol.assert_entity_generation(),
+                                ))
+                            })
+                            .expect("should have a frame for to");
+
+                        NodeCommand::Swap { owner, from, to }
+                    }
                     _ => {
                         panic!("Unrecognized start frame")
                     }
@@ -265,6 +315,11 @@ impl WireObject for NodeCommand {
                     let range = pos..pos + 2;
                     index.insert(format!("{idx}"), vec![range]);
                     pos += 2;
+                }
+                0x90 => {
+                    let range = pos..pos + 3;
+                    index.insert(format!("{idx}"), vec![range]);
+                    pos += 3;
                 }
                 _ => {}
             }
@@ -315,13 +370,12 @@ where
 }
 
 mod tests {
-    use crate::prelude::{Project};
+    use crate::prelude::Project;
 
     #[test]
     #[tracing_test::traced_test]
     fn test_protocol() {
         std::fs::remove_dir_all(".test").ok();
-        use std::{fs::File, path::PathBuf};
         use super::NodeCommand;
         use crate::prelude::{Appendix, Editor, Host};
         use crate::state::{AttributeGraph, AttributeIndex};
@@ -330,6 +384,7 @@ mod tests {
         use reality::Parser;
         use specs::WorldExt;
         use std::sync::Arc;
+        use std::{fs::File, path::PathBuf};
 
         let mut host = Host::load_content::<Test>(
             r#"
@@ -410,7 +465,7 @@ mod tests {
                     .unwrap()
             }
         }
-    
+
         fn read_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
             move || {
                 std::fs::OpenOptions::new()
@@ -420,7 +475,6 @@ mod tests {
                     .unwrap()
             }
         }
-
 
         let test_dir = PathBuf::from(".test");
         std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
@@ -440,9 +494,9 @@ mod tests {
         //
         let mut protocol = Protocol::empty();
         protocol.receive::<NodeCommand, _, _>(
-            read_stream(".test/control"), 
-            read_stream(".test/frames"), 
-            read_stream(".test/blob")
+            read_stream(".test/control"),
+            read_stream(".test/frames"),
+            read_stream(".test/blob"),
         );
         for command in protocol.decode::<NodeCommand>() {
             eprintln!("{:#?}", command);
@@ -452,8 +506,6 @@ mod tests {
 
         assert!(protocol.decode::<NodeCommand>().is_empty());
     }
-
-
 
     #[derive(Default)]
     struct Test;
