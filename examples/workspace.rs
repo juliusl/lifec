@@ -69,6 +69,7 @@ fn main() {
         ``` setup
         + .runtime
         : .println hello setup a
+        : testlabel .timer 10 ms
         : .chaos
         ```
 

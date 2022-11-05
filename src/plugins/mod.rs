@@ -208,6 +208,10 @@ pub trait Plugin {
                     .insert(child, Thunk::from_plugin::<Self>())
                     .expect("should be able to insert thunk component");
 
+                if let Some(label) = parser.symbol() {
+                    parser.define_child(child, "label", Value::Symbol(label.to_string()));
+                }
+
                 parser.define_child(child, "event_id", Value::Int(entity.id() as i32));
                 parser.define_child(child, Self::symbol(), Value::Symbol(content));
 
@@ -328,21 +332,21 @@ where
 }
 
 /// Prelude for building protocol implementations and plugins,
-/// 
+///
 pub mod protocol_prelude {
     /// Helpers for writing concrete implementations for each stream required by the protocol,
-    /// 
+    ///
     pub use crate::plugins::async_protocol_helpers::*;
     /// Wire protocol that defines the concept of a "wire object",
-    /// 
+    ///
     pub use reality::wire::Protocol;
 }
 
 /// Helpers for building different transport implementations for protocol,
-/// 
+///
 pub mod async_protocol_helpers {
     use std::future::Future;
-    use tokio::io::{AsyncWrite, AsyncRead};
+    use tokio::io::{AsyncRead, AsyncWrite};
 
     /// Strongly typed, Monad for a function that creates a writable stream
     ///
@@ -360,8 +364,8 @@ pub mod async_protocol_helpers {
     /// Strongly-typed, Monad for a function that creates a readable stream,
     ///
     pub fn read_stream<Reader, F>(
-        name: &'static str, 
-        reader_impl: impl FnOnce(&'static str) -> F
+        name: &'static str,
+        reader_impl: impl FnOnce(&'static str) -> F,
     ) -> impl FnOnce() -> F
     where
         Reader: AsyncRead + Unpin,
