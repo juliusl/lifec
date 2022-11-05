@@ -29,6 +29,9 @@ pub struct HostEditor {
     /// Adhoc profiler nodes,
     ///
     adhoc_nodes: Vec<Node>,
+    /// Whether to open the event window,
+    ///
+    is_event_window_opened: bool,
     /// True if the event runtime is paused,
     ///
     is_paused: bool,
@@ -44,7 +47,8 @@ pub struct HostEditor {
     /// Command to reset state on all events,
     ///
     reset: Option<()>,
-
+    /// Entity canvas,
+    ///
     canvas: Canvas,
     /// If debugger is enabled, it will be displayed in the host editor window,
     ///
@@ -55,6 +59,7 @@ impl Hash for HostEditor {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.nodes.hash(state);
         self.adhoc_nodes.hash(state);
+        self.is_event_window_opened.hash(state);
         self.is_paused.hash(state);
         self.is_stopped.hash(state);
         self.tick.hash(state);
@@ -64,6 +69,24 @@ impl Hash for HostEditor {
 }
 
 impl HostEditor {
+    /// Opens event window,
+    ///
+    pub fn open_event_window(&mut self) {
+        self.is_event_window_opened = true;
+    }
+
+    /// Closes event window,
+    ///
+    pub fn close_event_window(&mut self) {
+        self.is_event_window_opened = false;
+    }
+
+    /// Returns true if the events window should be open,
+    /// 
+    pub fn events_window_opened(&self) -> bool {
+        self.is_event_window_opened
+    }
+
     /// Dispatch a command to tick events,
     ///
     pub fn tick_events(&mut self) {
@@ -86,40 +109,47 @@ impl HostEditor {
     ///
     pub fn events_window(&mut self, suffix: impl AsRef<str>, ui: &Ui) {
         let suffix = suffix.as_ref();
-        Window::new(format!("Events {suffix}"))
-            .size([1500.0, 700.0], imgui::Condition::Appearing)
-            .build(ui, || {
-                // Toolbar for controlling event runtime
-                self.tool_bar(ui);
+        let mut opened = self.is_event_window_opened;
 
-                ui.spacing();
-                ui.separator();
-                ui.group(|| {
-                    ChildWindow::new(&format!("Events List {suffix}"))
-                        .size([750.0, 400.0])
-                        .border(true)
-                        .build(ui, || {
-                            self.event_list(ui);
-                        });
+        if opened {
+            Window::new(format!("Events {suffix}"))
+                .size([1500.0, 700.0], imgui::Condition::Appearing)
+                .opened(&mut opened)
+                .build(ui, || {
+                    // Toolbar for controlling event runtime
+                    self.tool_bar(ui);
 
-                    ui.same_line();
-                    ChildWindow::new(&format!("Performance {suffix}"))
-                        .size([-1.0, 400.0])
-                        .border(true)
-                        .build(ui, || {
-                            self.performance_section(ui);
-                        });
+                    ui.spacing();
+                    ui.separator();
+                    ui.group(|| {
+                        ChildWindow::new(&format!("Events List {suffix}"))
+                            .size([750.0, 400.0])
+                            .border(true)
+                            .build(ui, || {
+                                self.event_list(ui);
+                            });
+
+                        ui.same_line();
+                        ChildWindow::new(&format!("Performance {suffix}"))
+                            .size([-1.0, 400.0])
+                            .border(true)
+                            .build(ui, || {
+                                self.performance_section(ui);
+                            });
+                    });
+
+                    if let Some(debugger) = self.debugger.as_ref() {
+                        ChildWindow::new(&format!("Debugger {suffix}"))
+                            .size([0.0, -1.0])
+                            .border(true)
+                            .build(ui, || {
+                                debugger.display_ui(ui);
+                            });
+                    }
                 });
+        }
 
-                if let Some(debugger) = self.debugger.as_ref() {
-                    ChildWindow::new(&format!("Debugger {suffix}"))
-                        .size([0.0, -1.0])
-                        .border(true)
-                        .build(ui, || {
-                            debugger.display_ui(ui);
-                        });
-                }
-            });
+        self.is_event_window_opened = opened;
     }
 
     /// Takes nodes from the host editor,
@@ -141,6 +171,24 @@ impl App for HostEditor {
         // self.canvas.edit_ui(ui);
         window_padding.end();
         frame_padding.end();
+
+        Window::new("Workspace editor")
+            .menu_bar(true)
+            .build(ui, || {
+                    ui.menu_bar(|| {
+                        ui.menu("Windows", || {
+                            ui.menu("Host editor", || {
+                                let event_window_opened = self.is_event_window_opened;
+                                if imgui::MenuItem::new("Events window")
+                                    .selected(self.is_event_window_opened)
+                                    .build(ui)
+                                {
+                                    self.is_event_window_opened = !event_window_opened;
+                                }
+                            });
+                        })
+                    })
+            });
     }
 
     fn display_ui(&self, _: &imgui::Ui) {}
@@ -193,7 +241,7 @@ impl<'a> System<'a> for HostEditor {
                     .try_send_node_command(command.clone(), None)
                 {
                     Ok(_) => {
-                        event!(Level::DEBUG, "Sent node command {:?}", command);
+                        event!(Level::DEBUG, "Sent node command {}", command);
                     }
                     Err(err) => {
                         event!(

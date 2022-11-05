@@ -6,6 +6,9 @@ use crate::prelude::{Host, HostEditor, PluginFeatures, Project, ThunkContext, St
 
 /// Guest host as a component,
 ///
+/// TODO: 
+/// - List of guest features
+/// 
 #[derive(Component)]
 #[storage(HashMapStorage)]
 pub struct Guest {
@@ -13,7 +16,7 @@ pub struct Guest {
     pub owner: Entity,
     /// Host w/ protocol enabled,
     host: Host,
-    /// Run function
+    /// Run function,
     stateless: Run,
 }
 

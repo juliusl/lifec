@@ -1,4 +1,8 @@
-use std::{fmt::Display, ops::Deref, collections::{HashMap, BTreeMap}};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Display,
+    ops::Deref,
+};
 
 use atlier::system::Extension;
 use copypasta::{ClipboardContext, ClipboardProvider};
@@ -8,13 +12,14 @@ pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 use tracing::{event, Level};
 
 use crate::{
-    engine::{Runner, NodeCommandHandler},
+    engine::{NodeCommandHandler, Runner},
     prelude::{Runtime, Thunk},
 };
 
 use super::Appendix;
 
-/// Extension
+/// Extension to display workspace editing tools,
+///
 ///
 #[derive(Default)]
 pub struct WorkspaceEditor {
@@ -27,6 +32,32 @@ pub struct WorkspaceEditor {
 }
 
 impl WorkspaceEditor {
+    /// Handle the clipboard for tools,
+    ///
+    pub fn handle_clipboard(&mut self, ui: &Ui) {
+        if let Some(text) = ui.clipboard_text() {
+            if let Some(clipboard_context) = self.clipboard.as_mut() {
+                match clipboard_context.set_contents(text) {
+                    Ok(_) => {
+                        ui.set_clipboard_text(String::default());
+                    }
+                    Err(err) => {
+                        event!(Level::ERROR, "Could not set clipboard contents, {err}");
+                    }
+                }
+            } else {
+                match ClipboardContext::new() {
+                    Ok(ctx) => {
+                        self.clipboard = Some(ctx);
+                    }
+                    Err(err) => {
+                        event!(Level::ERROR, "Error creating clipboard context {err}");
+                    }
+                }
+            }
+        }
+    }
+
     pub fn plugins(&mut self, world: &World, ui: &Ui) {
         let runtime = world.read_resource::<Runtime>();
 
@@ -71,7 +102,9 @@ impl WorkspaceEditor {
         let table_flags =
             TableFlags::BORDERS_INNER_V | TableFlags::RESIZABLE | TableFlags::HIDEABLE;
 
-        if let Some(token) = ui.begin_table_with_flags(format!("Custom node handlers"), 2, table_flags) {
+        if let Some(token) =
+            ui.begin_table_with_flags(format!("Custom node command handlers"), 1, table_flags)
+        {
             fn name_column(ui: &Ui) {
                 let mut table_column_setup = TableColumnSetup::new("Custom command");
                 table_column_setup.flags =
@@ -80,15 +113,14 @@ impl WorkspaceEditor {
             }
 
             name_column(ui);
-            ui.table_setup_column("Description");
+            // ui.table_setup_column("Description");
             ui.table_headers_row();
 
             for (name, _) in handlers.iter() {
                 ui.table_next_row();
                 ui.table_next_column();
                 ui.text(name);
-
-                ui.table_next_column();
+                // TODO -- Should just special case these descriptions for now
             }
 
             token.end();
@@ -98,11 +130,24 @@ impl WorkspaceEditor {
     pub fn workspace_window(&mut self, world: &World, ui: &Ui) {
         Window::new("Workspace editor")
             .size([700.0, 600.0], imgui::Condition::Appearing)
+            .menu_bar(true)
             .build(ui, || {
-                ui.checkbox("enable imgui demo window", &mut self.enable_demo);
+                ui.menu_bar(|| {
+                    ui.menu("Windows", || {
+                        let enable_demo_window = self.enable_demo;
+                        if imgui::MenuItem::new("Imgui demo window")
+                            .selected(enable_demo_window)
+                            .build(ui)
+                        {
+                            self.enable_demo = !enable_demo_window;
+                        }
+                    })
+                });
+
                 if self.enable_demo {
                     ui.show_demo_window(&mut self.enable_demo);
                 }
+
                 ui.spacing();
                 ui.separator();
 
@@ -134,37 +179,52 @@ impl Display for WorkspaceCommand {
 
 impl Extension for WorkspaceEditor {
     fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui<'_>) {
-        if let Some(text) = ui.clipboard_text() {
-            if let Some(clipboard_context) = self.clipboard.as_mut() {
-                match clipboard_context.set_contents(text) {
-                    Ok(_) => {
-                        ui.set_clipboard_text(String::default());
-                    }
-                    Err(err) => {
-                        event!(Level::ERROR, "Could not set clipboard contents, {err}");
-                    }
-                }
-            } else {
-                match ClipboardContext::new() {
-                    Ok(ctx) => {
-                        self.clipboard = Some(ctx);
-                    }
-                    Err(err) => {
-                        event!(Level::ERROR, "Error creating clipboard context {err}");
-                    }
-                }
-            }
-        }
-
+        self.handle_clipboard(ui);
         self.workspace_window(world, ui);
-
+        // Handle guests
+        // TODO -- show guests
         {
             let runner = world.system_data::<Runner>();
             for guest in runner.guests() {
+
                 let mut guest_editor = guest.guest_editor();
-
-                guest_editor.events_window(format!("Guest {}", guest.owner.id()), ui);
-
+                let title = format!(
+                    "Guest {}",
+                    self.appendix
+                        .name(&guest.owner)
+                        .unwrap_or(format!("{}", guest.owner.id()).as_str())
+                );
+                
+                Window::new("Workspace editor")
+                .menu_bar(true)
+                .build(ui, || {
+                        ui.menu_bar(|| {
+                            ui.menu("Windows", || {
+                                ui.menu("Guests", || {
+                                    if imgui::MenuItem::new(format!("{}", title))
+                                        .selected(guest_editor.events_window_opened())
+                                        .build(ui)
+                                    {
+                                        if guest_editor.events_window_opened() {
+                                            guest_editor.close_event_window();
+                                        } else {
+                                            guest_editor.open_event_window();
+                                        }
+                                    }
+                                });
+                            })
+                        })
+                });
+                
+                guest_editor.events_window(
+                    format!(
+                        "Guest {}",
+                        self.appendix
+                            .name(&guest.owner)
+                            .unwrap_or(format!("{}", guest.owner.id()).as_str())
+                    ),
+                    ui,
+                );
                 guest_editor.run_now(guest.host().world());
             }
         }

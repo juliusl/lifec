@@ -1,7 +1,12 @@
-use imgui::{TreeNode, TreeNodeFlags, Ui, DragDropFlags};
+use imgui::{DragDropFlags, TreeNode, TreeNodeFlags, Ui};
+use specs::Entity;
 use tracing::Level;
 
-use crate::{prelude::{EventStatus, Thunk}, state::AttributeGraph, editor::workspace_editor::WorkspaceCommand};
+use crate::{
+    editor::workspace_editor::WorkspaceCommand,
+    prelude::{EventStatus, Thunk},
+    state::AttributeGraph,
+};
 
 use super::{CommandDispatcher, Node, NodeCommand};
 
@@ -49,23 +54,16 @@ impl EventNode for Node {
         };
 
         if let Some(target) = imgui::drag_drop::DragDropTarget::new(ui) {
-            match target.accept_payload::<WorkspaceCommand, _>(
-                "ADD_PLUGIN",
-                DragDropFlags::empty(),
-            ) {
+            match target.accept_payload::<WorkspaceCommand, _>("ADD_PLUGIN", DragDropFlags::empty())
+            {
                 Some(result) => match result {
-                    Ok(command) => {
-                        match command.data {
-                            WorkspaceCommand::AddPlugin(Thunk(name, ..)) => {
-                                self.custom(format!("add_plugin::{name}"), self.status.entity());
-                            },
+                    Ok(command) => match command.data {
+                        WorkspaceCommand::AddPlugin(Thunk(name, ..)) => {
+                            self.custom(format!("add_plugin::{name}"), self.status.entity());
                         }
-                    }
+                    },
                     Err(err) => {
-                        tracing::event!(
-                            Level::ERROR,
-                            "Error accepting workspace command, {err}"
-                        );
+                        tracing::event!(Level::ERROR, "Error accepting workspace command, {err}");
                     }
                 },
                 None => {}
@@ -101,6 +99,37 @@ impl EventNode for Node {
                             .label::<String, _>(format!("{name}"))
                             .flags(TreeNodeFlags::SPAN_FULL_WIDTH)
                             .push(ui);
+                        if let Some(tooltip) =
+                            imgui::drag_drop::DragDropSource::new("REORDER_PLUGIN")
+                                .flags(DragDropFlags::SOURCE_NO_PREVIEW_TOOLTIP)
+                                .begin_payload(ui, (self.status.entity(), s))
+                        {
+                            tooltip.end();
+                        }
+
+                        if let Some(target) = imgui::drag_drop::DragDropTarget::new(ui) {
+                            match target.accept_payload::<(Entity, Entity), _>(
+                                "REORDER_PLUGIN",
+                                DragDropFlags::empty(),
+                            ) {
+                                Some(result) => match result {
+                                    Ok(swap) => {
+                                        let (owner, from) = swap.data;
+
+                                        if self.status.entity() == owner {
+                                            self.swap(owner, from, s);
+                                        }
+                                    }
+                                    Err(err) => {
+                                        tracing::event!(
+                                            Level::ERROR,
+                                            "Error accepting workspace command, {err}"
+                                        );
+                                    }
+                                },
+                                None => {}
+                            }
+                        }
 
                         if let Some(tree_node) = tree_node {
                             if let Some(state) = self.appendix.state(&s) {

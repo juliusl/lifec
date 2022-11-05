@@ -392,6 +392,7 @@ impl AttributeGraph {
             }
             atlier::system::Value::Reference(_) => {}
             atlier::system::Value::Symbol(s) => {
+                // TODO: add debouncing?
                 ui.input_text(name, s).build();
             }
             atlier::system::Value::Complex(_) => {}

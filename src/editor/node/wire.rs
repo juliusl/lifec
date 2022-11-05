@@ -161,6 +161,10 @@ impl WireObject for NodeCommand {
                 encoder.interner.add_ident(name);
                 encoder.frames.push(frame);
             }
+            NodeCommand::Swap { owner, from, to } => {
+                // TODO - 0x90, 0x91, 0x92
+                unimplemented!("Not implemented")
+            },
         }
     }
 

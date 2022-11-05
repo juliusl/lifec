@@ -135,6 +135,11 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
                             .insert(entity, NodeCommand::Update(graph.clone()))
                             .expect("should be able to insert");
                     }
+                    NodeCommand::Swap { owner, from, to } => {
+                        commands
+                            .insert(owner, NodeCommand::Swap { owner, from, to })
+                            .expect("should be able to insert");
+                    }
                 }
             }
         }

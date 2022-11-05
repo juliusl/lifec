@@ -32,6 +32,16 @@ pub enum NodeCommand {
     /// Command to update state,
     ///
     Update(AttributeGraph),
+    /// Command to swap sequence postions of two nodes,
+    /// 
+    Swap { 
+        /// Owner of the sequence,
+        owner: Entity,
+        /// From child node, 
+        from: Entity, 
+        /// To child node,
+        to: Entity
+    },
     /// Custom command for this node,
     ///
     /// This allows for extending capabilities of the node,
@@ -58,6 +68,7 @@ impl Display for NodeCommand {
             NodeCommand::Spawn(e) => write!(f, "spawn {}", e.id()),
             NodeCommand::Update(g) => write!(f, "update {}", g.entity_id()),
             NodeCommand::Custom(name, e) => write!(f, "custom.{name} {}", e.id()),
+            NodeCommand::Swap { owner, from, to } => write!(f, "swap {}: {} -> {}", owner.id(), from.id(), to.id()),
         }
     }
 }
@@ -88,6 +99,10 @@ pub trait CommandDispatcher {
     /// Dispatches a command to spawn an entity,
     ///
     fn spawn(&mut self, source: Entity);
+
+    /// Dispatches a command to swap the positions of two nodes in a sequence,
+    ///
+    fn swap(&mut self, owner: Entity, from: Entity, to: Entity);
 
     /// Dispatch a command to update a graph,
     ///
@@ -129,5 +144,9 @@ impl CommandDispatcher for Node {
 
     fn custom(&mut self, name: impl AsRef<str>, entity: Entity) {
         self.command = Some(NodeCommand::Custom(name.as_ref().to_string(), entity));
+    }
+
+    fn swap(&mut self, owner: Entity, from: Entity, to: Entity) {
+        self.command = Some(NodeCommand::Swap { owner, from, to });
     }
 }

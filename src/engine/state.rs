@@ -1,4 +1,8 @@
-use std::{collections::{HashMap, BTreeMap}, ops::Deref, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    ops::Deref,
+    sync::Arc,
+};
 
 use atlier::system::Attribute;
 use specs::{prelude::*, Entities, SystemData};
@@ -107,7 +111,7 @@ impl<'a> State<'a> {
     }
 
     /// Returns a new appendix,
-    /// 
+    ///
     pub fn appendix(&self) -> Arc<Appendix> {
         self.appendix.deref().clone()
     }
@@ -697,6 +701,20 @@ impl<'a> State<'a> {
             .map(|(_, c)| c.iter_spawned())
             .flatten()
     }
+
+    /// Swaps the positions of two nodes in a sequence,
+    ///
+    pub fn swap(&mut self, owner: Entity, from: Entity, to: Entity) -> bool {
+        let Self { sequences, .. } = self;
+
+        if let Some(seq) = sequences.get_mut(owner) {
+            if seq.swap(from, to) {
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 impl<'a> State<'a> {
@@ -1023,6 +1041,17 @@ impl<'a> State<'a> {
                     event!(Level::DEBUG, "Spawning event {}", event.id());
                 }
             }
+            crate::editor::NodeCommand::Swap { owner, from, to } => {
+                if self.swap(owner, from, to) {
+                    event!(
+                        Level::DEBUG,
+                        "Swapping nodes {} -> {} in {}'s sequence",
+                        from.id(),
+                        to.id(),
+                        owner.id()
+                    );
+                }
+            }
             crate::editor::NodeCommand::Update(graph) => {
                 if self.update_state(&graph) {
                     event!(Level::DEBUG, "Updating state for {}", graph.entity_id());
@@ -1197,21 +1226,19 @@ impl<'a> State<'a> {
                                 match prop {
                                     BlockProperty::Single(value) => {
                                         graph.with(name, value.clone());
-                                    },
+                                    }
                                     BlockProperty::List(values) => {
                                         for value in values {
                                             graph.with(name, value.clone());
                                         }
-                                    },
+                                    }
                                     BlockProperty::Required(Some(value)) => {
                                         graph.with(name, value.clone());
-                                    },
+                                    }
                                     BlockProperty::Optional(Some(value)) => {
                                         graph.with(name, value.clone());
-                                    },
-                                    _ => {
-
                                     }
+                                    _ => {}
                                 }
                             }
 
