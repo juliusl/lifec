@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, ops::Deref};
 
+use crate::engine::NodeCommandHandler;
 use crate::prelude::Thunk;
 use crate::prelude::{AttributeParser, BlockObject, CustomAttribute, Plugin, SpecialAttribute};
 use specs::{Component, DefaultVecStorage, WorldExt};
@@ -11,13 +12,18 @@ pub use thunk_source::ThunkSource;
 
 /// Runtime provides access to the underlying project, and function tables for creating components
 ///
-#[derive(Component, Debug, Default, Clone)]
+#[derive(Component, Default, Clone)]
 #[storage(DefaultVecStorage)]
 pub struct Runtime {
     /// Table of functions for creating new event components
+    /// 
     plugins: BTreeMap<String, ThunkSource>,
     /// Set of custom attributes to use, added from install()
+    /// 
     custom_attributes: BTreeMap<String, CustomAttribute>,
+    /// Custom node commands,
+    ///
+    handlers: BTreeMap<String, NodeCommandHandler>,
 }
 
 impl Runtime {
@@ -87,6 +93,23 @@ impl Runtime {
 
             event!(Level::TRACE, "install custom attribute: .{}", P::symbol());
         }
+
+        self.handlers
+            .insert(format!("add_plugin::{}", P::symbol()), |state, entity| {
+                state.add_plugin::<P>(entity);
+            });
+    }
+
+    /// Returns an iterator over custom command handlers,
+    ///
+    pub fn iter_handlers(&self) -> impl Iterator<Item = (&String, &NodeCommandHandler)> {
+        self.handlers.iter()
+    }
+
+    /// Returns a thunk source,
+    ///
+    pub fn thunk_source(&self, name: impl AsRef<str>) -> Option<ThunkSource> {
+        self.plugins.get(name.as_ref()).cloned()
     }
 }
 

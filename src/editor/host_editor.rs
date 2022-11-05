@@ -47,7 +47,7 @@ pub struct HostEditor {
 
     canvas: Canvas,
     /// If debugger is enabled, it will be displayed in the host editor window,
-    /// 
+    ///
     debugger: Option<Debugger>,
 }
 
@@ -96,7 +96,7 @@ impl HostEditor {
                 ui.separator();
                 ui.group(|| {
                     ChildWindow::new(&format!("Events List {suffix}"))
-                        .size([900.0, 400.0])
+                        .size([750.0, 400.0])
                         .border(true)
                         .build(ui, || {
                             self.event_list(ui);
@@ -155,6 +155,10 @@ impl<'a> System<'a> for HostEditor {
 
     fn run(&mut self, (mut events, watcher, debugger): Self::SystemData) {
         self.debugger = debugger.clone();
+
+        if let Some(debugger) = self.debugger.as_mut() {
+            debugger.set_appendix((*events.appendix()).clone());
+        }
 
         // General event runtime state
         self.is_paused = !events.can_continue();
@@ -298,8 +302,7 @@ impl HostEditor {
                     ///
                     fn name_column(ui: &Ui) {
                         let mut table_column_setup = TableColumnSetup::new("Name");
-                        table_column_setup.flags =
-                            TableColumnFlags::NO_HIDE;
+                        table_column_setup.flags = TableColumnFlags::NO_HIDE;
                         ui.table_setup_column_with(table_column_setup);
                     }
 

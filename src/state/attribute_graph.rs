@@ -186,7 +186,7 @@ impl AttributeIndex for AttributeGraph {
             Some(property) => match property {
                 BlockProperty::Single(value) => Some(value),
                 BlockProperty::List(values) => values.first().cloned(),
-                BlockProperty::Required => {
+                BlockProperty::Required(_) => {
                     event!(
                         Level::ERROR,
                         "Required property has not been set, {}",
@@ -194,7 +194,7 @@ impl AttributeIndex for AttributeGraph {
                     );
                     None
                 }
-                BlockProperty::Optional => {
+                BlockProperty::Optional(_) => {
                     event!(
                         Level::WARN,
                         "Optional property has not been set, {}",
@@ -233,7 +233,7 @@ impl AttributeIndex for AttributeGraph {
             Some(property) => match property {
                 BlockProperty::Single(value) => vec![value],
                 BlockProperty::List(values) => values.clone(),
-                BlockProperty::Required => {
+                BlockProperty::Required(_) => {
                     event!(
                         Level::ERROR,
                         "Required property has not been set, {}",
@@ -241,7 +241,7 @@ impl AttributeIndex for AttributeGraph {
                     );
                     vec![]
                 }
-                BlockProperty::Optional => {
+                BlockProperty::Optional(_) => {
                     event!(
                         Level::WARN,
                         "Optional property has not been set, {}",

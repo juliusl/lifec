@@ -39,12 +39,14 @@ impl Event {
 
     /// Adds a thunk to this event and the entity w/ it's data,
     ///
-    pub fn add_thunk(&mut self, thunk: Thunk, entity: Entity) {
+    pub fn add_thunk(&mut self, thunk: Thunk, entity: Entity) -> bool {
         if let Some(sequence) = self.2.as_mut() {
             self.1.push(thunk);
             sequence.add(entity);
+            true
         } else {
-            event!(Level::WARN, "Cannot add thunk to an active event")
+            event!(Level::WARN, "Cannot add thunk to an active event");
+            false
         }
     }
 

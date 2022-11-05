@@ -36,12 +36,12 @@ pub use plugins::PluginListener;
 pub use plugins::Plugins;
 
 mod state;
-pub use state::State;
 pub use state::NodeCommandHandler;
+pub use state::State;
 
 mod status;
-pub use status::EventStatus;
 pub use status::EngineStatus;
+pub use status::EventStatus;
 
 mod lifecycle;
 pub use lifecycle::Lifecycle;
@@ -128,10 +128,10 @@ pub struct Engine {
     ///
     limit: Option<Limit>,
     // /// Psuedo-event to represent the engine's start,
-    // /// 
+    // ///
     // start_event: Option<Entity>,
     // /// Psuedo-event to represent the engine's end,
-    // /// 
+    // ///
     // end_event: Option<Entity>,
 }
 
@@ -149,7 +149,7 @@ impl Engine {
     }
 
     /// Returns the lifecycle option for the engine,
-    /// 
+    ///
     pub fn lifecycle(&self) -> Option<&(Lifecycle, Option<Vec<String>>)> {
         self.lifecycle.as_ref()
     }
@@ -394,6 +394,11 @@ impl Interpreter for Engine {
                             event.sequence().expect("should have a sequence").clone(),
                         )
                         .expect("should be able to insert component");
+
+                    let mut blocks = world.write_component::<Block>();
+                    blocks
+                        .insert(entity, block.clone())
+                        .expect("should be able to insert block");
                 }
 
                 if let Some(adhoc) = world.read_component::<Adhoc>().get(entity) {

@@ -49,6 +49,12 @@ impl Debugger {
         &self.appendix
     }
 
+    /// Sets the appendix,
+    /// 
+    pub fn set_appendix(&mut self, appendix: Appendix) {
+        self.appendix = appendix;
+    }
+
     /// Displays a tree view of completion history,
     /// 
     pub fn completion_tree(&self, ui: &Ui) {

@@ -177,7 +177,10 @@ pub trait Plugin {
     ///
     /// This allows the runmd parser to use this plugin as an attribute type,
     ///
-    fn as_custom_attr() -> CustomAttribute {
+    fn as_custom_attr() -> CustomAttribute 
+    where
+        Self: Sized + BlockObject
+    {
         CustomAttribute::new_with(Self::symbol(), |parser, content| {
             if let Some(world) = parser.world() {
                 let entity = parser.entity().expect("should have an entity");

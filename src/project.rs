@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::engine::Adhoc;
 use crate::engine::NodeCommandHandler;
@@ -12,9 +12,9 @@ pub use source::RunmdFile;
 pub use source::WorkspaceSource;
 
 mod workspace;
+pub use workspace::Operations;
 pub use workspace::Workspace;
 pub use workspace::WorkspaceConfig;
-pub use workspace::Operations;
 
 mod listener;
 pub use listener::Listener;
@@ -49,7 +49,19 @@ where
     /// Override to provide a custom Parser,
     ///
     fn parser() -> Parser {
-        default_parser(Self::world())
+        let mut world = Self::world();
+        let mut handlers = Self::node_handlers();
+        {
+            let runtime = world.fetch::<Runtime>();
+
+            for (name, handler) in runtime.iter_handlers() {
+                handlers.insert(name.to_string(), handler.clone());
+            }
+        }
+
+        world.insert(handlers);
+
+        default_parser(world)
     }
 
     /// Override to provide a custom World when compile is called,
@@ -62,8 +74,8 @@ where
     }
 
     /// Override to provide custom node command handlers,
-    /// 
-    fn node_handlers() -> HashMap<String, NodeCommandHandler> {
+    ///
+    fn node_handlers() -> BTreeMap<String, NodeCommandHandler> {
         default_node_handlers()
     }
 
@@ -79,7 +91,8 @@ where
     ) -> World {
         let mut workspace = workspace.clone();
 
-        let mut parser = parser.unwrap_or(Self::parser())
+        let mut parser = parser
+            .unwrap_or(Self::parser())
             .with_special_attr::<WorkspaceConfig>()
             .with_special_attr::<Operations>();
 
@@ -111,12 +124,9 @@ where
             parser
                 .as_ref()
                 .write_component()
-                .insert(
-                    entity,
-                    runmd_file.clone(),
-                )
+                .insert(entity, runmd_file.clone())
                 .expect("should be able to insert");
-            
+
             workspace.cache_file(&runmd_file);
         }
 
@@ -139,15 +149,12 @@ where
         };
 
         world.insert(Some(workspace.clone()));
-        
+
         // Apply config defined in root block
         {
             let mut config_data = world.system_data::<WorkspaceConfig>();
             config_data.apply();
         }
-
-        // Finalize world
-        world.insert(Self::node_handlers());
 
         return world;
     }
@@ -181,7 +188,11 @@ where
                 .expect("Should be able to insert graph for entity");
         }
 
-        for block in world.read_component::<Block>().join() {
+        let blocks = { 
+            world.read_component::<Block>().join().cloned().collect::<Vec<_>>()
+        };
+
+        for block in  blocks.iter() {
             engine.interpret(&world, block);
 
             Self::interpret(&world, block);
@@ -212,7 +223,7 @@ pub fn default_runtime() -> Runtime {
     runtime.install_with_custom::<Publish>("");
     runtime.install_with_custom::<Listen>("");
     runtime.install_with_custom::<Monitor>("");
-    
+
     // Plugins for testing
     runtime.install_with_custom::<Chaos>("");
     runtime.install_with_custom::<TestHost>("");
@@ -229,7 +240,7 @@ pub fn default_parser(world: World) -> Parser {
 }
 
 /// Retursn the default lifec world,
-/// 
+///
 pub fn default_world() -> World {
     let mut world = specs::World::new();
     world.register::<Thunk>();
@@ -255,17 +266,17 @@ pub fn default_world() -> World {
 }
 
 /// Returns teh default custom node command handlers,
-/// 
-pub fn default_node_handlers() -> HashMap<String, NodeCommandHandler> {
-    let mut handlers = HashMap::<String, NodeCommandHandler>::default();
+///
+pub fn default_node_handlers() -> BTreeMap<String, NodeCommandHandler> {
+    let mut handlers = BTreeMap::<String, NodeCommandHandler>::default();
 
     handlers.insert("delete_spawned".to_string(), |state, entity| {
-        state.delete(entity); 
+        state.delete(entity);
     });
 
     handlers.insert("cleanup_connection".to_string(), |state, entity| {
-        state.cleanup_connection(entity); 
-     });
+        state.cleanup_connection(entity);
+    });
 
     handlers
 }

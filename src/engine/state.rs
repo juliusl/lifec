@@ -1,6 +1,8 @@
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{collections::{HashMap, BTreeMap}, ops::Deref, sync::Arc};
 
+use atlier::system::Attribute;
 use specs::{prelude::*, Entities, SystemData};
+use tokio::sync::oneshot;
 
 use super::{
     connection::ConnectionState, Adhoc, EngineStatus, Limit, Plugins, Profiler, TickControl,
@@ -8,6 +10,7 @@ use super::{
 };
 use crate::{
     editor::{Appendix, Node, NodeStatus},
+    engine::Completion,
     prelude::*,
 };
 
@@ -19,12 +22,15 @@ pub type NodeCommandHandler = fn(&mut State, Entity);
 ///
 #[derive(SystemData)]
 pub struct State<'a> {
+    /// Runtime,
+    ///
+    runtime: Read<'a, Runtime>,
     /// Controls the event tick rate,
     ///
     tick_control: Write<'a, TickControl>,
     /// Appendix stores metadata on entities,
     ///
-    appendix: Read<'a, Arc<Appendix>>,
+    appendix: Write<'a, Arc<Appendix>>,
     /// Channel to send error contexts,
     ///
     send_errors: Read<'a, tokio::sync::mpsc::Sender<ErrorContext>, EventRuntime>,
@@ -33,7 +39,7 @@ pub struct State<'a> {
     send_completed: Read<'a, tokio::sync::broadcast::Sender<Entity>, EventRuntime>,
     /// Map of custom node command handlers,
     ///
-    handlers: Read<'a, HashMap<String, NodeCommandHandler>>,
+    handlers: Read<'a, BTreeMap<String, NodeCommandHandler>>,
     /// Lookup entities by label,
     ///
     entity_map: Read<'a, HashMap<String, Entity>>,
@@ -54,7 +60,13 @@ pub struct State<'a> {
     adhocs: ReadStorage<'a, Adhoc>,
     /// Block data,
     ///
-    blocks: ReadStorage<'a, Block>,
+    blocks: WriteStorage<'a, Block>,
+    /// Thunk storage,
+    ///
+    thunks: WriteStorage<'a, Thunk>,
+    /// Graph storage
+    ///
+    graphs: WriteStorage<'a, AttributeGraph>,
     /// Node statuses
     ///
     node_statuses: WriteStorage<'a, NodeStatus>,
@@ -92,6 +104,12 @@ impl<'a> State<'a> {
     ///
     pub fn plugins(&self) -> &Plugins<'a> {
         &self.plugins
+    }
+
+    /// Returns a new appendix,
+    /// 
+    pub fn appendix(&self) -> Arc<Appendix> {
+        self.appendix.deref().clone()
     }
 
     /// Returns a list of adhoc operations,
@@ -454,9 +472,18 @@ impl<'a> State<'a> {
     /// Updates state,
     ///
     pub fn update_state(&mut self, graph: &AttributeGraph) -> bool {
-        let Self { plugins, .. } = self;
-
-        plugins.update_graph(graph.clone())
+        let Self {
+            entities, graphs, ..
+        } = self;
+        let entity = entities.entity(graph.entity_id());
+        if let Some(_) = graphs
+            .insert(entity, graph.clone())
+            .expect("should be able to insert")
+        {
+            true
+        } else {
+            false
+        }
     }
 
     /// Handles the transition of an event,
@@ -495,22 +522,13 @@ impl<'a> State<'a> {
     /// Starts an event immediately, cancels any ongoing operations
     ///
     pub fn start(&mut self, event: Entity, previous: Option<&ThunkContext>) {
-        let State {
-            plugins,
-            sequences,
-            events,
-            operations,
-            yielding,
-            ..
-        } = self;
-
-        if let Some(e) = events.get(event) {
+        if let Some(e) = self.events.get(event) {
             event!(Level::DEBUG, "\n\n\t{}\tstarted event {}\n", e, event.id());
 
-            let sequence = sequences.get(event).expect("should have a sequence");
+            let sequence = self.sequences.get(event).expect("should have a sequence");
 
             let previous = if let None = previous {
-                if let Some(Yielding(_, previous)) = yielding.get(event) {
+                if let Some(Yielding(_, previous)) = self.yielding.get(event) {
                     Some(previous)
                 } else {
                     None
@@ -519,12 +537,12 @@ impl<'a> State<'a> {
                 previous
             };
 
-            let operation = plugins.start_sequence(event, sequence, previous);
+            let operation = self.start_sequence(event, sequence, previous);
 
-            if let Some(existing) = operations.get_mut(event) {
+            if let Some(existing) = self.operations.get_mut(event) {
                 existing.set_task(operation);
             } else {
-                operations
+                self.operations
                     .insert(event, operation)
                     .expect("should be able to insert operation");
             }
@@ -1126,5 +1144,247 @@ impl<'a> State<'a> {
     ///
     pub fn find_entity(&self, expression: impl AsRef<str>) -> Option<&Entity> {
         self.entity_map.get(expression.as_ref())
+    }
+}
+
+impl<'a> State<'a> {
+    /// Add's a plugin to an event,
+    ///
+    pub fn add_plugin<P>(&mut self, event_entity: Entity)
+    where
+        P: Plugin + BlockObject + Default,
+    {
+        if let Some(event) = self.events.get_mut(event_entity) {
+            if let Some(thunk_src) = self.runtime.thunk_source(format!("call::{}", P::symbol())) {
+                let plugin_entity = self.entities.create();
+
+                if event.add_thunk(thunk_src.thunk(), plugin_entity) {
+                    if let Some(sequence) = event.sequence() {
+                        self.sequences
+                            .insert(event_entity, sequence.clone())
+                            .expect("should have a sequence");
+
+                        if let Some(block) = self.blocks.get(event_entity) {
+                            let mut graph = if let Some(default_settings) =
+                                self.blocks.get(self.entities.entity(0)).and_then(|b| {
+                                    b.index()
+                                        .iter()
+                                        .find(|i| i.root().name() == thunk_src.thunk().0)
+                                        .cloned()
+                                }) {
+                                let mut root = default_settings.root().clone();
+                                root.set_id(plugin_entity.id());
+
+                                let mut block_index = BlockIndex::new(&root);
+                                for (name, prop) in default_settings.properties().iter_properties()
+                                {
+                                    block_index.properties_mut().set(name, prop.clone());
+                                }
+                                AttributeGraph::new(block_index)
+                            } else {
+                                let root =
+                                    Attribute::new(plugin_entity.id(), P::symbol(), Value::Empty);
+                                let mut graph = AttributeGraph::new(BlockIndex::new(&root));
+                                graph.with_symbol(P::symbol(), "");
+                                graph
+                            };
+
+                            graph.with_int("event_id", event_entity.id() as i32);
+
+                            let block_query = P::default().query();
+
+                            for (name, prop) in block_query.iter_properties() {
+                                match prop {
+                                    BlockProperty::Single(value) => {
+                                        graph.with(name, value.clone());
+                                    },
+                                    BlockProperty::List(values) => {
+                                        for value in values {
+                                            graph.with(name, value.clone());
+                                        }
+                                    },
+                                    BlockProperty::Required(Some(value)) => {
+                                        graph.with(name, value.clone());
+                                    },
+                                    BlockProperty::Optional(Some(value)) => {
+                                        graph.with(name, value.clone());
+                                    },
+                                    _ => {
+
+                                    }
+                                }
+                            }
+
+                            let mut appendix = (*self.appendix).deref().clone();
+                            appendix.insert_general(plugin_entity, &thunk_src.thunk());
+                            appendix.insert_state(
+                                plugin_entity,
+                                crate::editor::State {
+                                    control_symbol: block.symbol().to_string(),
+                                    graph: Some(graph.clone()),
+                                },
+                            );
+
+                            *self.appendix = Arc::new(appendix);
+
+                            self.blocks
+                                .insert(plugin_entity, block.clone())
+                                .expect("should be able to insrt block");
+
+                            self.graphs
+                                .insert(plugin_entity, graph)
+                                .expect("should be able to insert graph");
+
+                            self.thunks
+                                .insert(plugin_entity, thunk_src.thunk())
+                                .expect("should be able to insert thunk");
+                        } else {
+                            event!(Level::DEBUG, "Didn't have a block");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Returns a new context,
+    ///
+    pub fn new_context(&self) -> ThunkContext {
+        let Self { entities, .. } = self;
+
+        let entity = entities.create();
+
+        self.initialize_context(entity, None)
+    }
+
+    /// Returns an initialized context,
+    ///
+    pub fn initialize_context(
+        &self,
+        entity: Entity,
+        initial_context: Option<&ThunkContext>,
+    ) -> ThunkContext {
+        let Self { blocks, graphs, .. } = self;
+
+        let mut context = self
+            .plugins
+            .features()
+            .enable(entity, initial_context.unwrap_or(&ThunkContext::default()));
+
+        if let Some(block) = blocks.get(entity) {
+            context = context.with_block(block);
+        }
+
+        if let Some(graph) = graphs.get(entity) {
+            context = context.with_state(graph.clone());
+        }
+
+        context
+    }
+
+    /// Combines a sequence of plugin calls into an operation,
+    ///
+    pub fn start_sequence(
+        &self,
+        event: Entity,
+        sequence: &Sequence,
+        initial_context: Option<&ThunkContext>,
+    ) -> Operation {
+        let Self {
+            plugins,
+            thunks,
+            blocks,
+            graphs,
+            ..
+        } = self;
+
+        let sequence = sequence.clone();
+        let handle = plugins.features().handle();
+        let entity = sequence.peek().expect("should have at least 1 entity");
+
+        let thunk_context = self.initialize_context(entity, initial_context);
+
+        let mut thunk_map = HashMap::<Entity, Thunk>::default();
+        let mut graph_map = HashMap::<Entity, AttributeGraph>::default();
+        let mut block_map = HashMap::<Entity, Block>::default();
+        for call in sequence.iter_entities() {
+            let thunk = thunks.get(call).expect("should have a thunk").clone();
+            let graph = graphs.get(call).expect("should have a graph").clone();
+            let block = blocks.get(call).expect("should have a block").clone();
+            thunk_map.insert(call, thunk);
+            graph_map.insert(call, graph);
+            block_map.insert(call, block);
+        }
+
+        let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+
+        let task = handle.spawn(async move {
+            let mut context = thunk_context.clone();
+            let handle = context.handle().expect("should be a handle");
+            let mut cancel_source = Some(rx);
+
+            for e in sequence.iter_entities() {
+                if let Some(mut _rx) = cancel_source.take() {
+                    let (_tx, rx) = oneshot::channel::<()>();
+
+                    context.set_entity(e);
+
+                    let thunk = thunk_map.get(&e).expect("should have a thunk");
+                    let graph = graph_map.get(&e).expect("should exist");
+                    let block = block_map.get(&e).expect("should exist");
+
+                    context.set_state(graph.clone());
+                    context.set_block(block);
+
+                    let mut operation =
+                        Operation::empty(handle.clone()).start_with(thunk, &mut context);
+                    {
+                        let _rx = &mut _rx;
+                        select! {
+                            result = operation.task(rx) => {
+                                match result {
+                                    Some(mut result) => {
+                                        let mut completion = Completion {
+                                            event,
+                                            thunk: e,
+                                            control_values: context.control_values().clone(),
+                                            query: context.properties().clone(),
+                                            returns: None,
+                                        };
+
+                                        context = result.consume();
+
+                                        completion.returns = Some(context.properties().clone());
+
+                                        context.dispatch_completion(completion);
+                                    }
+                                    None => {
+                                    }
+                                }
+                            },
+                            _ = _rx => {
+                                _tx.send(()).ok();
+                                break;
+                            }
+                        }
+                    }
+
+                    event!(
+                        Level::DEBUG,
+                        "\n\n\t{:?}\n\tcompleted\n\tplugin {}\n",
+                        thunk,
+                        e.id(),
+                    );
+
+                    cancel_source = Some(_rx);
+                } else {
+                    break;
+                }
+            }
+
+            context
+        });
+
+        Operation::empty(handle.clone()).with_task((task, tx))
     }
 }

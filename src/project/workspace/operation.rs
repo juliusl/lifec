@@ -1,5 +1,5 @@
 use crate::engine::Adhoc;
-use crate::prelude::{Plugins, Runtime, Sequence, ThunkContext};
+use crate::prelude::{Runtime, Sequence, ThunkContext, State};
 use atlier::system::Value;
 use reality::{Block, SpecialAttribute};
 use specs::prelude::*;
@@ -10,7 +10,7 @@ use tracing::{event, Level};
 ///
 #[derive(SystemData)]
 pub struct Operations<'a> {
-    plugins: Plugins<'a>,
+    state: State<'a>,
     entities: Entities<'a>,
     blocks: ReadStorage<'a, Block>,
     adhocs: ReadStorage<'a, Adhoc>,
@@ -61,7 +61,7 @@ impl<'a> Operations<'a> {
     ) -> Option<crate::prelude::Operation> {
         let operations = self.scan_root();
 
-        let Operations { plugins, .. } = self;
+        let Operations { state, .. } = self;
 
         if let Some((entity, _, sequence)) = operations.iter().find(|(_, adhoc, _)| {
             let matches_operation_name = adhoc.name().as_ref() == operation.as_ref();
@@ -72,7 +72,7 @@ impl<'a> Operations<'a> {
                 matches_operation_name
             }
         }) {
-            return Some(plugins.start_sequence(*entity, sequence, context));
+            return Some(state.start_sequence(*entity, sequence, context));
         }
 
         None
@@ -90,9 +90,10 @@ impl<'a> Operations<'a> {
 
         let operation = { self.execute_operation(operation, tag, context).take() };
 
-        let Operations { plugins, .. } = self;
+        let Operations { state, .. } = self;
 
-        match plugins
+        match state
+            .plugins()
             .features()
             .broker()
             .try_send_operation(operation.expect("should have started the operation"))

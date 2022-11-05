@@ -1,6 +1,7 @@
-use imgui::{TreeNode, TreeNodeFlags, Ui};
+use imgui::{TreeNode, TreeNodeFlags, Ui, DragDropFlags};
+use tracing::Level;
 
-use crate::{prelude::EventStatus, state::AttributeGraph};
+use crate::{prelude::{EventStatus, Thunk}, state::AttributeGraph, editor::workspace_editor::WorkspaceCommand};
 
 use super::{CommandDispatcher, Node, NodeCommand};
 
@@ -47,12 +48,29 @@ impl EventNode for Node {
             }
         };
 
-        // if let Some(adhoc) = self.adhoc.as_ref() {
-        //     let tag = adhoc.tag();
-        //     if !tag.as_ref().is_empty() {
-        //         ui.text(format!("tag: {}", tag.as_ref()));
-        //     }
-        // }
+        if let Some(target) = imgui::drag_drop::DragDropTarget::new(ui) {
+            match target.accept_payload::<WorkspaceCommand, _>(
+                "ADD_PLUGIN",
+                DragDropFlags::empty(),
+            ) {
+                Some(result) => match result {
+                    Ok(command) => {
+                        match command.data {
+                            WorkspaceCommand::AddPlugin(Thunk(name, ..)) => {
+                                self.custom(format!("add_plugin::{name}"), self.status.entity());
+                            },
+                        }
+                    }
+                    Err(err) => {
+                        tracing::event!(
+                            Level::ERROR,
+                            "Error accepting workspace command, {err}"
+                        );
+                    }
+                },
+                None => {}
+            }
+        }
 
         ui.table_next_column();
         ui.text(format!("{event}"));

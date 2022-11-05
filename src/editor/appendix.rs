@@ -18,6 +18,9 @@ pub struct Appendix {
     /// Index of State infomation about an entity,
     /// 
     pub state: HashMap<Entity, State>,
+    /// Prefix notes,
+    /// 
+    pub prefix_notes: HashMap<String, String>,
 }
 
 impl Appendix {

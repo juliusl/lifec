@@ -29,7 +29,7 @@ fn main() {
     : opname .symbol print-2
     
     + .operation print
-    : .println Hello Print Operation a
+    : test .println Hello Print Operation a
     : .chaos
 
     + test .operation print
