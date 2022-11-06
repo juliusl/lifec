@@ -80,15 +80,18 @@ impl Guest {
 
     /// Gets a guest thunk context,
     ///
-    pub fn guest_context(&self) -> ThunkContext {
+    pub fn guest_context(&self, initial: Option<&ThunkContext>) -> ThunkContext {
         let state = self.protocol();
 
         let mut context = state
             .as_ref()
             .system_data::<State>()
-            .initialize_context(self.owner, None);
+            .initialize_context(self.owner, initial);
 
-        context.enable_remote(self.protocol.subscribe());
+        if let Some(remote) = self.remote.as_ref() {
+            context.enable_remote(remote.clone());
+        }
+
         context
     }
 

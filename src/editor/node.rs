@@ -21,6 +21,7 @@ pub use engine::EngineNode;
 mod commands;
 pub use commands::CommandDispatcher;
 pub use commands::NodeCommand;
+pub use commands::WorkspaceCommand;
 
 mod status;
 pub use status::NodeStatus;

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use specs::{Component, Entity, HashMapStorage};
 
-use crate::state::{AttributeGraph, AttributeIndex};
+use crate::{state::{AttributeGraph, AttributeIndex}, prelude::Thunk};
 
 use super::Node;
 
@@ -148,5 +148,22 @@ impl CommandDispatcher for Node {
 
     fn swap(&mut self, owner: Entity, from: Entity, to: Entity) {
         self.command = Some(NodeCommand::Swap { owner, from, to });
+    }
+}
+
+/// Enumeration of workspace commands,
+///
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkspaceCommand {
+    /// Command to add a plugin,
+    /// 
+    AddPlugin(Thunk),
+}
+
+impl Display for WorkspaceCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WorkspaceCommand::AddPlugin(Thunk(name, _, _)) => write!(f, "add_plugin::{name}"),
+        }
     }
 }

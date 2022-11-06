@@ -33,9 +33,7 @@ impl App for Debugger {
         "lifec_debugger"
     }
 
-    fn edit_ui(&mut self, _: &imgui::Ui) {
-        //
-    }
+    fn edit_ui(&mut self, _: &imgui::Ui) {}
 
     fn display_ui(&self, ui: &imgui::Ui) {
         self.completion_tree(ui);

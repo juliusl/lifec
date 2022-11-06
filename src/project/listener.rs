@@ -33,19 +33,15 @@ where
     fn on_completed_event(&mut self, entity: &Entity);
 }
 
-
+/// Enabling listener enables dispatching node commands,
+/// 
+/// This implementation is so that Users aren't required to use a Listener in order to enable_listener on the host
+/// 
 impl Listener for () {
-    fn create(_: &World) -> Self {
-        ()
-    }
-
+    fn create(_: &World) -> Self {()}
     fn on_status_update(&mut self, _: &StatusUpdate) {}
-
     fn on_operation(&mut self, _: Operation) {}
-
     fn on_completion(&mut self, _: Completion) {}
-
     fn on_error_context(&mut self, _: &ErrorContext) {}
-
     fn on_completed_event(&mut self, _: &Entity) {}
 }

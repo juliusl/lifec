@@ -1,19 +1,18 @@
-use std::{
-    collections::BTreeMap,
-    fmt::Display,
-    ops::Deref,
-};
+use std::{collections::BTreeMap, ops::Deref};
 
 use atlier::system::Extension;
 use copypasta::{ClipboardContext, ClipboardProvider};
-use imgui::{TableColumnFlags, TableColumnSetup, TableFlags, Ui, Window};
+use imgui::{
+    TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags, Ui, Window,
+};
 use specs::{Join, RunNow, World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 use tracing::{event, Level};
 
 use crate::{
+    editor::node::WorkspaceCommand,
     engine::{NodeCommandHandler, Runner},
-    prelude::{Runtime, Thunk},
+    prelude::{Runtime, State},
 };
 
 use super::Appendix;
@@ -147,9 +146,47 @@ impl WorkspaceEditor {
                 if self.enable_demo {
                     ui.show_demo_window(&mut self.enable_demo);
                 }
-
-                ui.spacing();
                 ui.separator();
+
+                if imgui::CollapsingHeader::new("Hosts")
+                    .flags(TreeNodeFlags::NO_TREE_PUSH_ON_OPEN)
+                    .build(ui)
+                {
+                    if let Some(token) = ui.begin_table("hosts", 2) {
+                        ui.table_setup_column("Name");
+                        ui.table_setup_column("Controls");
+                        ui.table_headers_row();
+
+                        ui.table_next_row();
+                        ui.table_next_column();
+                        let tree_node = TreeNode::new("main_host")
+                            .label::<String, _>("main".to_string())
+                            .push(ui);
+                        
+                        ui.table_next_column();
+
+                        if let Some(node) = tree_node {
+                            for (adhoc, _) in
+                                world.system_data::<State>().list_adhoc_operations()
+                            {
+                                ui.table_next_row();
+                                ui.table_next_column();
+                                ui.text(adhoc.name);
+                            }
+                            node.pop();
+                        }
+
+                        for guest in world.system_data::<Runner>().guests() {
+                            ui.table_next_row();
+                            ui.table_next_column();
+                            ui.text(format!("Guest {}", guest.owner.id()));
+
+                            ui.table_next_column();
+                        }
+
+                        token.end();
+                    }
+                }
 
                 if imgui::CollapsingHeader::new("Plugins").build(ui) {
                     self.plugins(world, ui);
@@ -159,21 +196,6 @@ impl WorkspaceEditor {
                     self.custom_node_handlers(world, ui);
                 }
             });
-    }
-}
-
-/// Enumeration of workspace commands,
-///
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorkspaceCommand {
-    AddPlugin(Thunk),
-}
-
-impl Display for WorkspaceCommand {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WorkspaceCommand::AddPlugin(Thunk(name, _, _)) => write!(f, "add plugin {name}"),
-        }
     }
 }
 
@@ -214,7 +236,6 @@ impl Extension for WorkspaceEditor {
                             })
                         })
                     });
-
                 guest_editor.events_window(
                     format!(
                         "Guest {}",
@@ -226,16 +247,13 @@ impl Extension for WorkspaceEditor {
                 );
                 guest_editor.run_now(guest.protocol().as_ref());
             }
-       
         }
     }
 
     fn on_run(&'_ mut self, world: &specs::World) {
         {
             let Runner {
-                entities,
-                guests,
-                ..
+                entities, guests, ..
             } = world.system_data::<Runner>();
 
             for (_, guest) in (&entities, &guests).join() {

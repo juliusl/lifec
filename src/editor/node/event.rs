@@ -3,7 +3,7 @@ use specs::Entity;
 use tracing::Level;
 
 use crate::{
-    editor::workspace_editor::WorkspaceCommand,
+    editor::node::commands::WorkspaceCommand,
     prelude::{EventStatus, Thunk},
     state::AttributeGraph,
 };
