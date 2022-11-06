@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use crate::engine::Adhoc;
+use crate::engine::Completion;
 use crate::engine::NodeCommandHandler;
 use crate::engine::Profiler;
 use crate::engine::Yielding;
@@ -254,12 +255,13 @@ pub fn default_world() -> World {
     world.register::<Sequence>();
     world.register::<Activity>();
     world.register::<Profiler>();
-    world.register::<Connection>();
+    world.register::<Yielding>();
     world.register::<Operation>();
     world.register::<RunmdFile>();
-    world.register::<Yielding>();
-    world.register::<EventStatus>();
     world.register::<Transition>();
+    world.register::<Completion>();
+    world.register::<Connection>();
+    world.register::<EventStatus>();
     world.register::<AttributeGraph>();
     world.insert(None::<Workspace>);
     world

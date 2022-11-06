@@ -127,12 +127,6 @@ pub struct Engine {
     /// Limit this engine can repeat
     ///
     limit: Option<Limit>,
-    // /// Psuedo-event to represent the engine's start,
-    // ///
-    // start_event: Option<Entity>,
-    // /// Psuedo-event to represent the engine's end,
-    // ///
-    // end_event: Option<Entity>,
 }
 
 impl Engine {
@@ -202,32 +196,6 @@ impl Engine {
 
         self.lifecycle = Some((lifecycle, engines));
     }
-
-    // /// Sets the engine's start event,
-    // ///
-    // pub fn set_start_event(&mut self, event: Entity) {
-    //     self.start_event = Some(event);
-    // }
-
-    // /// Sets the engine's end event,
-    // ///
-    // pub fn set_end_event(&mut self, event: Entity) {
-    //     self.end_event = Some(event);
-    // }
-
-    // /// Returns the engine start event entity,
-    // ///
-    // pub fn start_event(&self) -> Entity {
-    //     self.start_event
-    //         .expect("should have an entity for the start event")
-    // }
-
-    // /// Returns the engine end event entity,
-    // ///
-    // pub fn end_event(&self) -> Entity {
-    //     self.end_event
-    //         .expect("should be an entity for the end event")
-    // }
 }
 
 impl SpecialAttribute for Engine {
@@ -240,26 +208,6 @@ impl SpecialAttribute for Engine {
             let world = parser.world().expect("should have a world");
             let engine = Engine::default();
 
-            // let engine_start = world.entities().create();
-            // let mut engine_start_event = Event::empty();
-            // engine_start_event.set_name("engine_start");
-            // world
-            //     .write_component()
-            //     .insert(engine_start, engine_start_event)
-            //     .expect("should be able to insert event");
-            // engine.set_start_event(engine_start);
-
-            // let engine_end = world.entities().create();
-            // let mut engine_end_event = Event::empty();
-            // engine_end_event.set_name("engine_end");
-            // world
-            //     .write_component()
-            //     .insert(engine_end, engine_end_event)
-            //     .expect("should be able to insert event");
-            // engine.set_end_event(engine_end);
-
-            // parser.define_child(engine_start, "engine_start_event", true);
-            // parser.define_child(engine_end, "engine_end_event", true);
             world
                 .write_component()
                 .insert(entity, engine)
@@ -382,6 +330,7 @@ impl Interpreter for Engine {
                 .filter(|r| r.root().name().ends_with("operation"))
             {
                 let entity = world.entities().entity(e.root().id());
+                // Setup adhoc operations
                 if let Some(event) = world.write_component::<Event>().get_mut(entity) {
                     if let Some(name) = e.find_property("name").and_then(|p| p.symbol().cloned()) {
                         event.set_name(format!("{name}"));

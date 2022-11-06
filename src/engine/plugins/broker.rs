@@ -81,4 +81,12 @@ impl<'a> Broker<'a> {
 
         node_sender.try_send((node_command, yielding))
     }
+
+    /// Sends a completion,
+    /// 
+    pub fn try_send_completion(&self, completion: Completion)  -> Result<(), TrySendError<Completion>>  {
+        let Broker {completion_sender, .. } = self;
+
+        completion_sender.try_send(completion)
+    }
 }

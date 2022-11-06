@@ -196,6 +196,7 @@ impl Plugin for Process {
                                 
                                 println!("{}", line);
                                 writeln!(&mut stdout, "{}", line).expect("should be able to write");
+                                reader_context.update_status_only(format!("0: {}", line)).await;
                             },
                             None => {
                                 break;
@@ -215,12 +216,14 @@ impl Plugin for Process {
                     }
                 });
 
+                let reader_context = tc.clone();
                 let stderr_reader_task = tc.handle().unwrap().spawn(async move {
                     event!(Level::DEBUG, "starting to listen to stderr");
                     while let Ok(line) = stderr_reader.next_line().await {
                         match line {
                             Some(line) => {
                                 eprintln!("{}", line);
+                                reader_context.update_status_only(format!("1: {}", line)).await;
                             },
                             None => {
                                 break;

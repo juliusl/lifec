@@ -745,28 +745,27 @@ impl ThunkContext {
     /// Sends an update for the status and progress
     ///
     pub async fn update_progress(&self, status: impl AsRef<str>, progress: f32) {
-        // if let ThunkContext {
-        //     status_updates: Some(status_updates),
-        //     entity: Some(entity),
-        //     ..
-        // } = self
-        // {
-        //     match status_updates
-        //         .send((*entity, progress, status.as_ref().to_string()))
-        //         .await
-        //     {
-        //         Ok(_) => {}
-        //         Err(_) => {}
-        //     }
-        // }
-        event!(Level::TRACE, "progress {}, {}", progress, status.as_ref());
+        if let ThunkContext {
+            status_updates: Some(status_updates),
+            entity: Some(entity),
+            ..
+        } = self
+        {
+            match status_updates
+                .send((*entity, progress, status.as_ref().to_string()))
+                .await
+            {
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+       // event!(Level::TRACE, "progress {}, {}", progress, status.as_ref());
     }
 
     /// Updates status of thunk execution
     ///
     pub async fn update_status_only(&self, status: impl AsRef<str>) {
-        // TODO self.update_progress(&status, 0.0).await;
-        event!(Level::TRACE, "{}", status.as_ref())
+        self.update_progress(&status, 0.0).await;
     }
 
     /// Returns the error context this context has an error block

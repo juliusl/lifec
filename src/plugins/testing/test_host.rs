@@ -1,14 +1,17 @@
 use std::{fs::File, path::PathBuf, sync::Arc};
 
 use reality::{BlockObject, BlockProperties};
-use specs::RunNow;
+use specs::{RunNow, WorldExt};
 
 use crate::{
     debugger::Debugger,
-    engine::{Cleanup, Performance, Profilers},
-    guest::Guest,
+    engine::{Performance, Profilers, Cleanup},
+    guest::{Guest, RemoteProtocol},
     host::EventHandler,
-    prelude::{Appendix, Editor, EventRuntime, Host, Plugin, Project, RunmdFile, Sequencer},
+    prelude::{
+        Appendix, Editor, EventRuntime, Host, NodeStatus, Plugin, Project, RunmdFile, Sequencer,
+        State,
+    },
 };
 
 #[derive(Default)]
@@ -52,19 +55,21 @@ impl Plugin for TestHost {
                     "#,
                 ));
 
-                let world = root
+                let mut world = root
                     .compile::<TestHost>()
                     .expect("should be able to compile");
+                world.insert(None::<RemoteProtocol>);
+                world.insert(None::<Debugger>);
                 let mut host = Host::from(world);
                 host.prepare::<TestHost>();
                 host.link_sequences();
                 host.build_appendix();
                 host.enable_listener::<Debugger>();
                 host.prepare::<TestHost>();
-
                 if let Some(appendix) = host.world_mut().remove::<Appendix>() {
                     host.world_mut().insert(Arc::new(appendix));
                 }
+
                 let test_dir = PathBuf::from(".world/test.io/test_host");
                 std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
                 let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |guest| {
@@ -72,7 +77,25 @@ impl Plugin for TestHost {
                     Cleanup::default().run_now(guest.protocol().as_ref());
                     EventHandler::<Debugger>::default().run_now(guest.protocol().as_ref());
 
-                    guest.protocol().as_ref().system_data::<Profilers>().profile();
+                    guest
+                        .protocol()
+                        .as_ref()
+                        .system_data::<Profilers>()
+                        .profile();
+
+                    let nodes = guest
+                        .protocol()
+                        .as_ref()
+                        .system_data::<State>()
+                        .event_nodes();
+                    for node in nodes {
+                        guest
+                            .protocol()
+                            .as_ref()
+                            .write_component()
+                            .insert(node.status.entity(), node.status)
+                            .expect("should be able to insert status");
+                    }
 
                     if guest.encode_performance() {
                         let test_dir = PathBuf::from(".world/test.io/test_host/performance");
@@ -98,8 +121,67 @@ impl Plugin for TestHost {
                             true
                         });
                     }
+
+                    if guest.encode_status() {
+                        let test_dir = PathBuf::from(".world/test.io/test_host/status");
+                        std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
+
+                        fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
+                            move || {
+                                std::fs::OpenOptions::new()
+                                    .create(true)
+                                    .write(true)
+                                    .open(name)
+                                    .ok()
+                                    .unwrap()
+                            }
+                        }
+
+                        guest.update_protocol(|protocol| {
+                            protocol.send::<NodeStatus, _, _>(
+                                write_stream(".world/test.io/test_host/status/control"),
+                                write_stream(".world/test.io/test_host/status/frames"),
+                                write_stream(".world/test.io/test_host/status/blob"),
+                            );
+                            true
+                        });
+                    }
+
+                    // It's not the remotes I need to encode, it's the debugger
+                    // if guest.encode_remotes() {
+                    //     let test_dir = PathBuf::from(".world/test.io/test_host/remote");
+                    //     std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
+
+                    //     fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
+                    //         move || {
+                    //             std::fs::OpenOptions::new()
+                    //                 .create(true)
+                    //                 .write(true)
+                    //                 .open(name)
+                    //                 .ok()
+                    //                 .unwrap()
+                    //         }
+                    //     }
+
+                    //     guest.update_protocol(|protocol| {
+                    //         protocol.send::<Remote, _, _>(
+                    //             write_stream(".world/test.io/test_host/remote/control"),
+                    //             write_stream(".world/test.io/test_host/remote/frames"),
+                    //             write_stream(".world/test.io/test_host/remote/blob"),
+                    //         );
+                    //         true
+                    //     });
+                    // }
                 });
+
+                let remote_protocol = guest.subscribe();
+                guest.update_protocol(move |protocol| {
+                    protocol.as_mut().insert(Some(remote_protocol));
+                    true
+                });
+
                 tc.enable_guest(guest);
+
                 Some(tc)
             }
         })

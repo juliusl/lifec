@@ -22,7 +22,7 @@ pub struct Runner<'a> {
     /// Node commands,
     /// 
     commands: WriteStorage<'a, NodeCommand>,
-    /// Current node statuses,
+    /// Current node performance data,
     /// 
     samples: WriteStorage<'a, Performance>,
 }

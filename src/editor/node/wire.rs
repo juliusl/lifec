@@ -24,35 +24,37 @@ impl WireObject for NodeStatus {
         let appendix = appendix.deref().clone();
         match self {
             NodeStatus::Event(event) => {
-                match event {
+                let frame = match event {
                     crate::prelude::EventStatus::Scheduled(entity) => {
-                        encode_node_command(0x10, *entity, appendix, encoder)
+                        encode_node_command(0xE0, *entity, appendix, encoder)
                     }
                     crate::prelude::EventStatus::New(entity) => {
-                        encode_node_command(0x20, *entity, appendix, encoder)
+                        encode_node_command(0xE1, *entity, appendix, encoder)
                     }
                     crate::prelude::EventStatus::InProgress(entity) => {
-                        encode_node_command(0x30, *entity, appendix, encoder)
+                        encode_node_command(0xE2, *entity, appendix, encoder)
                     }
                     crate::prelude::EventStatus::Paused(entity) => {
-                        encode_node_command(0x40, *entity, appendix, encoder)
+                        encode_node_command(0xE3, *entity, appendix, encoder)
                     }
                     crate::prelude::EventStatus::Ready(entity) => {
-                        encode_node_command(0x50, *entity, appendix, encoder)
+                        encode_node_command(0xE4, *entity, appendix, encoder)
                     }
                     crate::prelude::EventStatus::Completed(entity) => {
-                        encode_node_command(0x60, *entity, appendix, encoder)
+                        encode_node_command(0xE5, *entity, appendix, encoder)
                     }
                     crate::prelude::EventStatus::Cancelled(entity) => {
-                        encode_node_command(0x70, *entity, appendix, encoder)
+                        encode_node_command(0xE6, *entity, appendix, encoder)
                     }
                     crate::prelude::EventStatus::Inactive(entity) => {
-                        encode_node_command(0x80, *entity, appendix, encoder)
+                        encode_node_command(0xE7, *entity, appendix, encoder)
                     }
                     crate::prelude::EventStatus::Disposed(entity) => {
-                        encode_node_command(0x90, *entity, appendix, encoder)
+                        encode_node_command(0xE8, *entity, appendix, encoder)
                     }
                 };
+
+                encoder.frames.push(frame);
             }
             _ => {}
         }
@@ -67,15 +69,15 @@ impl WireObject for NodeStatus {
         let frame = frames.get(0).expect("should only be 1 frame");
         let entity = frame.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
         match frame.op() {
-            0x10 => NodeStatus::Event(EventStatus::Scheduled(entity)),
-            0x20 => NodeStatus::Event(EventStatus::New(entity)),
-            0x30 => NodeStatus::Event(EventStatus::InProgress(entity)),
-            0x40 => NodeStatus::Event(EventStatus::Paused(entity)),
-            0x50 => NodeStatus::Event(EventStatus::Ready(entity)),
-            0x60 => NodeStatus::Event(EventStatus::Completed(entity)),
-            0x70 => NodeStatus::Event(EventStatus::Cancelled(entity)),
-            0x80 => NodeStatus::Event(EventStatus::Inactive(entity)),
-            0x90 => NodeStatus::Event(EventStatus::Disposed(entity)),
+            0xE0 => NodeStatus::Event(EventStatus::Scheduled(entity)),
+            0xE1 => NodeStatus::Event(EventStatus::New(entity)),
+            0xE2 => NodeStatus::Event(EventStatus::InProgress(entity)),
+            0xE3 => NodeStatus::Event(EventStatus::Paused(entity)),
+            0xE4 => NodeStatus::Event(EventStatus::Ready(entity)),
+            0xE5 => NodeStatus::Event(EventStatus::Completed(entity)),
+            0xE6 => NodeStatus::Event(EventStatus::Cancelled(entity)),
+            0xE7 => NodeStatus::Event(EventStatus::Inactive(entity)),
+            0xE8 => NodeStatus::Event(EventStatus::Disposed(entity)),
             _ => {
                 panic!("Unrecognized frame")
             }

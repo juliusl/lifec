@@ -8,7 +8,7 @@ use crate::{
     engine::Performance,
     guest::Guest,
     host::EventHandler,
-    prelude::{Appendix, Editor, Host, NodeCommand, Plugin, RunmdFile, Sequencer},
+    prelude::{Appendix, Editor, Host, NodeCommand, Plugin, RunmdFile, Sequencer, NodeStatus},
 };
 
 use super::TestHost;
@@ -50,20 +50,21 @@ impl Plugin for TestHostSender {
                     "#,
                 ));
 
-                let world = root
+                let mut world = root
                     .compile::<TestHost>()
                     .expect("should be able to compile");
+                world.insert(None::<Debugger>);
                 let mut host = Host::from(world);
                 host.prepare::<TestHost>();
                 host.link_sequences();
                 host.build_appendix();
-                host.enable_listener::<Debugger>();
+                host.enable_listener::<()>();
                 host.prepare::<TestHost>();
                 if let Some(appendix) = host.world_mut().remove::<Appendix>() {
                     host.world_mut().insert(Arc::new(appendix));
                 }
                 let mut guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |guest| {
-                    EventHandler::<Debugger>::default().run_now(guest.protocol().as_ref());
+                    EventHandler::<()>::default().run_now(guest.protocol().as_ref());
 
                     if guest.encode_commands() {
                         let test_dir = PathBuf::from(".world/test.io/test_host");
@@ -105,13 +106,14 @@ impl Plugin for TestHostSender {
 
                         let work_dir = workspace
                             .work_dir()
-                            .join(".world/test.io/test_host")
-                            .join("performance");
-                        let control = work_dir.join("control");
-                        let frames = work_dir.join("frames");
-                        let blob = work_dir.join("blob");
+                            .join(".world/test.io/test_host");
 
-                        if control.exists() && frames.exists() && blob.exists() {
+                        let performance_dir = work_dir.join("performance");
+                        let control = performance_dir.join("control");
+                        let frames = performance_dir.join("frames");
+                        let blob = performance_dir.join("blob");
+
+                        let performance_updated = if control.exists() && frames.exists() && blob.exists() {
                             protocol.clear::<Performance>();
                             protocol.receive::<Performance, _, _>(
                                 read_stream(&control),
@@ -125,8 +127,53 @@ impl Plugin for TestHostSender {
                             true
                         } else {
                             false
-                        }
-                    }) {}
+                        };
+
+                        let status_dir = work_dir.join("status");
+                        let control = status_dir.join("control");
+                        let frames = status_dir.join("frames");
+                        let blob = status_dir.join("blob");
+                        let status_updated = if control.exists() && frames.exists() && blob.exists() {
+                            protocol.clear::<NodeStatus>();
+                            protocol.receive::<NodeStatus, _, _>(
+                                read_stream(&control),
+                                read_stream(&frames),
+                                read_stream(&blob),
+                            );
+
+                            std::fs::remove_file(control).ok();
+                            std::fs::remove_file(frames).ok();
+                            std::fs::remove_file(blob).ok();
+                            true
+                        } else {
+                            false
+                        };
+
+                        // let remote_dir = work_dir.join("remote");
+                        // let control = remote_dir.join("control");
+                        // let frames = remote_dir.join("frames");
+                        // let blob = remote_dir.join("blob");
+                        // let remote_updated = if control.exists() && frames.exists() && blob.exists() {
+                        //     protocol.receive::<Remote, _, _>(
+                        //         read_stream(&control),
+                        //         read_stream(&frames),
+                        //         read_stream(&blob),
+                        //     );
+
+                        //     protocol.decode::<Remote>();
+
+                        //     std::fs::remove_file(control).ok();
+                        //     std::fs::remove_file(frames).ok();
+                        //     std::fs::remove_file(blob).ok();
+                        //     true
+                        // } else {
+                        //     false
+                        // };
+
+                        performance_updated | status_updated 
+                    }) {
+                        
+                    }
                 });
 
                 guest.enable_remote();

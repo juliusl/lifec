@@ -313,7 +313,6 @@ mod tests {
             }
         }
         fn on_error_context(&mut self, _: &ErrorContext) {}
-
         fn on_completion(&mut self, _: crate::engine::Completion) {}
     }
 

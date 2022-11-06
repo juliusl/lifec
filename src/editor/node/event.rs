@@ -24,12 +24,17 @@ pub trait EventNode {
 
 impl EventNode for Node {
     fn edit_event(&mut self, ui: &Ui, event: EventStatus) {
+        let tree_node_flags = TreeNodeFlags::SPAN_FULL_WIDTH | TreeNodeFlags::FRAME_PADDING;
+
         let tree_node = match self.connection_state {
             Some(connection_state) if connection_state.is_spawned() => {
                 let source = connection_state.source();
                 let tree_node = TreeNode::new(format!("{:?}", event.entity()))
-                    .label::<String, _>(format!("{}", self.appendix.name(&source).unwrap_or("--")))
-                    .flags(TreeNodeFlags::SPAN_FULL_WIDTH | TreeNodeFlags::FRAME_PADDING)
+                    .label::<String, _>(format!(
+                        "{}", 
+                        self.appendix.name(&source).unwrap_or("--")
+                    ))
+                    .flags(tree_node_flags)
                     .push(ui);
                 // ui.table_next_column();
                 // if let Some(general) = self.appendix.general(&source) {
@@ -43,7 +48,7 @@ impl EventNode for Node {
                         "{}",
                         self.appendix.name(&event.entity()).unwrap_or("--")
                     ))
-                    .flags(TreeNodeFlags::SPAN_FULL_WIDTH | TreeNodeFlags::FRAME_PADDING)
+                    .flags(tree_node_flags)
                     .push(ui);
                 // ui.table_next_column();
                 // if let Some(general) = self.appendix.general(&event.entity()) {
@@ -69,6 +74,8 @@ impl EventNode for Node {
                 None => {}
             }
         }
+        ui.table_next_column();
+        ui.text(format!("{}", self.status.entity().id()));
 
         ui.table_next_column();
         ui.text(format!("{event}"));
@@ -140,7 +147,7 @@ impl EventNode for Node {
                                     .unwrap_or(state.graph.clone().unwrap());
                                 let previous = graph.clone();
 
-                                ui.table_set_column_index(4);
+                                ui.table_set_column_index(5);
                                 for (name, property) in
                                     graph.resolve_properties_mut().iter_properties_mut()
                                 {

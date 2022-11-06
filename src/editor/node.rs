@@ -146,7 +146,7 @@ impl Hash for Node {
         self.appendix.hash(state);
         self.command.hash(state);
         self.connection_state.hash(state);
-        for (e, g) in self.mutations.iter(){
+        for (e, g) in self.mutations.iter() {
             e.hash(state);
             g.hash(state);
         }

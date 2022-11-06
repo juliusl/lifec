@@ -1,12 +1,16 @@
-use std::hash::Hash;
+use std::{hash::Hash, ops::Deref};
 
 use reality::wire::{Protocol, WireObject};
 use specs::{Component, Entity, HashMapStorage, RunNow, World, WorldExt};
 use tokio::sync::watch::Ref;
 
 use crate::{
+    debugger::Debugger,
     engine::{Performance, Runner},
-    prelude::{Host, HostEditor, NodeCommand, PluginFeatures, Project, State, ThunkContext, Workspace},
+    prelude::{
+        Host, HostEditor, NodeCommand, NodeStatus, PluginFeatures, Project, State, ThunkContext,
+        Workspace,
+    },
 };
 
 /// Type alias for a remotely updated protocol,
@@ -58,6 +62,23 @@ impl Guest {
         guest
     }
 
+    /// Exports debug info,
+    /// 
+    pub fn export_debug_info(&self) {
+        if let Some(debugger) = self
+            .protocol()
+            .as_ref()
+            .fetch::<Option<Debugger>>()
+            .deref()
+            .clone()
+        {
+            // Encode completions from guest debugger,
+            for c in debugger.completions() {
+                
+            }
+        }
+    }
+
     /// Enables the remote on this guest,
     ///
     /// When the remote is enabled, the host editor returned will have a remote protocol to read from,
@@ -65,7 +86,13 @@ impl Guest {
     pub fn enable_remote(&mut self) {
         self.remote = Some(self.subscribe());
     }
-    
+
+    /// Returns true if remote protocol is enabled,
+    ///
+    pub fn is_remote(&self) -> bool {
+        self.remote.is_some()
+    }
+
     /// Stateless run
     ///
     pub fn run(&self) {
@@ -73,7 +100,7 @@ impl Guest {
     }
 
     /// Returns the workspace hosting this guest,
-    /// 
+    ///
     pub fn workspace(&self) -> &Workspace {
         &self.workspace
     }
@@ -119,17 +146,15 @@ impl Guest {
     }
 
     /// Encode wire objects to protocol and update the watch channel,
-    /// 
+    ///
     /// Returns objects that were encoded
     ///
-    pub fn encode<T>(&self, take_objects: impl FnOnce(&mut Runner) -> Vec<(Entity, T)>) -> bool
+    pub fn encode<T>(&self, take_objects: impl FnOnce(&Protocol) -> Vec<(Entity, T)>) -> bool
     where
         T: WireObject + Clone + 'static,
     {
-         self.protocol.send_if_modified(move |protocol| {
-            let objects = { 
-                take_objects(&mut protocol.as_ref().system_data::<Runner>())
-            };
+        self.protocol.send_if_modified(move |protocol| {
+            let objects = { take_objects(protocol) };
 
             let encoding = !objects.is_empty();
 
@@ -155,8 +180,8 @@ impl Guest {
     ///
     /// returns true if any commands were encoded,
     ///
-    pub fn encode_commands(&self) -> bool{
-        self.encode::<NodeCommand>(|p| p.take_commands())
+    pub fn encode_commands(&self) -> bool {
+        self.encode::<NodeCommand>(|p| p.as_ref().system_data::<Runner>().take_commands())
     }
 
     /// Encodes performance to protocol,
@@ -164,7 +189,15 @@ impl Guest {
     /// returns true if performances were encoded
     ///
     pub fn encode_performance(&self) -> bool {
-        self.encode::<Performance>(|p| p.take_performance())
+        self.encode::<Performance>(|p| p.as_ref().system_data::<Runner>().take_performance())
+    }
+
+    /// Encodes node status to protocol,
+    ///  
+    /// returns true if status was encoded
+    ///
+    pub fn encode_status(&self) -> bool {
+        self.encode::<NodeStatus>(|p| p.as_ref().system_data::<State>().take_statuses())
     }
 
     /// Maintain the protocol world,

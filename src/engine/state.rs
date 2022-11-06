@@ -151,18 +151,6 @@ impl<'a> State<'a> {
         operations
     }
 
-    /// Returns an iterator over joined tuple w/ Sequence storage,
-    ///
-    pub fn join_sequences<C>(
-        &'a self,
-        other: &'a WriteStorage<'a, C>,
-    ) -> impl Iterator<Item = (Entity, &Sequence, &C)>
-    where
-        C: Component,
-    {
-        (&self.entities, &self.sequences, other).join()
-    }
-
     /// Resets Completed/Cancelled events
     ///
     pub fn reset_all(&mut self) {
@@ -966,6 +954,7 @@ impl<'a> State<'a> {
             entities,
             cursors,
             events,
+            node_statuses,
             connections,
             transitions,
             sequences,
@@ -974,8 +963,18 @@ impl<'a> State<'a> {
             ..
         } = self;
 
-        if let Some((_, connection, cursor, transition, sequence, connection_state, adhoc)) = (
+        if let Some((
+            _,
+            node_status,
+            connection,
+            cursor,
+            transition,
+            sequence,
+            connection_state,
+            adhoc,
+        )) = (
             events,
+            node_statuses.maybe(),
             connections.maybe(),
             cursors.maybe(),
             transitions.maybe(),
@@ -987,7 +986,13 @@ impl<'a> State<'a> {
             .get(event, entities)
         {
             Some(Node {
-                status: NodeStatus::Event(self.status(event)),
+                status: {
+                    if let Some(status) = node_status {
+                        status.clone()
+                    } else {
+                        NodeStatus::Event(self.status(event))
+                    }
+                },
                 transition: transition.cloned(),
                 connection: connection.cloned(),
                 cursor: cursor.cloned(),
@@ -1003,6 +1008,12 @@ impl<'a> State<'a> {
         } else {
             None
         }
+    }
+
+    /// Takes statuses from the world state,
+    /// 
+    pub fn take_statuses(&mut self) -> Vec<(Entity, NodeStatus)> {
+        (&self.entities, self.node_statuses.drain()).join().collect()
     }
 
     /// Handles the node command,
