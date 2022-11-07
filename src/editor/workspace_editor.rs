@@ -10,7 +10,8 @@ use tracing::{event, Level};
 use crate::{
     editor::node::WorkspaceCommand,
     engine::{NodeCommandHandler, Runner, Yielding},
-    prelude::{Runtime, State}, guest::Guest,
+    guest::Guest,
+    prelude::{Runtime, State},
 };
 
 use super::{Appendix, NodeCommand};
@@ -209,10 +210,16 @@ impl WorkspaceEditor {
                         }
 
                         for guest in world.system_data::<Runner>().guests() {
+                            let title = format!(
+                                "Guest {}",
+                                self.appendix
+                                    .name(&guest.owner)
+                                    .unwrap_or(format!("{}", guest.owner.id()).as_str())
+                            );
                             ui.table_next_row();
                             ui.table_next_column();
                             let tree_node =
-                                TreeNode::new(format!("Guest {}", guest.owner.id())).push(ui);
+                                TreeNode::new(title).push(ui);
 
                             ui.table_next_column();
                             if let Some(node) = tree_node {
@@ -339,13 +346,41 @@ impl Extension for WorkspaceEditor {
                     let active = if let Some(edit) = n.edit.as_mut() {
                         edit(n, ui)
                     } else {
-                        true
+                        false
                     };
 
                     if !active {
-                         if let Some(edit) = n.edit.take() {
+                        if let Some(edit) = n.edit.take() {
                             n.suspended_edit = Some(edit);
-                         }
+                        } else {
+                            Window::new("Workspace editor")
+                                .menu_bar(true)
+                                .build(ui, || {
+                                    ui.menu_bar(|| {
+                                        ui.menu("Windows", || {
+                                            ui.menu("Suspended", || {
+                                                let name = self
+                                                    .appendix
+                                                    .name(&n.status.entity())
+                                                    .unwrap_or(
+                                                        format!("{}", n.status.entity().id())
+                                                            .as_str(),
+                                                    )
+                                                    .to_string();
+                                                if imgui::MenuItem::new(format!("Guest {}", name))
+                                                    .selected(n.suspended_edit.is_some())
+                                                    .build(ui)
+                                                {
+                                                    if let Some(suspended) = n.suspended_edit.take()
+                                                    {
+                                                        n.edit = Some(suspended);
+                                                    }
+                                                }
+                                            });
+                                        })
+                                    })
+                                });
+                        }
                     }
                 }
                 guest.handle();

@@ -10,8 +10,8 @@ use crate::{
     host::EventHandler,
     prelude::{
         Appendix, Editor, EventRuntime, Host, NodeStatus, Plugin, Project, RunmdFile, Sequencer,
-        State, Journal
-    },
+        State, Journal, Node
+    }, editor::CommandDispatcher,
 };
 
 #[derive(Default)]
@@ -72,7 +72,7 @@ impl Plugin for TestHost {
 
                 let test_dir = PathBuf::from(".world/test.io/test_host");
                 std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
-                let guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |guest| {
+                let mut guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |guest| {
                     EventRuntime::default().run_now(guest.protocol().as_ref());
                     Cleanup::default().run_now(guest.protocol().as_ref());
                     EventHandler::<Debugger>::default().run_now(guest.protocol().as_ref());
@@ -179,20 +179,20 @@ impl Plugin for TestHost {
                     }
                 });
 
-                // guest.add_node(Node {
-                //     status: NodeStatus::Custom(tc.entity().unwrap()),
-                //     edit: Some(|n, ui| {
-                //         let mut opened = true;
-                //         imgui::Window::new("test").opened(&mut opened).build(ui, ||{
-                //             ui.text("test window");
-                //             if ui.button("test") {
-                //                 n.custom("test", n.status.entity());
-                //             }
-                //         });
-                //         opened
-                //     }),
-                //     .. Default::default()
-                // });
+                guest.add_node(Node {
+                    status: NodeStatus::Custom(tc.entity().unwrap()),
+                    edit: Some(|n, ui| {
+                        let mut opened = true;
+                        imgui::Window::new("test").opened(&mut opened).build(ui, ||{
+                            ui.text("test window");
+                            if ui.button("test") {
+                                n.custom("test", n.status.entity());
+                            }
+                        });
+                        opened
+                    }),
+                    .. Default::default()
+                });
 
                 tc.enable_guest(guest);
 

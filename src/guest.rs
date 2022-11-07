@@ -13,37 +13,12 @@ use crate::{
     },
 };
 
-#[derive(Clone)]
-pub struct RemoteProtocol {
-    remote: tokio::sync::watch::Receiver<Protocol>,
-    journal_cursor: usize,
-}
+mod remote_protocol;
+pub use remote_protocol::RemoteProtocol;
 
-impl Hash for RemoteProtocol {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.journal_cursor.hash(state);
-    }
-}
-
-impl RemoteProtocol {
-    /// Advance the journal cursor,
-    ///
-    pub fn advance_journal_cursor(&mut self, idx: usize) {
-        self.journal_cursor = idx;
-    }
-
-    /// Returns the current journal cursor,
-    ///
-    pub fn journal_cursor(&self) -> usize {
-        self.journal_cursor
-    }
-}
-
-impl AsRef<tokio::sync::watch::Receiver<Protocol>> for RemoteProtocol {
-    fn as_ref(&self) -> &tokio::sync::watch::Receiver<Protocol> {
-        &self.remote
-    }
-}
+/// Runs systems without a dispatcher,
+///
+pub type Run = fn(&Guest);
 
 /// Guest host as a component,
 ///
@@ -60,13 +35,9 @@ pub struct Guest {
     protocol: tokio::sync::watch::Sender<Protocol>,
     /// Remote protocol,
     remote: Option<RemoteProtocol>,
-    /// Nodes,
+    /// Guest nodes,
     nodes: Vec<Node>,
 }
-
-/// Runs systems without a dispatcher,
-///
-pub type Run = fn(&Guest);
 
 impl Guest {
     /// Returns a new guest component,
@@ -111,6 +82,8 @@ impl Guest {
         self.nodes.iter_mut()
     }
 
+    /// Handle any commands from guest nodes and update protocol,
+    /// 
     pub fn handle(&mut self) {
         let commands = self
             .nodes
@@ -304,10 +277,7 @@ impl Guest {
     /// Returns a remote protocol,
     ///
     pub fn subscribe(&self) -> RemoteProtocol {
-        RemoteProtocol {
-            remote: self.protocol.subscribe(),
-            journal_cursor: 0,
-        }
+        RemoteProtocol::new(self.protocol.subscribe())
     }
 }
 
