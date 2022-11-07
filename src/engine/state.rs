@@ -981,13 +981,7 @@ impl<'a> State<'a> {
             .get(event, entities)
         {
             Some(Node {
-                status: {
-                    if let Some(status) = node_status {
-                        status.clone()
-                    } else {
-                        NodeStatus::Event(self.status(event))
-                    }
-                },
+                status: NodeStatus::Event(self.status(event)),
                 transition: transition.cloned(),
                 connection: connection.cloned(),
                 cursor: cursor.cloned(),
@@ -1102,17 +1096,6 @@ impl<'a> State<'a> {
                     false
                 }
             }
-        }
-    }
-
-    /// Takes a sample of the current node state by adding the node status as a component to each entity,
-    ///
-    pub fn sample_nodes(&mut self) {
-        for node in self.event_nodes() {
-            let status = node.status;
-            self.node_statuses
-                .insert(status.entity(), status)
-                .expect("should be able to insert");
         }
     }
 }
