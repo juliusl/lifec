@@ -351,7 +351,7 @@ impl AttributeGraph {
                 ui.checkbox(name, b);
             }
             atlier::system::Value::TextBuffer(text) => {
-                ui.input_text_multiline(name, text, [140.0, 160.0]).build();
+                ui.input_text_multiline(name, text, [0.0, 160.0]).build();
             }
             atlier::system::Value::Int(i) => {
                 ui.input_int(name, i).build();
