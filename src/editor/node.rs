@@ -7,6 +7,7 @@ use specs::Entity;
 
 use super::Appendix;
 use crate::engine::{Adhoc, ConnectionState};
+use crate::guest::RemoteProtocol;
 use crate::{
     prelude::{Connection, Cursor, Sequence, Transition},
     state::AttributeGraph,
@@ -85,6 +86,9 @@ pub struct Node {
     /// Suspended display node ui,
     /// 
     pub suspended_display: Option<DisplayNode>,
+    /// Remote protocol,
+    /// 
+    pub remote_protocol: Option<RemoteProtocol>,
 }
 
 impl Node {

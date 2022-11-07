@@ -5,13 +5,14 @@ use specs::{RunNow, WorldExt};
 
 use crate::{
     debugger::Debugger,
-    engine::{Performance, Profilers, Cleanup},
+    editor::{CommandDispatcher, EventNode},
+    engine::{Cleanup, Performance, Profilers},
     guest::{Guest, RemoteProtocol},
     host::EventHandler,
     prelude::{
-        Appendix, Editor, EventRuntime, Host, NodeStatus, Plugin, Project, RunmdFile, Sequencer,
-        State, Journal, Node
-    }, editor::CommandDispatcher,
+        Appendix, Editor, EventRuntime, Host, Journal, Node, NodeStatus, Plugin, Project,
+        RunmdFile, Sequencer, State,
+    },
 };
 
 #[derive(Default)]
@@ -152,7 +153,7 @@ impl Plugin for TestHost {
                     let frames = remote_dir.join("frames");
                     let blob = remote_dir.join("blob");
                     let journal_exists = control.exists() && frames.exists() && blob.exists();
-                   
+
                     if !journal_exists && guest.encode_journal() {
                         let test_dir = PathBuf::from(".world/test.io/test_host/journal");
                         std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
@@ -181,17 +182,38 @@ impl Plugin for TestHost {
 
                 guest.add_node(Node {
                     status: NodeStatus::Custom(tc.entity().unwrap()),
+                    remote_protocol: Some(guest.subscribe()),
                     edit: Some(|n, ui| {
                         let mut opened = true;
-                        imgui::Window::new("test").opened(&mut opened).build(ui, ||{
-                            ui.text("test window");
-                            if ui.button("test") {
-                                n.custom("test", n.status.entity());
-                            }
-                        });
+                        imgui::Window::new("test")
+                            .opened(&mut opened)
+                            .build(ui, || {
+                                ui.text("test window");
+
+                                if let Some(rp) = n.remote_protocol.as_ref() {
+                                    for mut a in rp
+                                        .remote
+                                        .borrow()
+                                        .as_ref()
+                                        .system_data::<State>()
+                                        .event_nodes()
+                                    {
+                                        match a.status {
+                                            NodeStatus::Event(status) => {
+                                                a.event_buttons(ui, status);
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+
+                                if ui.button("test") {
+                                    n.custom("test", n.status.entity());
+                                }
+                            });
                         opened
                     }),
-                    .. Default::default()
+                    ..Default::default()
                 });
 
                 tc.enable_guest(guest);
