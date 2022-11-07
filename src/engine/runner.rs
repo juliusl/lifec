@@ -58,4 +58,10 @@ impl<'a> Runner<'a> {
     pub fn guests(&self) -> impl Iterator<Item = &Guest> {
         (&self.entities, &self.guests).join().map(|(_, g)| g)
     }
+
+    /// Returns a mutable iterator over guests,
+    /// 
+    pub fn guests_mut(&'a mut self) -> impl Iterator<Item = &'a mut Guest> {
+        (&self.entities, &mut self.guests).join().map(|(_, g)| g)
+    }
 }

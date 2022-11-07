@@ -14,8 +14,6 @@ use crate::{
     state::AttributeGraph,
 };
 
-pub mod wire;
-
 /// Struct for engine debugger,
 ///
 #[derive(Default, Clone)]
@@ -34,7 +32,7 @@ pub struct Debugger {
     errors: Vec<ErrorContext>,
     /// Command dispatcher,
     ///
-    command_dispatcher: Option<Sender<(NodeCommand, Option<Yielding>)>>,
+    _command_dispatcher: Option<Sender<(NodeCommand, Option<Yielding>)>>,
     /// Updated
     ///
     updated: Option<()>,
@@ -246,13 +244,15 @@ impl Debugger {
 
     pub fn updates_log(&mut self, ui: &Ui) {
         for (e, p, message) in self.status_updates.iter() {
-            ui.text(format!("{:?} ", e));
+            ui.text(format!("{}: ", e.id()));
             ui.same_line();
             ui.text(message);
 
             if *p > 0.0 {
                 ui.same_line();
+                ui.indent();
                 imgui::ProgressBar::new(*p).build(ui);
+                ui.unindent();
             }
         }
 
@@ -278,7 +278,7 @@ impl Listener for Debugger {
 
         Self {
             appendix: world.fetch::<Appendix>().deref().clone(),
-            command_dispatcher: Some(command_dispatcher),
+            _command_dispatcher: Some(command_dispatcher),
             ..Default::default()
         }
     }

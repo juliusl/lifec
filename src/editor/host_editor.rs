@@ -18,7 +18,7 @@ use crate::{
     state::AttributeGraph,
 };
 
-use super::{Appendix, Canvas, NodeCommand, NodeStatus, Profiler};
+use super::{Appendix, NodeCommand, NodeStatus, Profiler};
 
 /// Tool for viewing and interacting with a host,
 ///
@@ -51,9 +51,7 @@ pub struct HostEditor {
     /// Command to reset state on all events,
     ///
     reset: Option<()>,
-    /// Entity canvas,
-    ///
-    canvas: Canvas,
+    // canvas: Canvas,
     /// If debugger is enabled, it will be displayed in the host editor window,
     ///
     debugger: Option<Debugger>,
@@ -518,13 +516,6 @@ impl HostEditor {
         ui.text("Performance");
         ui.spacing();
         if let Some(tab_bar) = ui.tab_bar("Performance Tabs") {
-            let journal_tab = ui.tab_item("Journal");
-            if let Some(journal_tab) = journal_tab {
-                self.journal_list(ui);
-
-                journal_tab.end();
-            }
-
             if let Some(remote) = self.remote.as_ref() {
                 let tab = ui.tab_item("Remote");
                 if ui.is_item_hovered() {
@@ -564,6 +555,12 @@ impl HostEditor {
                     }
                     token.end();
                 }
+            }
+            let journal_tab = ui.tab_item("Journal");
+            if let Some(journal_tab) = journal_tab {
+                self.journal_list(ui);
+
+                journal_tab.end();
             }
 
             tab_bar.end();

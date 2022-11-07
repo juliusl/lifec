@@ -10,7 +10,7 @@ use crate::{
     host::EventHandler,
     prelude::{
         Appendix, Editor, EventRuntime, Host, NodeStatus, Plugin, Project, RunmdFile, Sequencer,
-        State, Journal,
+        State, Journal
     },
 };
 
@@ -177,33 +177,22 @@ impl Plugin for TestHost {
                             true
                         });
                     }
-
-                    // It's not the remotes I need to encode, it's the debugger
-                    // if guest.encode_remotes() {
-                    //     let test_dir = PathBuf::from(".world/test.io/test_host/remote");
-                    //     std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
-
-                    //     fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
-                    //         move || {
-                    //             std::fs::OpenOptions::new()
-                    //                 .create(true)
-                    //                 .write(true)
-                    //                 .open(name)
-                    //                 .ok()
-                    //                 .unwrap()
-                    //         }
-                    //     }
-
-                    //     guest.update_protocol(|protocol| {
-                    //         protocol.send::<Remote, _, _>(
-                    //             write_stream(".world/test.io/test_host/remote/control"),
-                    //             write_stream(".world/test.io/test_host/remote/frames"),
-                    //             write_stream(".world/test.io/test_host/remote/blob"),
-                    //         );
-                    //         true
-                    //     });
-                    // }
                 });
+
+                // guest.add_node(Node {
+                //     status: NodeStatus::Custom(tc.entity().unwrap()),
+                //     edit: Some(|n, ui| {
+                //         let mut opened = true;
+                //         imgui::Window::new("test").opened(&mut opened).build(ui, ||{
+                //             ui.text("test window");
+                //             if ui.button("test") {
+                //                 n.custom("test", n.status.entity());
+                //             }
+                //         });
+                //         opened
+                //     }),
+                //     .. Default::default()
+                // });
 
                 tc.enable_guest(guest);
 

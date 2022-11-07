@@ -3,13 +3,13 @@ use std::{hash::Hash, ops::Deref};
 use reality::wire::{Protocol, WireObject};
 use specs::{Component, Entity, HashMapStorage, RunNow, World, WorldExt};
 use tokio::sync::watch::Ref;
+use tracing::{event, Level};
 
 use crate::{
-    debugger::Debugger,
     engine::{Performance, Runner},
     prelude::{
-        Host, HostEditor, NodeCommand, NodeStatus, PluginFeatures, Project, State, ThunkContext,
-        Workspace, Journal,
+        Host, HostEditor, Journal, Node, NodeCommand, NodeStatus, PluginFeatures, Project, State,
+        ThunkContext, Workspace,
     },
 };
 
@@ -27,13 +27,13 @@ impl Hash for RemoteProtocol {
 
 impl RemoteProtocol {
     /// Advance the journal cursor,
-    /// 
+    ///
     pub fn advance_journal_cursor(&mut self, idx: usize) {
         self.journal_cursor = idx;
     }
 
     /// Returns the current journal cursor,
-    /// 
+    ///
     pub fn journal_cursor(&self) -> usize {
         self.journal_cursor
     }
@@ -60,6 +60,8 @@ pub struct Guest {
     protocol: tokio::sync::watch::Sender<Protocol>,
     /// Remote protocol,
     remote: Option<RemoteProtocol>,
+    /// Nodes,
+    nodes: Vec<Node>,
 }
 
 /// Runs systems without a dispatcher,
@@ -85,26 +87,57 @@ impl Guest {
             protocol,
             stateless,
             remote: None,
+            nodes: vec![],
         };
 
         guest
     }
 
-    /// Exports debug info,
-    /// 
-    pub fn export_debug_info(&self) {
-        if let Some(debugger) = self
-            .protocol()
-            .as_ref()
-            .fetch::<Option<Debugger>>()
-            .deref()
-            .clone()
-        {
-            // Encode completions from guest debugger,
-            for c in debugger.completions() {
-                
+    /// Adds a node to the guest,
+    ///
+    pub fn add_node(&mut self, node: Node) {
+        self.nodes.push(node);
+    }
+
+    /// Returns an iterator over nodes,
+    ///
+    pub fn iter_nodes(&self) -> impl Iterator<Item = &Node> {
+        self.nodes.iter()
+    }
+
+    /// Returns a mutable iterator over nodes,
+    ///
+    pub fn iter_nodes_mut(&mut self) -> impl Iterator<Item = &mut Node> {
+        self.nodes.iter_mut()
+    }
+
+    pub fn handle(&mut self) {
+        let commands = self
+            .nodes
+            .iter_mut()
+            .filter_map(|n| n.command.take())
+            .collect::<Vec<_>>();
+        self.protocol.send_if_modified(move |p| {
+            let mut modified = false;
+            for n in commands {
+                match p
+                    .as_ref()
+                    .system_data::<State>()
+                    .plugins()
+                    .features()
+                    .broker()
+                    .try_send_node_command(n, None)
+                {
+                    Ok(_) => {
+                        modified = true;
+                    }
+                    Err(err) => {
+                        event!(Level::ERROR, "Error dispatching command, {err}");
+                    }
+                }
             }
-        }
+            modified
+        });
     }
 
     /// Enables the remote on this guest,
@@ -199,13 +232,13 @@ impl Guest {
     }
 
     /// Encode a resource to the protocol,
-    /// 
+    ///
     pub fn encode_resource<T>(&self, take_object: impl FnOnce(&Protocol) -> Option<T>) -> bool
     where
         T: WireObject + Clone + 'static,
     {
         self.protocol.send_if_modified(move |protocol| {
-            if let Some(object) =  { take_object(protocol) } {
+            if let Some(object) = { take_object(protocol) } {
                 protocol.encoder::<T>(move |world, encoder| {
                     encoder.encode(&object, world);
                 });
@@ -250,9 +283,9 @@ impl Guest {
     }
 
     /// Encode the command journal to protocol,
-    /// 
+    ///
     pub fn encode_journal(&self) -> bool {
-        self.encode_resource::<Journal>(|p| { 
+        self.encode_resource::<Journal>(|p| {
             let journal = p.as_ref().read_resource::<Journal>();
 
             Some(journal.deref().clone())
@@ -271,7 +304,10 @@ impl Guest {
     /// Returns a remote protocol,
     ///
     pub fn subscribe(&self) -> RemoteProtocol {
-        RemoteProtocol { remote: self.protocol.subscribe(), journal_cursor: 0 }
+        RemoteProtocol {
+            remote: self.protocol.subscribe(),
+            journal_cursor: 0,
+        }
     }
 }
 

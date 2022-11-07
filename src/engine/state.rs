@@ -118,7 +118,7 @@ impl<'a> State<'a> {
 
     /// Returns a list of adhoc operations,
     ///
-    pub fn list_adhoc_operations(&self) -> Vec<(Adhoc, Sequence)> {
+    pub fn list_adhoc_operations(&self) -> Vec<(Entity, Adhoc, Sequence)> {
         let Self {
             entities,
             blocks,
@@ -143,7 +143,7 @@ impl<'a> State<'a> {
                 if let Some((adhoc, operation)) =
                     (adhocs, sequences).join().get(operation_entity, entities)
                 {
-                    operations.push((adhoc.clone(), operation.clone()));
+                    operations.push((operation_entity, adhoc.clone(), operation.clone()));
                 }
             }
         }
@@ -928,15 +928,7 @@ impl<'a> State<'a> {
                 status: NodeStatus::Profiler(e),
                 connection: Some(c.clone()),
                 appendix: appendix.deref().clone(),
-                mutations: HashMap::default(),
-                adhoc: None,
-                connection_state: None,
-                cursor: None,
-                sequence: None,
-                transition: None,
-                command: None,
-                edit: None,
-                display: None,
+                ..Default::default()
             })
             .collect::<Vec<_>>()
     }
@@ -1003,10 +995,7 @@ impl<'a> State<'a> {
                 connection_state: connection_state.cloned(),
                 appendix: appendix.deref().clone(),
                 adhoc: adhoc.cloned(),
-                mutations: HashMap::default(),
-                command: None,
-                edit: None,
-                display: None,
+                ..Default::default()
             })
         } else {
             None
@@ -1200,14 +1189,7 @@ impl<'a> State<'a> {
                 cursor: cursor.cloned(),
                 sequence: sequence.cloned(),
                 appendix: appendix.deref().clone(),
-                mutations: HashMap::default(),
-                transition: None,
-                connection: None,
-                connection_state: None,
-                adhoc: None,
-                command: None,
-                edit: None,
-                display: None,
+                ..Default::default()
             })
         } else {
             None

@@ -33,15 +33,15 @@ pub mod wire;
 
 /// Type alias for an edit node ui function,
 ///
-pub type EditNode = fn(&mut Node, &Ui);
+pub type EditNode = fn(&mut Node, &Ui) -> bool;
 
 /// Type alias for a display node ui function,
 ///
-pub type DisplayNode = fn(&Node, &Ui);
+pub type DisplayNode = fn(&Node, &Ui) -> bool;
 
 /// Struct for visualizing and commanding node-like entities,
 ///
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Node {
     /// Status of the current node,
     ///
@@ -79,6 +79,12 @@ pub struct Node {
     /// Display node ui function,
     ///
     pub display: Option<DisplayNode>,
+    /// Suspended edit node ui,
+    /// 
+    pub suspended_edit: Option<EditNode>,
+    /// Suspended display node ui,
+    /// 
+    pub suspended_display: Option<DisplayNode>,
 }
 
 impl Node {
@@ -122,7 +128,7 @@ impl App for Node {
         } else {
             match self.status {
                 // TODO:
-                NodeStatus::Engine(_) | NodeStatus::Profiler(_) | NodeStatus::Empty => {}
+                NodeStatus::Engine(_) | NodeStatus::Profiler(_) | NodeStatus::Custom(_) | NodeStatus::Empty => {}
                 NodeStatus::Event(status) => {
                     self.edit_event(ui, status);
                 }

@@ -13,6 +13,8 @@ pub enum NodeStatus {
     Event(EventStatus),
     /// This is a termination point for event nodes that are adhoc operations
     Profiler(Entity),
+    /// Custom node status,
+    Custom(Entity),
     /// Empty node,
     #[default]
     Empty,
@@ -26,6 +28,7 @@ impl NodeStatus {
             NodeStatus::Event(status) => status.entity(),
             NodeStatus::Profiler(entity) => *entity, 
             NodeStatus::Engine(status) => status.entity(),
+            NodeStatus::Custom(e) => *e,
             NodeStatus::Empty => unimplemented!("empty node has no status")
         }
     }

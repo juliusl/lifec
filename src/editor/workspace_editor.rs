@@ -2,20 +2,18 @@ use std::{collections::BTreeMap, ops::Deref};
 
 use atlier::system::Extension;
 use copypasta::{ClipboardContext, ClipboardProvider};
-use imgui::{
-    TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags, Ui, Window,
-};
+use imgui::{TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags, Ui, Window};
 use specs::{Join, RunNow, World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 use tracing::{event, Level};
 
 use crate::{
     editor::node::WorkspaceCommand,
-    engine::{NodeCommandHandler, Runner},
-    prelude::{Runtime, State},
+    engine::{NodeCommandHandler, Runner, Yielding},
+    prelude::{Runtime, State}, guest::Guest,
 };
 
-use super::Appendix;
+use super::{Appendix, NodeCommand};
 
 /// Extension to display workspace editing tools,
 ///
@@ -57,6 +55,8 @@ impl WorkspaceEditor {
         }
     }
 
+    /// Plugins table,
+    ///
     pub fn plugins(&mut self, world: &World, ui: &Ui) {
         let runtime = world.read_resource::<Runtime>();
 
@@ -95,6 +95,8 @@ impl WorkspaceEditor {
         }
     }
 
+    /// Custom node handlers,
+    ///
     pub fn custom_node_handlers(&mut self, world: &World, ui: &Ui) {
         let handlers = world.fetch::<BTreeMap<String, NodeCommandHandler>>();
 
@@ -126,6 +128,8 @@ impl WorkspaceEditor {
         }
     }
 
+    /// Opens a workspace window,
+    ///
     pub fn workspace_window(&mut self, world: &World, ui: &Ui) {
         Window::new("Workspace editor")
             .size([700.0, 600.0], imgui::Condition::Appearing)
@@ -149,7 +153,7 @@ impl WorkspaceEditor {
                 ui.separator();
 
                 if imgui::CollapsingHeader::new("Hosts")
-                    .flags(TreeNodeFlags::NO_TREE_PUSH_ON_OPEN)
+                    .flags(TreeNodeFlags::NO_TREE_PUSH_ON_OPEN | TreeNodeFlags::DEFAULT_OPEN)
                     .build(ui)
                 {
                     if let Some(token) = ui.begin_table("hosts", 2) {
@@ -160,18 +164,46 @@ impl WorkspaceEditor {
                         ui.table_next_row();
                         ui.table_next_column();
                         let tree_node = TreeNode::new("main_host")
+                            .flags(TreeNodeFlags::DEFAULT_OPEN)
                             .label::<String, _>("main".to_string())
                             .push(ui);
-                        
+
                         ui.table_next_column();
 
                         if let Some(node) = tree_node {
-                            for (adhoc, _) in
+                            let command_dispatcher = world
+                                .system_data::<State>()
+                                .plugins()
+                                .features()
+                                .broker()
+                                .command_dispatcher();
+
+                            for (entity, adhoc, _) in
                                 world.system_data::<State>().list_adhoc_operations()
                             {
                                 ui.table_next_row();
                                 ui.table_next_column();
-                                ui.text(adhoc.name);
+                                if adhoc.tag != "operation" {
+                                    ui.text(format!(
+                                        "{} ({})",
+                                        adhoc.name,
+                                        adhoc.tag.trim_end_matches(".operation")
+                                    ));
+                                } else {
+                                    ui.text(adhoc.name);
+                                }
+
+                                ui.table_next_column();
+                                if ui.button(format!("Spawn {}", entity.id())) {
+                                    match command_dispatcher
+                                        .try_send((NodeCommand::Spawn(entity), None::<Yielding>))
+                                    {
+                                        Ok(_) => {}
+                                        Err(err) => {
+                                            event!(Level::ERROR, "error sending command {err}");
+                                        }
+                                    }
+                                }
                             }
                             node.pop();
                         }
@@ -179,9 +211,54 @@ impl WorkspaceEditor {
                         for guest in world.system_data::<Runner>().guests() {
                             ui.table_next_row();
                             ui.table_next_column();
-                            ui.text(format!("Guest {}", guest.owner.id()));
+                            let tree_node =
+                                TreeNode::new(format!("Guest {}", guest.owner.id())).push(ui);
 
                             ui.table_next_column();
+                            if let Some(node) = tree_node {
+                                let command_dispatcher = guest
+                                    .protocol()
+                                    .as_ref()
+                                    .system_data::<State>()
+                                    .plugins()
+                                    .features()
+                                    .broker()
+                                    .command_dispatcher();
+
+                                for (entity, adhoc, _) in guest
+                                    .protocol()
+                                    .as_ref()
+                                    .system_data::<State>()
+                                    .list_adhoc_operations()
+                                {
+                                    ui.table_next_row();
+                                    ui.table_next_column();
+                                    if adhoc.tag != "operation" {
+                                        ui.text(format!(
+                                            "{} ({})",
+                                            adhoc.name,
+                                            adhoc.tag.trim_end_matches(".operation")
+                                        ));
+                                    } else {
+                                        ui.text(adhoc.name);
+                                    }
+
+                                    ui.table_next_column();
+                                    if ui.button(format!("Spawn {}", entity.id())) {
+                                        match command_dispatcher.try_send((
+                                            NodeCommand::Spawn(entity),
+                                            None::<Yielding>,
+                                        )) {
+                                            Ok(_) => {}
+                                            Err(err) => {
+                                                event!(Level::ERROR, "error sending command {err}");
+                                            }
+                                        }
+                                    }
+                                }
+
+                                node.pop();
+                            }
                         }
 
                         token.end();
@@ -203,11 +280,9 @@ impl Extension for WorkspaceEditor {
     fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui<'_>) {
         self.handle_clipboard(ui);
         self.workspace_window(world, ui);
-        // Handle guests
-        // TODO -- show guests
+
         {
-            let runner = world.system_data::<Runner>();
-            for guest in runner.guests() {
+            for guest in world.system_data::<Runner>().guests() {
                 let mut guest_editor = guest.guest_editor();
                 let title = format!(
                     "Guest {}",
@@ -236,6 +311,7 @@ impl Extension for WorkspaceEditor {
                             })
                         })
                     });
+
                 guest_editor.events_window(
                     format!(
                         "Guest {}",
@@ -246,19 +322,33 @@ impl Extension for WorkspaceEditor {
                     ui,
                 );
                 guest_editor.run_now(guest.protocol().as_ref());
-            }
-        }
-    }
+                for n in guest.iter_nodes() {
+                    if let Some(display) = n.display {
+                        display(n, ui);
+                    }
+                }
 
-    fn on_run(&'_ mut self, world: &specs::World) {
-        {
-            let Runner {
-                entities, guests, ..
-            } = world.system_data::<Runner>();
-
-            for (_, guest) in (&entities, &guests).join() {
                 guest.run();
                 guest.maintain();
+            }
+        }
+
+        {
+            for guest in (&mut world.write_component::<Guest>()).join() {
+                for n in guest.iter_nodes_mut() {
+                    let active = if let Some(edit) = n.edit.as_mut() {
+                        edit(n, ui)
+                    } else {
+                        true
+                    };
+
+                    if !active {
+                         if let Some(edit) = n.edit.take() {
+                            n.suspended_edit = Some(edit);
+                         }
+                    }
+                }
+                guest.handle();
             }
         }
     }
