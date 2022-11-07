@@ -93,6 +93,13 @@ impl Plugin for Process {
             // TODO: can ensure the file,
             p.define_child(entity, "redirect", Value::Symbol(content));
         });
+
+        // Cache output from process
+        parser.add_custom_with("cache_output",|p, _| {
+            let entity = p.last_child_entity().expect("should have a child entity");
+            // TODO: can ensure the file,
+            p.define_child(entity, "cache_output", true);
+        });
     }
 
     fn call(context: &mut ThunkContext) -> Option<AsyncContext> {
@@ -214,16 +221,18 @@ impl Plugin for Process {
                             },
                         }
                     }
+
+                    stdout
                 });
 
-                let reader_context = tc.clone();
+                let err_reader_context = tc.clone();
                 let stderr_reader_task = tc.handle().unwrap().spawn(async move {
                     event!(Level::DEBUG, "starting to listen to stderr");
                     while let Ok(line) = stderr_reader.next_line().await {
                         match line {
                             Some(line) => {
                                 eprintln!("{}", line);
-                                reader_context.update_status_only(format!("1: {}", line)).await;
+                                err_reader_context.update_status_only(format!("1: {}", line)).await;
                             },
                             None => {
                                 break;
@@ -252,7 +261,19 @@ impl Plugin for Process {
                     tc.copy_previous();
                 }
 
-                reader_task.abort();
+                if tc.is_enabled("cache_output") { 
+                    match reader_task.await {
+                        Ok(output) => {
+                            tc.with_text("output", output);
+                        },
+                        Err(err) => {
+                            event!(Level::ERROR, "Error getting output, {err}");
+                        },
+                    }
+                } else {
+                    reader_task.abort();
+                }
+
                 stderr_reader_task.abort();
                 Some(tc)
             }
