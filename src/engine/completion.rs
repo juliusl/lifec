@@ -6,7 +6,7 @@ use specs::{Entity, Component, VecStorage};
 
 /// Struct that contains the results of a single thunk completion,
 ///
-#[derive(Component, Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Component, Hash, Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 #[storage(VecStorage)]
 pub struct Completion {
     /// Event entity that initiated this completion,

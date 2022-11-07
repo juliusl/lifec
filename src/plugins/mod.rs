@@ -16,6 +16,7 @@ pub mod attributes;
 
 mod events;
 pub use events::EventRuntime;
+pub use events::Journal;
 
 mod thunks;
 pub use thunks::ErrorContext;

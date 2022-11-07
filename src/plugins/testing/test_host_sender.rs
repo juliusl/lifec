@@ -8,7 +8,7 @@ use crate::{
     engine::Performance,
     guest::Guest,
     host::EventHandler,
-    prelude::{Appendix, Editor, Host, NodeCommand, Plugin, RunmdFile, Sequencer, NodeStatus},
+    prelude::{Appendix, Editor, Host, NodeCommand, Plugin, RunmdFile, Sequencer, NodeStatus, Journal},
 };
 
 use super::TestHost;
@@ -149,28 +149,26 @@ impl Plugin for TestHostSender {
                             false
                         };
 
-                        // let remote_dir = work_dir.join("remote");
-                        // let control = remote_dir.join("control");
-                        // let frames = remote_dir.join("frames");
-                        // let blob = remote_dir.join("blob");
-                        // let remote_updated = if control.exists() && frames.exists() && blob.exists() {
-                        //     protocol.receive::<Remote, _, _>(
-                        //         read_stream(&control),
-                        //         read_stream(&frames),
-                        //         read_stream(&blob),
-                        //     );
+                        let remote_dir = work_dir.join("journal");
+                        let control = remote_dir.join("control");
+                        let frames = remote_dir.join("frames");
+                        let blob = remote_dir.join("blob");
+                        let journal_updated = if control.exists() && frames.exists() && blob.exists() {
+                            protocol.clear::<Journal>();
+                            protocol.receive::<Journal, _, _>(
+                                read_stream(&control),
+                                read_stream(&frames),
+                                read_stream(&blob),
+                            );
+                            std::fs::remove_file(control).ok();
+                            std::fs::remove_file(frames).ok();
+                            std::fs::remove_file(blob).ok();
+                            true
+                        } else {
+                            false
+                        };
 
-                        //     protocol.decode::<Remote>();
-
-                        //     std::fs::remove_file(control).ok();
-                        //     std::fs::remove_file(frames).ok();
-                        //     std::fs::remove_file(blob).ok();
-                        //     true
-                        // } else {
-                        //     false
-                        // };
-
-                        performance_updated | status_updated 
+                        performance_updated | status_updated | journal_updated
                     }) {
                         
                     }

@@ -20,7 +20,7 @@ use crate::{
 
 use tracing::{event, Level};
 
-pub type NodeCommandHandler = fn(&mut State, Entity);
+pub type NodeCommandHandler = fn(&mut State, Entity) -> bool;
 
 /// Engine system data,
 ///
@@ -541,7 +541,6 @@ impl<'a> State<'a> {
 
             self.set_started_connection_state(event);
         } else {
-            // TODO - Can reset the adhoc operation from here,
             event!(
                 Level::DEBUG,
                 "Did not have an event to start for {}",
@@ -636,10 +635,11 @@ impl<'a> State<'a> {
 
     /// Deletes an entity,
     ///
-    pub fn delete(&mut self, entity: Entity) {
+    pub fn delete(&mut self, entity: Entity) -> bool {
         match self.entities.delete(entity) {
             Ok(_) => {
                 event!(Level::DEBUG, "Deleted spawned entity, {}", entity.id());
+                true
             }
             Err(err) => {
                 event!(
@@ -647,13 +647,14 @@ impl<'a> State<'a> {
                     "Could not delete entity {}, {err}",
                     entity.id()
                 );
+                false
             }
         }
     }
 
     /// Cleans up an event connection,
     ///
-    pub fn cleanup_connection(&mut self, event: Entity) {
+    pub fn cleanup_connection(&mut self, event: Entity) -> bool {
         let mut disposed = vec![];
         if let Some(connection) = self.connections.get(event) {
             for (s, _, _) in connection.iter_spawned() {
@@ -671,6 +672,8 @@ impl<'a> State<'a> {
                 connection.remove_spawned(d);
             }
         }
+
+        disposed.len() > 0
     }
 
     /// Returns an iterator over spawned events,
@@ -1018,31 +1021,46 @@ impl<'a> State<'a> {
 
     /// Handles the node command,
     ///
-    pub fn handle_node_command(&mut self, command: NodeCommand) {
+    pub fn handle_node_command(&mut self, command: NodeCommand) -> bool {
         match command {
             crate::editor::NodeCommand::Activate(event) => {
                 if self.activate(event) {
                     event!(Level::DEBUG, "Activating event {}", event.id());
+                    true
+                } else {
+                    false
                 }
             }
             crate::editor::NodeCommand::Reset(event) => {
                 if self.reset(event) {
                     event!(Level::DEBUG, "Reseting event {}", event.id());
+                    true
+                } else {
+                    false
                 }
             }
             crate::editor::NodeCommand::Pause(event) => {
                 if self.pause_event(event) {
                     event!(Level::DEBUG, "Pausing event {}", event.id());
+                    true
+                } else {
+                    false
                 }
             }
             crate::editor::NodeCommand::Resume(event) => {
                 if self.resume_event(event) {
                     event!(Level::DEBUG, "Resuming event {}", event.id());
+                    true 
+                } else {
+                    false
                 }
             }
             crate::editor::NodeCommand::Cancel(event) => {
                 if self.cancel(event) {
                     event!(Level::DEBUG, "Cancelling event {}", event.id());
+                    true
+                } else {
+                    false
                 }
             }
             crate::editor::NodeCommand::Spawn(event) => {
@@ -1050,6 +1068,9 @@ impl<'a> State<'a> {
 
                 if self.activate(spawned) {
                     event!(Level::DEBUG, "Spawning event {}", event.id());
+                    true
+                } else {
+                    false
                 }
             }
             crate::editor::NodeCommand::Swap { owner, from, to } => {
@@ -1061,11 +1082,17 @@ impl<'a> State<'a> {
                         to.id(),
                         owner.id()
                     );
+                    true
+                } else {
+                    false
                 }
             }
             crate::editor::NodeCommand::Update(graph) => {
                 if self.update_state(&graph) {
                     event!(Level::DEBUG, "Updating state for {}", graph.entity_id());
+                    true
+                } else {
+                    false
                 }
             }
             crate::editor::NodeCommand::Custom(name, entity) => {
@@ -1076,7 +1103,14 @@ impl<'a> State<'a> {
                 );
 
                 if let Some(handler) = self.handlers.get(&name) {
-                    handler(self, entity);
+                    if handler(self, entity) {
+                        event!(Level::DEBUG, "Executed custom handler, {name}({})", entity.id());
+                        true
+                    } else {
+                        false 
+                    }
+                } else {
+                    false
                 }
             }
         }
@@ -1190,7 +1224,7 @@ impl<'a> State<'a> {
 impl<'a> State<'a> {
     /// Add's a plugin to an event,
     ///
-    pub fn add_plugin<P>(&mut self, event_entity: Entity)
+    pub fn add_plugin<P>(&mut self, event_entity: Entity) -> bool 
     where
         P: Plugin + BlockObject + Default,
     {
@@ -1276,6 +1310,7 @@ impl<'a> State<'a> {
                             self.thunks
                                 .insert(plugin_entity, thunk_src.thunk())
                                 .expect("should be able to insert thunk");
+                            return true;
                         } else {
                             event!(Level::DEBUG, "Didn't have a block");
                         }
@@ -1283,6 +1318,8 @@ impl<'a> State<'a> {
                 }
             }
         }
+
+        false
     }
 
     /// Returns a new context,

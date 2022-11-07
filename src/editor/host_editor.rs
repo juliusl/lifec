@@ -12,17 +12,17 @@ use tracing::{event, Level};
 
 use crate::debugger::Debugger;
 use crate::guest::RemoteProtocol;
-use crate::prelude::EventRuntime;
+use crate::prelude::{EventRuntime, Journal};
 use crate::{
     prelude::{Node, State},
     state::AttributeGraph,
 };
 
-use super::{Appendix, Canvas, NodeStatus, Profiler};
+use super::{Appendix, Canvas, NodeCommand, NodeStatus, Profiler};
 
 /// Tool for viewing and interacting with a host,
 ///
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct HostEditor {
     /// Appendix,
     ///
@@ -60,29 +60,14 @@ pub struct HostEditor {
     /// Remote protocol,
     ///
     remote: Option<RemoteProtocol>,
-}
-
-impl Clone for HostEditor {
-    fn clone(&self) -> Self {
-        Self {
-            appendix: self.appendix.clone(),
-            nodes: self.nodes.clone(),
-            adhoc_nodes: self.adhoc_nodes.clone(),
-            is_event_window_opened: self.is_event_window_opened.clone(),
-            is_paused: self.is_paused.clone(),
-            is_stopped: self.is_stopped.clone(),
-            tick: self.tick.clone(),
-            pause: self.pause.clone(),
-            reset: self.reset.clone(),
-            canvas: self.canvas.clone(),
-            debugger: self.debugger.clone(),
-            remote: None,
-        }
-    }
+    /// Journal of commands executed by the event runtime,
+    ///
+    journal: Journal,
 }
 
 impl Hash for HostEditor {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.appendix.hash(state);
         self.nodes.hash(state);
         self.adhoc_nodes.hash(state);
         self.is_event_window_opened.hash(state);
@@ -91,14 +76,32 @@ impl Hash for HostEditor {
         self.tick.hash(state);
         self.pause.hash(state);
         self.reset.hash(state);
+        self.journal.hash(state);
+        self.remote.hash(state);
     }
 }
 
 impl HostEditor {
     /// Sets the remote protocol,
     ///
+    pub fn has_remote(&mut self) -> bool {
+        self.remote.is_some()
+    }
+
+    /// Sets the remote protocol,
+    ///
     pub fn set_remote(&mut self, remote: RemoteProtocol) {
         self.remote = Some(remote);
+    }
+
+    /// Returns the current remote cursor value,
+    ///
+    pub fn remote_cursor(&self) -> Option<usize> {
+        if let Some(remote) = self.remote.as_ref() {
+            Some(remote.journal_cursor())
+        } else {
+            None
+        }
     }
 
     /// Opens event window,
@@ -169,6 +172,7 @@ impl HostEditor {
                                 self.performance_section(ui);
                             });
                     });
+
                     if let Some(debugger) = self.debugger.as_mut() {
                         ChildWindow::new(&format!("Debugger {suffix}"))
                             .size([0.0, -1.0])
@@ -238,9 +242,10 @@ impl<'a> System<'a> for HostEditor {
         State<'a>,
         Read<'a, tokio::sync::watch::Sender<HostEditor>, EventRuntime>,
         Write<'a, Option<Debugger>>,
+        Read<'a, Journal>,
     );
 
-    fn run(&mut self, (mut state, watcher, mut debugger): Self::SystemData) {
+    fn run(&mut self, (mut state, watcher, mut debugger, journal): Self::SystemData) {
         self.appendix = Some(state.appendix().clone());
         let updated = debugger.as_mut().and_then(|u| u.propagate_update()).clone();
         self.debugger = debugger.clone();
@@ -316,6 +321,43 @@ impl<'a> System<'a> for HostEditor {
         //
         self.adhoc_nodes = state.adhoc_nodes();
 
+        if let Some(remote) = self.remote.as_mut() {
+            let mut advance_to = 0;
+            if let Some(journal) = remote.as_ref().borrow().decode::<Journal>().first() {
+                if !self.journal.eq(journal) {
+                    self.journal = journal.clone();
+
+                    for (idx, (_, e)) in journal.iter().enumerate() {
+                        match e {
+                            NodeCommand::Swap { .. } if idx >= remote.journal_cursor() => {
+                                state.handle_node_command(e.clone());
+                                advance_to = idx + 1;
+                            }
+                            NodeCommand::Custom(name, _)
+                                if name.starts_with("add_plugin::")
+                                    && idx >= remote.journal_cursor() =>
+                            {
+                                state.handle_node_command(e.clone());
+                                advance_to = idx + 1;
+                            }
+                            // NodeCommand::Update(_) if idx >= remote.journal_cursor() => {
+                            //     state.handle_node_command(e.clone());
+                            //     advance_to = idx + 1;
+                            // }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+
+            if advance_to > 0 {
+                remote.advance_journal_cursor(advance_to);
+            }
+        } else {
+            self.journal.clear();
+            self.journal = journal.clone();
+        }
+
         // Update watcher
         //
         watcher.send_if_modified(|current| {
@@ -367,6 +409,14 @@ impl HostEditor {
         }
     }
 
+    /// List of commands executed,
+    ///
+    fn journal_list(&self, ui: &Ui) {
+        for (e, c) in self.journal.iter() {
+            ui.text(format!("{}: {}", e.id(), c));
+        }
+    }
+
     /// Event nodes in list format,
     ///
     fn event_list(&mut self, ui: &Ui) {
@@ -392,7 +442,7 @@ impl HostEditor {
         }
 
         if let Some(remote) = self.remote.as_ref() {
-            for status in remote.borrow().decode::<NodeStatus>() {
+            for status in remote.as_ref().borrow().decode::<NodeStatus>() {
                 statuses.insert(status.entity(), status);
             }
         }
@@ -468,13 +518,20 @@ impl HostEditor {
         ui.text("Performance");
         ui.spacing();
         if let Some(tab_bar) = ui.tab_bar("Performance Tabs") {
+            let journal_tab = ui.tab_item("Journal");
+            if let Some(journal_tab) = journal_tab {
+                self.journal_list(ui);
+
+                journal_tab.end();
+            }
+
             if let Some(remote) = self.remote.as_ref() {
                 let tab = ui.tab_item("Remote");
                 if ui.is_item_hovered() {
                     ui.tooltip_text("Performance histograms of connected remote");
                 }
                 if let Some(token) = tab {
-                    remote.borrow().histogram(ui, 0, &[]);
+                    remote.as_ref().borrow().histogram(ui, 0, &[]);
                     token.end();
                 }
             } else {

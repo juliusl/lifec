@@ -3,8 +3,6 @@ use specs::shred::ResourceId;
 
 use super::Debugger;
 
-enum DebuggerInstructions {
-}
 
 impl WireObject for Debugger {
     fn encode<BlobImpl>(&self, world: &specs::World, encoder: &mut reality::wire::Encoder<BlobImpl>)

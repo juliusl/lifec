@@ -96,7 +96,7 @@ impl Runtime {
 
         self.handlers
             .insert(format!("add_plugin::{}", P::symbol()), |state, entity| {
-                state.add_plugin::<P>(entity);
+                state.add_plugin::<P>(entity)
             });
     }
 

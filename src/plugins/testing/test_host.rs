@@ -10,7 +10,7 @@ use crate::{
     host::EventHandler,
     prelude::{
         Appendix, Editor, EventRuntime, Host, NodeStatus, Plugin, Project, RunmdFile, Sequencer,
-        State,
+        State, Journal,
     },
 };
 
@@ -147,6 +147,37 @@ impl Plugin for TestHost {
                         });
                     }
 
+                    let remote_dir = PathBuf::from(".world/test.io/test_host").join("journal");
+                    let control = remote_dir.join("control");
+                    let frames = remote_dir.join("frames");
+                    let blob = remote_dir.join("blob");
+                    let journal_exists = control.exists() && frames.exists() && blob.exists();
+                   
+                    if !journal_exists && guest.encode_journal() {
+                        let test_dir = PathBuf::from(".world/test.io/test_host/journal");
+                        std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
+
+                        fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
+                            move || {
+                                std::fs::OpenOptions::new()
+                                    .create(true)
+                                    .write(true)
+                                    .open(name)
+                                    .ok()
+                                    .unwrap()
+                            }
+                        }
+
+                        guest.update_protocol(|protocol| {
+                            protocol.send::<Journal, _, _>(
+                                write_stream(".world/test.io/test_host/journal/control"),
+                                write_stream(".world/test.io/test_host/journal/frames"),
+                                write_stream(".world/test.io/test_host/journal/blob"),
+                            );
+                            true
+                        });
+                    }
+
                     // It's not the remotes I need to encode, it's the debugger
                     // if guest.encode_remotes() {
                     //     let test_dir = PathBuf::from(".world/test.io/test_host/remote");
@@ -172,12 +203,6 @@ impl Plugin for TestHost {
                     //         true
                     //     });
                     // }
-                });
-
-                let remote_protocol = guest.subscribe();
-                guest.update_protocol(move |protocol| {
-                    protocol.as_mut().insert(Some(remote_protocol));
-                    true
                 });
 
                 tc.enable_guest(guest);

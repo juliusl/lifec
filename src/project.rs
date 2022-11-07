@@ -273,11 +273,11 @@ pub fn default_node_handlers() -> BTreeMap<String, NodeCommandHandler> {
     let mut handlers = BTreeMap::<String, NodeCommandHandler>::default();
 
     handlers.insert("delete_spawned".to_string(), |state, entity| {
-        state.delete(entity);
+        state.delete(entity)
     });
 
     handlers.insert("cleanup_connection".to_string(), |state, entity| {
-        state.cleanup_connection(entity);
+        state.cleanup_connection(entity)
     });
 
     handlers

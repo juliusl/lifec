@@ -182,6 +182,7 @@ impl WireObject for NodeCommand {
                 )
                 .with_parity(*entity);
 
+                encoder.interner.add_ident("name");
                 encoder.interner.add_ident(name);
                 encoder.frames.push(frame);
             }
@@ -204,7 +205,7 @@ impl WireObject for NodeCommand {
     ) -> Self {
         match frames.get(0) {
             Some(frame) => {
-                let entity = frame.get_entity(protocol.as_ref(), true);
+                let entity = frame.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
                 match frame.op() {
                     0x10 => NodeCommand::Activate(entity),
                     0x20 => NodeCommand::Reset(entity),
@@ -239,8 +240,6 @@ impl WireObject for NodeCommand {
                                 _ => {}
                             }
                         }
-
-                        eprintln!("{:#?}", attributes);
 
                         if let Some(index) = BlockIndex::index(attributes).first() {
                             NodeCommand::Update(AttributeGraph::new(index.clone()))

@@ -9,13 +9,41 @@ use crate::{
     engine::{Performance, Runner},
     prelude::{
         Host, HostEditor, NodeCommand, NodeStatus, PluginFeatures, Project, State, ThunkContext,
-        Workspace,
+        Workspace, Journal,
     },
 };
 
-/// Type alias for a remotely updated protocol,
-///
-pub type RemoteProtocol = tokio::sync::watch::Receiver<Protocol>;
+#[derive(Clone)]
+pub struct RemoteProtocol {
+    remote: tokio::sync::watch::Receiver<Protocol>,
+    journal_cursor: usize,
+}
+
+impl Hash for RemoteProtocol {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.journal_cursor.hash(state);
+    }
+}
+
+impl RemoteProtocol {
+    /// Advance the journal cursor,
+    /// 
+    pub fn advance_journal_cursor(&mut self, idx: usize) {
+        self.journal_cursor = idx;
+    }
+
+    /// Returns the current journal cursor,
+    /// 
+    pub fn journal_cursor(&self) -> usize {
+        self.journal_cursor
+    }
+}
+
+impl AsRef<tokio::sync::watch::Receiver<Protocol>> for RemoteProtocol {
+    fn as_ref(&self) -> &tokio::sync::watch::Receiver<Protocol> {
+        &self.remote
+    }
+}
 
 /// Guest host as a component,
 ///
@@ -132,7 +160,9 @@ impl Guest {
         let mut host_editor = features.host_editor();
 
         if let Some(remote) = self.remote.as_ref() {
-            host_editor.set_remote(remote.clone());
+            if !host_editor.has_remote() {
+                host_editor.set_remote(remote.clone());
+            }
         }
 
         host_editor.run_now(self.protocol.borrow().as_ref());
@@ -168,6 +198,25 @@ impl Guest {
         })
     }
 
+    /// Encode a resource to the protocol,
+    /// 
+    pub fn encode_resource<T>(&self, take_object: impl FnOnce(&Protocol) -> Option<T>) -> bool
+    where
+        T: WireObject + Clone + 'static,
+    {
+        self.protocol.send_if_modified(move |protocol| {
+            if let Some(object) =  { take_object(protocol) } {
+                protocol.encoder::<T>(move |world, encoder| {
+                    encoder.encode(&object, world);
+                });
+
+                true
+            } else {
+                false
+            }
+        })
+    }
+
     /// Updates the protocol,
     ///
     /// Returns true if there was a change,
@@ -200,6 +249,16 @@ impl Guest {
         self.encode::<NodeStatus>(|p| p.as_ref().system_data::<State>().take_statuses())
     }
 
+    /// Encode the command journal to protocol,
+    /// 
+    pub fn encode_journal(&self) -> bool {
+        self.encode_resource::<Journal>(|p| { 
+            let journal = p.as_ref().read_resource::<Journal>();
+
+            Some(journal.deref().clone())
+        })
+    }
+
     /// Maintain the protocol world,
     ///
     pub fn maintain(&self) {
@@ -212,7 +271,7 @@ impl Guest {
     /// Returns a remote protocol,
     ///
     pub fn subscribe(&self) -> RemoteProtocol {
-        self.protocol.subscribe()
+        RemoteProtocol { remote: self.protocol.subscribe(), journal_cursor: 0 }
     }
 }
 
