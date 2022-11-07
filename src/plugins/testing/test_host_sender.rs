@@ -86,7 +86,7 @@ impl Plugin for TestHostSender {
 
                         let work_dir = workspace
                             .work_dir()
-                            .join(".world/test.io/test_host");
+                            .join("test_host");
 
                         let performance_dir = work_dir.join("performance");
                         let control = performance_dir.join("control");
