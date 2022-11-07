@@ -1,12 +1,8 @@
-use crate::{
-    engine::Cleanup,
-    prelude::*,
-    project::Listener,
-};
+use crate::{engine::Cleanup, prelude::*, project::Listener};
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use specs::{Dispatcher, DispatcherBuilder, Entity, World, WorldExt};
-use std::{error::Error, path::PathBuf, str::from_utf8};
+use std::{error::Error, ops::Deref, path::PathBuf, str::from_utf8};
 
 mod inspector;
 pub use inspector::Inspector;
@@ -454,8 +450,14 @@ impl Into<World> for Host {
 
 impl From<World> for Host {
     fn from(world: World) -> Self {
+        let workspace = world
+            .fetch::<Option<Workspace>>()
+            .deref()
+            .clone()
+            .unwrap_or_default();
+
         Host {
-            workspace: Workspace::default(),
+            workspace,
             start: None,
             world: Some(world),
             listener_setup: None,
