@@ -16,6 +16,12 @@ use crate::{
 mod remote_protocol;
 pub use remote_protocol::RemoteProtocol;
 
+mod monitor;
+pub use monitor::Monitor;
+
+mod sender;
+pub use sender::Sender;
+
 /// Runs systems without a dispatcher,
 ///
 pub type Run = fn(&Guest);

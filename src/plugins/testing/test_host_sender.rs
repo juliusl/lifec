@@ -2,13 +2,14 @@ use std::{fs::File, path::PathBuf, sync::Arc};
 
 use reality::{BlockObject, BlockProperties};
 use specs::RunNow;
+use tracing::{event, Level};
 
 use crate::{
     debugger::Debugger,
     engine::Performance,
-    guest::Guest,
+    guest::{Guest, Sender},
     host::EventHandler,
-    prelude::{Appendix, Editor, Host, NodeCommand, Plugin, RunmdFile, Sequencer, NodeStatus, Journal},
+    prelude::{Appendix, Editor, Host, Plugin, RunmdFile, Sequencer, NodeStatus, Journal},
 };
 
 use super::TestHost;
@@ -66,30 +67,9 @@ impl Plugin for TestHostSender {
                 let mut guest = Guest::new::<TestHost>(tc.entity().unwrap(), host, |guest| {
                     EventHandler::<()>::default().run_now(guest.protocol().as_ref());
 
-                    if guest.encode_commands() {
-                        let test_dir = PathBuf::from(".world/test.io/test_host");
-                        std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
-
-                        fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
-                            move || {
-                                std::fs::OpenOptions::new()
-                                    .create(true)
-                                    .write(true)
-                                    .open(name)
-                                    .ok()
-                                    .unwrap()
-                            }
-                        }
-
-                        if guest.update_protocol(|protocol| {
-                            protocol.send::<NodeCommand, _, _>(
-                                write_stream(".world/test.io/test_host/control"),
-                                write_stream(".world/test.io/test_host/frames"),
-                                write_stream(".world/test.io/test_host/blob"),
-                            );
-
-                            true
-                        }) {}
+                    let test_dir = PathBuf::from(".world/test.io/test_host");
+                    if guest.send_commands(test_dir) {
+                        event!(Level::WARN, "Commands not sent, previous commands have not been read");
                     }
 
                     let workspace = guest.workspace().clone();

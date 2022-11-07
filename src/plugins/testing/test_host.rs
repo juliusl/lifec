@@ -1,4 +1,4 @@
-use std::{fs::File, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use reality::{BlockObject, BlockProperties};
 use specs::{RunNow, WorldExt};
@@ -6,11 +6,11 @@ use specs::{RunNow, WorldExt};
 use crate::{
     debugger::Debugger,
     editor::{CommandDispatcher, EventNode},
-    engine::{Cleanup, Performance, Profilers},
-    guest::{Guest, RemoteProtocol},
+    engine::{Cleanup, Profilers},
+    guest::{Guest, RemoteProtocol, Monitor},
     host::EventHandler,
     prelude::{
-        Appendix, Editor, EventRuntime, Host, Journal, Node, NodeStatus, Plugin, Project,
+        Appendix, Editor, EventRuntime, Host, Node, NodeStatus, Plugin, Project,
         RunmdFile, Sequencer, State,
     },
 };
@@ -98,86 +98,10 @@ impl Plugin for TestHost {
                             .expect("should be able to insert status");
                     }
 
-                    if guest.encode_performance() {
-                        let test_dir = PathBuf::from(".world/test.io/test_host/performance");
-                        std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
-
-                        fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
-                            move || {
-                                std::fs::OpenOptions::new()
-                                    .create(true)
-                                    .write(true)
-                                    .open(name)
-                                    .ok()
-                                    .unwrap()
-                            }
-                        }
-
-                        guest.update_protocol(|protocol| {
-                            protocol.send::<Performance, _, _>(
-                                write_stream(".world/test.io/test_host/performance/control"),
-                                write_stream(".world/test.io/test_host/performance/frames"),
-                                write_stream(".world/test.io/test_host/performance/blob"),
-                            );
-                            true
-                        });
-                    }
-
-                    if guest.encode_status() {
-                        let test_dir = PathBuf::from(".world/test.io/test_host/status");
-                        std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
-
-                        fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
-                            move || {
-                                std::fs::OpenOptions::new()
-                                    .create(true)
-                                    .write(true)
-                                    .open(name)
-                                    .ok()
-                                    .unwrap()
-                            }
-                        }
-
-                        guest.update_protocol(|protocol| {
-                            protocol.send::<NodeStatus, _, _>(
-                                write_stream(".world/test.io/test_host/status/control"),
-                                write_stream(".world/test.io/test_host/status/frames"),
-                                write_stream(".world/test.io/test_host/status/blob"),
-                            );
-                            true
-                        });
-                    }
-
-                    let remote_dir = PathBuf::from(".world/test.io/test_host").join("journal");
-                    let control = remote_dir.join("control");
-                    let frames = remote_dir.join("frames");
-                    let blob = remote_dir.join("blob");
-                    let journal_exists = control.exists() && frames.exists() && blob.exists();
-
-                    if !journal_exists && guest.encode_journal() {
-                        let test_dir = PathBuf::from(".world/test.io/test_host/journal");
-                        std::fs::create_dir_all(&test_dir).expect("should be able to create dirs");
-
-                        fn write_stream(name: &'static str) -> impl FnOnce() -> File + 'static {
-                            move || {
-                                std::fs::OpenOptions::new()
-                                    .create(true)
-                                    .write(true)
-                                    .open(name)
-                                    .ok()
-                                    .unwrap()
-                            }
-                        }
-
-                        guest.update_protocol(|protocol| {
-                            protocol.send::<Journal, _, _>(
-                                write_stream(".world/test.io/test_host/journal/control"),
-                                write_stream(".world/test.io/test_host/journal/frames"),
-                                write_stream(".world/test.io/test_host/journal/blob"),
-                            );
-                            true
-                        });
-                    }
+                    let test_host_dir = PathBuf::from(".world/test.io/test_host");
+                    guest.update_performance(&test_host_dir);
+                    guest.update_status(&test_host_dir);
+                    guest.update_journal(&test_host_dir);
                 });
 
                 guest.add_node(Node {
