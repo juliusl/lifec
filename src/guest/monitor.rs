@@ -19,7 +19,6 @@ impl Monitor for Guest {
         let control = performance_dir.join("control");
         let frames = performance_dir.join("frames");
         let blob = performance_dir.join("blob");
-        std::fs::create_dir_all(&performance_dir).expect("should be able to create dirs");
 
         let performance_exists = control.exists() && frames.exists() && blob.exists();
         if !performance_exists && self.encode_performance() {
@@ -52,7 +51,6 @@ impl Monitor for Guest {
         let control = status_dir.join("control");
         let frames = status_dir.join("frames");
         let blob = status_dir.join("blob");
-        std::fs::create_dir_all(&status_dir).expect("should be able to create dirs");
 
         let status_exists = control.exists() && frames.exists() && blob.exists();
         if !status_exists && self.encode_status() {
@@ -85,7 +83,6 @@ impl Monitor for Guest {
         let control = journal_dir.join("control");
         let frames = journal_dir.join("frames");
         let blob = journal_dir.join("blob");
-        std::fs::create_dir_all(&journal_dir).expect("should be able to create dirs");
 
         let journal_exists = control.exists() && frames.exists() && blob.exists();
         if !journal_exists && self.encode_journal() {
