@@ -30,6 +30,8 @@ fn main() {
     
     + .operation print
     : test .println Hello Print Operation a
+    : .process cargo update
+    : .silent
     : .chaos
 
     + test .operation print

@@ -100,6 +100,14 @@ impl Plugin for Process {
             // TODO: can ensure the file,
             p.define_child(entity, "cache_output", true);
         });
+
+                // Silent stdout/stderr from stream
+        parser.add_custom_with("silent",|p, _| {
+            let entity = p.last_child_entity().expect("should have a child entity");
+            // TODO: can ensure the file,
+            p.define_child(entity, "silent", true);
+        });
+        
     }
 
     fn call(context: &mut ThunkContext) -> Option<AsyncContext> {
@@ -201,7 +209,9 @@ impl Plugin for Process {
                             Some(line) => {
                                 use std::fmt::Write;
                                 
-                                println!("{}", line);
+                                if !reader_context.is_enabled("silent") {
+                                    println!("{}", line);
+                                }
                                 writeln!(&mut stdout, "{}", line).expect("should be able to write");
                                 reader_context.update_status_only(format!("0: {}", line)).await;
                             },
@@ -231,7 +241,10 @@ impl Plugin for Process {
                     while let Ok(line) = stderr_reader.next_line().await {
                         match line {
                             Some(line) => {
-                                eprintln!("{}", line);
+                                if !err_reader_context.is_enabled("silent") {
+                                    eprintln!("{}", line);
+                                }
+
                                 err_reader_context.update_status_only(format!("1: {}", line)).await;
                             },
                             None => {
