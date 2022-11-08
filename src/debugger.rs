@@ -96,7 +96,7 @@ impl Debugger {
     pub fn completion_tree(&self, ui: &Ui) {
         let mut groups = BTreeMap::<String, BTreeSet<Completion>>::default();
         for (_, completion) in self.completions.iter() {
-            let event_name = if let Some(name) = self.appendix.name_by_id(completion.event.id()) {
+            let control_symbol = if let Some(name) = self.appendix.control_symbol(&completion.event) {
                 name.to_string()
             } else if let Some(id) = completion.query.property("event_id").and_then(|p| p.int()) {
                 self.appendix
@@ -107,12 +107,12 @@ impl Debugger {
                 String::default()
             };
 
-            if let Some(group) = groups.get_mut(&event_name) {
+            if let Some(group) = groups.get_mut(&control_symbol) {
                 group.insert(completion.clone());
             } else {
                 let mut set = BTreeSet::<Completion>::default();
                 set.insert(completion.clone());
-                groups.insert(event_name, set);
+                groups.insert(control_symbol, set);
             }
         }
 
