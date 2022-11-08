@@ -525,37 +525,38 @@ impl HostEditor {
                     remote.as_ref().borrow().histogram(ui, 0, &[]);
                     token.end();
                 }
-            } else {
-                let tab = ui.tab_item("Engine events");
-                if ui.is_item_hovered() {
-                    ui.tooltip_text("Performance histograms of event transitions");
-                }
-                if let Some(token) = tab {
-                    // This is the performance of engine operation events
-                    for node in self.nodes.iter() {
-                        // TODO: Make these configurable
-                        if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
-                            ui.new_line();
-                        }
-                    }
-
-                    token.end();
-                }
-
-                let tab = ui.tab_item("Operations");
-                if ui.is_item_hovered() {
-                    ui.tooltip_text("Performance histograms of adhoc operation execution");
-                }
-                if let Some(token) = tab {
-                    // This is the performance of adhoc operation events
-                    for node in self.adhoc_nodes.iter() {
-                        if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
-                            ui.new_line();
-                        }
-                    }
-                    token.end();
-                }
             }
+            
+            let tab = ui.tab_item("Engine events");
+            if ui.is_item_hovered() {
+                ui.tooltip_text("Performance histograms of event transitions");
+            }
+            if let Some(token) = tab {
+                // This is the performance of engine operation events
+                for node in self.nodes.iter() {
+                    // TODO: Make these configurable
+                    if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
+                        ui.new_line();
+                    }
+                }
+
+                token.end();
+            }
+
+            let tab = ui.tab_item("Operations");
+            if ui.is_item_hovered() {
+                ui.tooltip_text("Performance histograms of adhoc operation execution");
+            }
+            if let Some(token) = tab {
+                // This is the performance of adhoc operation events
+                for node in self.adhoc_nodes.iter() {
+                    if node.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
+                        ui.new_line();
+                    }
+                }
+                token.end();
+            }
+
             let journal_tab = ui.tab_item("Journal");
             if let Some(journal_tab) = journal_tab {
                 self.journal_list(ui);
