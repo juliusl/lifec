@@ -1,6 +1,6 @@
 use crate::prelude::{ErrorContext, SecureClient, StatusUpdate};
 use crate::{
-    engine::{Runner, Yielding, Completion},
+    engine::{Completion, Runner, Yielding},
     guest::Guest,
     prelude::*,
 };
@@ -223,7 +223,11 @@ impl SetupHandler<SecureClient> for EventRuntime {
 }
 
 impl<'a> System<'a> for EventRuntime {
-    type SystemData = (State<'a>, Runner<'a>, Write<'a, Journal>);
+    type SystemData = (
+        State<'a>,
+        Runner<'a>,
+        Write<'a, Journal>,
+    );
 
     fn run(&mut self, (mut events, mut runner, mut journal): Self::SystemData) {
         if !events.should_exit() && events.can_continue() {
@@ -238,6 +242,12 @@ impl<'a> System<'a> for EventRuntime {
             if events.handle_node_command(command.clone()) {
                 journal.push((entity, command));
             }
+        }
+
+        // Run guests
+        for guest in runner.guests() {
+            guest.run();
+            guest.maintain();
         }
     }
 }

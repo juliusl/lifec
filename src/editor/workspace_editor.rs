@@ -334,9 +334,6 @@ impl Extension for WorkspaceEditor {
                         display(n, ui);
                     }
                 }
-
-                guest.run();
-                guest.maintain();
             }
         }
 
