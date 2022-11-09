@@ -4,10 +4,9 @@ use reality::{
     Keywords,
 };
 use specs::{shred::ResourceId, Entity};
-
 use crate::prelude::NodeCommand;
 
-/// Type alias for a vector of node commands,
+/// Struct for storing executed node commands,
 ///
 #[derive(Debug, Default, Clone, Hash, PartialEq, Eq)]
 pub struct Journal(pub Vec<(Entity, NodeCommand)>);
@@ -82,12 +81,16 @@ impl WireObject for Journal {
 
         let command_frames = &frames[1..];
         let index = NodeCommand::build_index(interner, command_frames);
-        let mut index = index.iter().map(|(_, v)| v).flatten().cloned().collect::<Vec<_>>();
+        let mut index = index
+            .iter()
+            .map(|(_, v)| v)
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
         index.sort_by(|a, b| a.start.cmp(&b.start));
         for range in index {
             let frames = &command_frames[range];
-            let start =
-                frames[0].get_entity(protocol.as_ref(), false);
+            let start = frames[0].get_entity(protocol.as_ref(), false);
             let command = NodeCommand::decode(protocol, interner, blob_device, frames);
             journal.push((start, command));
         }
@@ -120,5 +123,67 @@ impl WireObject for Journal {
 
     fn resource_id() -> specs::shred::ResourceId {
         ResourceId::new::<Journal>()
+    }
+}
+
+mod tests {
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test() {
+        use std::sync::Arc;
+        use reality::wire::{Protocol, WireObject};
+        use specs::WorldExt;
+        use crate::prelude::{Appendix, Journal, NodeCommand};
+
+        let mut protocol = Protocol::empty();
+    
+        protocol.as_mut().insert(Arc::new(Appendix::default()));
+    
+        // Record node command as wire objects in a protocol,
+        //
+        let frame_count = protocol.encoder::<Journal>(|world, encoder| {
+            let mut journal = Journal::default();
+            let entity_4 = world.entities().entity(4);
+            let entity_2 = world.entities().entity(2);
+            journal.push((entity_4, NodeCommand::Activate(entity_4)));
+            journal.push((entity_2, NodeCommand::Spawn(entity_2)));
+            journal.push((entity_4, NodeCommand::Activate(entity_4)));
+            journal.push((entity_2, NodeCommand::Activate(entity_2)));
+            journal.encode(world, encoder);
+            encoder.frame_index = Journal::build_index(&encoder.interner, encoder.frames_slice());
+        });
+    
+        let (control_client, control_server) = tokio::io::duplex(64 * frame_count);
+        let (frame_client, frame_server) = tokio::io::duplex(64 * frame_count);
+        let (blob_client, blob_server) = tokio::io::duplex(64 * frame_count);
+    
+        let read = tokio::spawn(async move {
+            protocol
+                .send_async::<Journal, _, _>(
+                    || std::future::ready(control_client),
+                    || std::future::ready(frame_client),
+                    || std::future::ready(blob_client),
+                )
+                .await;
+        });
+    
+        let write = tokio::spawn(async {
+            let mut receiver = Protocol::empty();
+            receiver
+                .receive_async::<Journal, _, _>(
+                    || std::future::ready(control_server),
+                    || std::future::ready(frame_server),
+                    || std::future::ready(blob_server),
+                )
+                .await;
+    
+            let journal = receiver.decode::<Journal>();
+            journal
+        });
+    
+        let (_, journal)= tokio::join!(read, write);
+    
+        let journal = journal.expect("should be okay");
+        eprintln!("{:#?}", journal);
     }
 }

@@ -1,87 +1,140 @@
-use std::{ops::Deref, sync::Arc};
 
 use atlier::system::{Attribute, Value};
 use reality::{
-    wire::{Data, Encoder, Frame, FrameBuilder, FrameIndex, WireObject},
-    BlockIndex, Elements,
+    wire::{Encoder, Frame, FrameIndex, WireObject},
+    BlockIndex, Keywords,
 };
-use specs::{shred::ResourceId, Component, Entity, WorldExt};
+use specs::{shred::ResourceId, Component, WorldExt};
 use tracing::{event, Level};
 
 use crate::{
-    prelude::{Appendix, EventStatus},
-    state::{AttributeGraph, AttributeIndex},
+    prelude::EventStatus,
+    state::{AttributeGraph, AttributeIndex}, engine::EngineStatus,
 };
 
 use super::{NodeCommand, NodeStatus};
 
 impl WireObject for NodeStatus {
-    fn encode<BlobImpl>(&self, world: &specs::World, encoder: &mut Encoder<BlobImpl>)
+    fn encode<BlobImpl>(&self, _: &specs::World, encoder: &mut Encoder<BlobImpl>)
     where
         BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
     {
-        let appendix = world.read_resource::<Arc<Appendix>>();
-        let appendix = appendix.deref().clone();
-        match self {
-            NodeStatus::Event(event) => {
-                let frame = match event {
-                    crate::prelude::EventStatus::Scheduled(entity) => {
-                        encode_node_command(0xE0, *entity, appendix, encoder)
-                    }
-                    crate::prelude::EventStatus::New(entity) => {
-                        encode_node_command(0xE1, *entity, appendix, encoder)
-                    }
-                    crate::prelude::EventStatus::InProgress(entity) => {
-                        encode_node_command(0xE2, *entity, appendix, encoder)
-                    }
-                    crate::prelude::EventStatus::Paused(entity) => {
-                        encode_node_command(0xE3, *entity, appendix, encoder)
-                    }
-                    crate::prelude::EventStatus::Ready(entity) => {
-                        encode_node_command(0xE4, *entity, appendix, encoder)
-                    }
-                    crate::prelude::EventStatus::Completed(entity) => {
-                        encode_node_command(0xE5, *entity, appendix, encoder)
-                    }
-                    crate::prelude::EventStatus::Cancelled(entity) => {
-                        encode_node_command(0xE6, *entity, appendix, encoder)
-                    }
-                    crate::prelude::EventStatus::Inactive(entity) => {
-                        encode_node_command(0xE7, *entity, appendix, encoder)
-                    }
-                    crate::prelude::EventStatus::Disposed(entity) => {
-                        encode_node_command(0xE8, *entity, appendix, encoder)
-                    }
-                };
+        encoder.interner.add_ident("engine_status");
+        encoder.interner.add_ident("event_status");
+        encoder.interner.add_ident("node_status");
+        encoder.interner.add_ident("custom");
+        encoder.interner.add_ident("profiler");
+        encoder.interner.add_ident("inactive");
+        encoder.interner.add_ident("active");
+        encoder.interner.add_ident("disposed");
+        encoder.interner.add_ident("scheduled");
+        encoder.interner.add_ident("new");
+        encoder.interner.add_ident("in_progress");
+        encoder.interner.add_ident("paused");
+        encoder.interner.add_ident("ready");
+        encoder.interner.add_ident("completed");
+        encoder.interner.add_ident("cancelled");
+        encoder.interner.add_ident("inactive");
 
+        match self {
+            NodeStatus::Engine(engine) => match engine {
+                crate::engine::EngineStatus::Inactive(e) => {
+                    let frame = Frame::extension("engine_status", "inactive").with_parity(*e);
+                    encoder.frames.push(frame);
+                },
+                crate::engine::EngineStatus::Active(e) => {
+                    let frame = Frame::extension("engine_status", "active").with_parity(*e);
+                    encoder.frames.push(frame);
+                },
+                crate::engine::EngineStatus::Disposed(e) => {
+                    let frame = Frame::extension("engine_status", "disposed").with_parity(*e);
+                    encoder.frames.push(frame);
+                },
+            },
+            NodeStatus::Event(event) => match event {
+                EventStatus::Scheduled(e) => {
+                    let frame = Frame::extension("event_status", "scheduled").with_parity(*e);
+                    encoder.frames.push(frame);
+                },
+                EventStatus::New(e) => {
+                    let frame = Frame::extension("event_status", "new").with_parity(*e);
+                    encoder.frames.push(frame);
+                },
+                EventStatus::InProgress(e) => {
+                    let frame = Frame::extension("event_status", "in_progress").with_parity(*e);
+                    encoder.frames.push(frame);
+                }
+                EventStatus::Paused(e) => {
+                    let frame = Frame::extension("event_status", "paused").with_parity(*e);
+                    encoder.frames.push(frame);
+                },
+                EventStatus::Ready(e) => {
+                    let frame = Frame::extension("event_status", "ready").with_parity(*e);
+                    encoder.frames.push(frame);
+                },
+                EventStatus::Completed(e) => {
+                    let frame = Frame::extension("event_status", "completed").with_parity(*e);
+                    encoder.frames.push(frame);
+                },
+                EventStatus::Cancelled(e) => {
+                    let frame = Frame::extension("event_status", "cancelled").with_parity(*e);
+                    encoder.frames.push(frame);
+                },
+                EventStatus::Inactive(e) => {
+                    let frame = Frame::extension("event_status", "inactive").with_parity(*e);
+                    encoder.frames.push(frame);
+                }
+                EventStatus::Disposed(e) => {
+                    let frame = Frame::extension("event_status", "disposed").with_parity(*e);
+                    encoder.frames.push(frame);
+                },
+            },
+            NodeStatus::Profiler(e) => {
+                let frame = Frame::extension("node_status", "profiler").with_parity(*e);
                 encoder.frames.push(frame);
-            }
-            _ => {}
+            },
+            NodeStatus::Custom(e) => {
+                let frame = Frame::extension("node_status", "custom").with_parity(*e);
+                encoder.frames.push(frame);
+            },
+            NodeStatus::Empty => {},
         }
     }
 
     fn decode(
         protocol: &reality::wire::Protocol,
-        _: &reality::wire::Interner,
+        interner: &reality::wire::Interner,
         _: &std::io::Cursor<Vec<u8>>,
         frames: &[Frame],
     ) -> Self {
-        let frame = frames.get(0).expect("should only be 1 frame");
-        let entity = frame.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
-        match frame.op() {
-            0xE0 => NodeStatus::Event(EventStatus::Scheduled(entity)),
-            0xE1 => NodeStatus::Event(EventStatus::New(entity)),
-            0xE2 => NodeStatus::Event(EventStatus::InProgress(entity)),
-            0xE3 => NodeStatus::Event(EventStatus::Paused(entity)),
-            0xE4 => NodeStatus::Event(EventStatus::Ready(entity)),
-            0xE5 => NodeStatus::Event(EventStatus::Completed(entity)),
-            0xE6 => NodeStatus::Event(EventStatus::Cancelled(entity)),
-            0xE7 => NodeStatus::Event(EventStatus::Inactive(entity)),
-            0xE8 => NodeStatus::Event(EventStatus::Disposed(entity)),
-            _ => {
-                panic!("Unrecognized frame")
-            }
-        }
+      let frame = frames.get(0).expect("should hav a frame");
+      let entity = frame.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
+      match (frame.name(interner).expect("should have a name").as_str(), frame.symbol(interner).expect("should have a symbol").as_str()) {
+        ("engine_status", status) => NodeStatus::Engine(match status {
+            "active" => EngineStatus::Active(entity),
+            "inactive" => EngineStatus::Inactive(entity),
+            "disposed" => EngineStatus::Disposed(entity),
+            _ => panic!("unknown engine status symbol")
+        }),
+        ("event_status", status) => NodeStatus::Event(match status{
+            "scheduled" => EventStatus::Scheduled(entity),
+            "new" => EventStatus::New(entity),
+            "in_progress" => EventStatus::InProgress(entity),
+            "paused" => EventStatus::Paused(entity),
+            "ready" => EventStatus::Ready(entity),
+            "completed" => EventStatus::Completed(entity),
+            "cancelled" => EventStatus::Cancelled(entity),
+            "inactive" => EventStatus::Inactive(entity),
+            "disposed" => EventStatus::Disposed(entity),
+            _ =>  panic!("unknown engine status symbol")
+        }),
+        ("node_status", status) => match status {
+            "profiler" => NodeStatus::Profiler(entity),
+            "custom" => NodeStatus::Custom(entity),
+            _ => NodeStatus::Empty
+        },
+        _ => NodeStatus::Empty
+      }
     }
 
     fn build_index(_: &reality::wire::Interner, frames: &[Frame]) -> FrameIndex {
@@ -107,37 +160,49 @@ impl WireObject for NodeCommand {
     where
         BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
     {
-        let appendix = world.read_resource::<Arc<Appendix>>();
+        encoder.interner.add_ident("node_command");
+        encoder.interner.add_ident("activate");
+        encoder.interner.add_ident("reset");
+        encoder.interner.add_ident("pause");
+        encoder.interner.add_ident("resume");
+        encoder.interner.add_ident("cancel");
+        encoder.interner.add_ident("spawn");
+        encoder.interner.add_ident("update");
+        encoder.interner.add_ident("swap");
+        encoder.interner.add_ident("swap.from");
+        encoder.interner.add_ident("swap.to");
+        encoder.interner.add_ident("custom");
 
         match self {
-            NodeCommand::Activate(entity) => {
-                let frame = encode_node_command(0x10, *entity, appendix.deref().clone(), encoder);
+            NodeCommand::Activate(e) => {
+                let frame = Frame::extension("node_command", "activate").with_parity(*e);
                 encoder.frames.push(frame);
             }
-            NodeCommand::Reset(entity) => {
-                let frame = encode_node_command(0x20, *entity, appendix.deref().clone(), encoder);
+            NodeCommand::Reset(e) => {
+                let frame = Frame::extension("node_command", "reset").with_parity(*e);
                 encoder.frames.push(frame);
             }
-            NodeCommand::Pause(entity) => {
-                let frame = encode_node_command(0x30, *entity, appendix.deref().clone(), encoder);
+            NodeCommand::Pause(e) => {
+                let frame = Frame::extension("node_command", "pause").with_parity(*e);
                 encoder.frames.push(frame);
             }
-            NodeCommand::Resume(entity) => {
-                let frame = encode_node_command(0x40, *entity, appendix.deref().clone(), encoder);
+            NodeCommand::Resume(e) => {
+                let frame = Frame::extension("node_command", "resume").with_parity(*e);
                 encoder.frames.push(frame);
             }
-            NodeCommand::Cancel(entity) => {
-                let frame = encode_node_command(0x50, *entity, appendix.deref().clone(), encoder);
+            NodeCommand::Cancel(e) => {
+                let frame = Frame::extension("node_command", "cancel").with_parity(*e);
                 encoder.frames.push(frame);
             }
-            NodeCommand::Spawn(entity) => {
-                let frame = encode_node_command(0x60, *entity, appendix.deref().clone(), encoder);
+            NodeCommand::Spawn(e) => {
+                let frame = Frame::extension("node_command", "spawn").with_parity(*e);
                 encoder.frames.push(frame);
             }
             NodeCommand::Update(graph) => {
                 let entity = world.entities().entity(graph.entity_id());
-                let frame = encode_node_command(0x70, entity, appendix.deref().clone(), encoder);
+                let frame = Frame::extension("node_command", "update").with_parity(entity);
                 encoder.frames.push(frame);
+
                 let index = graph.clone();
                 let index = index.index();
                 let symbol = index.root().name().to_string();
@@ -148,6 +213,19 @@ impl WireObject for NodeCommand {
                     index.root().value(),
                     &mut encoder.blob_device,
                 );
+
+                match index.root().value() {
+                    Value::Symbol(symbol) => {
+                        encoder.interner.add_ident(symbol);
+                    }
+                    Value::Complex(complex) => {
+                        for c in complex.iter() {
+                            encoder.interner.add_ident(c);
+                        }
+                    }
+                    _ => {}
+                }
+
                 encoder.frames.push(frame);
                 for (name, values) in graph.values() {
                     for value in values {
@@ -168,31 +246,24 @@ impl WireObject for NodeCommand {
                         encoder.frames.push(frame);
                     }
                 }
-                let frame = encode_node_command(0x71, entity, appendix.deref().clone(), encoder);
-                encoder.frames.push(frame);
-            }
-            NodeCommand::Custom(name, entity) => {
-                let frame = encode_node_command(0x80, *entity, appendix.deref().clone(), encoder);
-                encoder.frames.push(frame);
-
-                let frame = Frame::add(
-                    "name",
-                    &Value::Symbol(name.to_string()),
-                    &mut encoder.blob_device,
-                )
-                .with_parity(*entity);
-
-                encoder.interner.add_ident("name");
-                encoder.interner.add_ident(name);
-                encoder.frames.push(frame);
             }
             NodeCommand::Swap { owner, from, to } => {
-                let owner = encode_node_command(0x90, *owner, appendix.deref().clone(), encoder);
-                let from = encode_node_command(0x91, *from, appendix.deref().clone(), encoder);
-                let to = encode_node_command(0x92, *to, appendix.deref().clone(), encoder);
-                encoder.frames.push(owner);
-                encoder.frames.push(from);
-                encoder.frames.push(to);
+                let frame = Frame::extension("node_command", "swap").with_parity(*owner);
+                encoder.frames.push(frame);
+
+                let frame = Frame::extension("node_command", "swap.from").with_parity(*from);
+                encoder.frames.push(frame);
+
+                let frame = Frame::extension("node_command", "swap.to").with_parity(*to);
+                encoder.frames.push(frame);
+            }
+            NodeCommand::Custom(command, e) => {
+                encoder.interner.add_ident(command);
+
+                let frame = Frame::extension("node_command", "custom").with_parity(*e);
+                encoder.frames.push(frame);
+                let frame = Frame::extension("custom", command).with_parity(*e);
+                encoder.frames.push(frame);
             }
         }
     }
@@ -205,20 +276,32 @@ impl WireObject for NodeCommand {
     ) -> Self {
         match frames.get(0) {
             Some(frame) => {
-                let entity = frame.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
-                match frame.op() {
-                    0x10 => NodeCommand::Activate(entity),
-                    0x20 => NodeCommand::Reset(entity),
-                    0x30 => NodeCommand::Pause(entity),
-                    0x40 => NodeCommand::Resume(entity),
-                    0x50 => NodeCommand::Cancel(entity),
-                    0x60 => NodeCommand::Spawn(entity),
-                    0x70 => {
+                assert_eq!(frame.keyword(), Keywords::Extension);
+                let entity =
+                    frame.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
+                match frame.symbol(interner).expect("should have a symbol").as_str() {
+                    "activate" => NodeCommand::Activate(entity),
+                    "reset" => NodeCommand::Reset(entity),
+                    "pause" => NodeCommand::Pause(entity),
+                    "resume" => NodeCommand::Resume(entity),
+                    "cancel" => NodeCommand::Cancel(entity),
+                    "spawn" => NodeCommand::Spawn(entity),
+                    "swap" => {
+                        let from = frames.get(1).expect("should have a from frame");
+                        assert_eq!(from.name(interner).expect("should have a name").as_str(), "node_command");
+                        assert_eq!(from.symbol(interner).expect("should have a name").as_str(), "swap.from");
+                        let from = from.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
+
+                        let to = frames.get(2).expect("should have a to frame");
+                        assert_eq!(to.name(interner).expect("should have a name").as_str(), "node_command");
+                        assert_eq!(to.symbol(interner).expect("should have a name").as_str(), "swap.to");
+                        let to = to.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
+
+                        NodeCommand::Swap { owner: entity, from, to }
+                    }
+                    "update" => {
                         let mut attributes = vec![];
                         for attr in frames.iter().skip(1) {
-                            if attr.op() == 0x71 {
-                                break;
-                            }
                             match (
                                 attr.name(interner),
                                 attr.symbol(interner),
@@ -241,45 +324,18 @@ impl WireObject for NodeCommand {
                             }
                         }
 
-                        if let Some(index) = BlockIndex::index(attributes).first() {
+                        if let Some(index) = BlockIndex::index(attributes.clone()).first() {
                             NodeCommand::Update(AttributeGraph::new(index.clone()))
                         } else {
+                            event!(Level::ERROR, "{:#?}", attributes);
                             panic!("Could not get graph")
                         }
                     }
-                    0x80 => {
-                        if let Some(Value::Symbol(name)) = frames
-                            .get(1)
-                            .and_then(|name| name.read_value(interner, blob_device))
-                        {
-                            NodeCommand::Custom(name.to_string(), entity)
-                        } else {
-                            panic!("Name is required, {:?}", frames.get(1))
-                        }
-                    }
-                    0x90 => {
-                        let owner = frame
-                            .get_entity(protocol.as_ref(), protocol.assert_entity_generation());
-                        let from = frames
-                            .get(1)
-                            .and_then(|f| {
-                                Some(f.get_entity(
-                                    protocol.as_ref(),
-                                    protocol.assert_entity_generation(),
-                                ))
-                            })
-                            .expect("should have a frame for from");
-                        let to = frames
-                            .get(2)
-                            .and_then(|f| {
-                                Some(f.get_entity(
-                                    protocol.as_ref(),
-                                    protocol.assert_entity_generation(),
-                                ))
-                            })
-                            .expect("should have a frame for to");
+                    "custom" => {
+                        let command = frames.get(1).expect("should have a command frame");
+                        assert_eq!(command.name(interner), Some("custom".to_string()));
 
-                        NodeCommand::Swap { owner, from, to }
+                        NodeCommand::Custom(command.symbol(interner).expect("should have a symbol"), entity)
                     }
                     _ => {
                         panic!("Unrecognized start frame")
@@ -293,31 +349,39 @@ impl WireObject for NodeCommand {
     }
 
     fn build_index(
-        _: &reality::wire::Interner,
+        interner: &reality::wire::Interner,
         frames: &[reality::wire::Frame],
     ) -> reality::wire::FrameIndex {
         let mut index = FrameIndex::default();
         let mut pos = 0;
         for (idx, frame) in frames.iter().enumerate() {
-            match frame.op() {
-                0x10 | 0x20 | 0x30 | 0x40 | 0x50 | 0x60 => {
+
+            if frame.keyword() != Keywords::Extension {
+                continue;
+            }
+
+            match frame.symbol(interner).expect("should have a symbol").as_str() {
+                "activate" | "reset" | "pause" | "resume" | "cancel" | "spawn" => {
                     let range = pos..pos + 1;
                     index.insert(format!("{idx}"), vec![range]);
                     pos += 1;
                 }
-                0x70 => {
-                    if let Some(epos) = frames[idx..].iter().position(|p| p.op() == 0x71) {
-                        let range = pos..pos + epos + 1; // + 1 to include op 0x71
+                "update" => {
+                    if let Some(epos) = frames[idx+1..].iter().position(|p| p.keyword() == Keywords::Extension) {
+                        let range = pos..pos + epos; // + 1 to include op 0x71
                         index.insert(format!("{idx}"), vec![range]);
                         pos += epos + 1;
+                    } else {
+                        let range = pos..frames.len(); // + 1 to include op 0x71
+                        index.insert(format!("{idx}"), vec![range]);
                     }
                 }
-                0x80 => {
+                "custom" => {
                     let range = pos..pos + 2;
                     index.insert(format!("{idx}"), vec![range]);
                     pos += 2;
                 }
-                0x90 => {
+                "swap" => {
                     let range = pos..pos + 3;
                     index.insert(format!("{idx}"), vec![range]);
                     pos += 3;
@@ -331,43 +395,6 @@ impl WireObject for NodeCommand {
     fn resource_id() -> specs::shred::ResourceId {
         ResourceId::new::<<NodeCommand as Component>::Storage>()
     }
-}
-
-/// Encodes a node command into a frame,
-///
-fn encode_node_command<BlobImpl>(
-    op: u8,
-    entity: Entity,
-    appendix: Arc<Appendix>,
-    encoder: &mut Encoder<BlobImpl>,
-) -> Frame
-where
-    BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
-{
-    let mut frame = FrameBuilder::default();
-    frame.write(Data::Operation(op), None::<&mut BlobImpl>).ok();
-    if let Some(name) = appendix.name(&entity) {
-        event!(Level::TRACE, "Encoding {}", name);
-        encoder.interner.add_ident(name);
-        frame
-            .write(
-                Elements::Identifier(name.to_string()),
-                None::<&mut BlobImpl>,
-            )
-            .ok();
-    }
-    if let Some(control_symbol) = appendix.control_symbol(&entity) {
-        event!(Level::TRACE, "Encoding {}", control_symbol);
-        encoder.interner.add_ident(&control_symbol);
-        frame
-            .write(
-                Elements::Identifier(control_symbol.to_string()),
-                None::<&mut BlobImpl>,
-            )
-            .ok();
-    }
-    let frame: Frame = frame.into();
-    frame.with_parity(entity)
 }
 
 mod tests {
