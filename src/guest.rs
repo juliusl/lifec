@@ -1,4 +1,4 @@
-use std::{hash::Hash, ops::Deref};
+use std::hash::Hash;
 
 use reality::wire::{Protocol, WireObject};
 use specs::{Component, Entity, HashMapStorage, RunNow, World, WorldExt};
@@ -6,21 +6,14 @@ use tokio::sync::watch::Ref;
 use tracing::{event, Level};
 
 use crate::{
-    engine::{Performance, Runner},
     prelude::{
-        Host, HostEditor, Journal, Node, NodeCommand, NodeStatus, PluginFeatures, Project, State,
+        Host, HostEditor, Node, PluginFeatures, Project, State,
         ThunkContext, Workspace,
     },
 };
 
 mod remote_protocol;
 pub use remote_protocol::RemoteProtocol;
-
-mod monitor;
-pub use monitor::Monitor;
-
-mod sender;
-pub use sender::Sender;
 
 /// Runs systems without a dispatcher,
 ///
@@ -239,40 +232,6 @@ impl Guest {
     ///
     pub fn update_protocol(&self, update: impl FnOnce(&mut Protocol) -> bool) -> bool {
         self.protocol.send_if_modified(|protocol| update(protocol))
-    }
-
-    /// Encodes commands to protocol,
-    ///
-    /// returns true if any commands were encoded,
-    ///
-    pub fn encode_commands(&self) -> bool {
-        self.encode::<NodeCommand>(|p| p.as_ref().system_data::<Runner>().take_commands())
-    }
-
-    /// Encodes performance to protocol,
-    ///
-    /// returns true if performances were encoded
-    ///
-    pub fn encode_performance(&self) -> bool {
-        self.encode::<Performance>(|p| p.as_ref().system_data::<Runner>().take_performance())
-    }
-
-    /// Encodes node status to protocol,
-    ///  
-    /// returns true if status was encoded
-    ///
-    pub fn encode_status(&self) -> bool {
-        self.encode::<NodeStatus>(|p| p.as_ref().system_data::<State>().take_statuses())
-    }
-
-    /// Encode the command journal to protocol,
-    ///
-    pub fn encode_journal(&self) -> bool {
-        self.encode_resource::<Journal>(|p| {
-            let journal = p.as_ref().read_resource::<Journal>();
-
-            Some(journal.deref().clone())
-        })
     }
 
     /// Maintain the protocol world,

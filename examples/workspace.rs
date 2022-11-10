@@ -43,16 +43,9 @@ fn main() {
     : .chaos
     : .test_host
 
-    + .operation start_test_host
-    : .test_host
-    : .test_host_sender
-
     + test .operation print-2
     : .println Hello Print Operation c 4
     : .chaos
-
-    + .operation read-performance
-    : .monitor test_host
     ```
     "#,
     );

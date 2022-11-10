@@ -229,8 +229,6 @@ pub fn default_runtime() -> Runtime {
 
     // Plugins for testing
     runtime.install_with_custom::<Chaos>("");
-    runtime.install_with_custom::<TestHost>("");
-    runtime.install_with_custom::<TestHostSender>("");
     runtime
 }
 
