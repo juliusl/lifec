@@ -125,6 +125,10 @@ impl Guest {
     ///
     pub fn enable_remote(&mut self) {
         self.remote = Some(self.subscribe());
+
+        self.protocol.send_modify(|p| {
+            p.as_mut().insert(Some(self.subscribe()));
+        })
     }
 
     /// Returns true if remote protocol is enabled,
