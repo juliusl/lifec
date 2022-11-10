@@ -71,9 +71,6 @@ pub struct State<'a> {
     /// Graph storage
     ///
     graphs: WriteStorage<'a, AttributeGraph>,
-    /// Node statuses
-    ///
-    node_statuses: WriteStorage<'a, NodeStatus>,
     /// Entity cursors,
     ///
     cursors: WriteStorage<'a, Cursor>,
@@ -949,7 +946,6 @@ impl<'a> State<'a> {
             entities,
             cursors,
             events,
-            node_statuses,
             connections,
             transitions,
             sequences,
@@ -960,7 +956,6 @@ impl<'a> State<'a> {
 
         if let Some((
             _,
-            node_status,
             connection,
             cursor,
             transition,
@@ -969,7 +964,6 @@ impl<'a> State<'a> {
             adhoc,
         )) = (
             events,
-            node_statuses.maybe(),
             connections.maybe(),
             cursors.maybe(),
             transitions.maybe(),
@@ -994,12 +988,6 @@ impl<'a> State<'a> {
         } else {
             None
         }
-    }
-
-    /// Takes statuses from the world state,
-    /// 
-    pub fn take_statuses(&mut self) -> Vec<(Entity, NodeStatus)> {
-        (&self.entities, self.node_statuses.drain()).join().collect()
     }
 
     /// Handles the node command,
