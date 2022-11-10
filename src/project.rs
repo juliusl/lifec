@@ -1,11 +1,13 @@
 use std::collections::BTreeMap;
 
+use crate::debugger::Debugger;
 use crate::engine::Adhoc;
 use crate::engine::Completion;
 use crate::engine::NodeCommandHandler;
 use crate::engine::Profiler;
 use crate::engine::Yielding;
 use crate::guest::Guest;
+use crate::guest::RemoteProtocol;
 use crate::prelude::*;
 
 mod source;
@@ -264,6 +266,8 @@ pub fn default_world() -> World {
     world.register::<EventStatus>();
     world.register::<AttributeGraph>();
     world.insert(None::<Workspace>);
+    world.insert(None::<RemoteProtocol>);
+    world.insert(None::<Debugger>);
     world
 }
 

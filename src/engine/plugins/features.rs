@@ -1,7 +1,7 @@
 use std::ops::Deref;
 use specs::{prelude::*, SystemData};
 
-use crate::prelude::*;
+use crate::{prelude::*, guest::RemoteProtocol};
 
 /// System data with plugin feature resources,
 ///
@@ -11,6 +11,7 @@ pub struct Features<'a> {
     tokio_runtime: Read<'a, tokio::runtime::Runtime, EventRuntime>,
     secure_client: Read<'a, SecureClient, EventRuntime>,
     host_editor: Read<'a, tokio::sync::watch::Receiver<HostEditor>, EventRuntime>,
+    remote_protocol: Read<'a, Option<RemoteProtocol>>,
     broker: PluginBroker<'a>,
 }
 
@@ -28,6 +29,10 @@ impl<'a> Features<'a> {
 
         if let Some(workspace) = workspace.as_ref() {
             context.enable_workspace(workspace.clone());
+        }
+
+        if let Some(remote_protocol) = self.remote_protocol.as_ref() {
+            context.enable_remote(remote_protocol.clone());
         }
 
         context.enable_host_editor_watcher(self.host_editor.deref().clone());
