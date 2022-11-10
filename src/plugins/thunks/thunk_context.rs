@@ -120,7 +120,7 @@ impl Clone for ThunkContext {
             guest_dispatcher: self.guest_dispatcher.clone(),
             node_dispatcher: self.node_dispatcher.clone(),
             completion_dispatcher: self.completion_dispatcher.clone(),
-            remote: None,
+            remote: self.remote.clone(),
             response_cache: None,
             body_cache: None,
         }
