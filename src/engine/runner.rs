@@ -18,7 +18,7 @@ pub struct Runner<'a> {
     pub entities: Entities<'a>,
     /// Guests,
     /// 
-    pub guests: WriteStorage<'a, Guest>,
+    pub guests: ReadStorage<'a, Guest>,
     /// Node commands,
     /// 
     commands: WriteStorage<'a, NodeCommand>,
@@ -57,11 +57,5 @@ impl<'a> Runner<'a> {
     /// 
     pub fn guests(&self) -> impl Iterator<Item = &Guest> {
         (&self.entities, &self.guests).join().map(|(_, g)| g)
-    }
-
-    /// Returns a mutable iterator over guests,
-    /// 
-    pub fn guests_mut(&'a mut self) -> impl Iterator<Item = &'a mut Guest> {
-        (&self.entities, &mut self.guests).join().map(|(_, g)| g)
     }
 }
