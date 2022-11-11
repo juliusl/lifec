@@ -29,7 +29,7 @@ impl Default for Profiler {
 impl<'a> System<'a> for Profiler {
     type SystemData = Profilers<'a>;
 
-    fn run(&mut self, mut profilers: Self::SystemData) {       
+    fn run(&mut self, profilers: Self::SystemData) {       
         profilers.profile();
     }
 }
