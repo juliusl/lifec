@@ -1021,12 +1021,8 @@ impl<'a> State<'a> {
             crate::editor::NodeCommand::Spawn(event) => {
                 let spawned = self.spawn(event);
 
-                if self.activate(spawned) {
-                    event!(Level::DEBUG, "Spawning event {}", event.id());
-                    true
-                } else {
-                    false
-                }
+                self.activate(spawned);
+                true
             }
             crate::editor::NodeCommand::Swap { owner, from, to } => {
                 if self.swap(owner, from, to) {
