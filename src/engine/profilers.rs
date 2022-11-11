@@ -24,7 +24,7 @@ pub struct Profilers<'a> {
 impl<'a> Profilers<'a> {
     /// Collect profiling data, results are stored as entities
     /// 
-    pub fn profile(&mut self) {
+    pub fn profile(&self) {
         for connection in self.connections.join() {
             let profiler = self
                 .profilers
