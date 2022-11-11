@@ -213,7 +213,7 @@ impl Plugin for Process {
                                     println!("{}", line);
                                 }
                                 writeln!(&mut stdout, "{}", line).expect("should be able to write");
-                                reader_context.update_status_only(format!("0: {}", line)).await;
+                                reader_context.status(format!("0: {}", line)).await;
                             },
                             None => {
                                 break;
@@ -245,7 +245,7 @@ impl Plugin for Process {
                                     eprintln!("{}", line);
                                 }
 
-                                err_reader_context.update_status_only(format!("1: {}", line)).await;
+                                err_reader_context.status(format!("1: {}", line)).await;
                             },
                             None => {
                                 break;

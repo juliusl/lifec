@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use atlier::system::{Attribute, Value};
+use chrono::{Utc, DateTime};
 use reality::{Block, BlockProperties};
 use specs::{Entity, Component, VecStorage};
 
@@ -9,6 +10,9 @@ use specs::{Entity, Component, VecStorage};
 #[derive(Component, Hash, Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
 #[storage(VecStorage)]
 pub struct Completion {
+    /// Timestamp,
+    /// 
+    pub timestamp: DateTime<Utc>,
     /// Event entity that initiated this completion,
     ///
     /// If this is a completion from a spawned event, then its possible that the spawned event was cleaned up,

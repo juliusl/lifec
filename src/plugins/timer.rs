@@ -43,9 +43,9 @@ impl Plugin for Timer {
                     let progress = elapsed.as_secs_f32() / duration;
                     if progress < 1.0 {
                         if tc.is_enabled("quiet") {
-                            tc.update_progress("", progress).await;
+                            tc.progress("", progress).await;
                         } else {
-                            tc.update_progress(
+                            tc.progress(
                                 format!("elapsed {} ms", elapsed.as_millis()),
                                 progress,
                             )
@@ -54,10 +54,13 @@ impl Plugin for Timer {
                     } else {
                         tc.state_mut()
                             .with_symbol("elapsed", format!("{:?}", elapsed));
+
+                        tc.progress("Completed", 1.0).await;
                         break;
                     }
 
                     if ThunkContext::is_cancelled(&mut cancel_source) {
+                        tc.progress("Cancelling", progress).await;
                         break;
                     }
                 }

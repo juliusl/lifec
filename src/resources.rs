@@ -98,7 +98,7 @@ impl Resources {
         if let Some(parent) = path.parent() {
             match tokio::fs::create_dir_all(parent).await {
                 Ok(_) => {
-                    tc.update_status_only(format!("Using embedded resource {prefix} for {src}"))
+                    tc.status(format!("Using embedded resource {prefix} for {src}"))
                         .await;
                 }
                 Err(err) => {
@@ -111,7 +111,7 @@ impl Resources {
             if let Some(resource) = C::get(src.trim_start_matches(&format!("{prefix}/"))) {
                 match tokio::fs::write(&src, resource.data).await {
                     Ok(_) => {
-                        tc.update_status_only(format!(
+                        tc.status(format!(
                             "Loaded embedded resource {prefix} for {src}"
                         ))
                         .await;

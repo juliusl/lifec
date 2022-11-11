@@ -744,7 +744,7 @@ impl ThunkContext {
 
     /// Sends an update for the status and progress
     ///
-    pub async fn update_progress(&self, status: impl AsRef<str>, progress: f32) {
+    pub async fn progress(&self, status: impl AsRef<str>, progress: f32) {
         if let ThunkContext {
             status_updates: Some(status_updates),
             entity: Some(entity),
@@ -764,8 +764,8 @@ impl ThunkContext {
 
     /// Updates status of thunk execution
     ///
-    pub async fn update_status_only(&self, status: impl AsRef<str>) {
-        self.update_progress(&status, 0.0).await;
+    pub async fn status(&self, status: impl AsRef<str>) {
+        self.progress(&status, -1.0).await;
     }
 
     /// Returns the error context this context has an error block

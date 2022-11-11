@@ -1,12 +1,13 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeMap, VecDeque},
     ops::Deref,
 };
 
 use atlier::system::App;
-use imgui::Ui;
+use imgui::{TreeNode, Ui};
 use specs::Entity;
 use tokio::sync::mpsc::Sender;
+use tracing::{event, Level};
 
 use crate::{
     engine::{Completion, Yielding},
@@ -23,10 +24,10 @@ pub struct Debugger {
     appendix: Appendix,
     /// Map of completions,
     ///
-    completions: BTreeMap<(Entity, Entity), Completion>,
+    completions: VecDeque<((Entity, Entity), Completion)>,
     /// Status updates,
     ///
-    status_updates: VecDeque<StatusUpdate>,
+    status_updates: BTreeMap<Entity, VecDeque<StatusUpdate>>,
     /// Errors,
     ///
     errors: Vec<ErrorContext>,
@@ -94,9 +95,10 @@ impl Debugger {
     /// Displays a tree view of completion history,
     ///
     pub fn completion_tree(&self, ui: &Ui) {
-        let mut groups = BTreeMap::<String, BTreeSet<Completion>>::default();
+        let mut groups = BTreeMap::<String, Vec<Completion>>::default();
         for (_, completion) in self.completions.iter() {
-            let control_symbol = if let Some(name) = self.appendix.control_symbol(&completion.event) {
+            let control_symbol = if let Some(name) = self.appendix.control_symbol(&completion.event)
+            {
                 name.to_string()
             } else if let Some(id) = completion.query.property("event_id").and_then(|p| p.int()) {
                 self.appendix
@@ -108,17 +110,16 @@ impl Debugger {
             };
 
             if let Some(group) = groups.get_mut(&control_symbol) {
-                group.insert(completion.clone());
+                group.push(completion.clone());
             } else {
-                let mut set = BTreeSet::<Completion>::default();
-                set.insert(completion.clone());
-                groups.insert(control_symbol, set);
+                groups.insert(control_symbol, vec![completion.clone()]);
             }
         }
 
         for (group, completions) in groups {
             imgui::TreeNode::new(group).build(ui, || {
                 for Completion {
+                    timestamp,
                     event,
                     thunk,
                     control_values,
@@ -128,7 +129,8 @@ impl Debugger {
                 {
                     imgui::TreeNode::new(format!("{:?}{:?}", event, thunk))
                         .label::<String, _>(format!(
-                            "Completion of {} {}.{}",
+                            "{} Completion {} {}.{}",
+                            timestamp,
                             self.appendix.control_symbol(&event).unwrap_or_default(),
                             self.appendix.name(&event).unwrap_or_default(),
                             self.appendix.name(thunk).unwrap_or_default()
@@ -242,22 +244,45 @@ impl Debugger {
         }
     }
 
+    /// Dispalys logs in a tree format,
+    /// 
     pub fn updates_log(&mut self, ui: &Ui) {
-        for (e, p, message) in self.status_updates.iter() {
-            ui.text(format!("{}: ", e.id()));
-            ui.same_line();
-            ui.text(message);
+        let mut logs = BTreeMap::<String, BTreeMap<Entity, &VecDeque<StatusUpdate>>>::default();
 
-            if *p > 0.0 {
-                ui.same_line();
-                ui.indent();
-                imgui::ProgressBar::new(*p).build(ui);
-                ui.unindent();
+        for (e, status_updates) in self.status_updates.iter() {
+            let control = self.appendix().control_symbol(e).unwrap_or_default();
+
+            if !logs.contains_key(&control) {
+                logs.insert(control.clone(), BTreeMap::default());
+            }
+
+            if let Some(updates) = logs.get_mut(&control) {
+                updates.insert(*e, status_updates);
             }
         }
 
-        if let Some(_) = self.updated.take() {
-            ui.set_scroll_here_y();
+        for (log, status_updates) in logs {
+            TreeNode::new(format!("Logs {}", log)).build(ui, || {
+                for (idx, (entity, updates)) in status_updates.iter().enumerate() {
+
+                    TreeNode::new(format!("{} {}", idx, entity.id()))
+                        .label::<String, _>(format!(
+                            "{}: {}",
+                            entity.id(),
+                            self.appendix().name(entity).unwrap_or_default()
+                        ))
+                        .build(ui, || {
+                            let p = updates.iter().map(|(_, p, _)| *p).last().unwrap_or_default();
+                            for (_, _, message) in updates.iter() {
+                                ui.text(message);
+                            }
+
+                            if p > 0.0 {
+                                imgui::ProgressBar::new(p).build(ui);
+                            }
+                        });
+                }
+            });
         }
     }
 }
@@ -284,17 +309,19 @@ impl Listener for Debugger {
     }
 
     fn on_status_update(&mut self, status_update: &crate::prelude::StatusUpdate) {
-        if self.status_updates.len() > 1000 {
-            self.status_updates.pop_front();
+        if !self.status_updates.contains_key(&status_update.0) {
+            self.status_updates
+                .insert(status_update.0, Default::default());
         }
 
-        if let Some((e, p, _)) = self.status_updates.back() {
-            if status_update.0 == *e  && *p > 0.0 {
-                self.status_updates.pop_back();
+        if let Some(status_updates) = self.status_updates.get_mut(&status_update.0) {
+            if status_updates.len() > 3 {
+                status_updates.pop_front();
             }
+
+            status_updates.push_back(status_update.clone());
         }
 
-        self.status_updates.push_back(status_update.clone());
         self.updated = Some(());
     }
 
@@ -303,8 +330,13 @@ impl Listener for Debugger {
     }
 
     fn on_completion(&mut self, completion: crate::engine::Completion) {
+        if self.completions.len() > 1000 {
+            event!(Level::TRACE, "Discarding old results");
+            self.completions.pop_front();
+        }
+
         self.completions
-            .insert((completion.event, completion.thunk), completion);
+            .push_back(((completion.event, completion.thunk), completion));
     }
 
     fn on_error_context(&mut self, error: &crate::prelude::ErrorContext) {

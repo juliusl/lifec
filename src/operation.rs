@@ -267,8 +267,9 @@ impl Operation {
     /// returns true if a change was made
     /// 
     pub fn cancel(&mut self) -> bool {
-        if let Some((_, cancel)) = self.task.take() {
+        if let Some((j, cancel)) = self.task.take() {
             cancel.send(()).ok();
+            j.abort();
             self.cancelled = true;
             true 
         } else {

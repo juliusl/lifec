@@ -5,6 +5,7 @@ use std::{
 };
 
 use atlier::system::Attribute;
+use chrono::Utc;
 use specs::{prelude::*, Entities, SystemData};
 use tokio::sync::oneshot;
 
@@ -27,7 +28,7 @@ pub type NodeCommandHandler = fn(&mut State, Entity) -> bool;
 #[derive(SystemData)]
 pub struct State<'a> {
     /// Lazy updates,
-    /// 
+    ///
     lazy_update: Read<'a, LazyUpdate>,
     /// Runtime,
     ///
@@ -76,31 +77,31 @@ pub struct State<'a> {
     graphs: ReadStorage<'a, AttributeGraph>,
     /// Entity cursors,
     ///
-    cursors: WriteStorage<'a, Cursor>,
+    cursors: ReadStorage<'a, Cursor>,
     /// Sequences of entities,
     ///
-    sequences: WriteStorage<'a, Sequence>,
+    sequences: ReadStorage<'a, Sequence>,
+    /// Event config,
+    ///
+    events: ReadStorage<'a, Event>,
+    /// Connection state storage,
+    ///
+    connection_states: ReadStorage<'a, ConnectionState>,
+    /// Engine storage,
+    ///
+    engines: ReadStorage<'a, Engine>,
     /// Execution limits,
     ///
     limits: WriteStorage<'a, Limit>,
-    /// Event config,
-    ///
-    events: WriteStorage<'a, Event>,
     /// Connection storage,
     ///
     connections: WriteStorage<'a, Connection>,
     /// Operation storage,
     ///
     operations: WriteStorage<'a, Operation>,
-    /// Connection state storage,
-    ///
-    connection_states: WriteStorage<'a, ConnectionState>,
     /// Yielding storage,
     ///
     yielding: WriteStorage<'a, Yielding>,
-    /// Engine storage,
-    ///
-    engines: WriteStorage<'a, Engine>,
 }
 
 impl<'a> State<'a> {
@@ -176,8 +177,10 @@ impl<'a> State<'a> {
             EventStatus::Completed(e) | EventStatus::Cancelled(e) => {
                 operations.remove(e);
 
-                if let (Some(sequence), Some(event)) = (sequences.get(e), events.get_mut(e)) {
-                    event.reactivate(sequence.clone());
+                if let (Some(sequence), Some(event)) = (sequences.get(e), events.get(e)) {
+                    let mut next = event.clone();
+                    next.reactivate(sequence.clone());
+                    self.lazy_update.insert(e, next);
                     true
                 } else {
                     false
@@ -445,11 +448,12 @@ impl<'a> State<'a> {
         let State {
             sequences, events, ..
         } = self;
-        if let Some(event) = events.get_mut(event) {
-            if let Some(sequence) = event.activate() {
+        if let Some(event) = events.get(event) {
+            let mut next = event.clone();
+            if let Some(sequence) = next.activate() {
+                self.lazy_update.insert(event_entity, next);
                 if !sequences.contains(event_entity) {
-                    self.lazy_update
-                        .insert(event_entity, sequence);
+                    self.lazy_update.insert(event_entity, sequence);
                 }
                 true
             } else {
@@ -463,10 +467,7 @@ impl<'a> State<'a> {
     /// Updates state,
     ///
     pub fn update_state(&mut self, graph: &AttributeGraph) -> bool {
-        let Self {
-            entities,
-            ..
-        } = self;
+        let Self { entities, .. } = self;
         let entity = entities.entity(graph.entity_id());
         self.lazy_update.insert(entity, graph.clone());
         true
@@ -600,26 +601,22 @@ impl<'a> State<'a> {
 
         // Enable sequence on spawned
         let sequence = self.sequences.get(source).expect("should have a sequence");
-        self.lazy_update
-            .insert(spawned, sequence.clone());
+        self.lazy_update.insert(spawned, sequence.clone());
 
         // Enable event on spawned
         let event = self.events.get(source).expect("should have event");
         let mut spawned_event = event.clone();
         spawned_event.activate();
-        self.lazy_update
-            .insert(spawned, spawned_event);
+        self.lazy_update.insert(spawned, spawned_event);
 
         // Enable cursor on spawned,
         if let Some(cursor) = self.cursors.get(source) {
-            self.lazy_update
-                .insert(spawned, cursor.clone());
+            self.lazy_update.insert(spawned, cursor.clone());
         }
 
         // Remove yielding and add it to this spawned event,
         if let Some(yielding) = self.yielding.remove(source) {
-            self.lazy_update
-                .insert(spawned, yielding);
+            self.lazy_update.insert(spawned, yielding);
         }
 
         spawned
@@ -690,8 +687,11 @@ impl<'a> State<'a> {
     pub fn swap(&mut self, owner: Entity, from: Entity, to: Entity) -> bool {
         let Self { sequences, .. } = self;
 
-        if let Some(seq) = sequences.get_mut(owner) {
-            if seq.swap(from, to) {
+        if let Some(seq) = sequences.get(owner) {
+            let mut next = seq.clone();
+            if next.swap(from, to) {
+                self.lazy_update.insert(owner, next);
+
                 return true;
             }
         }
@@ -946,15 +946,7 @@ impl<'a> State<'a> {
             ..
         } = self;
 
-        if let Some((
-            _,
-            connection,
-            cursor,
-            transition,
-            sequence,
-            connection_state,
-            adhoc,
-        )) = (
+        if let Some((_, connection, cursor, transition, sequence, connection_state, adhoc)) = (
             events,
             connections.maybe(),
             cursors.maybe(),
@@ -1013,7 +1005,7 @@ impl<'a> State<'a> {
             crate::editor::NodeCommand::Resume(event) => {
                 if self.resume_event(event) {
                     event!(Level::DEBUG, "Resuming event {}", event.id());
-                    true 
+                    true
                 } else {
                     false
                 }
@@ -1067,10 +1059,14 @@ impl<'a> State<'a> {
 
                 if let Some(handler) = self.handlers.get(&name) {
                     if handler(self, entity) {
-                        event!(Level::DEBUG, "Executed custom handler, {name}({})", entity.id());
+                        event!(
+                            Level::DEBUG,
+                            "Executed custom handler, {name}({})",
+                            entity.id()
+                        );
                         true
                     } else {
-                        false 
+                        false
                     }
                 } else {
                     false
@@ -1169,16 +1165,18 @@ impl<'a> State<'a> {
 impl<'a> State<'a> {
     /// Add's a plugin to an event,
     ///
-    pub fn add_plugin<P>(&mut self, event_entity: Entity) -> bool 
+    pub fn add_plugin<P>(&mut self, event_entity: Entity) -> bool
     where
         P: Plugin + BlockObject + Default,
     {
-        if let Some(event) = self.events.get_mut(event_entity) {
+        if let Some(event) = self.events.get(event_entity) {
+            let mut next = event.clone();
+
             if let Some(thunk_src) = self.runtime.thunk_source(format!("call::{}", P::symbol())) {
                 let plugin_entity = self.entities.create();
 
-                if event.add_thunk(thunk_src.thunk(), plugin_entity) {
-                    if let Some(sequence) = event.sequence() {
+                if next.add_thunk(thunk_src.thunk(), plugin_entity) {
+                    if let Some(sequence) = next.sequence() {
                         self.lazy_update.insert(event_entity, sequence.clone());
 
                         if let Some(block) = self.blocks.get(event_entity) {
@@ -1242,14 +1240,14 @@ impl<'a> State<'a> {
 
                             *self.appendix = Arc::new(appendix);
 
-                            self.lazy_update
-                                .insert(plugin_entity, block.clone());
+                            self.lazy_update.insert(plugin_entity, block.clone());
 
-                            self.lazy_update
-                                .insert(plugin_entity, graph);
+                            self.lazy_update.insert(plugin_entity, graph);
 
-                            self.lazy_update
-                                .insert(plugin_entity, thunk_src.thunk());
+                            self.lazy_update.insert(plugin_entity, thunk_src.thunk());
+
+                            self.lazy_update.insert(event_entity, next);
+
 
                             return true;
                         } else {
@@ -1361,6 +1359,7 @@ impl<'a> State<'a> {
                                 match result {
                                     Some(mut result) => {
                                         let mut completion = Completion {
+                                            timestamp: Utc::now(),
                                             event,
                                             thunk: e,
                                             control_values: context.control_values().clone(),

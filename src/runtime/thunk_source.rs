@@ -4,17 +4,17 @@ use crate::prelude::*;
 /// 
 /// Catalogs aspects of the underlying plugin driving the event's thunk.
 /// 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ThunkSource {
     /// The event struct component this source returns,
     /// 
     thunk: Thunk,
     /// Description of the plugin,
     /// 
-    description: Option<String>, 
+    _description: Option<String>, 
     /// Caveats of the plugin,
     /// 
-    caveats: Option<String>, 
+    _caveats: Option<String>, 
 }
 
 impl ThunkSource {
@@ -32,7 +32,7 @@ impl ThunkSource {
     {
         ThunkSource {
             thunk: Thunk::from_plugin::<P>(),
-            description: {
+            _description: {
                 let description = P::description();
                 if description.is_empty() {
                     None 
@@ -40,7 +40,7 @@ impl ThunkSource {
                     Some(description.to_string())
                 }
             },
-            caveats: {
+            _caveats: {
                 let caveats = P::caveats();
                 if caveats.is_empty() {
                     None 
@@ -48,16 +48,6 @@ impl ThunkSource {
                     Some(caveats.to_string())
                 }
             },
-        }
-    }
-}
-
-impl Clone for ThunkSource {
-    fn clone(&self) -> Self {
-        Self { 
-            thunk: self.thunk.clone(),
-            description: self.description.clone(),
-            caveats: self.caveats.clone(),
         }
     }
 }
