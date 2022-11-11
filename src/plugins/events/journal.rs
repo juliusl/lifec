@@ -99,24 +99,12 @@ impl WireObject for Journal {
     }
 
     fn build_index(
-        interner: &reality::wire::Interner,
+        _: &reality::wire::Interner,
         frames: &[reality::wire::Frame],
     ) -> reality::wire::FrameIndex {
         let mut frame_index = FrameIndex::default();
 
-        for (idx, f) in frames.iter().enumerate().filter(|(_, f)| {
-            f.name(interner) == Some("journal".to_string())
-                && f.keyword() == Keywords::Add
-                && f.attribute() == Some(reality::Attributes::Int)
-        }) {
-            match f.read_value(interner, &Default::default()) {
-                Some(Value::Int(len)) => {
-                    let range = idx..idx + (len as usize);
-                    frame_index.insert(format!("journal-{}", idx), vec![range]);
-                }
-                _ => {}
-            }
-        }
+        frame_index.insert("journal".to_string(), vec![0..frames.len()]);
 
         frame_index
     }
