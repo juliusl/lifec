@@ -34,7 +34,6 @@ impl WireObject for NodeStatus {
         encoder.interner.add_ident("ready");
         encoder.interner.add_ident("completed");
         encoder.interner.add_ident("cancelled");
-        encoder.interner.add_ident("inactive");
 
         match self {
             NodeStatus::Engine(engine) => match engine {
@@ -109,7 +108,7 @@ impl WireObject for NodeStatus {
     ) -> Self {
       let frame = frames.get(0).expect("should hav a frame");
       let entity = frame.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
-      match (frame.name(interner).expect("should have a name").as_str(), frame.symbol(interner).expect("should have a symbol").as_str()) {
+      match (frame.name(interner).unwrap_or_default().as_str(), frame.symbol(interner).unwrap_or_default().as_str()) {
         ("engine_status", status) => NodeStatus::Engine(match status {
             "active" => EngineStatus::Active(entity),
             "inactive" => EngineStatus::Inactive(entity),
