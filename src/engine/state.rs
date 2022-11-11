@@ -26,6 +26,9 @@ pub type NodeCommandHandler = fn(&mut State, Entity) -> bool;
 ///
 #[derive(SystemData)]
 pub struct State<'a> {
+    /// Lazy updates,
+    /// 
+    lazy_update: Read<'a, LazyUpdate>,
     /// Runtime,
     ///
     runtime: Read<'a, Runtime>,
@@ -64,13 +67,13 @@ pub struct State<'a> {
     adhocs: ReadStorage<'a, Adhoc>,
     /// Block data,
     ///
-    blocks: WriteStorage<'a, Block>,
+    blocks: ReadStorage<'a, Block>,
     /// Thunk storage,
     ///
-    thunks: WriteStorage<'a, Thunk>,
+    thunks: ReadStorage<'a, Thunk>,
     /// Graph storage
     ///
-    graphs: WriteStorage<'a, AttributeGraph>,
+    graphs: ReadStorage<'a, AttributeGraph>,
     /// Entity cursors,
     ///
     cursors: WriteStorage<'a, Cursor>,
@@ -445,9 +448,8 @@ impl<'a> State<'a> {
         if let Some(event) = events.get_mut(event) {
             if let Some(sequence) = event.activate() {
                 if !sequences.contains(event_entity) {
-                    sequences
-                        .insert(event_entity, sequence)
-                        .expect("should be able to insert sequence");
+                    self.lazy_update
+                        .insert(event_entity, sequence);
                 }
                 true
             } else {
@@ -462,17 +464,12 @@ impl<'a> State<'a> {
     ///
     pub fn update_state(&mut self, graph: &AttributeGraph) -> bool {
         let Self {
-            entities, graphs, ..
+            entities,
+            ..
         } = self;
         let entity = entities.entity(graph.entity_id());
-        if let Some(_) = graphs
-            .insert(entity, graph.clone())
-            .expect("should be able to insert")
-        {
-            true
-        } else {
-            false
-        }
+        self.lazy_update.insert(entity, graph.clone());
+        true
     }
 
     /// Handles the transition of an event,
@@ -603,28 +600,26 @@ impl<'a> State<'a> {
 
         // Enable sequence on spawned
         let sequence = self.sequences.get(source).expect("should have a sequence");
-        self.sequences
-            .insert(spawned, sequence.clone())
-            .expect("should be able to insert");
+        self.lazy_update
+            .insert(spawned, sequence.clone());
 
         // Enable event on spawned
         let event = self.events.get(source).expect("should have event");
-        self.events
-            .insert(spawned, event.clone())
-            .expect("should be able to insert");
+        let mut spawned_event = event.clone();
+        spawned_event.activate();
+        self.lazy_update
+            .insert(spawned, spawned_event);
 
         // Enable cursor on spawned,
         if let Some(cursor) = self.cursors.get(source) {
-            self.cursors
-                .insert(spawned, cursor.clone())
-                .expect("should be able to insert");
+            self.lazy_update
+                .insert(spawned, cursor.clone());
         }
 
         // Remove yielding and add it to this spawned event,
         if let Some(yielding) = self.yielding.remove(source) {
-            self.yielding
-                .insert(spawned, yielding)
-                .expect("should be able to insert");
+            self.lazy_update
+                .insert(spawned, yielding);
         }
 
         spawned
@@ -823,7 +818,6 @@ impl<'a> State<'a> {
         let State {
             cursors,
             connections,
-            connection_states,
             ..
         } = self;
 
@@ -832,9 +826,8 @@ impl<'a> State<'a> {
                 Cursor::Next(next) => {
                     if let Some(connection) = connections.get_mut(*next) {
                         if let Some(key) = connection.schedule(event) {
-                            connection_states
-                                .insert(event, key)
-                                .expect("should be able to insert connection state");
+                            self.lazy_update
+                                .insert(event, key);
                         }
                     }
                 }
@@ -842,9 +835,8 @@ impl<'a> State<'a> {
                     for fork in forks {
                         if let Some(connection) = connections.get_mut(*fork) {
                             if let Some(key) = connection.schedule(event) {
-                                connection_states
-                                    .insert(event, key)
-                                    .expect("should be able to insert connection state");
+                                self.lazy_update
+                                    .insert(event, key);
                             }
                         }
                     }
@@ -1187,9 +1179,7 @@ impl<'a> State<'a> {
 
                 if event.add_thunk(thunk_src.thunk(), plugin_entity) {
                     if let Some(sequence) = event.sequence() {
-                        self.sequences
-                            .insert(event_entity, sequence.clone())
-                            .expect("should have a sequence");
+                        self.lazy_update.insert(event_entity, sequence.clone());
 
                         if let Some(block) = self.blocks.get(event_entity) {
                             let mut graph = if let Some(default_settings) =
@@ -1252,17 +1242,15 @@ impl<'a> State<'a> {
 
                             *self.appendix = Arc::new(appendix);
 
-                            self.blocks
-                                .insert(plugin_entity, block.clone())
-                                .expect("should be able to insrt block");
+                            self.lazy_update
+                                .insert(plugin_entity, block.clone());
 
-                            self.graphs
-                                .insert(plugin_entity, graph)
-                                .expect("should be able to insert graph");
+                            self.lazy_update
+                                .insert(plugin_entity, graph);
 
-                            self.thunks
-                                .insert(plugin_entity, thunk_src.thunk())
-                                .expect("should be able to insert thunk");
+                            self.lazy_update
+                                .insert(plugin_entity, thunk_src.thunk());
+
                             return true;
                         } else {
                             event!(Level::DEBUG, "Didn't have a block");

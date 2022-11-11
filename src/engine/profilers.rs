@@ -1,5 +1,5 @@
 use specs::prelude::*;
-use specs::{Entities, SystemData, WriteStorage};
+use specs::{Entities, SystemData};
 
 use super::{Performance, Profiler, Connection};
 
@@ -7,18 +7,18 @@ use super::{Performance, Profiler, Connection};
 ///
 #[derive(SystemData)]
 pub struct Profilers<'a> {
+    /// Lazy updates,
+    /// 
+    lazy_updates: Read<'a, LazyUpdate>,
     /// Entities
     /// 
     entities: Entities<'a>,
     /// Connections
     /// 
     connections: ReadStorage<'a, Connection>,
-    /// Profilers,
+    /// Profilers
     /// 
-    profilers: WriteStorage<'a, Profiler>,
-    /// Performance storage,
-    /// 
-    performance: WriteStorage<'a, Performance>,
+    profilers: ReadStorage<'a, Profiler>,
 }
 
 impl<'a> Profilers<'a> {
@@ -39,9 +39,8 @@ impl<'a> Profilers<'a> {
             );
 
             for sample in samples {
-                self.performance
-                    .insert(self.entities.create(), sample)
-                    .expect("should be able to insert sample");
+                self.lazy_updates
+                    .insert(self.entities.create(), sample);
             }
         }
     }
