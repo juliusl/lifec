@@ -1,8 +1,10 @@
-use crate::{prelude::NodeCommand, state::AttributeIndex};
+use atlier::system::Value;
 use reality::{
-    wire::{FrameIndex, WireObject},
+    wire::{Frame, FrameIndex, WireObject},
+    Keywords,
 };
-use specs::{shred::ResourceId, Entity, WorldExt};
+use specs::{shred::ResourceId, Entity};
+use crate::prelude::NodeCommand;
 
 /// Struct for storing executed node commands,
 ///
@@ -39,6 +41,15 @@ impl WireObject for Journal {
             c.encode(world, &mut _encoder);
         }
         encoder.interner = _encoder.interner.clone();
+        encoder.interner.add_ident("journal");
+
+        let frames_len = _encoder.frames.len() + 1;
+        let frame = Frame::add(
+            "journal",
+            &Value::Int(frames_len as i32),
+            &mut encoder.blob_device,
+        );
+        encoder.frames.push(frame);
 
         for f in _encoder.frames.iter() {
             encoder.frames.push(f.clone());
@@ -51,9 +62,24 @@ impl WireObject for Journal {
         blob_device: &std::io::Cursor<Vec<u8>>,
         frames: &[reality::wire::Frame],
     ) -> Self {
+        let journal = frames.get(0).expect("should have a starting frame");
+        assert_eq!(journal.name(interner), Some("journal".to_string()));
+
+        match journal
+            .read_value(interner, blob_device)
+            .expect("should have a value")
+        {
+            Value::Int(commands) => {
+                assert_eq!(commands as usize, frames.len());
+            }
+            _ => {
+                panic!("Root attribute should be an integer");
+            }
+        }
+
         let mut journal = Journal::default();
 
-        let command_frames = &frames[..];
+        let command_frames = &frames[1..];
         let index = NodeCommand::build_index(interner, command_frames);
         let mut index = index
             .iter()
@@ -64,37 +90,33 @@ impl WireObject for Journal {
         index.sort_by(|a, b| a.start.cmp(&b.start));
         for range in index {
             let frames = &command_frames[range];
+            let start = frames[0].get_entity(protocol.as_ref(), false);
             let command = NodeCommand::decode(protocol, interner, blob_device, frames);
-            let entity = {
-                match &command {
-                    NodeCommand::Activate(e)
-                    | NodeCommand::Reset(e)
-                    | NodeCommand::Pause(e)
-                    | NodeCommand::Resume(e)
-                    | NodeCommand::Cancel(e)
-                    | NodeCommand::Spawn(e) => *e,
-                    NodeCommand::Update(g) => { 
-                        let e = g.clone().entity_id();
-                        protocol.as_ref().entities().entity(e)
-                    },
-                    NodeCommand::Swap { owner, .. } => *owner,
-                    NodeCommand::Custom(_, e) => *e,
-                }
-            };
-
-            journal.push((entity, command));
+            journal.push((start, command));
         }
 
         journal
     }
 
     fn build_index(
-        _: &reality::wire::Interner,
+        interner: &reality::wire::Interner,
         frames: &[reality::wire::Frame],
     ) -> reality::wire::FrameIndex {
         let mut frame_index = FrameIndex::default();
 
-        frame_index.insert("journal".to_string(), vec![0..frames.len()]);
+        for (idx, f) in frames.iter().enumerate().filter(|(_, f)| {
+            f.name(interner) == Some("journal".to_string())
+                && f.keyword() == Keywords::Add
+                && f.attribute() == Some(reality::Attributes::Int)
+        }) {
+            match f.read_value(interner, &Default::default()) {
+                Some(Value::Int(len)) => {
+                    let range = idx..idx + (len as usize);
+                    frame_index.insert(format!("journal-{}", idx), vec![range]);
+                }
+                _ => {}
+            }
+        }
 
         frame_index
     }
@@ -108,15 +130,15 @@ mod tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test() {
-        use crate::prelude::{Appendix, Journal, NodeCommand};
+        use std::sync::Arc;
         use reality::wire::{Protocol, WireObject};
         use specs::WorldExt;
-        use std::sync::Arc;
+        use crate::prelude::{Appendix, Journal, NodeCommand};
 
         let mut protocol = Protocol::empty();
-
+    
         protocol.as_mut().insert(Arc::new(Appendix::default()));
-
+    
         // Record node command as wire objects in a protocol,
         //
         let frame_count = protocol.encoder::<Journal>(|world, encoder| {
@@ -130,11 +152,11 @@ mod tests {
             journal.encode(world, encoder);
             encoder.frame_index = Journal::build_index(&encoder.interner, encoder.frames_slice());
         });
-
+    
         let (control_client, control_server) = tokio::io::duplex(64 * frame_count);
         let (frame_client, frame_server) = tokio::io::duplex(64 * frame_count);
         let (blob_client, blob_server) = tokio::io::duplex(64 * frame_count);
-
+    
         let read = tokio::spawn(async move {
             protocol
                 .send_async::<Journal, _, _>(
@@ -144,7 +166,7 @@ mod tests {
                 )
                 .await;
         });
-
+    
         let write = tokio::spawn(async {
             let mut receiver = Protocol::empty();
             receiver
@@ -154,13 +176,13 @@ mod tests {
                     || std::future::ready(blob_server),
                 )
                 .await;
-
+    
             let journal = receiver.decode::<Journal>();
             journal
         });
-
-        let (_, journal) = tokio::join!(read, write);
-
+    
+        let (_, journal)= tokio::join!(read, write);
+    
         let journal = journal.expect("should be okay");
         eprintln!("{:#?}", journal);
     }
