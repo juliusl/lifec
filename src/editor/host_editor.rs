@@ -149,6 +149,10 @@ impl HostEditor {
                 .size([1500.0, 700.0], imgui::Condition::Appearing)
                 .opened(&mut opened)
                 .build(ui, || {
+                    if let Some(_) = self.remote.as_ref() {
+                        ui.text("Remote protocol is enabled");
+                    }
+
                     // Toolbar for controlling event runtime
                     self.tool_bar(ui);
 
