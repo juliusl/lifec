@@ -440,8 +440,11 @@ impl HostEditor {
         }
 
         if let Some(remote) = self.remote.as_ref() {
-            for status in remote.as_ref().borrow().decode::<NodeStatus>() {
-                statuses.insert(status.entity(), status);
+            for status in remote.as_ref().borrow().decode::<NodeStatus>().iter().filter(|s| match s {
+                NodeStatus::Empty => false,
+                _ => true
+            }) {
+                statuses.insert(status.entity(), *status);
             }
         }
 
