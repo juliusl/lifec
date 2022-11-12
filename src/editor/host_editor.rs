@@ -547,14 +547,18 @@ impl HostEditor {
         ui.text("Performance");
         ui.spacing();
         if let Some(tab_bar) = ui.tab_bar("Performance Tabs") {
-            if let Some(remote) = self.remote.as_ref() {
+            if self.has_remote() {
                 let tab = ui.tab_item("Remote");
                 if ui.is_item_hovered() {
                     ui.tooltip_text("Performance histograms of connected remote");
                 }
-                if let Some(token) = tab {
-                    remote.as_ref().borrow().histogram(ui, 0, &[]);
-                    token.end();
+
+                if let Some(tab) = tab {
+                    if self.histogram(ui, 100, &[50.0, 75.0, 90.0, 99.0]) {
+                        ui.new_line();
+                    }
+
+                    tab.end();
                 }
             }
 
