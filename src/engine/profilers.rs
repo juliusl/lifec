@@ -1,5 +1,5 @@
 use specs::prelude::*;
-use specs::{Entities, SystemData};
+use specs::SystemData;
 
 use super::{Performance, Profiler, Connection};
 

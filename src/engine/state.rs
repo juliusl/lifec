@@ -385,7 +385,7 @@ impl<'a> State<'a> {
 
     /// Returns next entities this event points to,
     ///
-    pub fn get_next_entities(&mut self, event: Entity) -> Vec<Entity> {
+    pub fn get_next_entities(&self, event: Entity) -> Vec<Entity> {
         let State { cursors, .. } = self;
         if let Some(cursor) = cursors.get(event) {
             match cursor {
@@ -475,7 +475,7 @@ impl<'a> State<'a> {
 
     /// Updates state,
     ///
-    pub fn update_state(&mut self, graph: &AttributeGraph) -> bool {
+    pub fn update_state(&self, graph: &AttributeGraph) -> bool {
         let Self { entities, .. } = self;
         let entity = entities.entity(graph.entity_id());
         self.lazy_update.insert(entity, graph.clone());
