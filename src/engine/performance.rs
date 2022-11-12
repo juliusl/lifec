@@ -67,7 +67,7 @@ impl Performance {
                     percentiles.iter().map(|p| get_percentile(*p)).collect()
                 },
                 from: *from,
-                to: to,
+                to,
             });
         }
 

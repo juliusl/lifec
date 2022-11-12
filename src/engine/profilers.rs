@@ -10,9 +10,6 @@ pub struct Profilers<'a> {
     /// Lazy updates,
     /// 
     lazy_updates: Read<'a, LazyUpdate>,
-    /// Entities
-    /// 
-    entities: Entities<'a>,
     /// Connections
     /// 
     connections: ReadStorage<'a, Connection>,
@@ -40,7 +37,7 @@ impl<'a> Profilers<'a> {
 
             for sample in samples {
                 self.lazy_updates
-                    .insert(self.entities.create(), sample);
+                    .insert(sample.from, sample);
             }
         }
     }
