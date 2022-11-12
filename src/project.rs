@@ -155,9 +155,11 @@ where
 
         // Apply config defined in root block
         {
-            let mut config_data = world.system_data::<WorkspaceConfig>();
+            let config_data = world.system_data::<WorkspaceConfig>();
             config_data.apply();
         }
+
+        world.maintain();
 
         return world;
     }

@@ -1,8 +1,9 @@
 use std::{collections::BTreeMap, ops::Deref};
 
-use atlier::system::Extension;
+use atlier::system::{App, Extension};
 use copypasta::{ClipboardContext, ClipboardProvider};
 use imgui::{TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags, Ui, Window};
+use reality::BlockIndex;
 use specs::{Join, RunNow, World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 use tracing::{event, Level};
@@ -11,7 +12,8 @@ use crate::{
     editor::node::WorkspaceCommand,
     engine::{NodeCommandHandler, Runner, Yielding},
     guest::Guest,
-    prelude::{Runtime, State},
+    prelude::{Runtime, State, WorkspaceConfig},
+    state::AttributeGraph,
 };
 
 use super::{Appendix, NodeCommand};
@@ -23,10 +25,25 @@ use super::{Appendix, NodeCommand};
 pub struct WorkspaceEditor {
     /// Enables the imgui demo window
     enable_demo: bool,
-    /// Appendix
+    /// Appendix,
     appendix: Appendix,
-    /// Clipboard context to enable copy/paste
+    /// Clipboard context to enable copy/paste,
     clipboard: Option<ClipboardContext>,
+    /// Local copy of workspace config,
+    workspace_config: BTreeMap<String, BlockIndex>,
+}
+
+impl WorkspaceEditor {
+    /// Adds workspace config from world,
+    ///
+    pub fn add_workspace_config(&mut self, world: &World) {
+        let workspace_config = world.system_data::<WorkspaceConfig>();
+
+        for config in workspace_config.scan_root() {
+            let key = format!("{}-{:?}", config.root().name(), config.root().value());
+            self.workspace_config.insert(key, config);
+        }
+    }
 }
 
 impl WorkspaceEditor {
@@ -53,6 +70,59 @@ impl WorkspaceEditor {
                     }
                 }
             }
+        }
+    }
+
+    /// List of workspace config,
+    ///
+    pub fn workspace_config(&mut self, world: &World, ui: &Ui) {
+        let config = world.system_data::<WorkspaceConfig>();
+
+        if let Some(token) = ui.begin_table("workspace_config_table", 2) {
+            ui.table_setup_column("Name");
+            ui.table_setup_column("Tag");
+            ui.table_headers_row();
+
+            for (idx, (_, c)) in self.workspace_config.iter_mut().enumerate() {
+                match c.root().value() {
+                    atlier::system::Value::Symbol(editing) => {
+                        ui.table_next_row();
+                        ui.table_next_column();
+
+                        let tag = c.root().name();
+                        let tree = TreeNode::new(format!("{editing}{idx}"))
+                            .label::<String, _>(format!("{editing}"))
+                            .push(ui);
+
+                        ui.table_next_column();
+                        ui.text(tag.trim_end_matches(".config").trim_end_matches("config"));
+
+                        if let Some(tree) = tree {
+                            ui.table_next_row();
+                            ui.table_next_column();
+
+                            let can_apply = config.can_apply(&c);
+
+                            ui.disabled(!can_apply, || {
+                                let mut graph = AttributeGraph::new(c.clone());
+                                let code = graph.hash_code();
+                                graph.edit_ui(ui);
+
+                                if code != graph.hash_code() {
+                                    config.find_apply(graph.index());
+
+                                    *c = graph.index().to_owned();
+                                }
+                            });
+
+                            tree.pop();
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            token.end();
         }
     }
 
@@ -218,8 +288,7 @@ impl WorkspaceEditor {
                             );
                             ui.table_next_row();
                             ui.table_next_column();
-                            let tree_node =
-                                TreeNode::new(title).push(ui);
+                            let tree_node = TreeNode::new(title).push(ui);
 
                             ui.table_next_column();
                             if let Some(node) = tree_node {
@@ -270,6 +339,13 @@ impl WorkspaceEditor {
 
                         token.end();
                     }
+                }
+
+                if imgui::CollapsingHeader::new("Workspace Config")
+                    .flags(TreeNodeFlags::NO_TREE_PUSH_ON_OPEN | TreeNodeFlags::DEFAULT_OPEN)
+                    .build(ui)
+                {
+                    self.workspace_config(world, ui);
                 }
 
                 if imgui::CollapsingHeader::new("Plugins").build(ui) {
@@ -392,6 +468,7 @@ impl From<Appendix> for WorkspaceEditor {
             enable_demo: false,
             appendix,
             clipboard: None,
+            workspace_config: Default::default(),
         }
     }
 }

@@ -51,6 +51,9 @@ pub struct State<'a> {
     /// Lookup entities by label,
     ///
     entity_map: Read<'a, HashMap<String, Entity>>,
+    /// Workspace config,
+    /// 
+    workspace_config: WorkspaceConfig<'a>,
     /// Plugins system data,
     ///
     plugins: Plugins<'a>,
@@ -105,6 +108,12 @@ pub struct State<'a> {
 }
 
 impl<'a> State<'a> {
+    /// Returns workspace config state,
+    /// 
+    pub fn workspace_config(&self) -> &WorkspaceConfig<'a> {
+        &self.workspace_config
+    }
+
     /// Returns plugins data,
     ///
     pub fn plugins(&self) -> &Plugins<'a> {

@@ -39,7 +39,11 @@ impl Editor for Host {
             self.enable_listener::<Debugger>();
         }
 
-        self.open::<P, _>(WorkspaceEditor::from(appendix))
+        let mut editor = WorkspaceEditor::from(appendix);
+
+        editor.add_workspace_config(self.world());
+
+        self.open::<P, _>(editor);
     }
 
     fn open<P, E>(mut self, extension: E)

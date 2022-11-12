@@ -58,13 +58,13 @@ impl AttributeGraph {
         for (name, property) in config.iter_properties() {
             match property {
                 BlockProperty::Single(value) => {
-                    self.add_control(name, value.clone());
+                    self.set_control(name, value.clone());
                 }
                 BlockProperty::List(values) => {
                     // Control values can only have a single value, so apply the last value in the list
                     // Since by default the indexer will convert a duplicate named attribute into a list property
                     let last = values.last().expect("should have a last value");
-                    self.add_control(name, last.clone());
+                    self.set_control(name, last.clone());
                 }
                 _ => {}
             }
@@ -77,8 +77,10 @@ impl AttributeGraph {
     ///
     /// A control value will be available to every plugin that consumes this graph.
     ///
-    pub fn add_control(&mut self, name: impl AsRef<str>, value: impl Into<Value>) {
-        self.index.add_control(name, value);
+    pub fn set_control(&mut self, name: impl AsRef<str>, value: impl Into<Value>) {
+        self.index
+            .control_values_mut()
+            .insert(name.as_ref().to_string(), value.into());
     }
 
     /// Returns the current hash_code of the graph
