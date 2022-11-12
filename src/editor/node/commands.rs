@@ -158,16 +158,12 @@ pub enum WorkspaceCommand {
     /// Command to add a plugin,
     /// 
     AddPlugin(Thunk),
-    /// Add's a new empty adhoc operation,
-    /// 
-    AddAdhocOperation,
 }
 
 impl Display for WorkspaceCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             WorkspaceCommand::AddPlugin(Thunk(name, _, _)) => write!(f, "add_plugin::{name}"),
-            WorkspaceCommand::AddAdhocOperation => write!(f, "add_adhoc_operation"),
         }
     }
 }
