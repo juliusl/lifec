@@ -40,14 +40,6 @@ impl<'a> Runner<'a> {
         let mut samples = vec![];
         for (entity, sample) in (&self.entities, self.samples.drain()).join() {
             samples.push((entity, sample));
-            match self.entities.delete(entity) {
-                Ok(_) => {
-                    
-                },
-                Err(err) => {
-                    event!(Level::ERROR, "could remove sample entity {}, {err}", entity.id());
-                },
-            }
         }
 
         samples
