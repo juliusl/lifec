@@ -1,8 +1,8 @@
-use std::{ops::Deref, sync::Arc};
+use std::{ops::Deref, sync::Arc, collections::HashMap};
 
 use specs::Write;
 
-use crate::{editor::State, engine::Profiler, prelude::*, debugger::Debugger};
+use crate::{editor::State, engine::{Profiler, Performance}, prelude::*, debugger::Debugger};
 
 /// Extension trait for Host, that provides functions for opening a GUI editor,
 ///
@@ -60,6 +60,9 @@ impl Editor for Host {
         if let Some(appendix) = self.world_mut().remove::<Appendix>() {
             self.world_mut().insert(Arc::new(appendix));
         }
+
+        self.world_mut().insert(None::<HashMap<Entity, NodeStatus>>);
+        self.world_mut().insert(None::<Vec<Performance>>);
 
         // Consume the compiled world
         let world = self.world.take();

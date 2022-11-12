@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tracing::{event, Level};
 
 use crate::debugger::Debugger;
+use crate::engine::Performance;
 use crate::guest::RemoteProtocol;
 use crate::prelude::{EventRuntime, Journal};
 use crate::{
@@ -61,6 +62,12 @@ pub struct HostEditor {
     /// Journal of commands executed by the event runtime,
     ///
     journal: Journal,
+    /// Performance data,
+    /// 
+    performance_data: Option<Vec<Performance>>,
+    /// Additional node status data,
+    /// 
+    node_status: Option<HashMap::<Entity, NodeStatus>>,
 }
 
 impl Hash for HostEditor {
@@ -82,7 +89,7 @@ impl Hash for HostEditor {
 impl HostEditor {
     /// Sets the remote protocol,
     ///
-    pub fn has_remote(&mut self) -> bool {
+    pub fn has_remote(&self) -> bool {
         self.remote.is_some()
     }
 
@@ -92,11 +99,33 @@ impl HostEditor {
         self.remote = Some(remote);
     }
 
+    /// Returns remote protocol,
+    /// 
+    pub fn remote(&self) -> Option<&RemoteProtocol> {
+        self.remote.as_ref()
+    }
+
+    /// Returns a reference to appendix,
+    /// 
+    pub fn appendix(&self) -> Option<&Arc<Appendix>> {
+        self.appendix.as_ref()
+    }
+
     /// Returns the current remote cursor value,
     ///
     pub fn remote_cursor(&self) -> Option<usize> {
         if let Some(remote) = self.remote.as_ref() {
             Some(remote.journal_cursor())
+        } else {
+            None
+        }
+    }
+
+    /// Additional performance data from world,
+    /// 
+    pub fn performance_data(&self) -> Option<&[Performance]> {
+        if let Some(perf) = self.performance_data.as_ref() {
+            Some(perf.as_slice())
         } else {
             None
         }
@@ -245,9 +274,11 @@ impl<'a> System<'a> for HostEditor {
         Read<'a, tokio::sync::watch::Sender<HostEditor>, EventRuntime>,
         Write<'a, Option<Debugger>>,
         Read<'a, Journal>,
+        Write<'a, Option<Vec<Performance>>>,
+        Write<'a, Option<HashMap::<Entity, NodeStatus>>>,
     );
 
-    fn run(&mut self, (mut state, watcher, mut debugger, journal): Self::SystemData) {
+    fn run(&mut self, (mut state, watcher, mut debugger, journal, mut performance_data, mut node_statuses): Self::SystemData) {
         self.appendix = Some(state.appendix().clone());
         let updated = debugger.as_mut().and_then(|u| u.propagate_update()).clone();
         self.debugger = debugger.clone();
@@ -323,41 +354,44 @@ impl<'a> System<'a> for HostEditor {
         //
         self.adhoc_nodes = state.adhoc_nodes();
 
-        if let Some(remote) = self.remote.as_mut() {
-            let mut advance_to = 0;
-            if let Some(journal) = remote.as_ref().borrow().decode::<Journal>().first() {
-                if !self.journal.eq(journal) {
-                    self.journal = journal.clone();
+        if !journal.eq(&self.journal) {
+            self.journal = journal.clone();
 
-                    for (idx, (_, e)) in journal.iter().enumerate() {
-                        match e {
-                            NodeCommand::Swap { .. } if idx >= remote.journal_cursor() => {
-                                state.handle_node_command(e.clone());
-                                advance_to = idx + 1;
-                            }
-                            NodeCommand::Custom(name, _)
-                                if name.starts_with("add_plugin::")
-                                    && idx >= remote.journal_cursor() =>
-                            {
-                                state.handle_node_command(e.clone());
-                                advance_to = idx + 1;
-                            }
-                            // NodeCommand::Update(_) if idx >= remote.journal_cursor() => {
-                            //     state.handle_node_command(e.clone());
-                            //     advance_to = idx + 1;
-                            // }
-                            _ => {}
+            if let Some(remote) = self.remote.as_mut() {
+                let mut advance_to = 0;
+                for (idx, (_, e)) in journal.iter().enumerate() {
+                    match e {
+                        NodeCommand::Swap { .. } if idx >= remote.journal_cursor() => {
+                            state.handle_node_command(e.clone());
+                            advance_to = idx + 1;
                         }
+                        NodeCommand::Custom(name, _)
+                            if name.starts_with("add_plugin::")
+                                && idx >= remote.journal_cursor() =>
+                        {
+                            state.handle_node_command(e.clone());
+                            advance_to = idx + 1;
+                        }
+                        // NodeCommand::Update(_) if idx >= remote.journal_cursor() => {
+                        //     state.handle_node_command(e.clone());
+                        //     advance_to = idx + 1;
+                        // }
+                        _ => {}
                     }
                 }
-            }
 
-            if advance_to > 0 {
-                remote.advance_journal_cursor(advance_to);
+                if advance_to > 0 {
+                    remote.advance_journal_cursor(advance_to);
+                }
             }
-        } else {
-            self.journal.clear();
-            self.journal = journal.clone();
+        }
+
+        if let Some(data) = performance_data.take() {
+            self.performance_data = Some(data);
+        } 
+
+        if let Some(node_status) = node_statuses.take() {
+            self.node_status = Some(node_status);
         }
 
         // Update watcher
@@ -423,7 +457,6 @@ impl HostEditor {
     ///
     fn event_list(&mut self, ui: &Ui) {
         let mut events = BTreeMap::<String, Vec<&mut Node>>::default();
-        let mut statuses = HashMap::<Entity, NodeStatus>::default();
 
         for node in self.nodes.iter_mut() {
             let control_symbol = node.control_symbol();
@@ -440,15 +473,6 @@ impl HostEditor {
                 } else {
                     events.insert(String::from("Adhoc Operations"), vec![node]);
                 }
-            }
-        }
-
-        if let Some(remote) = self.remote.as_ref() {
-            for status in remote.as_ref().borrow().decode::<NodeStatus>().iter().filter(|s| match s {
-                NodeStatus::Empty => false,
-                _ => true
-            }) {
-                statuses.insert(status.entity(), *status);
             }
         }
 
@@ -500,7 +524,7 @@ impl HostEditor {
                         ui.table_headers_row();
 
                         for mut node in nodes {
-                            if self.remote.is_some() {
+                            if let Some(statuses) = self.node_status.as_ref() {
                                 if let Some(status) = statuses.get(&node.status.entity()) {
                                     node.status = status.clone();
                                 }
@@ -533,7 +557,7 @@ impl HostEditor {
                     token.end();
                 }
             }
-            
+
             let tab = ui.tab_item("Engine events");
             if ui.is_item_hovered() {
                 ui.tooltip_text("Performance histograms of event transitions");

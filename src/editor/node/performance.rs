@@ -3,7 +3,10 @@ use std::sync::Arc;
 use imgui::Ui;
 use reality::wire::Protocol;
 
-use crate::{engine::Performance, prelude::Appendix};
+use crate::{
+    engine::Performance,
+    prelude::{Appendix, HostEditor},
+};
 
 use super::Node;
 
@@ -26,6 +29,25 @@ impl Profiler for Node {
                 drawn = true;
             }
         }
+        drawn
+    }
+}
+
+impl Profiler for HostEditor {
+    fn histogram(&self, ui: &Ui, _: u64, _: &[f64]) -> bool {
+        let mut drawn = false;
+         
+        if self.has_remote() {
+            if let Some(appendix) = self.appendix() {
+                if let Some(performance_data) = self.performance_data() {
+                    for performance in performance_data {
+                        render_performance(performance.clone(), &appendix, ui);
+                        drawn = true;
+                    }
+                }
+            }
+        }
+
         drawn
     }
 }
