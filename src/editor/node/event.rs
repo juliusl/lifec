@@ -66,7 +66,6 @@ impl EventNode for Node {
                         WorkspaceCommand::AddPlugin(Thunk(name, ..)) => {
                             self.custom(format!("add_plugin::{name}"), self.status.entity());
                         }
-                        _ => {}
                     },
                     Err(err) => {
                         tracing::event!(Level::ERROR, "Error accepting workspace command, {err}");
