@@ -40,6 +40,9 @@ pub struct Debugger {
     /// Command dispatcher,
     ///
     _command_dispatcher: Option<Sender<(NodeCommand, Option<Yielding>)>>,
+    /// Update notification,
+    /// 
+    updated: Option<()>,
 }
 
 impl App for Debugger {
@@ -67,6 +70,18 @@ impl App for Debugger {
 }
 
 impl Debugger {
+    /// Propagates updated,
+    ///
+    pub fn propagate_update(&mut self) -> Option<()> {
+        self.updated.take()
+    }
+
+    /// Set the update notification,
+    /// 
+    pub fn set_update(&mut self) {
+        self.updated = Some(());
+    }
+
     /// Returns an iterator over completions,
     ///
     pub fn completions(&self) -> impl Iterator<Item = &Completion> {
