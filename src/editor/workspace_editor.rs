@@ -10,13 +10,13 @@ use tracing::{event, Level};
 
 use crate::{
     editor::node::WorkspaceCommand,
-    engine::{NodeCommandHandler, Runner, Yielding},
+    engine::{EngineStatus, NodeCommandHandler, Runner, Yielding},
     guest::Guest,
     prelude::{Runtime, State, WorkspaceConfig},
     state::AttributeGraph,
 };
 
-use super::{Appendix, NodeCommand};
+use super::{Appendix, NodeCommand, NodeStatus};
 
 /// Extension to display workspace editing tools,
 ///
@@ -224,7 +224,7 @@ impl WorkspaceEditor {
                 ui.separator();
 
                 if imgui::CollapsingHeader::new("Hosts")
-                    .flags(TreeNodeFlags::NO_TREE_PUSH_ON_OPEN | TreeNodeFlags::DEFAULT_OPEN)
+                    .flags(TreeNodeFlags::NO_TREE_PUSH_ON_OPEN | TreeNodeFlags::DEFAULT_OPEN )
                     .build(ui)
                 {
                     if let Some(token) = ui.begin_table("hosts", 2) {
@@ -235,11 +235,10 @@ impl WorkspaceEditor {
                         ui.table_next_row();
                         ui.table_next_column();
                         let tree_node = TreeNode::new("main_host")
-                            .flags(TreeNodeFlags::DEFAULT_OPEN)
+                            .flags(TreeNodeFlags::DEFAULT_OPEN | TreeNodeFlags::FRAME_PADDING)
                             .label::<String, _>("main".to_string())
                             .push(ui);
 
-                        ui.table_next_column();
 
                         if let Some(node) = tree_node {
                             let command_dispatcher = world
@@ -248,6 +247,56 @@ impl WorkspaceEditor {
                                 .features()
                                 .broker()
                                 .command_dispatcher();
+
+                            let current_events = world.system_data::<State>().event_nodes();
+                            let engines = world.system_data::<State>().engine_nodes();
+
+                            for engine in engines {
+                                ui.table_next_row();
+                                ui.table_next_column();
+                                let tree_node = TreeNode::new(format!(
+                                    "{}",
+                                    self.appendix
+                                        .name(&engine.status.entity())
+                                        .unwrap_or_default()
+                                ))
+                                .flags(TreeNodeFlags::FRAME_PADDING | TreeNodeFlags::NO_TREE_PUSH_ON_OPEN)
+                                .push(ui);
+
+                                ui.table_next_column();
+                                if let NodeStatus::Engine(EngineStatus::Inactive(_)) = engine.status {
+                                    if ui.button(format!("Start {}", engine.status.entity().id())) {
+                                        if let Some(e) = engine.sequence.as_ref().and_then(|s| s.peek()) {
+                                            match command_dispatcher.try_send((NodeCommand::Activate(e), None::<Yielding>)) {
+                                                Ok(_) => {
+                                                    event!(Level::DEBUG, "Activating engine, {}", engine.status.entity().id());
+                                                },
+                                                Err(err) => {
+                                                    event!(Level::ERROR, "Could not send command to activate engine, {err}");
+                                                },
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    ui.text("active");
+                                }
+
+                                if let Some(tree_node) = tree_node {
+                                    if let Some(e) = engine.sequence.as_ref() {
+                                        ui.table_next_row();
+                                        for e in e.iter_entities() {
+                                            ui.table_next_column();
+                                            let name = self.appendix.name(&e).unwrap_or_default();
+                                            ui.text(format!("{name}"));
+
+                                            ui.table_next_column();
+                                            let status = world.system_data::<State>().status(e);
+                                            ui.text(format!("{}", status));
+                                        }
+                                    }
+                                    tree_node.end();
+                                }
+                            }
 
                             for (entity, adhoc, _) in
                                 world.system_data::<State>().list_adhoc_operations()
@@ -274,6 +323,19 @@ impl WorkspaceEditor {
                                             event!(Level::ERROR, "error sending command {err}");
                                         }
                                     }
+                                }
+
+                                let spawned = current_events
+                                    .iter()
+                                    .filter(|e| e.is_spawned())
+                                    .filter_map(|e| e.connection_state)
+                                    .filter(|c| c.source() == entity)
+                                    .map(|c| format!("{}", c.incoming().id()))
+                                    .collect::<Vec<_>>();
+
+                                if !spawned.is_empty() {
+                                    ui.same_line();
+                                    ui.text(format!("Spawned: {}", spawned.join(",")));
                                 }
                             }
                             node.pop();
