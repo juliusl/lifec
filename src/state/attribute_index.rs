@@ -78,11 +78,36 @@ pub trait AttributeIndex {
 
     /// Finds all symbol values with name,
     ///
-    fn find_binary_values<'a>(&'a self, with_name: impl AsRef<str>) -> Vec<Vec<u8>> {
+    fn find_binary_values(&self, with_name: impl AsRef<str>) -> Vec<Vec<u8>> {
         self.find_values(with_name)
             .iter()
             .filter_map(|v| match v {
                 Value::BinaryVector(bin) => Some(bin.to_vec()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Finds a list of float ranges,
+    /// 
+    fn find_float_range_values(&self, with_name: impl AsRef<str>) -> Vec<[f32; 3]> {
+        self.find_values(with_name)
+            .iter()
+            .filter_map(|v| match v {
+                Value::FloatRange(a, b, c) => Some([*a, *b, *c]),
+                _ => None,
+            })
+            .collect()
+    }
+
+
+    /// Finds a list of float pairs,
+    /// 
+    fn find_float_pair_values(&self, with_name: impl AsRef<str>) -> Vec<[f32; 2]> {
+        self.find_values(with_name)
+            .iter()
+            .filter_map(|v| match v {
+                Value::FloatPair(a, b) => Some([*a, *b]),
                 _ => None,
             })
             .collect()
