@@ -31,12 +31,15 @@ pub struct Debugger {
     /// Errors,
     ///
     errors: Vec<ErrorContext>,
+    /// Number of status updates to keep,
+    /// 
+    status_update_limits: Option<usize>,
+    /// Number of completions to keep,
+    /// 
+    completion_limits: Option<usize>,
     /// Command dispatcher,
     ///
     _command_dispatcher: Option<Sender<(NodeCommand, Option<Yielding>)>>,
-    /// Updated
-    ///
-    updated: Option<()>,
 }
 
 impl App for Debugger {
@@ -64,20 +67,22 @@ impl App for Debugger {
 }
 
 impl Debugger {
-    /// Propagates updated,
-    ///
-    pub fn propagate_update(&mut self) -> Option<()> {
-        self.updated.take()
-    }
-
-    pub fn set_update(&mut self) {
-        self.updated = Some(());
-    }
-
     /// Returns an iterator over completions,
     ///
     pub fn completions(&self) -> impl Iterator<Item = &Completion> {
         self.completions.iter().map(|(_, c)| c)
+    }
+
+    /// Returns the status logs for an entity,
+    /// 
+    pub fn status_log(&self, entity: Entity) -> Option<VecDeque<StatusUpdate>> {
+        self.status_updates.get(&entity).cloned()
+    }
+
+    /// Returns all status logs,
+    /// 
+    pub fn status_logs(&self) -> BTreeMap<Entity, VecDeque<StatusUpdate>> {
+        self.status_updates.clone()
     }
 
     /// Returns the debugger's appendix,
@@ -331,22 +336,16 @@ impl Listener for Debugger {
         }
 
         if let Some(status_updates) = self.status_updates.get_mut(&status_update.0) {
-            if status_updates.len() > 3 {
+            if status_updates.len() > self.status_update_limits.unwrap_or(10) {
                 status_updates.pop_front();
             }
 
             status_updates.push_back(status_update.clone());
         }
-
-        self.updated = Some(());
-    }
-
-    fn on_operation(&mut self, _: crate::prelude::Operation) {
-        // TODO -- Can implement "break points" here ?
     }
 
     fn on_completion(&mut self, completion: crate::engine::Completion) {
-        if self.completions.len() > 1000 {
+        if self.completions.len() > self.completion_limits.unwrap_or(1000) {
             event!(Level::TRACE, "Discarding old results");
             self.completions.pop_front();
         }
@@ -358,6 +357,8 @@ impl Listener for Debugger {
     fn on_error_context(&mut self, error: &crate::prelude::ErrorContext) {
         self.errors.push(error.clone());
     }
+
+    fn on_operation(&mut self, _: crate::prelude::Operation) {}
 
     fn on_completed_event(&mut self, _: &specs::Entity) {}
 }
