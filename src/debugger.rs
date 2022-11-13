@@ -245,7 +245,7 @@ impl Debugger {
     }
 
     /// Dispalys logs in a tree format,
-    /// 
+    ///
     pub fn updates_log(&mut self, ui: &Ui) {
         let mut logs = BTreeMap::<String, BTreeMap<Entity, &VecDeque<StatusUpdate>>>::default();
 
@@ -264,7 +264,6 @@ impl Debugger {
         for (log, status_updates) in logs {
             TreeNode::new(format!("Logs {}", log)).build(ui, || {
                 for (idx, (entity, updates)) in status_updates.iter().enumerate() {
-
                     TreeNode::new(format!("{} {}", idx, entity.id()))
                         .label::<String, _>(format!(
                             "{}: {}",
@@ -272,9 +271,26 @@ impl Debugger {
                             self.appendix().name(entity).unwrap_or_default()
                         ))
                         .build(ui, || {
-                            let p = updates.iter().map(|(_, p, _)| *p).last().unwrap_or_default();
+                            let p = updates
+                                .iter()
+                                .map(|(_, p, _)| *p)
+                                .last()
+                                .unwrap_or_default();
+                            if ui.small_button(format!("Copy to clipboard {}.{}", idx, entity.id()))
+                            {
+                                let message = updates
+                                    .iter()
+                                    .map(|(_, _, m)| m.to_string())
+                                    .collect::<Vec<_>>()
+                                    .join("\n");
+                                ui.set_clipboard_text(message);
+                            }
                             for (_, _, message) in updates.iter() {
-                                ui.text(message);
+                                if message.starts_with("1:") {
+                                    ui.text_colored([0.0, 0.8, 0.8, 1.0], message.trim_start_matches("1:"));
+                                } else {
+                                    ui.text(message);
+                                }
                             }
 
                             if p > 0.0 {
