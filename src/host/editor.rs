@@ -1,8 +1,13 @@
-use std::{ops::Deref, sync::Arc, collections::HashMap};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 use specs::Write;
 
-use crate::{editor::State, engine::{Profiler, Performance}, prelude::*, debugger::Debugger};
+use crate::{
+    debugger::Debugger,
+    editor::State,
+    engine::{Performance, Profiler},
+    prelude::*,
+};
 
 /// Extension trait for Host, that provides functions for opening a GUI editor,
 ///
@@ -20,6 +25,13 @@ pub trait Editor {
         P: Project,
         E: Extension + 'static;
 
+    /// Opens a project that implements App,
+    ///
+    fn open_app<A, E>(self, app: A, extension: E)
+    where
+        A: Project + App + for<'a> System<'a>,
+        E: Extension + 'static;
+
     /// Build appendix to look up descriptions for entities,
     ///
     fn build_appendix(&mut self);
@@ -35,6 +47,9 @@ impl Editor for Host {
         let appendix = self.world().read_resource::<Appendix>().deref().clone();
 
         self.world_mut().insert(None::<Debugger>);
+        self.world_mut().insert(None::<HashMap<Entity, NodeStatus>>);
+        self.world_mut().insert(None::<Vec<Performance>>);
+
         if enable_debugger {
             self.enable_listener::<Debugger>();
         }
@@ -61,9 +76,6 @@ impl Editor for Host {
             self.world_mut().insert(Arc::new(appendix));
         }
 
-        self.world_mut().insert(None::<HashMap<Entity, NodeStatus>>);
-        self.world_mut().insert(None::<Vec<Performance>>);
-
         // Consume the compiled world
         let world = self.world.take();
 
@@ -71,6 +83,34 @@ impl Editor for Host {
         atlier::prelude::open_window(
             HostEditor::name(),
             HostEditor::default(),
+            extension,
+            world,
+            Some(builder),
+        );
+    }
+
+    fn open_app<A, E>(mut self, app: A, extension: E)
+    where
+        A: Project + App + for<'a> System<'a>,
+        E: Extension + 'static 
+    {
+        // This is to initialize resources, but the actual dispatcher will be from open,
+        //
+        self.prepare::<A>();
+        let builder = self.new_dispatcher_builder::<A>();
+
+        // Consume Appendix and convert to read-only Arc
+        if let Some(appendix) = self.world_mut().remove::<Appendix>() {
+            self.world_mut().insert(Arc::new(appendix));
+        }
+
+        // Consume the compiled world
+        let world = self.world.take();
+
+        // Open the window
+        atlier::prelude::open_window(
+            A::name(),
+            app,
             extension,
             world,
             Some(builder),
