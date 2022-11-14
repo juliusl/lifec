@@ -1,4 +1,4 @@
-use crate::engine::{Yielding, Completion};
+use crate::engine::{Completion, Yielding};
 use crate::guest::{Guest, RemoteProtocol};
 use crate::prelude::{attributes::Fmt, *};
 use hyper::{Body, Response};
@@ -70,11 +70,11 @@ pub struct ThunkContext {
     status_updates: Option<Sender<StatusUpdate>>,
     /// Dispatcher for operations
     operation_dispatcher: Option<Sender<Operation>>,
-    /// Dispatcher for sending a guest, 
+    /// Dispatcher for sending a guest,
     guest_dispatcher: Option<Sender<Guest>>,
-    /// Dispatcher for sending a node command, 
+    /// Dispatcher for sending a node command,
     node_dispatcher: Option<Sender<(NodeCommand, Option<Yielding>)>>,
-    /// Dispatcher for sending a node command, 
+    /// Dispatcher for sending a node command,
     completion_dispatcher: Option<Sender<Completion>>,
     /// Watches for changes to the world's HostEditor,
     host_editor_watcher: Option<tokio::sync::watch::Receiver<HostEditor>>,
@@ -174,13 +174,13 @@ impl ThunkContext {
     }
 
     /// Returns a reference to the cached response,
-    /// 
+    ///
     pub fn cached_response(&self) -> Option<&Response<Body>> {
         self.response_cache.as_ref()
     }
 
     /// Returns a reference to the cached body,
-    /// 
+    ///
     pub fn cached_body(&self) -> Option<&Body> {
         self.body_cache.as_ref()
     }
@@ -276,7 +276,7 @@ impl ThunkContext {
     }
 
     /// Sets the current graph,
-    /// 
+    ///
     pub fn set_state(&mut self, state: impl Into<AttributeGraph>) {
         self.graph = state.into();
     }
@@ -290,7 +290,7 @@ impl ThunkContext {
     }
 
     /// Sets the current block,
-    /// 
+    ///
     pub fn set_block(&mut self, block: &Block) {
         self.block = block.clone();
     }
@@ -371,29 +371,27 @@ impl ThunkContext {
     }
 
     /// Sets the entity,
-    /// 
+    ///
     pub fn set_entity(&mut self, entity: Entity) {
         self.entity = Some(entity);
     }
 
     /// Returns the entity,
-    /// 
+    ///
     pub fn entity(&self) -> Option<Entity> {
         self.entity.clone()
     }
 
     /// Enables a guest on this context's entity, returns true if the guest was dispatched,
-    /// 
+    ///
     pub fn enable_guest(&self, guest: Guest) -> bool {
         if let (Some(_), Some(guest_dispatcher)) = (self.entity, self.guest_dispatcher.as_ref()) {
             match guest_dispatcher.try_send(guest) {
-                Ok(_) => {
-                    true
-                },
+                Ok(_) => true,
                 Err(err) => {
                     event!(Level::ERROR, "Error sending a guest {err}");
                     false
-                },
+                }
             }
         } else {
             false
@@ -401,13 +399,13 @@ impl ThunkContext {
     }
 
     /// Enables the remote protocol on this thunk,
-    /// 
+    ///
     pub fn enable_remote(&mut self, remote: RemoteProtocol) {
         self.remote = Some(remote);
     }
 
     /// Returns a remote protocol,
-    /// 
+    ///
     pub fn remote(&self) -> Option<RemoteProtocol> {
         self.remote.clone()
     }
@@ -447,20 +445,26 @@ impl ThunkContext {
     }
 
     /// Returns a context w/ the guest sender enabled
-    /// 
-    pub fn enable_guest_dispatcher(&mut self, guest: Sender<Guest>) -> &mut ThunkContext{
+    ///
+    pub fn enable_guest_dispatcher(&mut self, guest: Sender<Guest>) -> &mut ThunkContext {
         self.guest_dispatcher = Some(guest);
         self
     }
 
-     /// Returns a context w/ the node dispatcher enabled
-    /// 
-    pub fn enable_node_dispatcher(&mut self, nodes: Sender<(NodeCommand, Option<Yielding>)>) -> &mut ThunkContext{
+    /// Returns a context w/ the node dispatcher enabled
+    ///
+    pub fn enable_node_dispatcher(
+        &mut self,
+        nodes: Sender<(NodeCommand, Option<Yielding>)>,
+    ) -> &mut ThunkContext {
         self.node_dispatcher = Some(nodes);
         self
     }
 
-    pub fn enable_completion_dispatcher(&mut self, completions: Sender<Completion>) -> &mut ThunkContext {
+    pub fn enable_completion_dispatcher(
+        &mut self,
+        completions: Sender<Completion>,
+    ) -> &mut ThunkContext {
         self.completion_dispatcher = Some(completions);
         self
     }
@@ -472,13 +476,16 @@ impl ThunkContext {
     }
 
     /// Enables watching the runtime's host editor,
-    /// 
-    pub fn enable_host_editor_watcher(&mut self, watcher: tokio::sync::watch::Receiver<HostEditor>) {
+    ///
+    pub fn enable_host_editor_watcher(
+        &mut self,
+        watcher: tokio::sync::watch::Receiver<HostEditor>,
+    ) {
         self.host_editor_watcher = Some(watcher);
     }
 
     /// Returns the current state of the host editor,
-    /// 
+    ///
     pub fn host_editor(&self) -> Option<HostEditor> {
         if let Some(host_editor) = self.host_editor_watcher.as_ref() {
             Some(host_editor.borrow().clone())
@@ -489,17 +496,15 @@ impl ThunkContext {
 
     /// Returns the next host editor, if None, either there was an error or this feature is not enabled,
     /// or the channel has closed.
-    /// 
+    ///
     pub async fn next_host_editor(&mut self) -> Option<HostEditor> {
         if let Some(watcher) = self.host_editor_watcher.as_mut() {
             match watcher.changed().await {
-                Ok(_) => {
-                    Some(watcher.borrow().clone())
-                },
+                Ok(_) => Some(watcher.borrow().clone()),
                 Err(err) => {
                     event!(Level::ERROR, "Error watching host editor for changes {err}");
                     None
-                },
+                }
             }
         } else {
             None
@@ -507,7 +512,7 @@ impl ThunkContext {
     }
 
     /// Returns a new host watcher receiver,
-    /// 
+    ///
     pub fn host_watcher(&self) -> Option<tokio::sync::watch::Receiver<HostEditor>> {
         if let Some(recv) = self.host_editor_watcher.as_ref() {
             Some(recv.clone())
@@ -654,59 +659,85 @@ impl ThunkContext {
     }
 
     /// Returns a node dispatcher,
-    /// 
+    ///
     pub fn node_dispatcher(&self) -> Option<Sender<(NodeCommand, Option<Yielding>)>> {
         self.node_dispatcher.clone()
     }
 
     /// Dispatches a completion,
-    /// 
+    ///
     pub fn dispatch_completion(&self, completion: Completion) {
         if let Some(disp) = self.completion_dispatcher.as_ref() {
             match disp.try_send(completion) {
-                Ok(_) => {
-                },
+                Ok(_) => {}
                 Err(err) => {
                     event!(Level::ERROR, "Could not dispatch {err}");
-                },
+                }
             }
         }
     }
 
     /// Sends a node command, if the command was a spawn command assumes yielding and returns a receiver to get the result on completion,
-    /// 
-    pub fn dispatch_node_command(&self, command: NodeCommand) -> Option<tokio::sync::oneshot::Receiver<ThunkContext>> {
+    ///
+    pub fn dispatch_node_command(
+        &self,
+        command: NodeCommand,
+    ) -> Option<tokio::sync::oneshot::Receiver<ThunkContext>> {
         if let Some(node_dispatcher) = self.node_dispatcher.as_ref() {
             match command {
                 NodeCommand::Spawn(_) => {
                     let (yielding, receiver) = Yielding::new(self.clone());
                     match node_dispatcher.try_send((command, Some(yielding))) {
-                        Ok(_) => {
-                            Some(receiver)
-                        },
+                        Ok(_) => Some(receiver),
                         Err(err) => {
                             event!(Level::ERROR, "Could not send command, {err}");
                             None
-                        },
+                        }
+                    }
+                }
+                _ => match node_dispatcher.try_send((command, None)) {
+                    Ok(_) => None,
+                    Err(err) => {
+                        event!(Level::ERROR, "Could not send command, {err}");
+                        None
                     }
                 },
-                _ => {
-                    match node_dispatcher.try_send((command, None)) {
-                        Ok(_) => {
-                            None
-                        },
-                        Err(err) => {
-                            event!(Level::ERROR, "Could not send command, {err}");
-                            None
-                        },
-                    }
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Dispatches a custom node command,
+    ///
+    pub fn dispatch_custom_node_command(
+        &self,
+        command: impl AsRef<str>,
+    ) -> Option<tokio::sync::oneshot::Receiver<ThunkContext>> {
+        if let Some(node_dispatcher) = self.node_dispatcher.as_ref() {
+            // Create a yield so that a response can be received, 
+            let (yielding, receiver) = Yielding::new(self.clone());
+            
+            // Send the custom node command,
+            match node_dispatcher.try_send((
+                NodeCommand::custom(
+                    command.as_ref(),
+                    self.entity().expect("should have an entity"),
+                ),
+                Some(yielding),
+            )) {
+                // Return a receiver which is a thunk context,
+                Ok(_) => Some(receiver),
+                Err(err) => {
+                    event!(Level::ERROR, "Could not send command, {err}");
+                    None
                 }
             }
         } else {
-            None 
+            None
         }
     }
-    
+
     /// Spawns and executes a task that will be managed by the event runtime
     ///
     /// Caveat: async must be enabled for this api to work, otherwise it will result in a
@@ -759,7 +790,7 @@ impl ThunkContext {
                 Err(_) => {}
             }
         }
-       // event!(Level::TRACE, "progress {}, {}", progress, status.as_ref());
+        // event!(Level::TRACE, "progress {}, {}", progress, status.as_ref());
     }
 
     /// Updates status of thunk execution
