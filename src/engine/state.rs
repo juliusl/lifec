@@ -108,6 +108,12 @@ pub struct State<'a> {
 }
 
 impl<'a> State<'a> {
+    /// Returns a reference to lazy update resource,
+    /// 
+    pub fn lazy_updates(&self) -> &LazyUpdate {
+        &self.lazy_update
+    }
+
     /// Returns workspace config state,
     /// 
     pub fn workspace_config(&self) -> &WorkspaceConfig<'a> {
