@@ -422,6 +422,14 @@ impl WorkspaceEditor {
                     if let Some(debugger) = world.read_resource::<Option<Debugger>>().deref() {
                         debugger.display_ui(ui);
                     }
+
+                    for guest in world.system_data::<Runner>().guests() {
+                        if let Some(debugger) = guest.protocol().as_ref().try_fetch::<Option<Debugger>>() {
+                            if let Some(debugger) = debugger.as_ref() {
+                                debugger.display_ui(ui);
+                            }
+                        }
+                    }
                 }
             });
     }
