@@ -630,8 +630,12 @@ impl WireObject for Debugger {
         }
 
         for (entity, _status_updates) in self.status_updates.iter() {
-            let name = self.appendix().name(entity).unwrap_or_default();
-            event!(Level::DEBUG, "encoding {name}");
+            let mut name = self.appendix().name(entity).unwrap_or_default().to_string();
+  
+            if name.is_empty() {
+                name = self.appendix().control_symbol(entity).unwrap_or("unknown".to_string());
+            }
+
             let mut status_update = encoder.start_extension("status_update", name);
             status_update.set_entity(*entity);
             for (_, p, s) in _status_updates.iter() {
