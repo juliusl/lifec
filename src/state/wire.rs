@@ -67,7 +67,7 @@ impl WireObject for AttributeGraph {
             if frame.keyword() == Keywords::Add {
                 let name = frame.name(&interner).expect("should have a name");
                 let value = frame
-                    .read_value(&interner, &blob_device)
+                    .read_value(&interner, blob_device)
                     .expect("should have a value");
                 block_index.add_control(name, value);
             }

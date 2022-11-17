@@ -13,7 +13,7 @@ use crate::{
     engine::{EngineStatus, NodeCommandHandler, Runner, Yielding},
     guest::Guest,
     prelude::{Runtime, State, WorkspaceConfig},
-    state::AttributeGraph,
+    state::AttributeGraph, debugger::Debugger,
 };
 
 use super::{Appendix, NodeCommand, NodeStatus};
@@ -416,6 +416,12 @@ impl WorkspaceEditor {
 
                 if imgui::CollapsingHeader::new("Node command handlers").build(ui) {
                     self.custom_node_handlers(world, ui);
+                }
+
+                if imgui::CollapsingHeader::new("Debugger").build(ui) {
+                    if let Some(debugger) = world.read_resource::<Option<Debugger>>().deref() {
+                        debugger.display_ui(ui);
+                    }
                 }
             });
     }

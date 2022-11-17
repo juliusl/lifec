@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use atlier::system::Value;
 use reality::{
     wire::{Frame, FrameIndex, WireObject},
@@ -109,7 +111,7 @@ impl WireObject for Journal {
                 && f.keyword() == Keywords::Add
                 && f.attribute() == Some(reality::Attributes::Int)
         }) {
-            match f.read_value(interner, &Default::default()) {
+            match f.read_value(interner, &Cursor::<Vec<u8>>::default()) {
                 Some(Value::Int(len)) => {
                     let range = idx..idx + (len as usize);
                     frame_index.insert(format!("journal-{}", idx), vec![range]);
