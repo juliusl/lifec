@@ -651,12 +651,15 @@ impl WireObject for Debugger {
         }
     }
 
-    fn decode(
-        _: &reality::wire::Protocol,
+    fn decode<BlobImpl>(
+        _: &reality::wire::Protocol<BlobImpl>,
         _: &reality::wire::Interner,
-        _: &std::io::Cursor<Vec<u8>>,
+        _: &BlobImpl,
         _: &[reality::wire::Frame],
-    ) -> Self {
+    ) -> Self 
+    where
+        BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
+    {
         let debugger = Debugger::default();
         debugger
     }

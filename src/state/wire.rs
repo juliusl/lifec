@@ -34,12 +34,15 @@ impl WireObject for AttributeGraph {
         }
     }
 
-    fn decode(
-        protocol: &reality::wire::Protocol,
+    fn decode<BlobImpl>(
+        protocol: &reality::wire::Protocol<BlobImpl>,
         interner: &reality::wire::Interner,
-        blob_device: &std::io::Cursor<Vec<u8>>,
+        blob_device: &BlobImpl,
         frames: &[reality::wire::Frame],
-    ) -> Self {
+    ) -> Self 
+    where
+        BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
+    {
         let properties_frame = frames.get(0).expect("should have a properties frame");
         let control_values_pos = frames
             .iter()
@@ -135,8 +138,9 @@ mod tests {
         use reality::wire::WireObject;
         use reality::BlockProperties;
         use specs::WorldExt;
+        use std::io::Cursor;
         
-        let mut protocol = Protocol::empty();
+        let mut protocol = Protocol::<Cursor<Vec<u8>>>::empty();
         protocol.as_mut().register::<BlockProperties>();
 
         protocol.encoder::<AttributeGraph>(|world, encoder| {

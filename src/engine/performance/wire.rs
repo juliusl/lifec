@@ -83,12 +83,15 @@ impl WireObject for Performance {
         }
     }
 
-    fn decode(
-        protocol: &reality::wire::Protocol,
+    fn decode<BlobImpl>(
+        protocol: &reality::wire::Protocol<BlobImpl>,
         _: &reality::wire::Interner,
-        _: &std::io::Cursor<Vec<u8>>,
+        _: &BlobImpl,
         frames: &[reality::wire::Frame],
-    ) -> Self {
+    ) -> Self 
+    where
+        BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
+    {
         let start = frames.get(0).expect("should have starting frame");
 
         assert_eq!(start.op(), 0x10);

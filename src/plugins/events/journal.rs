@@ -58,12 +58,15 @@ impl WireObject for Journal {
         }
     }
 
-    fn decode(
-        protocol: &reality::wire::Protocol,
+    fn decode<BlobImpl>(
+        protocol: &reality::wire::Protocol<BlobImpl>,
         interner: &reality::wire::Interner,
-        blob_device: &std::io::Cursor<Vec<u8>>,
+        blob_device: &BlobImpl,
         frames: &[reality::wire::Frame],
-    ) -> Self {
+    ) -> Self 
+    where
+        BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
+    {
         let journal = frames.get(0).expect("should have a starting frame");
         assert_eq!(journal.name(interner), Some("journal".to_string()));
 
