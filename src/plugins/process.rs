@@ -128,7 +128,7 @@ impl Plugin for Process {
                 let mut command_task = tokio::process::Command::new(command);
                 command_task.args(args);
 
-                command_task.kill_on_drop(true);
+              //  command_task.kill_on_drop(true);
 
                 // Set up any env variables
                 for (env_name, env_val) in tc
