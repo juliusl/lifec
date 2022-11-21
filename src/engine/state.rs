@@ -294,16 +294,18 @@ impl<'a> State<'a> {
             EventStatus::Ready(ready) => {
                 let mut result = self.get_result(*ready);
 
-                let result = result.take();
+                let mut result = result.take();
 
                 if let Some(Yielding(yielding, _)) = self.yielding.remove(*ready) {
-                    if let Some(result) = result.clone() {
-                        match yielding.send(result) {
+                    if let Some(_result) = result.take() {
+                        let clone = _result.clone();
+                        match yielding.send(_result) {
                             Ok(_) => {}
                             Err(_) => {
                                 event!(Level::ERROR, "Could not send to yielding channel");
                             }
                         }
+                        result = Some(clone);
                     } else {
                         drop(yielding);
                     }
