@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use atlier::system::{Attribute, Value};
+use reality::{Attribute, Value};
 use imgui::Ui;
 use reality::BlockProperties;
 use specs::Component;
@@ -346,58 +346,58 @@ impl AttributeGraph {
         ui: &Ui,
     ) {
         match value {
-            atlier::system::Value::Empty => {
+            Value::Empty => {
                 ui.label_text(name, "empty");
             }
-            atlier::system::Value::Bool(b) => {
+            Value::Bool(b) => {
                 ui.checkbox(name, b);
             }
-            atlier::system::Value::TextBuffer(text) => {
+            Value::TextBuffer(text) => {
                 ui.input_text_multiline(name, text, [0.0, 160.0]).build();
             }
-            atlier::system::Value::Int(i) => {
+            Value::Int(i) => {
                 ui.input_int(name, i).build();
             }
-            atlier::system::Value::IntPair(a, b) => {
+            Value::IntPair(a, b) => {
                 let clone = &mut [*a, *b];
                 ui.input_int2(name, clone).build();
                 *a = clone[0];
                 *b = clone[1];
             }
-            atlier::system::Value::IntRange(a, b, c) => {
+           Value::IntRange(a, b, c) => {
                 let clone = &mut [*a, *b, *c];
                 ui.input_int3(name, clone).build();
                 *a = clone[0];
                 *b = clone[1];
                 *c = clone[2];
             }
-            atlier::system::Value::Float(f) => {
+            Value::Float(f) => {
                 ui.input_float(name, f).build();
             }
-            atlier::system::Value::FloatPair(a, b) => {
+            Value::FloatPair(a, b) => {
                 let clone = &mut [*a, *b];
                 ui.input_float2(name, clone).build();
                 *a = clone[0];
                 *b = clone[1];
             }
-            atlier::system::Value::FloatRange(a, b, c) => {
+            Value::FloatRange(a, b, c) => {
                 let clone = &mut [*a, *b, *c];
                 ui.input_float3(name, clone).build();
                 *a = clone[0];
                 *b = clone[1];
                 *c = clone[2];
             }
-            atlier::system::Value::BinaryVector(_) => {
+            Value::BinaryVector(_) => {
                 if let Some(_) = workspace {
                     if ui.button(format!("Save {} to file", name.as_ref())) {}
                 }
             }
-            atlier::system::Value::Reference(_) => {}
-            atlier::system::Value::Symbol(s) => {
+            Value::Reference(_) => {}
+            Value::Symbol(s) => {
                 // TODO: add debouncing?
                 ui.input_text(name, s).build();
             }
-            atlier::system::Value::Complex(_) => {}
+            Value::Complex(_) => {}
         }
     }
 }

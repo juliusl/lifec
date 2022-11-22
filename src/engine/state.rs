@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use atlier::system::Attribute;
+use reality::Attribute;
 use chrono::Utc;
 use specs::{prelude::*, Entities, SystemData};
 use tokio::sync::oneshot;
@@ -434,14 +434,22 @@ impl<'a> State<'a> {
     /// Waits for an event's operation to be ready w/o completing it,
     ///
     pub fn wait_for_ready(&self, event: Entity) {
+        loop {
+            if self.is_ready(event) {
+                break;
+            }
+        }
+    }
+
+    /// Returns true if the event operation is in an is_ready state,
+    /// 
+    pub fn is_ready(&self, event: Entity) -> bool {
         let State { operations, .. } = self;
 
-        loop {
-            if let Some(operation) = operations.get(event) {
-                if operation.is_ready() {
-                    break;
-                }
-            }
+        if let Some(operation) = operations.get(event) {
+            operation.is_ready()
+        } else {
+            false
         }
     }
 

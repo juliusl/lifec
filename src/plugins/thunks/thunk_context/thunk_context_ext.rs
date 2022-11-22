@@ -13,7 +13,7 @@ impl AttributeIndex for ThunkContext {
         self.state().hash_code()
     }
 
-    fn find_value(&self, with_name: impl AsRef<str>) -> Option<atlier::system::Value> {
+    fn find_value(&self, with_name: impl AsRef<str>) -> Option<reality::Value> {
         if let Some(value) = self.state().find_value(with_name.as_ref()) {
             Some(value)
         } else if let Some(value) = self
@@ -26,7 +26,7 @@ impl AttributeIndex for ThunkContext {
         }
     }
 
-    fn find_values(&self, with_name: impl AsRef<str>) -> Vec<atlier::system::Value> {
+    fn find_values(&self, with_name: impl AsRef<str>) -> Vec<reality::Value> {
         let values = self.state().find_values(with_name.as_ref());
 
         match self.previous() {
@@ -35,15 +35,15 @@ impl AttributeIndex for ThunkContext {
         }
     }
 
-    fn add_attribute(&mut self, attr: atlier::system::Attribute) {
+    fn add_attribute(&mut self, attr: reality::Attribute) {
         self.state_mut().add_attribute(attr);
     }
 
-    fn replace_attribute(&mut self, attr: atlier::system::Attribute) {
+    fn replace_attribute(&mut self, attr: reality::Attribute) {
         self.state_mut().replace_attribute(attr);
     }
 
-    fn values(&self) -> std::collections::BTreeMap<String, Vec<atlier::system::Value>> {
+    fn values(&self) -> std::collections::BTreeMap<String, Vec<reality::Value>> {
         self.state().values()
     }
 

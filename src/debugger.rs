@@ -3,10 +3,11 @@ use std::{
     ops::Deref,
 };
 
-use atlier::system::{App, Value};
+use atlier::system::App;
 use chrono::{NaiveDateTime, Utc};
 use imgui::{TableFlags, TreeNode, Ui};
 use reality::{
+    Value,
     wire::{ControlDevice, Decoder, Encoder, FrameIndex, Protocol, ResourceId, WireObject},
     Keywords,
 };

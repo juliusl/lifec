@@ -1,6 +1,6 @@
 use crate::engine::Adhoc;
 use crate::prelude::{Runtime, Sequence, ThunkContext, State};
-use atlier::system::Value;
+use reality::Value;
 use reality::{Block, SpecialAttribute};
 use specs::prelude::*;
 use specs::{Entities, ReadStorage, SystemData, WorldExt};

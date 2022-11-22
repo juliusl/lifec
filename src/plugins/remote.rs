@@ -1,8 +1,4 @@
 
-// TODO: Incorporate this as a custom attribute added by .process 
-
-// use crate::AttributeIndex;
-// use crate::plugins::thunks::CancelToken;
 // use crate::plugins::{Plugin, ThunkContext};
 // use chrono::Utc;
 // use specs::storage::DenseVecStorage;
@@ -14,7 +10,7 @@
 // use tokio::process::Command;
 // use tokio::select;
 
-// use super::Process;
+// use super::{Process, AsyncContext, AttributeIndex};
 
 // #[derive(Component, Default)]
 // #[storage(DenseVecStorage)]
@@ -30,8 +26,8 @@
 //     }
 
 //     fn call(
-//         context: &ThunkContext,
-//     ) -> Option<(tokio::task::JoinHandle<ThunkContext>, CancelToken)> {
+//         context: &mut ThunkContext,
+//     ) -> Option<AsyncContext> {
 //         context.clone().task(|mut cancel_source| {
 //             let mut tc = context.clone();
 //             let log = context.clone();
@@ -39,19 +35,19 @@
 //             async move {
 //                 let cmd = Process::resolve_command(&tc).unwrap_or("echo missing command".to_string());
 //                 let parts: Vec<&str> = cmd.split(" ").collect();
-//                 tc.update_progress(format!("``` {} process", tc.block.block_name), 0.10)
+//                 tc.progress(format!("``` {} process", tc.block().name()), 0.10)
 //                             .await;
 //                 if let Some(command) = parts.get(0) {
-//                     tc.update_progress(format!("add command .text {}", command), 0.10).await;
+//                     tc.progress(format!("add command .text {}", command), 0.10).await;
 //                     let mut command_task = Command::new(&command);
 //                     for (el, arg) in parts.iter().skip(1).enumerate() {
 //                             command_task.arg(arg);
-//                             tc.update_progress(format!("add arg{}    .text {}", el, arg), 0.10)
+//                             tc.progress(format!("add arg{}    .text {}", el, arg), 0.10)
 //                                 .await;
 //                     }
-//                     tc.update_progress("```", 0.10).await;
+//                     tc.progress("```", 0.10).await;
                     
-//                     let enable_stdin_shell = tc.as_ref().is_enabled("enable_listener").unwrap_or_default();
+//                     let enable_stdin_shell = tc.is_enabled("enable_listener");
 //                     if enable_stdin_shell {
 //                         // Normally stdin would be from the terminal window, 
 //                         // enable this attribute to use the built in shell
@@ -61,8 +57,8 @@
 //                     command_task.stdout(Stdio::piped());
 //                     command_task.stderr(Stdio::piped());
 
-//                     if let Some(current_dir) = tc.as_ref().find_text("current_dir") {
-//                         tc.update_progress(format!("add current_dir .text {current_dir}"), 0.20).await;
+//                     if let Some(current_dir) = tc.state().find_text("current_dir") {
+//                         tc.progress(format!("add current_dir .text {current_dir}"), 0.20).await;
 //                         command_task.current_dir(current_dir);
 //                     }
 
@@ -126,7 +122,7 @@
 
 //                             if let Some(handle) = child_handle {
 //                                 let _child_task = handle.clone().spawn(async move {
-//                                 tc.update_progress("# child process started, stdout/stdin are being piped to console", 0.50).await;
+//                                 tc.progress("# child process started, stdout/stdin are being piped to console", 0.50).await;
 //                                 let start_time = Some(Utc::now());
 
 //                                 select! {
@@ -134,16 +130,16 @@
 //                                          match output {
 //                                              Ok(output) => {
 //                                                 // Completed process, publish result
-//                                                 tc.update_progress("# Finished, recording output", 0.30).await;
-//                                                 Process::resolve_output(&mut tc, cmd, start_time, output);
+//                                                 tc.progress("# Finished, recording output", 0.30).await;
+//                                                 //Process::resolve_output(&mut tc, cmd, start_time, output);
 //                                              }
 //                                              Err(err) => {
-//                                                  tc.update_progress(format!("# error {}", err), 0.0).await;
+//                                                  tc.progress(format!("# error {}", err), 0.0).await;
 //                                              }
 //                                          }
 //                                     }
 //                                     _ = child_cancel_rx => {
-//                                          tc.update_progress(format!("# child cancel received"), 0.0).await;
+//                                          tc.progress(format!("# child cancel received"), 0.0).await;
 //                                     }
 //                                  }
 
@@ -159,11 +155,11 @@
 //                                 while let Ok(line) = reader.next_line().await {
 //                                     match line {
 //                                         Some(line) => {
-//                                             for byte in line.as_bytes() {
-//                                                 log.send_char(*byte).await;
-//                                             }
-//                                             log.send_char(b'\r').await;
-//                                             log.update_status_only(line).await;
+//                                             // for byte in line.as_bytes() {
+//                                             //     log.send_char(*byte).await;
+//                                             // }
+//                                             // log.send_char(b'\r').await;
+//                                             log.status(line).await;
 //                                         },
 //                                         None => {
 //                                             break;
@@ -176,13 +172,13 @@
 //                                 while let Ok(line) = stderr_reader.next_line().await {
 //                                     match line {
 //                                         Some(line) => {      
-//                                             for byte in line.as_bytes() {
-//                                                 log_stderr.send_char(*byte).await;
-//                                             }
-//                                             log_stderr.send_char(b'\r').await;
+//                                             // for byte in line.as_bytes() {
+//                                             //     log_stderr.send_char(*byte).await;
+//                                             // }
+//                                             // log_stderr.send_char(b'\r').await;
                                         
 //                                             eprintln!("{}", line);
-//                                             log_stderr.update_status_only(line).await;
+//                                             log_stderr.status(line).await;
 //                                         },
 //                                         None => {
 //                                             event!(Level::WARN, "Didn't read anything from stderr");
@@ -226,7 +222,7 @@
 //                     }
 //                 }
 
-//                 log.update_status_only("Could not spawn child process").await;
+//                 log.status("Could not spawn child process").await;
 //                 None
 //             } else {
 //                 None

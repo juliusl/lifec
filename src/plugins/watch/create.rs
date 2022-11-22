@@ -3,7 +3,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use atlier::system::Value;
+use reality::Value;
 use logos::Logos;
 use notify::{event::CreateKind, EventKind};
 use reality::SpecialAttribute;

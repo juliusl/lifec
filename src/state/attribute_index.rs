@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use atlier::system::{Attribute, Value};
+use reality::{Attribute, Value};
 use reality::BlockProperties;
 
 /// V2 - Revising interface w/ attributes

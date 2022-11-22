@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, ops::Deref};
 use atlier::system::{App, Extension};
 use copypasta::{ClipboardContext, ClipboardProvider};
 use imgui::{TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags, Ui, Window};
-use reality::BlockIndex;
+use reality::{BlockIndex, Value};
 use specs::{Join, RunNow, World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 use tracing::{event, Level};
@@ -85,7 +85,7 @@ impl WorkspaceEditor {
 
             for (idx, (_, c)) in self.workspace_config.iter_mut().enumerate() {
                 match c.root().value() {
-                    atlier::system::Value::Symbol(editing) => {
+                    Value::Symbol(editing) => {
                         ui.table_next_row();
                         ui.table_next_column();
 

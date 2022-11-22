@@ -471,6 +471,8 @@ fn test_engine() {
     let mut world = specs::World::new();
     world.register::<Runtime>();
     world.register::<Event>();
+    world.register::<Engine>();
+    world.register::<Thunk>();
     world.insert(runtime);
 
     let parser = Parser::new_with(world)
@@ -481,8 +483,8 @@ fn test_engine() {
         r#"
     ``` test
     + .engine 
-    : .event step_one 
-    : .event step_two 
+    : .start step_one 
+    : .start step_two 
     ```
 
     ``` step_one test
@@ -547,10 +549,6 @@ fn test_engine() {
                 let index = world.read_component::<BlockIndex>();
                 let index = index.get(e);
                 eprintln!("{:#?}", index);
-
-                let event = world.read_component::<Event>();
-                let event = event.get(e).expect("should have been added");
-                eprintln!("{event}");
             }
         }
 
