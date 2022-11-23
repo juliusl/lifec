@@ -11,6 +11,10 @@ impl Plugin for Publish {
         "publish"
     }
 
+    fn description() -> &'static str {
+        "Publishes a file over tcp. Starts a tcp listener waiting to accept a connection. On connection, sends the file being published and exits."
+    }
+
     fn call(context: &mut ThunkContext) -> Option<AsyncContext> {
         context.task(|mut cancel_source| {
             let mut tc = context.clone();

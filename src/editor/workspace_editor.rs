@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, ops::Deref};
+use std::{collections::BTreeMap, ops::{Deref, DerefMut}};
 
 use atlier::system::{App, Extension};
 use copypasta::{ClipboardContext, ClipboardProvider};
-use imgui::{TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags, Ui, Window};
+use imgui::{TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags, Ui, Window, ColorEdit};
 use reality::{BlockIndex, Value};
 use specs::{Join, RunNow, World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
@@ -31,6 +31,8 @@ pub struct WorkspaceEditor {
     clipboard: Option<ClipboardContext>,
     /// Local copy of workspace config,
     workspace_config: BTreeMap<String, BlockIndex>,
+    /// Background clear color
+    background: [f32; 4],
 }
 
 impl WorkspaceEditor {
@@ -436,6 +438,15 @@ impl WorkspaceEditor {
 }
 
 impl Extension for WorkspaceEditor {
+    fn configure_app_world(_world: &mut World) {
+        _world.insert(wgpu::Color {
+            r: 0.02122,
+            g: 0.02519,
+            b: 0.03434,
+            a: 1.0,
+        });
+    }
+
     fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui<'_>) {
         self.handle_clipboard(ui);
         self.workspace_window(world, ui);
@@ -535,6 +546,22 @@ impl Extension for WorkspaceEditor {
                 guest.handle();
             }
         }
+
+        ui.main_menu_bar(|| {
+            ui.menu("Theme", || {
+                if ColorEdit::new("Background clear", &mut self.background).build(ui) {
+                    let [r, g, b, a] = self.background;
+                    let mut clear_color = world.write_resource::<wgpu::Color>();
+                    let clear_color = clear_color.deref_mut();
+                    *clear_color = wgpu::Color {
+                        r: r.into(),
+                        g: g.into(),
+                        b: b.into(),
+                        a: a.into(),
+                    };
+                }
+            })
+        })
     }
 }
 
@@ -545,6 +572,7 @@ impl From<Appendix> for WorkspaceEditor {
             appendix,
             clipboard: None,
             workspace_config: Default::default(),
+            background: [0.02122, 0.02519, 0.03434, 1.0]
         }
     }
 }

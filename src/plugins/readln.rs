@@ -12,6 +12,10 @@ impl Plugin for Readln {
         "readln"
     }
 
+    fn description() -> &'static str {
+        "Reads a line from stdin and stores it in state for the subsequent plugin."
+    }
+
     fn call(context: &mut ThunkContext) -> Option<AsyncContext> {
         context.task(|_| {
             let mut tc = context.clone();
