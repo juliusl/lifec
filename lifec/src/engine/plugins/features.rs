@@ -3,6 +3,7 @@ use std::ops::Deref;
 
 use crate::{guest::RemoteProtocol, prelude::*};
 
+cfg_not_editor! {
 /// System data with plugin feature resources,
 ///
 #[derive(SystemData)]
@@ -12,6 +13,21 @@ pub struct Features<'a> {
     secure_client: Read<'a, SecureClient, EventRuntime>,
     remote_protocol: Read<'a, Option<RemoteProtocol>>,
     broker: PluginBroker<'a>,
+}
+}
+
+cfg_editor! {
+/// System data with plugin feature resources,
+///
+#[derive(SystemData)]
+pub struct Features<'a> {
+    workspace: Read<'a, Option<Workspace>>,
+    tokio_runtime: Read<'a, tokio::runtime::Runtime, EventRuntime>,
+    secure_client: Read<'a, SecureClient, EventRuntime>,
+    remote_protocol: Read<'a, Option<RemoteProtocol>>,
+    broker: PluginBroker<'a>,
+    host_editor: Read<'a, tokio::sync::watch::Receiver<HostEditor>, EventRuntime>,
+}
 }
 
 impl<'a> Features<'a> {
@@ -40,6 +56,9 @@ impl<'a> Features<'a> {
             context.enable_remote(remote_protocol.clone());
         }
 
+        #[cfg(feature = "editor")]
+        let context = self.enable_editor_features(&context);
+
         context
     }
 
@@ -59,15 +78,10 @@ impl<'a> Features<'a> {
 }
 
 cfg_editor! {
-    #[derive(SystemData)]
-    pub struct EditorFeatures<'a> {
-        host_editor: Read<'a, tokio::sync::watch::Receiver<HostEditor>, EventRuntime>,
-    }
-
-    impl<'a> EditorFeatures<'a> {
+    impl<'a> Features<'a> {
         /// Enable editor features on this thunk context,
         /// 
-        pub fn enable(&self, context: &ThunkContext) -> ThunkContext {
+        pub fn enable_editor_features(&self, context: &ThunkContext) -> ThunkContext {
             let mut context = context.clone();
             context.enable_host_editor_watcher(self.host_editor.deref().clone());
             context
@@ -76,7 +90,7 @@ cfg_editor! {
         /// Returns a clone of the host editor if there was a change,
         ///
         pub fn try_next_host_editor(&self) -> Option<HostEditor> {
-            let EditorFeatures { host_editor } = self;
+            let Features { host_editor, .. } = self;
 
              match host_editor.has_changed() {
                 Ok(changed) => {

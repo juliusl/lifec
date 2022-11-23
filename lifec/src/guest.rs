@@ -91,7 +91,7 @@ impl Guest {
     pub fn guest_editor(&self) -> HostEditor {
         let state = self.protocol();
 
-        let features = state.as_ref().system_data::<crate::engine::EditorFeatures>();
+        let features = state.as_ref().system_data::<crate::engine::PluginFeatures>();
 
         let mut host_editor = features.host_editor();
 

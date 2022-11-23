@@ -40,10 +40,6 @@ pub use plugins::PluginFeatures;
 pub use plugins::PluginListener;
 pub use plugins::Plugins;
 
-cfg_editor! {
-    pub use plugins::EditorFeatures;
-}
-
 mod state;
 pub use state::NodeCommandHandler;
 pub use state::State;

@@ -8,10 +8,6 @@ pub use broker::Broker as PluginBroker;
 mod features;
 pub use features::Features as PluginFeatures;
 
-cfg_editor! {
-    pub use features::EditorFeatures;
-}
-
 use specs::SystemData;
 use specs::prelude::*;
 
