@@ -1,12 +1,15 @@
-pub use crate::editor::Appendix;
-pub use crate::editor::DisplayNode;
-pub use crate::editor::EditNode;
-pub use crate::editor::General;
-pub use crate::editor::HostEditor;
-pub use crate::editor::Node;
-pub use crate::editor::NodeCommand;
-pub use crate::editor::NodeStatus;
-pub use crate::editor::WorkspaceEditor;
+
+cfg_editor! {
+    pub use crate::editor::DisplayNode;
+    pub use crate::editor::EditNode;
+    pub use crate::editor::HostEditor;
+    pub use crate::editor::Node;
+    pub use crate::editor::NodeStatus;
+    pub use crate::editor::WorkspaceEditor;
+    pub use atlier::system::{combine, combine_default, App, Extension};
+    pub use crate::host::Editor;
+}
+
 pub use crate::engine::Activity;
 pub use crate::engine::Connection;
 pub use crate::engine::Cursor;
@@ -22,7 +25,6 @@ pub use crate::engine::Sequence;
 pub use crate::engine::State;
 pub use crate::engine::Transition;
 pub use crate::host::Commands;
-pub use crate::host::Editor;
 pub use crate::host::Host;
 pub use crate::host::Inspector;
 pub use crate::host::Sequencer;
@@ -42,7 +44,6 @@ pub use crate::runtime::Runtime;
 pub use crate::runtime::ThunkSource;
 pub use crate::state::AttributeGraph;
 pub use crate::state::AttributeIndex;
-pub use atlier::system::{combine, combine_default, App, Extension};
 pub use specs::{
     storage::BTreeStorage, Component, DefaultVecStorage, DenseVecStorage, DispatcherBuilder,
     Entities, Entity, HashMapStorage, Join, Read, ReadStorage, System, VecStorage, World, WorldExt,

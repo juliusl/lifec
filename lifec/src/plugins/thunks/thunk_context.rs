@@ -1,4 +1,4 @@
-use crate::engine::{Completion, Yielding};
+use crate::engine::{Completion, NodeCommand, Yielding};
 use crate::guest::{Guest, RemoteProtocol};
 use crate::prelude::{attributes::Fmt, *};
 use hyper::{Body, Response};
@@ -77,6 +77,7 @@ pub struct ThunkContext {
     /// Dispatcher for sending a node command,
     completion_dispatcher: Option<Sender<Completion>>,
     /// Watches for changes to the world's HostEditor,
+    #[cfg(feature = "editor")]
     host_editor_watcher: Option<tokio::sync::watch::Receiver<HostEditor>>,
     /// Remote protocol
     remote: Option<RemoteProtocol>,
@@ -116,6 +117,7 @@ impl Clone for ThunkContext {
             status_updates: self.status_updates.clone(),
             operation_dispatcher: self.operation_dispatcher.clone(),
             udp_socket: self.udp_socket.clone(),
+            #[cfg(feature = "editor")]
             host_editor_watcher: self.host_editor_watcher.clone(),
             guest_dispatcher: self.guest_dispatcher.clone(),
             node_dispatcher: self.node_dispatcher.clone(),
@@ -475,6 +477,7 @@ impl ThunkContext {
         self.workspace = Some(workspace);
     }
 
+    cfg_editor! {
     /// Enables watching the runtime's host editor,
     ///
     pub fn enable_host_editor_watcher(
@@ -519,6 +522,7 @@ impl ThunkContext {
         } else {
             None
         }
+    }
     }
 
     /// Enables a tcp listener for this context to listen to. accepts the first listener, creates a connection
@@ -715,9 +719,9 @@ impl ThunkContext {
         command: impl AsRef<str>,
     ) -> Option<tokio::sync::oneshot::Receiver<ThunkContext>> {
         if let Some(node_dispatcher) = self.node_dispatcher.as_ref() {
-            // Create a yield so that a response can be received, 
+            // Create a yield so that a response can be received,
             let (yielding, receiver) = Yielding::new(self.clone());
-            
+
             // Send the custom node command,
             match node_dispatcher.try_send((
                 NodeCommand::custom(

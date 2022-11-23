@@ -9,14 +9,13 @@ pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 use tracing::{event, Level};
 
 use crate::{
-    editor::node::WorkspaceCommand,
-    engine::{EngineStatus, NodeCommandHandler, Runner, Yielding},
+    engine::{EngineStatus, NodeCommandHandler, Runner, Yielding, WorkspaceCommand, NodeCommand},
     guest::Guest,
     prelude::{Runtime, State, WorkspaceConfig},
-    state::AttributeGraph, debugger::Debugger,
+    state::AttributeGraph, debugger::Debugger, appendix::Appendix,
 };
 
-use super::{Appendix, NodeCommand, NodeStatus};
+use super::NodeStatus;
 
 /// Extension to display workspace editing tools,
 ///

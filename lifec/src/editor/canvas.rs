@@ -2,7 +2,7 @@ use atlier::system::App;
 use imgui::{ChildWindow, DragDropFlags, StyleVar, Window};
 use tracing::{event, Level};
 
-use super::node::WorkspaceCommand;
+use crate::engine::WorkspaceCommand;
 
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct Canvas {

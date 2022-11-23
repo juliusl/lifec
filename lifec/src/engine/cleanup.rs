@@ -1,9 +1,7 @@
 use specs::{System, Entities};
 use tracing::{event, Level};
 
-use crate::prelude::NodeCommand;
-
-use super::{State, EventStatus};
+use super::{State, EventStatus, NodeCommand};
 
 /// System for cleaning up completed spawned entities,
 ///

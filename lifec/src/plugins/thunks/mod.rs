@@ -8,7 +8,7 @@ pub use error::ErrorContext;
 mod thunk_context;
 pub use thunk_context::ThunkContext;
 
-use crate::editor::General;
+use crate::appendix::General;
 
 use super::Plugin;
 use std::fmt::Debug;

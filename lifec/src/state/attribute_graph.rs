@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use reality::{Attribute, Value};
-use imgui::Ui;
 use reality::BlockProperties;
 use specs::Component;
 use std::{
@@ -336,102 +335,106 @@ impl AttributeIndex for AttributeGraph {
     }
 }
 
-impl AttributeGraph {
-    /// Edit value,
-    ///
-    pub fn edit_value(
-        name: impl AsRef<str>,
-        value: &mut Value,
-        workspace: Option<Workspace>,
-        ui: &Ui,
-    ) {
-        match value {
-            Value::Empty => {
-                ui.label_text(name, "empty");
-            }
-            Value::Bool(b) => {
-                ui.checkbox(name, b);
-            }
-            Value::TextBuffer(text) => {
-                ui.input_text_multiline(name, text, [0.0, 160.0]).build();
-            }
-            Value::Int(i) => {
-                ui.input_int(name, i).build();
-            }
-            Value::IntPair(a, b) => {
-                let clone = &mut [*a, *b];
-                ui.input_int2(name, clone).build();
-                *a = clone[0];
-                *b = clone[1];
-            }
-           Value::IntRange(a, b, c) => {
-                let clone = &mut [*a, *b, *c];
-                ui.input_int3(name, clone).build();
-                *a = clone[0];
-                *b = clone[1];
-                *c = clone[2];
-            }
-            Value::Float(f) => {
-                ui.input_float(name, f).build();
-            }
-            Value::FloatPair(a, b) => {
-                let clone = &mut [*a, *b];
-                ui.input_float2(name, clone).build();
-                *a = clone[0];
-                *b = clone[1];
-            }
-            Value::FloatRange(a, b, c) => {
-                let clone = &mut [*a, *b, *c];
-                ui.input_float3(name, clone).build();
-                *a = clone[0];
-                *b = clone[1];
-                *c = clone[2];
-            }
-            Value::BinaryVector(_) => {
-                if let Some(_) = workspace {
-                    if ui.button(format!("Save {} to file", name.as_ref())) {}
+cfg_editor! { 
+    use imgui::Ui;
+    impl AttributeGraph {
+        /// Edit value,
+        ///
+        pub fn edit_value(
+            name: impl AsRef<str>,
+            value: &mut Value,
+            workspace: Option<Workspace>,
+            ui: &Ui,
+        ) {
+            match value {
+                Value::Empty => {
+                    ui.label_text(name, "empty");
                 }
+                Value::Bool(b) => {
+                    ui.checkbox(name, b);
+                }
+                Value::TextBuffer(text) => {
+                    ui.input_text_multiline(name, text, [0.0, 160.0]).build();
+                }
+                Value::Int(i) => {
+                    ui.input_int(name, i).build();
+                }
+                Value::IntPair(a, b) => {
+                    let clone = &mut [*a, *b];
+                    ui.input_int2(name, clone).build();
+                    *a = clone[0];
+                    *b = clone[1];
+                }
+               Value::IntRange(a, b, c) => {
+                    let clone = &mut [*a, *b, *c];
+                    ui.input_int3(name, clone).build();
+                    *a = clone[0];
+                    *b = clone[1];
+                    *c = clone[2];
+                }
+                Value::Float(f) => {
+                    ui.input_float(name, f).build();
+                }
+                Value::FloatPair(a, b) => {
+                    let clone = &mut [*a, *b];
+                    ui.input_float2(name, clone).build();
+                    *a = clone[0];
+                    *b = clone[1];
+                }
+                Value::FloatRange(a, b, c) => {
+                    let clone = &mut [*a, *b, *c];
+                    ui.input_float3(name, clone).build();
+                    *a = clone[0];
+                    *b = clone[1];
+                    *c = clone[2];
+                }
+                Value::BinaryVector(_) => {
+                    if let Some(_) = workspace {
+                        if ui.button(format!("Save {} to file", name.as_ref())) {}
+                    }
+                }
+                Value::Reference(_) => {}
+                Value::Symbol(s) => {
+                    // TODO: add debouncing?
+                    ui.input_text(name, s).build();
+                }
+                Value::Complex(_) => {}
             }
-            Value::Reference(_) => {}
-            Value::Symbol(s) => {
-                // TODO: add debouncing?
-                ui.input_text(name, s).build();
+        }
+    }
+    
+    
+    impl App for AttributeGraph {
+        fn name() -> &'static str {
+            "graph"
+        }
+    
+        fn edit_ui(&mut self, ui: &imgui::Ui) {
+            let id = self.entity_id();
+    
+            for (name, property) in self.resolve_properties_mut().iter_properties_mut() {
+                property.edit(
+                    move |value| Self::edit_value(format!("{name} {id}"), value, None, ui),
+                    move |values| {
+                        imgui::ListBox::new(format!("{name} {id}")).build(ui, || {
+                            for (idx, value) in values.iter_mut().enumerate() {
+                                Self::edit_value(format!("{name} {id}-{idx}"), value, None, ui);
+                            }
+                        });
+                    },
+                    || None,
+                )
             }
-            Value::Complex(_) => {}
         }
-    }
-}
-
-impl App for AttributeGraph {
-    fn name() -> &'static str {
-        "graph"
-    }
-
-    fn edit_ui(&mut self, ui: &imgui::Ui) {
-        let id = self.entity_id();
-
-        for (name, property) in self.resolve_properties_mut().iter_properties_mut() {
-            property.edit(
-                move |value| Self::edit_value(format!("{name} {id}"), value, None, ui),
-                move |values| {
-                    imgui::ListBox::new(format!("{name} {id}")).build(ui, || {
-                        for (idx, value) in values.iter_mut().enumerate() {
-                            Self::edit_value(format!("{name} {id}-{idx}"), value, None, ui);
-                        }
-                    });
-                },
-                || None,
-            )
-        }
-    }
-
-    fn display_ui(&self, ui: &imgui::Ui) {
-        for (name, property) in self.resolve_properties().iter_properties() {
-            ui.text(format!("{name}: {property}"));
-        }
-
-        for (name, value) in self.index.control_values() {
-            ui.text(format!("{name}: {:?}", value));
+    
+        fn display_ui(&self, ui: &imgui::Ui) {
+            for (name, property) in self.resolve_properties().iter_properties() {
+                ui.text(format!("{name}: {property}"));
+            }
+    
+            for (name, value) in self.index.control_values() {
+                ui.text(format!("{name}: {:?}", value));
+            }
         }
     }
 }

@@ -6,7 +6,7 @@ pub use runmd::RunmdFile;
 use specs::{Read, ReadStorage, SystemData};
 use specs::prelude::*;
 
-use crate::prelude::{Runtime, Host, Sequencer, Editor};
+use crate::prelude::{Runtime, Host, Sequencer};
 
 use super::{Workspace, Project, default_world, Listener};
 

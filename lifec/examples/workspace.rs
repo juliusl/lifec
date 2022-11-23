@@ -136,6 +136,7 @@ fn main() {
 
     let mut host = Host::from(world);
     host.link_sequences();
+    
     host.open_runtime_editor::<Test>(true)
 }
 

@@ -2,8 +2,8 @@ use specs::SystemData;
 use specs::prelude::*;
 
 use crate::guest::Guest;
-use crate::prelude::NodeCommand;
 
+use super::NodeCommand;
 use super::Performance;
 
 /// Runner system data,

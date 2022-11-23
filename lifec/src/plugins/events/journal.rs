@@ -6,7 +6,8 @@ use reality::{
     Keywords,
 };
 use specs::{shred::ResourceId, Entity};
-use crate::prelude::NodeCommand;
+
+use crate::engine::NodeCommand;
 
 /// Struct for storing executed node commands,
 ///
@@ -132,13 +133,16 @@ impl WireObject for Journal {
 }
 
 mod tests {
+
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test() {
+        use crate::appendix::Appendix;
         use std::sync::Arc;
         use reality::wire::{Protocol, WireObject};
         use specs::WorldExt;
-        use crate::prelude::{Appendix, Journal, NodeCommand};
+        use crate::prelude::Journal;
+        use crate::engine::NodeCommand;
 
         let mut protocol = Protocol::empty();
     

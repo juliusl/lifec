@@ -11,13 +11,16 @@ use tokio::sync::oneshot;
 
 use super::{
     connection::ConnectionState, Adhoc, EngineStatus, Limit, Plugins, Profiler, TickControl,
-    Transition, Yielding,
+    Transition, Yielding, NodeCommand,
 };
 use crate::{
-    editor::{Appendix, Node, NodeStatus},
     engine::Completion,
-    prelude::*,
+    prelude::*, appendix::Appendix,
 };
+
+cfg_editor! {
+    use crate::editor::{Node, NodeStatus};
+}
 
 use tracing::{event, Level};
 
@@ -925,7 +928,105 @@ impl<'a> State<'a> {
 /// Editor related functions
 ///
 impl<'a> State<'a> {
-    /// Returns connections from adhoc profilers as a vector of nodes,
+    /// Handles the node command,
+    ///
+    pub fn handle_node_command(&mut self, command: NodeCommand) -> bool {
+        match command {
+            NodeCommand::Activate(event) => {
+                if self.activate(event) {
+                    event!(Level::DEBUG, "Activating event {}", event.id());
+                    true
+                } else {
+                    false
+                }
+            }
+            NodeCommand::Reset(event) => {
+                if self.reset(event) {
+                    event!(Level::DEBUG, "Reseting event {}", event.id());
+                    true
+                } else {
+                    false
+                }
+            }
+            NodeCommand::Pause(event) => {
+                if self.pause_event(event) {
+                    event!(Level::DEBUG, "Pausing event {}", event.id());
+                    true
+                } else {
+                    false
+                }
+            }
+            NodeCommand::Resume(event) => {
+                if self.resume_event(event) {
+                    event!(Level::DEBUG, "Resuming event {}", event.id());
+                    true
+                } else {
+                    false
+                }
+            }
+            NodeCommand::Cancel(event) => {
+                if self.cancel(event) {
+                    event!(Level::DEBUG, "Cancelling event {}", event.id());
+                    true
+                } else {
+                    false
+                }
+            }
+            NodeCommand::Spawn(event) => {
+                self.spawn(event);
+                true
+            }
+            NodeCommand::Swap { owner, from, to } => {
+                if self.swap(owner, from, to) {
+                    event!(
+                        Level::DEBUG,
+                        "Swapping nodes {} -> {} in {}'s sequence",
+                        from.id(),
+                        to.id(),
+                        owner.id()
+                    );
+                    true
+                } else {
+                    false
+                }
+            }
+            NodeCommand::Update(graph) => {
+                if self.update_state(&graph) {
+                    event!(Level::DEBUG, "Updating state for {}", graph.entity_id());
+                    true
+                } else {
+                    false
+                }
+            }
+            NodeCommand::Custom(name, entity) => {
+                event!(
+                    Level::DEBUG,
+                    "Handling custom command {name} for {}",
+                    entity.id()
+                );
+
+                if let Some(handler) = self.handlers.get(&name) {
+                    if handler(self, entity) {
+                        event!(
+                            Level::DEBUG,
+                            "Executed custom handler, {name}({})",
+                            entity.id()
+                        );
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
+        }
+    }
+}
+
+cfg_editor! {
+    impl<'a> State<'a> {
+        /// Returns connections from adhoc profilers as a vector of nodes,
     ///
     pub fn adhoc_nodes(&self) -> Vec<Node> {
         let State {
@@ -999,103 +1100,6 @@ impl<'a> State<'a> {
         }
     }
 
-    /// Handles the node command,
-    ///
-    pub fn handle_node_command(&mut self, command: NodeCommand) -> bool {
-        match command {
-            crate::editor::NodeCommand::Activate(event) => {
-                if self.activate(event) {
-                    event!(Level::DEBUG, "Activating event {}", event.id());
-                    true
-                } else {
-                    false
-                }
-            }
-            crate::editor::NodeCommand::Reset(event) => {
-                if self.reset(event) {
-                    event!(Level::DEBUG, "Reseting event {}", event.id());
-                    true
-                } else {
-                    false
-                }
-            }
-            crate::editor::NodeCommand::Pause(event) => {
-                if self.pause_event(event) {
-                    event!(Level::DEBUG, "Pausing event {}", event.id());
-                    true
-                } else {
-                    false
-                }
-            }
-            crate::editor::NodeCommand::Resume(event) => {
-                if self.resume_event(event) {
-                    event!(Level::DEBUG, "Resuming event {}", event.id());
-                    true
-                } else {
-                    false
-                }
-            }
-            crate::editor::NodeCommand::Cancel(event) => {
-                if self.cancel(event) {
-                    event!(Level::DEBUG, "Cancelling event {}", event.id());
-                    true
-                } else {
-                    false
-                }
-            }
-            crate::editor::NodeCommand::Spawn(event) => {
-                self.spawn(event);
-                true
-            }
-            crate::editor::NodeCommand::Swap { owner, from, to } => {
-                if self.swap(owner, from, to) {
-                    event!(
-                        Level::DEBUG,
-                        "Swapping nodes {} -> {} in {}'s sequence",
-                        from.id(),
-                        to.id(),
-                        owner.id()
-                    );
-                    true
-                } else {
-                    false
-                }
-            }
-            crate::editor::NodeCommand::Update(graph) => {
-                if self.update_state(&graph) {
-                    event!(Level::DEBUG, "Updating state for {}", graph.entity_id());
-                    true
-                } else {
-                    false
-                }
-            }
-            crate::editor::NodeCommand::Custom(name, entity) => {
-                event!(
-                    Level::DEBUG,
-                    "Handling custom command {name} for {}",
-                    entity.id()
-                );
-
-                if let Some(handler) = self.handlers.get(&name) {
-                    if handler(self, entity) {
-                        event!(
-                            Level::DEBUG,
-                            "Executed custom handler, {name}({})",
-                            entity.id()
-                        );
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            }
-        }
-    }
-}
-
-impl<'a> State<'a> {
     /// Scans engines for status,
     ///
     pub fn scan_engines(&'a self) -> impl Iterator<Item = EngineStatus> + '_ {
@@ -1173,7 +1177,10 @@ impl<'a> State<'a> {
             None
         }
     }
+}
+}
 
+impl<'a> State<'a> {
     /// Returns the entity for a block by name,
     ///
     pub fn find_entity(&self, expression: impl AsRef<str>) -> Option<&Entity> {
@@ -1251,7 +1258,7 @@ impl<'a> State<'a> {
                             appendix.insert_general(plugin_entity, &thunk_src.thunk());
                             appendix.insert_state(
                                 plugin_entity,
-                                crate::editor::State {
+                                crate::appendix::State {
                                     control_symbol: block.symbol().to_string(),
                                     graph: Some(graph.clone()),
                                 },

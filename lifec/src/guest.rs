@@ -1,16 +1,16 @@
 use std::hash::Hash;
 
 use reality::wire::{Protocol, WireObject};
-use specs::{Component, Entity, HashMapStorage, RunNow, World, WorldExt};
+use specs::{Component, Entity, HashMapStorage, World, WorldExt};
 use tokio::sync::watch::Ref;
-use tracing::{event, Level};
 
-use crate::{
-    prelude::{
-        Host, HostEditor, Node, PluginFeatures, Project, State,
-        ThunkContext, Workspace,
-    },
-};
+use crate::prelude::{Host, Project, State, ThunkContext, Workspace};
+
+cfg_editor! {
+    use crate::prelude::{HostEditor, Node};
+    use tracing::{event, Level};
+    use specs::RunNow;
+}
 
 mod remote_protocol;
 pub use remote_protocol::RemoteProtocol;
@@ -34,7 +34,9 @@ pub struct Guest {
     protocol: tokio::sync::watch::Sender<Protocol>,
     /// Remote protocol,
     remote: Option<RemoteProtocol>,
+
     /// Guest nodes,
+    #[cfg(feature = "editor")]
     nodes: Vec<Node>,
 }
 
@@ -57,12 +59,15 @@ impl Guest {
             protocol,
             stateless,
             remote: None,
+
+            #[cfg(feature = "editor")]
             nodes: vec![],
         };
 
         guest
     }
 
+    cfg_editor! {
     /// Adds a node to the guest,
     ///
     pub fn add_node(&mut self, node: Node) {
@@ -81,8 +86,27 @@ impl Guest {
         self.nodes.iter_mut()
     }
 
+    /// Returns a host editor for this guest,
+    ///
+    pub fn guest_editor(&self) -> HostEditor {
+        let state = self.protocol();
+
+        let features = state.as_ref().system_data::<crate::engine::EditorFeatures>();
+
+        let mut host_editor = features.host_editor();
+
+        if let Some(remote) = self.remote.as_ref() {
+            if !host_editor.has_remote() {
+                host_editor.set_remote(remote.clone());
+            }
+        }
+
+        host_editor.run_now(self.protocol.borrow().as_ref());
+        host_editor
+    }
+    
     /// Handle any commands from guest nodes and update protocol,
-    /// 
+    ///
     pub fn handle(&mut self) {
         let commands = self
             .nodes
@@ -110,6 +134,7 @@ impl Guest {
             }
             modified
         });
+    }
     }
 
     /// Enables the remote on this guest,
@@ -157,25 +182,6 @@ impl Guest {
         }
 
         context
-    }
-
-    /// Returns a host editor for this guest,
-    ///
-    pub fn guest_editor(&self) -> HostEditor {
-        let state = self.protocol();
-
-        let features = state.as_ref().system_data::<PluginFeatures>();
-
-        let mut host_editor = features.host_editor();
-
-        if let Some(remote) = self.remote.as_ref() {
-            if !host_editor.has_remote() {
-                host_editor.set_remote(remote.clone());
-            }
-        }
-
-        host_editor.run_now(self.protocol.borrow().as_ref());
-        host_editor
     }
 
     /// Returns a reference to protocol,

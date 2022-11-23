@@ -1,3 +1,4 @@
+use crate::engine::NodeCommand;
 use crate::prelude::{ErrorContext, SecureClient, StatusUpdate};
 use crate::{
     engine::{Completion, Runner, Yielding},
@@ -26,6 +27,7 @@ impl SetupHandler<tokio::runtime::Runtime> for EventRuntime {
     }
 }
 
+cfg_editor! {
 /// Setup for watch channel for host editor
 impl SetupHandler<sync::watch::Receiver<HostEditor>> for EventRuntime {
     fn setup(world: &mut specs::World) {
@@ -46,6 +48,7 @@ impl SetupHandler<sync::watch::Sender<HostEditor>> for EventRuntime {
             world.insert(tx);
         }
     }
+}
 }
 
 /// Setup for tokio-mulitple-producers single-consumer channel for guests
@@ -223,11 +226,7 @@ impl SetupHandler<SecureClient> for EventRuntime {
 }
 
 impl<'a> System<'a> for EventRuntime {
-    type SystemData = (
-        State<'a>,
-        Runner<'a>,
-        Write<'a, Journal>,
-    );
+    type SystemData = (State<'a>, Runner<'a>, Write<'a, Journal>);
 
     fn run(&mut self, (mut events, mut runner, mut journal): Self::SystemData) {
         if !events.should_exit() && events.can_continue() {

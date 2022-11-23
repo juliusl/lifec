@@ -2,6 +2,11 @@ use std::collections::HashMap;
 
 use crate::prelude::*;
 
+mod command;
+pub use command::CommandDispatcher;
+pub use command::WorkspaceCommand;
+pub use command::NodeCommand;
+
 mod profiler;
 pub use profiler::Profiler;
 
@@ -34,6 +39,10 @@ pub use plugins::PluginBroker;
 pub use plugins::PluginFeatures;
 pub use plugins::PluginListener;
 pub use plugins::Plugins;
+
+cfg_editor! {
+    pub use plugins::EditorFeatures;
+}
 
 mod state;
 pub use state::NodeCommandHandler;
@@ -451,9 +460,9 @@ impl Interpreter for Engine {
     }
 }
 
-impl Into<General> for &Engine {
-    fn into(self) -> General {
-        General {
+impl Into<crate::appendix::General> for &Engine {
+    fn into(self) -> crate::appendix::General {
+        crate::appendix::General {
             name: self.name.to_string(),
             expression: self.name.to_string(),
         }

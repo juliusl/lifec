@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, engine::NodeCommand};
 use specs::{shred::DynamicSystemData, DispatcherBuilder, System, World, Write, LazyUpdate};
 
 type EnableListener = fn(&World, &mut DispatcherBuilder);

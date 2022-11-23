@@ -10,6 +10,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use tracing::{event, Level};
 
+use crate::appendix::Appendix;
 use crate::debugger::Debugger;
 use crate::engine::Performance;
 use crate::guest::RemoteProtocol;
@@ -17,9 +18,10 @@ use crate::prelude::{EventRuntime, Journal};
 use crate::{
     prelude::{Node, State},
     state::AttributeGraph,
+    engine::NodeCommand
 };
 
-use super::{Appendix, NodeCommand, NodeStatus, Profiler};
+use super::{NodeStatus, Profiler};
 
 /// Tool for viewing and interacting with a host,
 ///

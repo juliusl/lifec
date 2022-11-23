@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{prelude::*, editor::General};
+use crate::{prelude::*, appendix::General};
 use reality::Block;
 use specs::{Component, Entity};
 use tracing::{event, Level};

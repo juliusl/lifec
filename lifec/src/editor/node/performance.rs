@@ -5,7 +5,7 @@ use reality::wire::Protocol;
 
 use crate::{
     engine::Performance,
-    prelude::{Appendix, HostEditor},
+    prelude::HostEditor, appendix::Appendix,
 };
 
 use super::Node;

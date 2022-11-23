@@ -3,12 +3,11 @@ use specs::Entity;
 use tracing::Level;
 
 use crate::{
-    editor::node::commands::WorkspaceCommand,
     prelude::{EventStatus, Thunk},
-    state::AttributeGraph,
+    state::AttributeGraph, engine::{WorkspaceCommand, CommandDispatcher},
 };
 
-use super::{CommandDispatcher, Node, NodeCommand};
+use super::{Node, NodeCommand};
 
 /// Extension for Node to edit event nodes,
 ///

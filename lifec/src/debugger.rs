@@ -3,22 +3,18 @@ use std::{
     ops::Deref,
 };
 
-use atlier::system::App;
 use chrono::{NaiveDateTime, Utc};
-use imgui::{TableFlags, TreeNode, Ui};
 use reality::{
     Value,
-    wire::{ControlDevice, Decoder, Encoder, FrameIndex, Protocol, ResourceId, WireObject},
-    Keywords,
+    wire::{Decoder, Encoder, FrameIndex, Protocol, ResourceId, WireObject}, 
 };
 use specs::{Entity, World};
 use tokio::sync::mpsc::Sender;
 use tracing::{event, Level};
 
 use crate::{
-    engine::{Completion, Yielding},
-    prelude::{Appendix, ErrorContext, General, Listener, NodeCommand, Plugins, StatusUpdate},
-    state::AttributeGraph,
+    engine::{Completion, Yielding, NodeCommand},
+    prelude::{ErrorContext, Listener, Plugins, StatusUpdate}, appendix::Appendix,
 };
 
 /// Struct for engine debugger,
@@ -70,222 +66,181 @@ impl Clone for Debugger {
     }
 }
 
-impl App for Debugger {
-    fn name() -> &'static str {
-        "lifec_debugger"
-    }
+cfg_editor! {
+    use reality::wire::ControlDevice;
+    use reality::Keywords;
+    use crate::state::AttributeGraph;
+    use imgui::{TableFlags, TreeNode, Ui};
+    use atlier::system::App;
 
-    fn edit_ui(&mut self, ui: &imgui::Ui) {
-        imgui::ChildWindow::new("Completion Tree")
-            .size([600.0, 0.0])
-            .build(ui, || {
-                self.completion_tree(ui);
-            });
+    impl App for Debugger {
+        fn name() -> &'static str {
+            "lifec_debugger"
+        }
 
-        ui.same_line();
-        imgui::ChildWindow::new("Status Updates")
-            .border(true)
-            .size([0.0, 0.0])
-            .build(ui, || {
-                self.updates_log(ui);
-            });
-    }
+        fn edit_ui(&mut self, ui: &imgui::Ui) {
+            imgui::ChildWindow::new("Completion Tree")
+                .size([600.0, 0.0])
+                .build(ui, || {
+                    self.completion_tree(ui);
+                });
 
-    fn display_ui(&self, ui: &imgui::Ui) {
-        if let Some(encoder) = self.encoded.as_ref() {
-            TreeNode::new("Control Device").build(ui, || {
-                if let Some(table) = ui.begin_table("Idents", 2) {
-                    let control_device = ControlDevice::new(encoder.interner());
-                    ui.table_next_row();
-                    ui.table_next_column();
-                    ui.text("Data");
-                    ui.table_next_column();
-                    ui.text(format!("{} frames", control_device.data.len()));
+            ui.same_line();
+            imgui::ChildWindow::new("Status Updates")
+                .border(true)
+                .size([0.0, 0.0])
+                .build(ui, || {
+                    self.updates_log(ui);
+                });
+        }
 
-                    ui.table_next_row();
-                    ui.table_next_column();
-                    ui.text("Read");
-                    ui.table_next_column();
-                    ui.text(format!("{} frames", control_device.read.len()));
-
-                    ui.table_next_row();
-                    ui.table_next_column();
-                    ui.text("Index");
-                    ui.table_next_column();
-                    ui.text(format!("{} frames", control_device.index.len()));
-
-                    let mut s = encoder
-                        .interner
-                        .strings()
-                        .iter()
-                        .map(|(_, s)| s)
-                        .collect::<Vec<_>>();
-                    s.sort();
-                    for ident in s {
+        fn display_ui(&self, ui: &imgui::Ui) {
+            if let Some(encoder) = self.encoded.as_ref() {
+                TreeNode::new("Control Device").build(ui, || {
+                    if let Some(table) = ui.begin_table("Idents", 2) {
+                        let control_device = ControlDevice::new(encoder.interner());
                         ui.table_next_row();
                         ui.table_next_column();
-                        ui.text(format!("{ident}"));
-
+                        ui.text("Data");
                         ui.table_next_column();
-                        ui.text(format!("{} chars", ident.len()));
+                        ui.text(format!("{} frames", control_device.data.len()));
+
+                        ui.table_next_row();
+                        ui.table_next_column();
+                        ui.text("Read");
+                        ui.table_next_column();
+                        ui.text(format!("{} frames", control_device.read.len()));
+
+                        ui.table_next_row();
+                        ui.table_next_column();
+                        ui.text("Index");
+                        ui.table_next_column();
+                        ui.text(format!("{} frames", control_device.index.len()));
+
+                        let mut s = encoder
+                            .interner
+                            .strings()
+                            .iter()
+                            .map(|(_, s)| s)
+                            .collect::<Vec<_>>();
+                        s.sort();
+                        for ident in s {
+                            ui.table_next_row();
+                            ui.table_next_column();
+                            ui.text(format!("{ident}"));
+
+                            ui.table_next_column();
+                            ui.text(format!("{} chars", ident.len()));
+                        }
+
+                        table.end();
                     }
+                });
 
-                    table.end();
-                }
-            });
+                TreeNode::new("Frames").build(ui, || {
+                    if let Some(table) = ui.begin_table_with_flags(
+                        "frames",
+                        7,
+                        TableFlags::BORDERS_INNER_V
+                            | TableFlags::RESIZABLE
+                            | TableFlags::SIZING_FIXED_FIT,
+                    ) {
+                        ui.table_setup_column("Keyword");
+                        ui.table_setup_column("Entity");
+                        ui.table_setup_column("Name");
+                        ui.table_setup_column("Symbol");
+                        ui.table_setup_column("Frame Len");
+                        ui.table_setup_column("Attribute");
+                        ui.table_setup_column("Value");
+                        ui.table_headers_row();
 
-            TreeNode::new("Frames").build(ui, || {
-                if let Some(table) = ui.begin_table_with_flags(
-                    "frames",
-                    7,
-                    TableFlags::BORDERS_INNER_V
-                        | TableFlags::RESIZABLE
-                        | TableFlags::SIZING_FIXED_FIT,
-                ) {
-                    ui.table_setup_column("Keyword");
-                    ui.table_setup_column("Entity");
-                    ui.table_setup_column("Name");
-                    ui.table_setup_column("Symbol");
-                    ui.table_setup_column("Frame Len");
-                    ui.table_setup_column("Attribute");
-                    ui.table_setup_column("Value");
-                    ui.table_headers_row();
+                        for frame in encoder.frames.iter() {
+                            ui.table_next_row();
+                            ui.table_next_column();
+                            ui.text(format!("{:?}", frame.keyword()));
 
-                    for frame in encoder.frames.iter() {
-                        ui.table_next_row();
-                        ui.table_next_column();
-                        ui.text(format!("{:?}", frame.keyword()));
+                            ui.table_next_column();
+                            let (id, gen) = frame.parity();
+                            ui.text(format!("{id}.{gen}"));
 
-                        ui.table_next_column();
-                        let (id, gen) = frame.parity();
-                        ui.text(format!("{id}.{gen}"));
+                            ui.table_next_column();
+                            if let Some(name) = frame.name(&encoder.interner) {
+                                ui.text(name);
+                            }
 
-                        ui.table_next_column();
-                        if let Some(name) = frame.name(&encoder.interner) {
-                            ui.text(name);
-                        }
+                            ui.table_next_column();
+                            if let Some(symbol) = frame.symbol(&encoder.interner) {
+                                ui.text(symbol);
+                            }
 
-                        ui.table_next_column();
-                        if let Some(symbol) = frame.symbol(&encoder.interner) {
-                            ui.text(symbol);
-                        }
+                            ui.table_next_column();
+                            ui.text(format!("{}", frame.frame_len()));
 
-                        ui.table_next_column();
-                        ui.text(format!("{}", frame.frame_len()));
+                            ui.table_next_column();
+                            if let Some(attribute) = frame.attribute() {
+                                ui.text(format!("{}", attribute));
+                            }
 
-                        ui.table_next_column();
-                        if let Some(attribute) = frame.attribute() {
-                            ui.text(format!("{}", attribute));
-                        }
-
-                        ui.table_next_column();
-                        match frame.keyword() {
-                            Keywords::Add | Keywords::Define => {
-                                if let Some(value) =
-                                    frame.read_value(&encoder.interner, &encoder.blob_device)
-                                {
-                                    match value {
-                                        Value::Empty => {
-                                            ui.text("empty");
-                                        }
-                                        Value::Bool(b) => {
-                                            ui.text(format!("{}", b));
-                                        }
-                                        Value::TextBuffer(t) => {
-                                            ui.text(format!("{}", t));
-                                        }
-                                        Value::Int(i) => {
-                                            ui.text(format!("{}", i));
-                                        }
-                                        Value::IntPair(a, b) => {
-                                            ui.text(format!("{a}, {b}"));
-                                        }
-                                        Value::IntRange(a, b, c) => {
-                                            ui.text(format!("{a}, {b}, {c}"));
-                                        }
-                                        Value::Float(f) => {
-                                            ui.text(format!("{f}"));
-                                        }
-                                        Value::FloatPair(a, b) => {
-                                            ui.text(format!("{a}, {b}"));
-                                        }
-                                        Value::FloatRange(a, b, c) => {
-                                            ui.text(format!("{a}, {b}, {c}"));
-                                        }
-                                        Value::BinaryVector(_) => {}
-                                        Value::Reference(r) => {
-                                            ui.text(format!("{}", r));
-                                        }
-                                        Value::Symbol(s) => {
-                                            ui.text(format!("{:?}", s));
-                                        }
-                                        Value::Complex(c) => {
-                                            ui.text(format!("{:?}", c));
+                            ui.table_next_column();
+                            match frame.keyword() {
+                                Keywords::Add | Keywords::Define => {
+                                    if let Some(value) =
+                                        frame.read_value(&encoder.interner, &encoder.blob_device)
+                                    {
+                                        match value {
+                                            Value::Empty => {
+                                                ui.text("empty");
+                                            }
+                                            Value::Bool(b) => {
+                                                ui.text(format!("{}", b));
+                                            }
+                                            Value::TextBuffer(t) => {
+                                                ui.text(format!("{}", t));
+                                            }
+                                            Value::Int(i) => {
+                                                ui.text(format!("{}", i));
+                                            }
+                                            Value::IntPair(a, b) => {
+                                                ui.text(format!("{a}, {b}"));
+                                            }
+                                            Value::IntRange(a, b, c) => {
+                                                ui.text(format!("{a}, {b}, {c}"));
+                                            }
+                                            Value::Float(f) => {
+                                                ui.text(format!("{f}"));
+                                            }
+                                            Value::FloatPair(a, b) => {
+                                                ui.text(format!("{a}, {b}"));
+                                            }
+                                            Value::FloatRange(a, b, c) => {
+                                                ui.text(format!("{a}, {b}, {c}"));
+                                            }
+                                            Value::BinaryVector(_) => {}
+                                            Value::Reference(r) => {
+                                                ui.text(format!("{}", r));
+                                            }
+                                            Value::Symbol(s) => {
+                                                ui.text(format!("{:?}", s));
+                                            }
+                                            Value::Complex(c) => {
+                                                ui.text(format!("{:?}", c));
+                                            }
                                         }
                                     }
                                 }
+                                _ => {}
                             }
-                            _ => {}
                         }
-                    }
 
-                    table.end()
-                }
-            });
+                        table.end()
+                    }
+                });
+            }
         }
     }
-}
 
-impl Debugger {
-    /// Propagates updated,
-    ///
-    pub fn propagate_update(&mut self) -> Option<()> {
-        let mut protocol = Protocol::empty();
-        protocol.encoder::<Debugger>(|world, encoder| {
-            self.encode(world, encoder);
-        });
-
-        self.encoded = protocol.take_encoder(Debugger::resource_id());
-        self.updated.take()
-    }
-
-    /// Set the update notification,
-    ///
-    pub fn set_update(&mut self) {
-        self.updated = Some(());
-    }
-
-    /// Returns an iterator over completions,
-    ///
-    pub fn completions(&self) -> impl Iterator<Item = &Completion> {
-        self.completions.iter().map(|(_, c)| c)
-    }
-
-    /// Returns the status logs for an entity,
-    ///
-    pub fn status_log(&self, entity: Entity) -> Option<VecDeque<StatusUpdate>> {
-        self.status_updates.get(&entity).cloned()
-    }
-
-    /// Returns all status logs,
-    ///
-    pub fn status_logs(&self) -> BTreeMap<Entity, VecDeque<StatusUpdate>> {
-        self.status_updates.clone()
-    }
-
-    /// Returns the debugger's appendix,
-    ///
-    pub fn appendix(&self) -> &Appendix {
-        &self.appendix
-    }
-
-    /// Sets the appendix,
-    ///
-    pub fn set_appendix(&mut self, appendix: Appendix) {
-        self.appendix = appendix;
-    }
-
-    /// Displays a tree view of completion history,
+    impl Debugger {
+          /// Displays a tree view of completion history,
     ///
     pub fn completion_tree(&self, ui: &Ui) {
         let mut groups = BTreeMap::<String, Vec<Completion>>::default();
@@ -497,6 +452,57 @@ impl Debugger {
             });
         }
     }
+    }
+}
+
+impl Debugger {
+    /// Propagates updated,
+    ///
+    pub fn propagate_update(&mut self) -> Option<()> {
+        let mut protocol = Protocol::empty();
+        protocol.encoder::<Debugger>(|world, encoder| {
+            self.encode(world, encoder);
+        });
+
+        self.encoded = protocol.take_encoder(Debugger::resource_id());
+        self.updated.take()
+    }
+
+    /// Set the update notification,
+    ///
+    pub fn set_update(&mut self) {
+        self.updated = Some(());
+    }
+
+    /// Returns an iterator over completions,
+    ///
+    pub fn completions(&self) -> impl Iterator<Item = &Completion> {
+        self.completions.iter().map(|(_, c)| c)
+    }
+
+    /// Returns the status logs for an entity,
+    ///
+    pub fn status_log(&self, entity: Entity) -> Option<VecDeque<StatusUpdate>> {
+        self.status_updates.get(&entity).cloned()
+    }
+
+    /// Returns all status logs,
+    ///
+    pub fn status_logs(&self) -> BTreeMap<Entity, VecDeque<StatusUpdate>> {
+        self.status_updates.clone()
+    }
+
+    /// Returns the debugger's appendix,
+    ///
+    pub fn appendix(&self) -> &Appendix {
+        &self.appendix
+    }
+
+    /// Sets the appendix,
+    ///
+    pub fn set_appendix(&mut self, appendix: Appendix) {
+        self.appendix = appendix;
+    }
 }
 
 impl PartialEq for Debugger {
@@ -632,9 +638,12 @@ impl WireObject for Debugger {
 
         for (entity, _status_updates) in self.status_updates.iter() {
             let mut name = self.appendix().name(entity).unwrap_or_default().to_string();
-  
+
             if name.is_empty() {
-                name = self.appendix().control_symbol(entity).unwrap_or("unknown".to_string());
+                name = self
+                    .appendix()
+                    .control_symbol(entity)
+                    .unwrap_or("unknown".to_string());
             }
 
             let mut status_update = encoder.start_extension("status_update", name);
@@ -657,7 +666,7 @@ impl WireObject for Debugger {
         _: &reality::wire::Interner,
         _: &BlobImpl,
         _: &[reality::wire::Frame],
-    ) -> Self 
+    ) -> Self
     where
         BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
     {
@@ -694,7 +703,7 @@ impl WireObject for Debugger {
                 .expect("should be a symbol");
             debugger.appendix.general.insert(
                 event_entity.id(),
-                General {
+                crate::appendix::General {
                     name: event,
                     ..Default::default()
                 },
@@ -711,7 +720,7 @@ impl WireObject for Debugger {
                 .expect("should be a symbol");
             debugger.appendix.general.insert(
                 plugin_entity.id(),
-                General {
+                crate::appendix::General {
                     name: plugin,
                     ..Default::default()
                 },

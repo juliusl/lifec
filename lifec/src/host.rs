@@ -1,7 +1,7 @@
-use crate::{engine::Cleanup, prelude::*, project::Listener};
+use crate::{engine::{Cleanup, Profiler}, prelude::*, project::Listener, appendix::Appendix};
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
-use specs::{Dispatcher, DispatcherBuilder, Entity, World, WorldExt};
+use specs::{Dispatcher, DispatcherBuilder, Entity, World, WorldExt, Write};
 use std::{error::Error, ops::Deref, path::PathBuf, str::from_utf8};
 
 mod inspector;
@@ -16,8 +16,10 @@ pub use commands::Commands;
 mod sequencer;
 pub use sequencer::Sequencer;
 
-mod editor;
-pub use editor::Editor;
+cfg_editor! {
+    mod editor;
+    pub use editor::Editor;
+}
 
 pub mod async_ext;
 
@@ -51,6 +53,74 @@ pub struct Host {
 /// ECS configuration,
 ///
 impl Host {
+    /// Builds an index and inserts into world,
+    /// 
+    pub fn build_appendix(&mut self) {
+        // Build runtime appendix
+        self.world_mut().exec(
+            |(entities, engines, events, thunks, graphs, profilers, blocks, mut appendix): (
+                Entities,
+                ReadStorage<Engine>,
+                ReadStorage<Event>,
+                ReadStorage<Thunk>,
+                ReadStorage<AttributeGraph>,
+                ReadStorage<Profiler>,
+                ReadStorage<Block>,
+                Write<Appendix>,
+            )| {
+                for (entity, block, engine, event, thunk, graph) in (
+                    &entities,
+                    blocks.maybe(),
+                    engines.maybe(),
+                    events.maybe(),
+                    thunks.maybe(),
+                    graphs.maybe(),
+                )
+                    .join()
+                {
+                    match (block, event, thunk, graph, engine) {
+                        (Some(block), None, Some(thunk), Some(graph), None) => {
+                            appendix.insert_general(entity, thunk);
+                            appendix.insert_state(
+                                entity,
+                                crate::appendix::State {
+                                    control_symbol: block.symbol().to_string(),
+                                    graph: Some(graph.clone()),
+                                },
+                            );
+                        }
+                        (block, Some(event), None, _, None) => {
+                            appendix.insert_general(entity, event);
+                            if let Some(block) = block {
+                                appendix.insert_state(
+                                    entity,
+                                    crate::appendix::State {
+                                        control_symbol: block.symbol().to_string(),
+                                        graph: None,
+                                    },
+                                );
+                            }
+                        }
+                        (_, None, None, None, Some(engine)) => {
+                            appendix.insert_general(entity, engine)
+                        }
+                        _ => {}
+                    }
+                }
+
+                for (entity, _) in (&entities, &profilers).join() {
+                    appendix.insert_general(
+                        entity,
+                        crate::appendix::General {
+                            name: "profiler".to_string(),
+                            expression: format!("profiler-{}", entity.id()),
+                        },
+                    )
+                }
+            },
+        );
+    }
+
     /// Returns a new dispatcher builder with core
     /// systems included.
     ///

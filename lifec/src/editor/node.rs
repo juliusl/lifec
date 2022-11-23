@@ -5,8 +5,8 @@ use atlier::system::App;
 use imgui::Ui;
 use specs::Entity;
 
-use super::Appendix;
-use crate::engine::{Adhoc, ConnectionState};
+use crate::appendix::Appendix;
+use crate::engine::{Adhoc, ConnectionState, NodeCommand};
 use crate::guest::RemoteProtocol;
 use crate::{
     prelude::{Connection, Cursor, Sequence, Transition},
@@ -19,17 +19,13 @@ pub use event::EventNode;
 mod engine;
 pub use engine::EngineNode;
 
-mod commands;
-pub use commands::CommandDispatcher;
-pub use commands::NodeCommand;
-pub use commands::WorkspaceCommand;
-
 mod status;
 pub use status::NodeStatus;
 
 mod performance;
 pub use performance::Profiler;
 
+pub mod commands;
 pub mod wire;
 
 /// Type alias for an edit node ui function,

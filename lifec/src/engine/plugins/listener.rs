@@ -1,7 +1,7 @@
 use specs::prelude::*;
 use tokio::sync::mpsc::Receiver;
 
-use crate::{prelude::*, guest::Guest, engine::{Yielding, Completion}};
+use crate::{prelude::*, guest::Guest, engine::{Yielding, Completion, NodeCommand}};
 
 /// Resources for consuming messages from plugins,
 ///

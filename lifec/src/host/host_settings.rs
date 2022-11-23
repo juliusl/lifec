@@ -1,15 +1,19 @@
-use std::{path::PathBuf, str::FromStr};
 use hyper::Uri;
+use std::{path::PathBuf, str::FromStr};
 
 use clap::Args;
 use tracing::{event, Level};
 
 use crate::prelude::Project;
 
-use super::{Commands, Host, Editor};
+use super::{Commands, Host};
+
+cfg_editor! {
+    use crate::prelude::Editor;
+}
 
 /// CLI arguments that can be configured into a host,
-/// 
+///
 #[derive(Debug, Default, Args)]
 #[clap(arg_required_else_help = true)]
 pub struct HostSettings {
@@ -32,9 +36,9 @@ pub struct HostSettings {
     ///
     /// A workspace directory is a directory of .runmd files that are compiled together. A valid workspace directory requires a root
     /// .runmd file, followed by named runmd files (ex. test.runmd).
-    /// 
-    /// Named files will be parsed w/ the file name used as the implicit block symbol. All named files will be parsed first and the root .runmd file will be parsed last. 
-    /// 
+    ///
+    /// Named files will be parsed w/ the file name used as the implicit block symbol. All named files will be parsed first and the root .runmd file will be parsed last.
+    ///
     /// When this mode is used, the workspace feature
     /// will be enabled with thunk contexts, so all plugins will execute in the context of the same work_dir.
     ///
@@ -47,7 +51,6 @@ pub struct HostSettings {
 }
 
 impl HostSettings {
-    
     /// Returns the current command,
     ///
     pub fn command(&self) -> Option<&Commands> {
@@ -73,7 +76,7 @@ impl HostSettings {
     }
 
     /// Sets the workspace uri,
-    /// 
+    ///
     pub fn set_workspace(&mut self, workspace: impl AsRef<str>) {
         self.workspace = Some(workspace.as_ref().to_string());
     }
@@ -89,11 +92,12 @@ impl HostSettings {
                 if let Some(host) = self.create_host::<P>().await {
                     host.with_start(start).start::<P>();
                 }
-            },
+            }
             Some(Commands::Open) => {
                 if let Some(host) = self.create_host::<P>().await {
                     tokio::task::block_in_place(|| {
-                        host.open_runtime_editor::<P>(self.debug);
+                            #[cfg(feature = "editor" )]
+                            host.open_runtime_editor::<P>(self.debug);
                     })
                 }
             }
@@ -135,7 +139,7 @@ impl HostSettings {
                                 Some(fragment.to_string())
                             } else {
                                 None
-                            }
+                            },
                         );
 
                         Some(host)
@@ -168,9 +172,7 @@ impl HostSettings {
                 }
 
                 match Host::open::<P>(runmd_path.clone()).await {
-                    Ok(host) => {
-                        Some(host)
-                    }
+                    Ok(host) => Some(host),
                     Err(err) => {
                         event!(Level::ERROR, "Could not load runmd from path {err}");
                         None
@@ -178,9 +180,7 @@ impl HostSettings {
                 }
             }
             _ => match Host::runmd::<P>().await {
-                Ok(host) => {
-                    Some(host)
-                }
+                Ok(host) => Some(host),
                 Err(err) => {
                     event!(
                         Level::ERROR,
@@ -192,4 +192,3 @@ impl HostSettings {
         }
     }
 }
-

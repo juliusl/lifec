@@ -3,7 +3,7 @@ use std::ops::Deref;
 use specs::{prelude::*, Read};
 use tokio::sync::mpsc::{error::SendError, error::TrySendError, Sender};
 
-use crate::{prelude::*, guest::Guest, engine::{Yielding, Completion}};
+use crate::{prelude::*, guest::Guest, engine::{Yielding, Completion, NodeCommand}};
 
 /// Resources for sending messages from plugins,
 ///
