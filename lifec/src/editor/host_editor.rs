@@ -274,22 +274,18 @@ impl<'a> System<'a> for HostEditor {
     type SystemData = (
         State<'a>,
         Read<'a, tokio::sync::watch::Sender<HostEditor>, EventRuntime>,
-        Write<'a, Option<Debugger>>,
+        Read<'a, Option<Debugger>>,
         Read<'a, Journal>,
         Write<'a, Option<Vec<Performance>>>,
         Write<'a, Option<HashMap::<Entity, NodeStatus>>>,
     );
 
-    fn run(&mut self, (mut state, watcher, mut debugger, journal, mut performance_data, mut node_statuses): Self::SystemData) {
+    fn run(&mut self, (mut state, watcher, debugger, journal, mut performance_data, mut node_statuses): Self::SystemData) {
         self.appendix = Some(state.appendix().clone());
-        let updated = debugger.as_mut().and_then(|u| u.propagate_update()).clone();
         self.debugger = debugger.clone();
 
         if let Some(debugger) = self.debugger.as_mut() {
             debugger.set_appendix((*state.appendix()).clone());
-            if updated.is_some() {
-                debugger.set_update();
-            }
         }
 
         // General event runtime state

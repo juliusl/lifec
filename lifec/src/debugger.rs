@@ -456,22 +456,14 @@ cfg_editor! {
 }
 
 impl Debugger {
-    /// Propagates updated,
+    /// Encodes debugger state,
     ///
-    pub fn propagate_update(&mut self) -> Option<()> {
+    pub fn encode_state(&mut self) {
         let mut protocol = Protocol::empty();
         protocol.encoder::<Debugger>(|world, encoder| {
             self.encode(world, encoder);
         });
-
         self.encoded = protocol.take_encoder(Debugger::resource_id());
-        self.updated.take()
-    }
-
-    /// Set the update notification,
-    ///
-    pub fn set_update(&mut self) {
-        self.updated = Some(());
     }
 
     /// Returns an iterator over completions,
@@ -539,26 +531,19 @@ impl Listener for Debugger {
 
             status_updates.push_back(status_update.clone());
         }
-
-        self.set_update();
     }
 
     fn on_completion(&mut self, completion: crate::engine::Completion) {
-        if self.completions.len() > self.completion_limits.unwrap_or(1000) {
+        if self.completions.len() > self.completion_limits.unwrap_or(100) {
             event!(Level::TRACE, "Discarding old results");
             self.completions.pop_front();
         }
 
-        self.completions
-            .push_back(((completion.event, completion.thunk), completion));
-
-        self.set_update();
+        self.completions.push_back(((completion.event, completion.thunk), completion));
     }
 
     fn on_error_context(&mut self, error: &crate::prelude::ErrorContext) {
         self.errors.push(error.clone());
-
-        self.set_update();
     }
 
     fn on_operation(&mut self, _: crate::prelude::Operation) {}
