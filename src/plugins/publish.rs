@@ -11,10 +11,16 @@ impl Plugin for Publish {
         "publish"
     }
 
+    fn description() -> &'static str {
+        "Publishes a file over tcp. Starts a tcp listener waiting to accept a connection. On connection, sends the file being published and exits."
+    }
+
     fn call(context: &mut ThunkContext) -> Option<AsyncContext> {
         context.task(|mut cancel_source| {
-            let tc = context.clone();
+            let mut tc = context.clone();
             async move {
+                tc.assign_addresses().await;
+
                 if let Some(file_path) = tc.state().find_symbol("publish") {
                     let mut file = tokio::fs::OpenOptions::new()
                         .read(true)
@@ -83,12 +89,12 @@ mod tests {
             r#"
     ``` test
     + .engine
-    : .event publish
+    : .start publish
     : .exit
     ```
 
     ``` publish test
-    : address .symbol 127.0.0.1:49579
+    : tcp .symbol 127.0.0.1:49579
 
     + .runtime
     : .publish examples/io/.runmd
@@ -111,11 +117,11 @@ mod tests {
             context.readln_stream().await
         });
 
+
         // This drives the event runtime a bit so things start up
         let mut count = 0;
         loop {
             dispatcher.dispatch(host.world());
-
             host.world_mut().maintain();
             count += 1;
             if count > 10 {
@@ -130,11 +136,6 @@ mod tests {
             .expect("should be able to read");
 
         assert_eq!(received.trim(), tocompare.trim());
-
-        let program = std::env::args().next().expect("should always be the program");
-        let program = PathBuf::from(program);
-        let program = program.file_name().expect("should be the name of the binary");
-        eprintln!("{:?}", program);
 
         // Clean up nested runtime
         host.exit();

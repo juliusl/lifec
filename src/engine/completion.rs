@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use atlier::system::{Attribute, Value};
+use reality::{Attribute, Value};
 use chrono::{Utc, DateTime};
 use reality::{Block, BlockProperties};
 use specs::{Entity, Component, VecStorage};
@@ -39,78 +39,6 @@ pub struct Completion {
     pub returns: Option<BlockProperties>,
 }
 
-impl Into<Block> for Completion {
-    fn into(self) -> Block {
-        let mut block = Block::new(self.thunk, "", "completion");
-        let mut attribute = Attribute::new(self.thunk.id(), format!("completion::event"), Value::Empty);
-        attribute.edit_as(Value::Int(self.event.id() as i32));
-        block.add_attribute(&attribute);
-
-        let mut attribute = Attribute::new(self.thunk.id(), format!("completion::thunk"), Value::Empty);
-        attribute.edit_as(Value::Int(self.thunk.id() as i32));
-        block.add_attribute(&attribute);
-        
-        for (name, value) in self.control_values {
-            let mut attribute =
-                Attribute::new(self.thunk.id(), format!("completion::{name}"), Value::Empty);
-            attribute.edit_as(value.clone());
-            block.add_attribute(&attribute);
-        }
-
-        block.add_attribute(&Attribute::new(self.thunk.id(), "query", Value::Empty));
-        for (name, query) in self.query.iter_properties() {
-            match query {
-                reality::BlockProperty::Single(value) => {
-                    let mut attribute =
-                        Attribute::new(self.thunk.id(), format!("query::{name}"), Value::Empty);
-                    attribute.edit_as(value.clone());
-                    block.add_attribute(&attribute);
-                }
-                reality::BlockProperty::List(values) => {
-                    for value in values {
-                        let mut attribute =
-                            Attribute::new(self.thunk.id(), format!("query::{name}"), Value::Empty);
-                        attribute.edit_as(value.clone());
-                        block.add_attribute(&attribute);
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        block.add_attribute(&Attribute::new(self.thunk.id(), "returns", Value::Empty));
-        if let Some(returns) = self.returns {
-            for (name, returns) in returns.iter_properties() {
-                match returns {
-                    reality::BlockProperty::Single(value) => {
-                        let mut attribute = Attribute::new(
-                            self.thunk.id(),
-                            format!("returns::{name}"),
-                            Value::Empty,
-                        );
-                        attribute.edit_as(value.clone());
-                        block.add_attribute(&attribute);
-                    }
-                    reality::BlockProperty::List(values) => {
-                        for value in values {
-                            let mut attribute = Attribute::new(
-                                self.thunk.id(),
-                                format!("returns::{name}"),
-                                Value::Empty,
-                            );
-                            attribute.edit_as(value.clone());
-                            block.add_attribute(&attribute);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        block
-    }
-}
-
 mod tests {
     use super::Completion;
     use crate::prelude::{Listener, Project};
@@ -139,10 +67,7 @@ mod tests {
 
     #[test]
     fn test() {
-        use atlier::system::Value;
-        use crate::state::{AttributeGraph, AttributeIndex};
         use crate::host::Host;
-        use reality::Block;
         use std::ops::Deref;
 
         let mut host = Host::load_content::<Test>(
@@ -164,29 +89,12 @@ mod tests {
 
         let test = host.world().fetch::<Option<Test>>();
         if let Some(test) = test.deref().clone() {
-            let block: Block = test
-                .completion
-                .clone()
-                .expect("should have a completion")
-                .into();
-            
-            // Assert control values
-            assert_eq!( block.map_control().get("event"), Some(&Value::Int(2)));
-            assert_eq!( block.map_control().get("thunk"), Some(&Value::Int(3)));
+            assert!(test.completion.is_some());
+            let completion = test.completion.clone().unwrap();
 
-            // Assert index count
-            let indexes = block.index();
-            assert_eq!(indexes.len(), 2);
-
-            // Assert query root/index
-            let query = indexes.iter().find(|i| i.root().name() == "query").expect("should have a query root");
-            let query = AttributeGraph::new(query.clone());
-            assert_eq!(query.find_symbol("println"), Some("hello world".to_string()));
-
-            // Assert returns root/index
-            let returns = indexes.iter().find(|i| i.root().name() == "returns").expect("should have a returns root");
-            let returns = AttributeGraph::new(returns.clone());
-            assert_eq!(returns.find_symbol("println"), Some("hello world".to_string()));
+            let returns = completion.returns.unwrap();
+            let println = returns.property("println").unwrap();
+            assert_eq!(println.symbol(), Some(&String::from("hello world")));
         }
     }
 }

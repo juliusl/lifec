@@ -1,4 +1,4 @@
-use atlier::system::{Attribute, Value};
+use reality::{Attribute, Value};
 use reality::{
     wire::{Frame, FrameIndex, ResourceId, WireObject},
     BlockIndex, BlockProperties, Keywords,

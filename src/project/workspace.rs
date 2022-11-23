@@ -319,7 +319,7 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn test_compile_workspace() {
-        use atlier::system::{Attribute, Value};
+        use reality::{Attribute, Value};
         use reality::Block;
         use reality::BlockProperty;
         use specs::WorldExt;
@@ -487,11 +487,18 @@ mod tests {
 
         let mut dispatcher = host.prepare::<Test>();
         {
-            let mut events = host.world().system_data::<State>();
+            {
+                let mut events = host.world().system_data::<State>();
 
-            // Test that activating an event gets picked up by .scan()
+                // Test that activating an event gets picked up by .scan()
+                let event = host.world().entities().entity(2);
+                events.activate(event);
+            }
+            host.world_mut().maintain();
+
+            let mut events = host.world().system_data::<State>();
             let event = host.world().entities().entity(2);
-            events.activate(event);
+           
 
             // TODO - add assertions
             {
@@ -532,11 +539,17 @@ mod tests {
 
         let mut dispatcher = host.prepare::<Test>();
         {
-            let mut events = host.world().system_data::<State>();
+            {
+                let mut events = host.world().system_data::<State>();
 
-            // Test that activating an event gets picked up by .scan()
+                // Test that activating an event gets picked up by .scan()
+                let event = host.world().entities().entity(2);
+                events.activate(event);
+            }
+            host.world_mut().maintain();
+
+            let mut events = host.world().system_data::<State>();
             let event = host.world().entities().entity(2);
-            events.activate(event);
 
             {
                 // TODO - add assertions

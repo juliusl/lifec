@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use atlier::system::Value;
+use reality::Value;
 use reality::SpecialAttribute;
 use specs::prelude::*;
 use specs::SystemData;
