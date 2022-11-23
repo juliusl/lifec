@@ -1,6 +1,6 @@
 # Lifec Runtime
 
-Lifec is a runtime based on `runmd` and `specs ECS`. It uses the `reality` parser to compile `runmd` into "block" data. These blocks are then interpreted by plugins that are installed w/ the runtime in order to setup the specs World before any execution happens. An engine is a sequence of events, and lifec provides custom attributes to define engines within runmd. Lifec also provides a specs system that can drive these sequences after interpretation completes.
+Lifec is a runtime based on `runmd`, `specs ECS`, and `tokio`. It uses the `reality` parser to compile `runmd` into "block" data. These blocks are then interpreted by plugins that are installed w/ the runtime in order to setup the specs World before any execution happens. An engine is a sequence of events, and lifec provides custom attributes to define engines within runmd. Lifec also provides a specs system that can drive these sequences after interpretation completes.
 
 To interact with lifec, consumers implement a Project trait, and use the Host struct to perform these actions. The main output of this process is a specs World. The host can return a dispatcher builder with default lifec systems, but this also allows for customization.
 
@@ -19,8 +19,8 @@ An engine is declared within a control block. This is an example of what a `runm
 
 <``` ubuntu>
 + .engine
-: .event setup
-: .event install
+: .start setup
+: .start install
 : .exit
 <```>
 

@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 
-use reality::{Attribute, Value};
 use chrono::{Utc, DateTime};
-use reality::{Block, BlockProperties};
+use reality::{Value, BlockProperties};
 use specs::{Entity, Component, VecStorage};
 
 /// Struct that contains the results of a single thunk completion,

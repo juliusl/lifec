@@ -82,8 +82,6 @@ mod tests {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_publish() {
-        use std::path::PathBuf;
-
         // Define an engine that calls the plugin
         let mut host = Host::load_content::<Test>(
             r#"

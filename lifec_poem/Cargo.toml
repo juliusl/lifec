@@ -1,0 +1,11 @@
+[package]
+name = "lifec_poem"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+lifec = { git = "https://github.com/juliusl/lifec.git", branch = "pr/v2-protocol2" }
+poem = { version = "1.3.32", features = ["server", "static-files", "rustls"] }
+tokio = "1.19.2"
