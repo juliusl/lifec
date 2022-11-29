@@ -80,7 +80,7 @@ impl<'a> Features<'a> {
 cfg_editor! {
     impl<'a> Features<'a> {
         /// Enable editor features on this thunk context,
-        /// 
+        ///
         pub fn enable_editor_features(&self, context: &ThunkContext) -> ThunkContext {
             let mut context = context.clone();
             context.enable_host_editor_watcher(self.host_editor.deref().clone());

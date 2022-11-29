@@ -31,10 +31,8 @@ impl Plugin for Install {
                     .state()
                     .find_symbol("src_dir")
                     .unwrap_or(String::default());
-                    
-                let work_dir = tc
-                    .work_dir()
-                    .expect("work_dir required for install plugin");
+
+                let work_dir = tc.work_dir().expect("work_dir required for install plugin");
 
                 tokio::fs::create_dir_all(&work_dir)
                     .await
@@ -47,7 +45,7 @@ impl Plugin for Install {
                     Ok(_) => {
                         tc.copy_previous();
                         Some(tc)
-                    },
+                    }
                     Err(err) => {
                         panic!("Could not copy files {err}");
                     }

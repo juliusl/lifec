@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 
 use hdrhistogram::Histogram;
-use specs::{Component, Entity, VecStorage, DenseVecStorage};
+use specs::{Component, DenseVecStorage, Entity, VecStorage};
 use tracing::{event, Level};
 
 use crate::prelude::ErrorContext;
@@ -61,7 +61,7 @@ impl ConnectionState {
     }
 
     /// Returns true if this connection state was spawned,
-    /// 
+    ///
     pub fn is_spawned(&self) -> bool {
         self.source.is_some()
     }
@@ -111,11 +111,13 @@ impl Connection {
     }
 
     /// Returns an iterator over a tuple of spawned events and their source from this connection,
-    /// 
+    ///
     /// Tuple layout is (spawned, source, )
-    /// 
+    ///
     pub fn iter_spawned(&self) -> impl Iterator<Item = (&Entity, &Entity, &Entity)> {
-        self.spawned.iter().map(|(spawned, source)| (spawned, source, &self.to))
+        self.spawned
+            .iter()
+            .map(|(spawned, source)| (spawned, source, &self.to))
     }
 
     /// Returns the entity this connection points to,
@@ -139,7 +141,7 @@ impl Connection {
     }
 
     /// Removes a spawned entity,
-    /// 
+    ///
     pub fn remove_spawned(&mut self, spawned: &Entity) {
         self.spawned.remove(spawned);
     }

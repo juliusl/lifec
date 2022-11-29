@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use reality::{Attribute, Value};
 use reality::BlockProperties;
+use reality::{Attribute, Value};
 use specs::Component;
 use std::{
     collections::{hash_map::DefaultHasher, BTreeMap},
@@ -335,7 +335,7 @@ impl AttributeIndex for AttributeGraph {
     }
 }
 
-cfg_editor! { 
+cfg_editor! {
     use imgui::Ui;
     impl AttributeGraph {
         /// Edit value,
@@ -402,23 +402,23 @@ cfg_editor! {
             }
         }
     }
-    
-    
+
+
     impl App for AttributeGraph {
         fn name() -> &'static str {
             "graph"
         }
-    
+
         fn edit_ui(&mut self, ui: &imgui::Ui) {
             let id = self.entity_id();
-    
+
             for (name, property) in self.resolve_properties_mut().iter_properties_mut() {
                 property.edit(
-                    move |value| Self::edit_value(format!("{name} {id}"), value, None, ui),
+                    move |value| Self::edit_value(format!("{name}##{id}"), value, None, ui),
                     move |values| {
-                        imgui::ListBox::new(format!("{name} {id}")).build(ui, || {
+                        imgui::ListBox::new(format!("{name}##{id}")).build(ui, || {
                             for (idx, value) in values.iter_mut().enumerate() {
-                                Self::edit_value(format!("{name} {id}-{idx}"), value, None, ui);
+                                Self::edit_value(format!("{name}##{id}-{idx}"), value, None, ui);
                             }
                         });
                     },
@@ -426,12 +426,12 @@ cfg_editor! {
                 )
             }
         }
-    
+
         fn display_ui(&self, ui: &imgui::Ui) {
             for (name, property) in self.resolve_properties().iter_properties() {
                 ui.text(format!("{name}: {property}"));
             }
-    
+
             for (name, value) in self.index.control_values() {
                 ui.text(format!("{name}: {:?}", value));
             }

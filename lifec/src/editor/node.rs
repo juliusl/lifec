@@ -109,7 +109,7 @@ impl Node {
     /// Returns the control block symbol, if empty the control is the root block,
     ///
     pub fn control_symbol(&self) -> String {
-        if let Some(state) = self.appendix.state(&self.status.entity()) {
+        if let Some(state) = self.appendix.config(&self.status.entity()) {
             state.control_symbol.to_string()
         } else {
             String::default()

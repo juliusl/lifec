@@ -1,14 +1,11 @@
 use reality::{
-    Attribute, Value,
     wire::{Frame, FrameIndex, WireObject},
-    BlockIndex, Keywords,
+    Attribute, BlockIndex, Keywords, Value,
 };
 use specs::{shred::ResourceId, Component, WorldExt};
 use tracing::{event, Level};
 
-use crate::{
-    state::{AttributeGraph, AttributeIndex},
-};
+use crate::state::{AttributeGraph, AttributeIndex};
 
 use super::NodeCommand;
 

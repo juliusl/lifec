@@ -1,5 +1,5 @@
-use crate::{prelude::*, engine::NodeCommand};
-use specs::{shred::DynamicSystemData, DispatcherBuilder, System, World, Write, LazyUpdate};
+use crate::{engine::NodeCommand, prelude::*};
+use specs::{shred::DynamicSystemData, DispatcherBuilder, LazyUpdate, System, World, Write};
 
 type EnableListener = fn(&World, &mut DispatcherBuilder);
 
@@ -93,8 +93,7 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
             }
 
             if let Some(guest) = plugin_messages.try_next_guest() {
-                lazy_updates
-                    .insert(guest.owner, guest);
+                lazy_updates.insert(guest.owner, guest);
             }
 
             if let Some((command, yielding)) = plugin_messages.try_next_node_command() {
@@ -114,12 +113,10 @@ impl<'a, L: Listener> System<'a> for EventHandler<L> {
                     }
                     NodeCommand::Update(graph) => {
                         let entity = entities.entity(graph.entity_id());
-                        lazy_updates
-                            .insert(entity, NodeCommand::Update(graph.clone()));
+                        lazy_updates.insert(entity, NodeCommand::Update(graph.clone()));
                     }
                     NodeCommand::Swap { owner, from, to } => {
-                        lazy_updates
-                            .insert(owner, NodeCommand::Swap { owner, from, to });
+                        lazy_updates.insert(owner, NodeCommand::Swap { owner, from, to });
                     }
                 }
             }

@@ -1,4 +1,10 @@
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::ops::Deref;
+
 pub use crate::prelude::*;
+use reality::wire::Interner;
+use reality::wire::ResourceId;
 use tokio::select;
 use tokio::sync::oneshot;
 
@@ -143,7 +149,7 @@ where
 /// Implement this trait to extend the events that the runtime can create
 ///
 pub trait Plugin {
-    /// Returns the symbol name representing this plugin
+    /// Returns the symbol custom_attr representing this plugin
     ///
     fn symbol() -> &'static str;
 
@@ -163,6 +169,23 @@ pub trait Plugin {
         ""
     }
 
+    /// Starts a documentation token to build documentation during compile(),
+    ///
+    fn start_docs<'a>(parser: &'a mut AttributeParser) -> Option<DocumentationToken<'a>> {
+        if let Some(_) = parser.world() {
+            let mut interner = Interner::default();
+            let base_ident_id = interner.add_ident(Self::symbol());
+            Some(DocumentationToken {
+                base_ident_id,
+                parser,
+                interner,
+                docs: HashMap::default(),
+            })
+        } else {
+            None
+        }
+    }
+
     /// Optionally, implement to customize the attribute parser,
     ///
     /// Only used if this type is being used as a CustomAttribute.
@@ -173,9 +196,9 @@ pub trait Plugin {
     ///
     /// This allows the runmd parser to use this plugin as an attribute type,
     ///
-    fn as_custom_attr() -> CustomAttribute 
+    fn as_custom_attr() -> CustomAttribute
     where
-        Self: Sized + BlockObject
+        Self: Sized + BlockObject,
     {
         CustomAttribute::new_with(Self::symbol(), |parser, content| {
             if let Some(world) = parser.world() {
@@ -220,9 +243,136 @@ pub trait Plugin {
     }
 }
 
+/// Finds documentation for an attribute related to this plugin,
+///
+pub fn find_doc(
+    plugin: impl AsRef<str>,
+    custom_attr: impl AsRef<str>,
+    world: &World,
+) -> Option<Documentation> {
+    let mut interner = Interner::default();
+    let id = interner.add_ident(plugin);
+    let id = id | interner.add_ident(custom_attr);
+    let resource_id = ResourceId::new_with_dynamic_id::<Documentation>(id);
+
+    world
+        .try_fetch_by_id::<Documentation>(resource_id)
+        .and_then(|d| Some(d.deref().clone()))
+}
+
+/// Returns all documentation for this plugin,
+///
+pub fn docs(plugin: impl AsRef<str>, world: &World) -> BTreeMap<String, Documentation> {
+    let mut interner = Interner::default();
+    let base_id = interner.add_ident(plugin);
+    let resource_id = ResourceId::new_with_dynamic_id::<Interner>(base_id);
+
+    let mut docs = BTreeMap::default();
+
+    if let Some(_interner) = world.try_fetch_by_id::<Interner>(resource_id) {
+        interner = interner.merge(&_interner);
+
+        for (id, attr) in interner.strings().iter().filter(|(i, _)| **i != base_id) {
+            let resource_id = ResourceId::new_with_dynamic_id::<Documentation>(id | base_id);
+
+            if let Some(doc) = world.try_fetch_by_id::<Documentation>(resource_id) {
+                docs.insert(attr.clone(), doc.deref().clone());
+            }
+        }
+    }
+
+    docs
+}
+
+/// Implement trait to add documentation,
+///
+pub trait AddDoc<'a, 'b> {
+    /// Adds documentation,
+    ///
+    fn add_doc(
+        &'a self,
+        token: &'a mut DocumentationToken<'b>,
+        summary: impl AsRef<str>,
+    ) -> &mut Documentation;
+}
+
+impl<'a, 'b> AddDoc<'a, 'b> for CustomAttribute {
+    fn add_doc(
+        &'a self,
+        token: &'a mut DocumentationToken<'b>,
+        summary: impl AsRef<str>,
+    ) -> &mut Documentation {
+        token.add_doc(self.ident(), summary.as_ref())
+    }
+}
+
+/// Wrapper struct for constructing documentation during `fn compile(..)`,
+///
+/// When this struct is dropped, the documentation will be lazily added to the World
+///
+pub struct DocumentationToken<'a> {
+    /// Base id,
+    ///
+    base_ident_id: u64,
+    /// Current parser being used,
+    ///
+    parser: &'a mut AttributeParser,
+    /// Interner for converting strings into id's
+    ///
+    interner: Interner,
+    /// Map of docs being added,
+    ///
+    docs: HashMap<ResourceId, Documentation>,
+}
+
+impl<'a> DocumentationToken<'a> {
+    /// Adds documentation for an attribute,
+    ///
+    pub fn add_doc(
+        &mut self,
+        attr_name: impl AsRef<str>,
+        doc: impl Into<Documentation>,
+    ) -> &mut Documentation {
+        let custom_attr_id = self.interner.add_ident(attr_name.as_ref());
+        let resource_id =
+            ResourceId::new_with_dynamic_id::<Documentation>(self.base_ident_id | custom_attr_id);
+
+        self.docs.insert(resource_id.clone(), doc.into());
+        self.docs
+            .get_mut(&resource_id)
+            .expect("should exist, just added")
+    }
+}
+
+impl<'a> Drop for DocumentationToken<'a> {
+    fn drop(&mut self) {
+        let mut docs = self.docs.clone();
+        let base_id = self.base_ident_id;
+        let interner = self.interner.clone();
+        self.parser.lazy_exec_mut(move |world| {
+            for (r, d) in docs.drain() {
+                world.insert_by_id(r, d);
+            }
+
+            let interner_resource_id = ResourceId::new_with_dynamic_id::<Interner>(base_id);
+            world.insert_by_id(interner_resource_id, interner);
+        });
+    }
+}
+
+impl<'a> AsMut<AttributeParser> for DocumentationToken<'a> {
+    fn as_mut(&mut self) -> &mut AttributeParser {
+        self.parser
+    }
+}
+
 /// Function signature for the plugin trait's call() fn
 ///
 pub type Call = fn(&mut ThunkContext) -> Option<AsyncContext>;
+
+/// Type alias for the Plugin trait's compile fn
+///
+pub type Compile = fn(&mut AttributeParser);
 
 /// Combine plugins
 /// Example "Copy" plugin:
@@ -350,38 +500,38 @@ pub mod async_protocol_helpers {
     /// Strongly typed, Monad for a function that creates a writable stream
     ///
     pub fn write_stream<Writer, F>(
-        name: &'static str,
+        custom_attr: &'static str,
         writer_impl: impl FnOnce(&'static str) -> F,
     ) -> impl FnOnce() -> F
     where
         Writer: AsyncWrite + Unpin,
         F: Future<Output = Writer>,
     {
-        stream::<Writer, F>(name, writer_impl)
+        stream::<Writer, F>(custom_attr, writer_impl)
     }
 
     /// Strongly-typed, Monad for a function that creates a readable stream,
     ///
     pub fn read_stream<Reader, F>(
-        name: &'static str,
+        custom_attr: &'static str,
         reader_impl: impl FnOnce(&'static str) -> F,
     ) -> impl FnOnce() -> F
     where
         Reader: AsyncRead + Unpin,
         F: Future<Output = Reader>,
     {
-        stream::<Reader, F>(name, reader_impl)
+        stream::<Reader, F>(custom_attr, reader_impl)
     }
 
     /// Monad for a function that creates a stream,
     ///
     pub fn stream<IO, F>(
-        name: &'static str,
+        custom_attr: &'static str,
         stream_impl: impl FnOnce(&'static str) -> F,
     ) -> impl FnOnce() -> F
     where
         F: Future<Output = IO>,
     {
-        move || stream_impl(name)
+        move || stream_impl(custom_attr)
     }
 }

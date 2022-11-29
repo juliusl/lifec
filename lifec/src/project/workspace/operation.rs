@@ -1,5 +1,5 @@
 use crate::engine::Adhoc;
-use crate::prelude::{Runtime, Sequence, ThunkContext, State};
+use crate::prelude::{Runtime, Sequence, State, ThunkContext};
 use reality::Value;
 use reality::{Block, SpecialAttribute};
 use specs::prelude::*;
@@ -42,7 +42,9 @@ impl<'a> Operations<'a> {
                 let operation_entity = operation.root().id();
                 let operation_entity = entities.entity(operation_entity);
 
-                if let Some((adhoc, operation)) = (adhocs, sequences).join().get(operation_entity, entities) {
+                if let Some((adhoc, operation)) =
+                    (adhocs, sequences).join().get(operation_entity, entities)
+                {
                     operations.push((operation_entity, adhoc.clone(), operation.clone()));
                 }
             }

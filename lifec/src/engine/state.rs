@@ -4,19 +4,16 @@ use std::{
     sync::Arc,
 };
 
-use reality::Attribute;
 use chrono::Utc;
+use reality::Attribute;
 use specs::{prelude::*, Entities, SystemData};
 use tokio::sync::oneshot;
 
 use super::{
-    connection::ConnectionState, Adhoc, EngineStatus, Limit, Plugins, Profiler, TickControl,
-    Transition, Yielding, NodeCommand,
+    connection::ConnectionState, Adhoc, EngineStatus, Limit, NodeCommand, Plugins, Profiler,
+    TickControl, Transition, Yielding,
 };
-use crate::{
-    engine::Completion,
-    prelude::*, appendix::Appendix,
-};
+use crate::{appendix::Appendix, engine::Completion, prelude::*};
 
 cfg_editor! {
     use crate::editor::{Node, NodeStatus};
@@ -55,7 +52,7 @@ pub struct State<'a> {
     ///
     entity_map: Read<'a, HashMap<String, Entity>>,
     /// Workspace config,
-    /// 
+    ///
     workspace_config: WorkspaceConfig<'a>,
     /// Plugins system data,
     ///
@@ -112,13 +109,13 @@ pub struct State<'a> {
 
 impl<'a> State<'a> {
     /// Returns a reference to lazy update resource,
-    /// 
+    ///
     pub fn lazy_updates(&self) -> &LazyUpdate {
         &self.lazy_update
     }
 
     /// Returns workspace config state,
-    /// 
+    ///
     pub fn workspace_config(&self) -> &WorkspaceConfig<'a> {
         &self.workspace_config
     }
@@ -445,7 +442,7 @@ impl<'a> State<'a> {
     }
 
     /// Returns true if the event operation is in an is_ready state,
-    /// 
+    ///
     pub fn is_ready(&self, event: Entity) -> bool {
         let State { operations, .. } = self;
 
@@ -854,8 +851,7 @@ impl<'a> State<'a> {
                 Cursor::Next(next) => {
                     if let Some(connection) = connections.get_mut(*next) {
                         if let Some(key) = connection.schedule(event) {
-                            self.lazy_update
-                                .insert(event, key);
+                            self.lazy_update.insert(event, key);
                         }
                     }
                 }
@@ -863,8 +859,7 @@ impl<'a> State<'a> {
                     for fork in forks {
                         if let Some(connection) = connections.get_mut(*fork) {
                             if let Some(key) = connection.schedule(event) {
-                                self.lazy_update
-                                    .insert(event, key);
+                                self.lazy_update.insert(event, key);
                             }
                         }
                     }
@@ -1256,9 +1251,9 @@ impl<'a> State<'a> {
 
                             let mut appendix = (*self.appendix).deref().clone();
                             appendix.insert_general(plugin_entity, &thunk_src.thunk());
-                            appendix.insert_state(
+                            appendix.insert_config(
                                 plugin_entity,
-                                crate::appendix::State {
+                                crate::appendix::Config {
                                     control_symbol: block.symbol().to_string(),
                                     graph: Some(graph.clone()),
                                 },
@@ -1273,7 +1268,6 @@ impl<'a> State<'a> {
                             self.lazy_update.insert(plugin_entity, thunk_src.thunk());
 
                             self.lazy_update.insert(event_entity, next);
-
 
                             return true;
                         } else {

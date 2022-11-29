@@ -1,4 +1,4 @@
-use std::{fmt::Display, collections::BTreeSet};
+use std::{collections::BTreeSet, fmt::Display};
 
 use specs::{Component, Entity, VecStorage};
 

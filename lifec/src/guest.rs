@@ -104,7 +104,7 @@ impl Guest {
         host_editor.run_now(self.protocol.borrow().as_ref());
         host_editor
     }
-    
+
     /// Handle any commands from guest nodes and update protocol,
     ///
     pub fn handle(&mut self) {

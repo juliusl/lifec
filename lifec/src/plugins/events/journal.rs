@@ -1,9 +1,8 @@
 use std::io::Cursor;
 
 use reality::{
-    Value,
     wire::{Frame, FrameIndex, WireObject},
-    Keywords,
+    Keywords, Value,
 };
 use specs::{shred::ResourceId, Entity};
 
@@ -64,7 +63,7 @@ impl WireObject for Journal {
         interner: &reality::wire::Interner,
         blob_device: &BlobImpl,
         frames: &[reality::wire::Frame],
-    ) -> Self 
+    ) -> Self
     where
         BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
     {
@@ -138,16 +137,16 @@ mod tests {
     #[tracing_test::traced_test]
     async fn test() {
         use crate::appendix::Appendix;
-        use std::sync::Arc;
+        use crate::engine::NodeCommand;
+        use crate::prelude::Journal;
         use reality::wire::{Protocol, WireObject};
         use specs::WorldExt;
-        use crate::prelude::Journal;
-        use crate::engine::NodeCommand;
+        use std::sync::Arc;
 
         let mut protocol = Protocol::empty();
-    
+
         protocol.as_mut().insert(Arc::new(Appendix::default()));
-    
+
         // Record node command as wire objects in a protocol,
         //
         let frame_count = protocol.encoder::<Journal>(|world, encoder| {
@@ -161,11 +160,11 @@ mod tests {
             journal.encode(world, encoder);
             encoder.frame_index = Journal::build_index(&encoder.interner, encoder.frames_slice());
         });
-    
+
         let (control_client, control_server) = tokio::io::duplex(64 * frame_count);
         let (frame_client, frame_server) = tokio::io::duplex(64 * frame_count);
         let (blob_client, blob_server) = tokio::io::duplex(64 * frame_count);
-    
+
         let read = tokio::spawn(async move {
             protocol
                 .send_async::<Journal, _, _>(
@@ -175,7 +174,7 @@ mod tests {
                 )
                 .await;
         });
-    
+
         let write = tokio::spawn(async {
             let mut receiver = Protocol::empty();
             receiver
@@ -185,13 +184,13 @@ mod tests {
                     || std::future::ready(blob_server),
                 )
                 .await;
-    
+
             let journal = receiver.decode::<Journal>();
             journal
         });
-    
-        let (_, journal)= tokio::join!(read, write);
-    
+
+        let (_, journal) = tokio::join!(read, write);
+
         let journal = journal.expect("should be okay");
         eprintln!("{:#?}", journal);
     }

@@ -1,18 +1,24 @@
-use std::{collections::BTreeMap, ops::{Deref, DerefMut}};
+use std::{
+    collections::BTreeMap,
+    ops::{Deref, DerefMut},
+};
 
 use atlier::system::{App, Extension};
 use copypasta::{ClipboardContext, ClipboardProvider};
-use imgui::{TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags, Ui, Window, ColorEdit};
+use imgui::{
+    ColorEdit, TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags, Ui, Window, StyleVar,
+};
 use reality::{BlockIndex, Value};
 use specs::{Join, RunNow, World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 use tracing::{event, Level};
 
 use crate::{
-    engine::{EngineStatus, NodeCommandHandler, Runner, Yielding, WorkspaceCommand, NodeCommand},
+    appendix::Appendix,
+    engine::{EngineStatus, NodeCommand, NodeCommandHandler, Runner, WorkspaceCommand, Yielding},
     guest::Guest,
-    prelude::{Runtime, State, WorkspaceConfig},
-    state::AttributeGraph, debugger::Debugger, appendix::Appendix,
+    prelude::{docs, Runtime, State, WorkspaceConfig},
+    state::AttributeGraph,
 };
 
 use super::NodeStatus;
@@ -130,10 +136,14 @@ impl WorkspaceEditor {
     /// Plugins table,
     ///
     pub fn plugins(&mut self, world: &World, ui: &Ui) {
+        let indent_spacing = ui.push_style_var(StyleVar::IndentSpacing(8.0));
+        
         let runtime = world.read_resource::<Runtime>();
 
-        let table_flags =
-            TableFlags::BORDERS_INNER_V | TableFlags::RESIZABLE | TableFlags::HIDEABLE;
+        let table_flags = TableFlags::BORDERS_INNER_V
+            | TableFlags::BORDERS_INNER_H
+            | TableFlags::RESIZABLE
+            | TableFlags::HIDEABLE;
 
         if let Some(token) = ui.begin_table_with_flags(format!("Plugins"), 2, table_flags) {
             fn name_column(ui: &Ui) {
@@ -142,7 +152,6 @@ impl WorkspaceEditor {
                     TableColumnFlags::NO_HIDE | TableColumnFlags::WIDTH_FIXED;
                 ui.table_setup_column_with(table_column_setup);
             }
-
             name_column(ui);
             ui.table_setup_column("Description");
             ui.table_headers_row();
@@ -151,20 +160,45 @@ impl WorkspaceEditor {
                 ui.table_next_row();
                 ui.table_next_column();
                 let name = thunk.0;
-                ui.button_with_size(format!("{name}"), [140.0, 0.0]);
+                let plugin_node = TreeNode::new(name).push(ui);
                 if let Some(tooltip) = imgui::drag_drop::DragDropSource::new("ADD_PLUGIN")
                     .begin_payload(ui, WorkspaceCommand::AddPlugin(thunk))
                 {
-                    ui.text(format!("Thunk - {name}"));
+                    ui.text(format!(
+                        "Thunk - {name} - Drop on host editor or canvas to add this plugin"
+                    ));
                     tooltip.end();
                 }
-
                 ui.table_next_column();
                 ui.text(thunk.1);
+
+                if let Some(node) = plugin_node {
+                    for (name, doc) in docs(name, world) {
+                        ui.table_next_row();
+                        ui.table_next_column();
+                        TreeNode::new(format!(".{name}"))
+                            .leaf(true)
+                            .bullet(true)
+                            .push(ui);
+                        // if let Some(tooltip) = imgui::drag_drop::DragDropSource::new("ADD_PLUGIN")
+                        //     .begin_payload(ui, WorkspaceCommand::AddPlugin(thunk))
+                        // {
+                        //     ui.text(format!(
+                        //         "Thunk - {name} - Drop on host editor or canvas to add this plugin"
+                        //     ));
+                        //     tooltip.end();
+                        // }
+
+                        ui.table_next_column();
+                        ui.text(doc.summary);
+                    }
+                    node.pop();
+                }
             }
 
             token.end();
         }
+        indent_spacing.end();
     }
 
     /// Custom node handlers,
@@ -266,7 +300,7 @@ impl WorkspaceEditor {
 
                                 ui.table_next_column();
                                 if let NodeStatus::Engine(EngineStatus::Inactive(_)) = engine.status {
-                                    if ui.button(format!("Start {}", engine.status.entity().id())) {
+                                    if ui.button(format!("Start##{}", engine.status.entity().id())) {
                                         if let Some(e) = engine.sequence.as_ref().and_then(|s| s.peek()) {
                                             match command_dispatcher.try_send((NodeCommand::Activate(e), None::<Yielding>)) {
                                                 Ok(_) => {
@@ -315,7 +349,7 @@ impl WorkspaceEditor {
                                 }
 
                                 ui.table_next_column();
-                                if ui.button(format!("Spawn {}", entity.id())) {
+                                if ui.button(format!("Spawn##{}", entity.id())) {
                                     match command_dispatcher
                                         .try_send((NodeCommand::Spawn(entity), None::<Yielding>))
                                     {
@@ -383,7 +417,7 @@ impl WorkspaceEditor {
                                     }
 
                                     ui.table_next_column();
-                                    if ui.button(format!("Spawn {}", entity.id())) {
+                                    if ui.button(format!("Spawn##{}", entity.id())) {
                                         match command_dispatcher.try_send((
                                             NodeCommand::Spawn(entity),
                                             None::<Yielding>,
@@ -444,6 +478,10 @@ impl Extension for WorkspaceEditor {
             b: 0.03434,
             a: 1.0,
         });
+    }
+
+    fn configure_imgui_context(context: &mut imgui::Context) {
+        context.style_mut().cell_padding = [12.0, 6.0];
     }
 
     fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui<'_>) {
@@ -571,7 +609,7 @@ impl From<Appendix> for WorkspaceEditor {
             appendix,
             clipboard: None,
             workspace_config: Default::default(),
-            background: [0.02122, 0.02519, 0.03434, 1.0]
+            background: [0.02122, 0.02519, 0.03434, 1.0],
         }
     }
 }

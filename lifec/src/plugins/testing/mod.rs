@@ -5,9 +5,8 @@ pub use chaos::Chaos;
 
 pub struct Test;
 
-/// Debug component 
-/// 
+/// Debug component
+///
 #[derive(Component, Default)]
 #[storage(DefaultVecStorage)]
 pub struct Debug();
-

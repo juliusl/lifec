@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{prelude::*, appendix::General};
+use crate::{appendix::General, prelude::*};
 use reality::Block;
 use specs::{Component, Entity};
 use tracing::{event, Level};
@@ -60,7 +60,7 @@ impl Event {
     }
 
     /// Reactivates the event,
-    /// 
+    ///
     pub fn reactivate(&mut self, sequence: Sequence) {
         self.2 = Some(sequence);
     }
@@ -119,9 +119,9 @@ impl Display for Event {
 
 impl Into<General> for &Event {
     fn into(self) -> General {
-        General { 
+        General {
             name: self.0.to_string(),
-            expression: format!("::{}", self.0)
+            expression: format!("::{}", self.0),
         }
     }
 }

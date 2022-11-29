@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use reality::{Attribute, Value};
 use reality::BlockProperties;
+use reality::{Attribute, Value};
 
 /// V2 - Revising interface w/ attributes
 ///
@@ -39,17 +39,17 @@ pub trait AttributeIndex {
     fn values(&self) -> BTreeMap<String, Vec<Value>>;
 
     /// Returns a reference to state as a block properties struct,
-    /// 
+    ///
     fn properties(&self) -> &BlockProperties;
 
     /// Returns a mutable reference to state as a block properties struct,
-    /// 
+    ///
     fn properties_mut(&mut self) -> &mut BlockProperties;
 
     /// Returns a map of control values,
-    /// 
+    ///
     /// Control values are defined at the block level and are used when the index for root of the index does not have a value,
-    /// 
+    ///
     fn control_values(&self) -> &BTreeMap<String, Value>;
 
     /// Finds all text values with name,
@@ -89,7 +89,7 @@ pub trait AttributeIndex {
     }
 
     /// Finds a list of float ranges,
-    /// 
+    ///
     fn find_float_range_values(&self, with_name: impl AsRef<str>) -> Vec<[f32; 3]> {
         self.find_values(with_name)
             .iter()
@@ -100,9 +100,8 @@ pub trait AttributeIndex {
             .collect()
     }
 
-
     /// Finds a list of float pairs,
-    /// 
+    ///
     fn find_float_pair_values(&self, with_name: impl AsRef<str>) -> Vec<[f32; 2]> {
         self.find_values(with_name)
             .iter()
@@ -420,8 +419,11 @@ pub trait AttributeIndex {
 
     /// Replaces an float range attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_float_range_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 3]) -> &mut Self
-    {
+    fn replace_float_range_attr(
+        &mut self,
+        name: impl AsRef<str>,
+        init_value: &[f32; 3],
+    ) -> &mut Self {
         self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
@@ -439,8 +441,7 @@ pub trait AttributeIndex {
         &mut self,
         name: impl AsRef<str>,
         init_value: impl Into<BTreeSet<String>>,
-    ) -> &mut Self
-    {
+    ) -> &mut Self {
         self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
@@ -451,8 +452,7 @@ pub trait AttributeIndex {
 
     /// Replaces a reference attribute w/ init_value and w/ name to index for entity.
     ///
-    fn replace_reference(&mut self, name: impl AsRef<str>, init_value: Value) -> &mut Self
-    {
+    fn replace_reference(&mut self, name: impl AsRef<str>, init_value: Value) -> &mut Self {
         self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
@@ -474,8 +474,7 @@ pub trait AttributeIndex {
 
     /// Replaces an empty attribute w/ name to index for entity.
     ///
-    fn replace_empty_attr(&mut self, name: impl AsRef<str>) -> &mut Self
-    {
+    fn replace_empty_attr(&mut self, name: impl AsRef<str>) -> &mut Self {
         self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
@@ -486,8 +485,11 @@ pub trait AttributeIndex {
 
     /// Replaces a binary vector attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_binary_attr(&mut self, name: impl AsRef<str>, init_value: impl Into<Vec<u8>>) -> &mut Self
-    {
+    fn replace_binary_attr(
+        &mut self,
+        name: impl AsRef<str>,
+        init_value: impl Into<Vec<u8>>,
+    ) -> &mut Self {
         self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
@@ -498,8 +500,11 @@ pub trait AttributeIndex {
 
     /// Replaces a text buffer attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_text_attr(&mut self, name: impl AsRef<str>, init_value: impl AsRef<str>) -> &mut Self
-    {
+    fn replace_text_attr(
+        &mut self,
+        name: impl AsRef<str>,
+        init_value: impl AsRef<str>,
+    ) -> &mut Self {
         self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
@@ -510,8 +515,7 @@ pub trait AttributeIndex {
 
     /// Replaces an int attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_int_attr(&mut self, name: impl AsRef<str>, init_value: i32) -> &mut Self
-    {
+    fn replace_int_attr(&mut self, name: impl AsRef<str>, init_value: i32) -> &mut Self {
         self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
@@ -522,8 +526,7 @@ pub trait AttributeIndex {
 
     /// Replaces an float attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_float_attr(&mut self, name: impl AsRef<str>, init_value: f32) -> &mut Self
-    {
+    fn replace_float_attr(&mut self, name: impl AsRef<str>, init_value: f32) -> &mut Self {
         self.add_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
@@ -534,8 +537,7 @@ pub trait AttributeIndex {
 
     /// Replaces a bool attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_bool_attr(&mut self, name: impl AsRef<str>, init_value: bool) -> &mut Self
-    {
+    fn replace_bool_attr(&mut self, name: impl AsRef<str>, init_value: bool) -> &mut Self {
         self.add_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
@@ -546,8 +548,11 @@ pub trait AttributeIndex {
 
     /// Replaces a float pair attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_float_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[f32; 2]) -> &mut Self
-    {
+    fn replace_float_pair_attr(
+        &mut self,
+        name: impl AsRef<str>,
+        init_value: &[f32; 2],
+    ) -> &mut Self {
         self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
@@ -558,8 +563,7 @@ pub trait AttributeIndex {
 
     /// Replaces an int pair attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_int_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) -> &mut Self
-    {
+    fn replace_int_pair_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 2]) -> &mut Self {
         self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),
@@ -570,8 +574,11 @@ pub trait AttributeIndex {
 
     /// Replaces an int range attribute w/ name and w/ init_value for entity.
     ///
-    fn replace_int_range_attr(&mut self, name: impl AsRef<str>, init_value: &[i32; 3]) -> &mut Self 
-    {
+    fn replace_int_range_attr(
+        &mut self,
+        name: impl AsRef<str>,
+        init_value: &[i32; 3],
+    ) -> &mut Self {
         self.replace_attribute(Attribute::new(
             self.entity_id(),
             name.as_ref().to_string(),

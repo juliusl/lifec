@@ -1,8 +1,8 @@
-use reality::{Attribute, Value};
 use reality::{
     wire::{Frame, FrameIndex, ResourceId, WireObject},
     BlockIndex, BlockProperties, Keywords,
 };
+use reality::{Attribute, Value};
 use specs::{Component, WorldExt};
 
 use super::{AttributeGraph, AttributeIndex};
@@ -39,7 +39,7 @@ impl WireObject for AttributeGraph {
         interner: &reality::wire::Interner,
         blob_device: &BlobImpl,
         frames: &[reality::wire::Frame],
-    ) -> Self 
+    ) -> Self
     where
         BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
     {
@@ -133,13 +133,13 @@ impl WireObject for AttributeGraph {
 mod tests {
     #[test]
     fn test_graph_wire_object() {
-        use reality::wire::Protocol;
         use crate::state::{AttributeGraph, AttributeIndex};
+        use reality::wire::Protocol;
         use reality::wire::WireObject;
         use reality::BlockProperties;
         use specs::WorldExt;
         use std::io::Cursor;
-        
+
         let mut protocol = Protocol::<Cursor<Vec<u8>>>::empty();
         protocol.as_mut().register::<BlockProperties>();
 
@@ -169,22 +169,30 @@ mod tests {
             encoder.frame_index = graph;
         });
 
-
         let graphs = protocol.decode::<AttributeGraph>();
 
         let graph = graphs.get(0).expect("Should have a graph");
-        assert_eq!(graph.find_symbol("test").expect("should exist"), "test_symbol");
+        assert_eq!(
+            graph.find_symbol("test").expect("should exist"),
+            "test_symbol"
+        );
         assert_eq!(graph.find_bool("test_bool").expect("should exist"), false);
         assert_eq!(graph.find_int("test_int").expect("should exist"), 10);
 
         // Alphabetically this is in the second position, but this is the 3rd graph from above
         let graph = graphs.get(1).expect("Should have a graph");
-        assert_eq!(graph.find_symbol("test").expect("should exist"), "test_symbol4");
+        assert_eq!(
+            graph.find_symbol("test").expect("should exist"),
+            "test_symbol4"
+        );
         assert_eq!(graph.find_bool("test_bool").expect("should exist"), true);
         assert_eq!(graph.find_int("test_int").expect("should exist"), 60);
 
         let graph = graphs.get(2).expect("Should have a graph");
-        assert_eq!(graph.find_symbol("test").expect("should exist"), "test_symbol2");
+        assert_eq!(
+            graph.find_symbol("test").expect("should exist"),
+            "test_symbol2"
+        );
         assert_eq!(graph.find_bool("test_bool").expect("should exist"), true);
         assert_eq!(graph.find_int("test_int").expect("should exist"), 40);
     }

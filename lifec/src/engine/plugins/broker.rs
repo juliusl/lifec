@@ -3,7 +3,11 @@ use std::ops::Deref;
 use specs::{prelude::*, Read};
 use tokio::sync::mpsc::{error::SendError, error::TrySendError, Sender};
 
-use crate::{prelude::*, guest::Guest, engine::{Yielding, Completion, NodeCommand}};
+use crate::{
+    engine::{Completion, NodeCommand, Yielding},
+    guest::Guest,
+    prelude::*,
+};
 
 /// Resources for sending messages from plugins,
 ///
@@ -18,7 +22,7 @@ pub struct Broker<'a> {
 
 impl<'a> Broker<'a> {
     /// Returns a new command dispatcher,
-    /// 
+    ///
     pub fn command_dispatcher(&self) -> Sender<(NodeCommand, Option<Yielding>)> {
         self.node_sender.deref().clone()
     }
@@ -26,7 +30,13 @@ impl<'a> Broker<'a> {
     /// Enables message senders on a thunk context,
     ///
     pub fn enable(&self, context: &mut ThunkContext) {
-        let Broker { status_sender, operation_sender, guest_sender, node_sender, completion_sender } = self;
+        let Broker {
+            status_sender,
+            operation_sender,
+            guest_sender,
+            node_sender,
+            completion_sender,
+        } = self;
 
         context
             .enable_operation_dispatcher(operation_sender.deref().clone())
@@ -50,7 +60,9 @@ impl<'a> Broker<'a> {
     /// Sends an operation,
     ///
     pub async fn send_operation(&self, operation: Operation) -> Result<(), SendError<Operation>> {
-        let Broker { operation_sender, .. } = self;
+        let Broker {
+            operation_sender, ..
+        } = self;
 
         operation_sender.send(operation).await
     }
@@ -61,7 +73,7 @@ impl<'a> Broker<'a> {
         &self,
         status_update: StatusUpdate,
     ) -> Result<(), TrySendError<StatusUpdate>> {
-        let Broker {  status_sender, .. } = self;
+        let Broker { status_sender, .. } = self;
 
         status_sender.try_send(status_update)
     }
@@ -69,23 +81,34 @@ impl<'a> Broker<'a> {
     /// Sends an operation,
     ///
     pub fn try_send_operation(&self, operation: Operation) -> Result<(), TrySendError<Operation>> {
-        let Broker { operation_sender, .. } = self;
+        let Broker {
+            operation_sender, ..
+        } = self;
 
         operation_sender.try_send(operation)
     }
 
     /// Sends a node command,
-    /// 
-    pub fn try_send_node_command(&self, node_command: NodeCommand, yielding: Option<Yielding>) -> Result<(), TrySendError<(NodeCommand, Option<Yielding>)>> {
-        let Broker { node_sender, .. } = self; 
+    ///
+    pub fn try_send_node_command(
+        &self,
+        node_command: NodeCommand,
+        yielding: Option<Yielding>,
+    ) -> Result<(), TrySendError<(NodeCommand, Option<Yielding>)>> {
+        let Broker { node_sender, .. } = self;
 
         node_sender.try_send((node_command, yielding))
     }
 
     /// Sends a completion,
-    /// 
-    pub fn try_send_completion(&self, completion: Completion)  -> Result<(), TrySendError<Completion>>  {
-        let Broker {completion_sender, .. } = self;
+    ///
+    pub fn try_send_completion(
+        &self,
+        completion: Completion,
+    ) -> Result<(), TrySendError<Completion>> {
+        let Broker {
+            completion_sender, ..
+        } = self;
 
         completion_sender.try_send(completion)
     }

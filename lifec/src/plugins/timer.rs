@@ -45,11 +45,8 @@ impl Plugin for Timer {
                         if tc.is_enabled("quiet") {
                             tc.progress("", progress).await;
                         } else {
-                            tc.progress(
-                                format!("elapsed {} ms", elapsed.as_millis()),
-                                progress,
-                            )
-                            .await;
+                            tc.progress(format!("elapsed {} ms", elapsed.as_millis()), progress)
+                                .await;
                         }
                     } else {
                         tc.state_mut()

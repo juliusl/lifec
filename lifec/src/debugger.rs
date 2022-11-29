@@ -5,21 +5,21 @@ use std::{
 
 use chrono::{NaiveDateTime, Utc};
 use reality::{
+    wire::{Decoder, Encoder, FrameIndex, Protocol, ResourceId, WireObject},
     Value,
-    wire::{Decoder, Encoder, FrameIndex, Protocol, ResourceId, WireObject}, 
 };
 use specs::{Entity, World};
-use tokio::sync::mpsc::Sender;
 use tracing::{event, Level};
 
 use crate::{
-    engine::{Completion, Yielding, NodeCommand},
-    prelude::{ErrorContext, Listener, Plugins, StatusUpdate}, appendix::Appendix,
+    appendix::Appendix,
+    engine::Completion,
+    prelude::{ErrorContext, Listener, StatusUpdate},
 };
 
 /// Struct for engine debugger,
 ///
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Debugger {
     /// Appendix to look up metadata,
     ///
@@ -39,31 +39,9 @@ pub struct Debugger {
     /// Number of completions to keep,
     ///
     completion_limits: Option<usize>,
-    /// Command dispatcher,
-    ///
-    _command_dispatcher: Option<Sender<(NodeCommand, Option<Yielding>)>>,
-    /// Update notification,
-    ///
-    updated: Option<()>,
     /// Encoded form,
     ///
     encoded: Option<Encoder>,
-}
-
-impl Clone for Debugger {
-    fn clone(&self) -> Self {
-        Self {
-            appendix: self.appendix.clone(),
-            completions: self.completions.clone(),
-            status_updates: self.status_updates.clone(),
-            errors: self.errors.clone(),
-            status_update_limits: self.status_update_limits.clone(),
-            completion_limits: self.completion_limits.clone(),
-            _command_dispatcher: self._command_dispatcher.clone(),
-            updated: self.updated.clone(),
-            encoded: None,
-        }
-    }
 }
 
 cfg_editor! {
@@ -307,7 +285,7 @@ cfg_editor! {
                                     property.edit(
                                         move |value| {
                                             AttributeGraph::edit_value(
-                                                format!("{name} {i}.{}.{}", event.id(), thunk.id()),
+                                                format!("{name}##{i}.{}.{}", event.id(), thunk.id()),
                                                 value,
                                                 None,
                                                 ui,
@@ -319,7 +297,7 @@ cfg_editor! {
                                                 for (idx, value) in values.iter_mut().enumerate() {
                                                     AttributeGraph::edit_value(
                                                         format!(
-                                                            "{name} {i}-{idx}.{}.{}",
+                                                            "{name}##{i}-{idx}.{}.{}",
                                                             event.id(),
                                                             thunk.id()
                                                         ),
@@ -347,7 +325,7 @@ cfg_editor! {
                                             move |value| {
                                                 AttributeGraph::edit_value(
                                                     format!(
-                                                        "{name} c_{i}.{}.{}",
+                                                        "{name}##c_{i}.{}.{}",
                                                         event.id(),
                                                         thunk.id()
                                                     ),
@@ -368,7 +346,7 @@ cfg_editor! {
                                                     {
                                                         AttributeGraph::edit_value(
                                                             format!(
-                                                                "{name} c_{i}-{idx}.{}.{}",
+                                                                "{name}##c_{i}-{idx}.{}.{}",
                                                                 event.id(),
                                                                 thunk.id()
                                                             ),
@@ -463,7 +441,7 @@ impl Debugger {
         protocol.encoder::<Debugger>(|world, encoder| {
             self.encode(world, encoder);
         });
-        self.encoded = protocol.take_encoder(Debugger::resource_id());
+        self.encoded = protocol.take_encoder(&Debugger::resource_id());
     }
 
     /// Returns an iterator over completions,
@@ -505,15 +483,8 @@ impl PartialEq for Debugger {
 
 impl Listener for Debugger {
     fn create(world: &specs::World) -> Self {
-        let command_dispatcher = world
-            .system_data::<Plugins>()
-            .features()
-            .broker()
-            .command_dispatcher();
-
         Self {
             appendix: world.fetch::<Appendix>().deref().clone(),
-            _command_dispatcher: Some(command_dispatcher),
             ..Default::default()
         }
     }
@@ -539,7 +510,8 @@ impl Listener for Debugger {
             self.completions.pop_front();
         }
 
-        self.completions.push_back(((completion.event, completion.thunk), completion));
+        self.completions
+            .push_back(((completion.event, completion.thunk), completion));
     }
 
     fn on_error_context(&mut self, error: &crate::prelude::ErrorContext) {

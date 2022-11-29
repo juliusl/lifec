@@ -10,10 +10,9 @@ pub use thunk_context::ThunkContext;
 
 use crate::appendix::General;
 
-use super::Plugin;
+use super::{Call, Plugin};
 use std::fmt::Debug;
 use std::hash::Hash;
-use tokio::task::JoinHandle;
 
 /// Thunk is a function that can be passed around for the system to call later
 #[derive(Component, Clone, Copy)]
@@ -23,8 +22,8 @@ pub struct Thunk(
     pub &'static str,
     /// Description
     pub &'static str,
-    /// thunk fn
-    pub fn(&mut ThunkContext) -> Option<(JoinHandle<ThunkContext>, CancelToken)>,
+    /// Call fn,
+    pub Call,
 );
 
 impl Thunk {

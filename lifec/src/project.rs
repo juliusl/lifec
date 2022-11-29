@@ -193,11 +193,15 @@ where
                 .expect("Should be able to insert graph for entity");
         }
 
-        let blocks = { 
-            world.read_component::<Block>().join().cloned().collect::<Vec<_>>()
+        let blocks = {
+            world
+                .read_component::<Block>()
+                .join()
+                .cloned()
+                .collect::<Vec<_>>()
         };
 
-        for block in  blocks.iter() {
+        for block in blocks.iter() {
             engine.interpret(&world, block);
 
             Self::interpret(&world, block);

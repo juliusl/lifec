@@ -88,19 +88,23 @@ impl Workspace {
     }
 
     /// Returns a cached file,
-    /// 
+    ///
     pub fn cached_file(&self, symbol: impl AsRef<str>) -> Option<&RunmdFile> {
         self.cached_files.get(symbol.as_ref())
     }
 
     /// If the root_runmd is set, compiles the workspace w/ the cached files and returns a world,
-    /// 
+    ///
     pub fn compile<P>(&self) -> Option<World>
     where
-        P: Project
+        P: Project,
     {
         if let Some(_) = self.root_runmd() {
-            Some(P::compile_workspace(self, self.cached_files.iter().map(|(_, f)| f), None))
+            Some(P::compile_workspace(
+                self,
+                self.cached_files.iter().map(|(_, f)| f),
+                None,
+            ))
         } else {
             None
         }
@@ -319,9 +323,9 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn test_compile_workspace() {
-        use reality::{Attribute, Value};
         use reality::Block;
         use reality::BlockProperty;
+        use reality::{Attribute, Value};
         use specs::WorldExt;
         use tracing::Level;
 
@@ -498,7 +502,6 @@ mod tests {
 
             let mut events = host.world().system_data::<State>();
             let event = host.world().entities().entity(2);
-           
 
             // TODO - add assertions
             {
@@ -556,7 +559,6 @@ mod tests {
                 let mut event_state = events.scan();
                 assert_eq!(event_state.next(), Some(EventStatus::New(event)));
             }
-
 
             events.handle();
 

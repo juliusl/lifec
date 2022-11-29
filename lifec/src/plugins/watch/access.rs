@@ -3,10 +3,10 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use reality::Value;
 use logos::Logos;
 use notify::{event::AccessKind, event::AccessMode, EventKind};
 use reality::SpecialAttribute;
+use reality::Value;
 
 /// Enumeration of `access` event kinds
 ///

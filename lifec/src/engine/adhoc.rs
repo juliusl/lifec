@@ -15,16 +15,14 @@ pub struct Adhoc {
 
 impl Adhoc {
     /// Returns the tag name,
-    /// 
+    ///
     pub fn tag(&self) -> impl AsRef<str> + '_ {
-        self.tag
-            .trim_end_matches("operation")
-            .trim_end_matches(".")
+        self.tag.trim_end_matches("operation").trim_end_matches(".")
     }
 
     /// Returns the name of the adhoc
-    /// 
-    pub fn name(&self) -> impl AsRef<str>  + '_ {
+    ///
+    pub fn name(&self) -> impl AsRef<str> + '_ {
         &self.name
     }
 }

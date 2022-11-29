@@ -3,9 +3,9 @@ use std::io::Write;
 
 use reality::wire::FrameIndex;
 use reality::wire::{Frame, WireObject};
+use specs::shred::ResourceId;
 use specs::Component;
 use specs::WorldExt;
-use specs::shred::ResourceId;
 
 use super::Performance;
 
@@ -88,7 +88,7 @@ impl WireObject for Performance {
         _: &reality::wire::Interner,
         _: &BlobImpl,
         frames: &[reality::wire::Frame],
-    ) -> Self 
+    ) -> Self
     where
         BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
     {
@@ -143,7 +143,7 @@ impl WireObject for Performance {
                             let mut _c = [0; 4];
                             _c.copy_from_slice(c);
                             performance.buckets.push(bytemuck::cast::<[u8; 4], f32>(_c));
-                            
+
                             if bucket_len > 0 {
                                 bucket_len -= 1;
                             }
@@ -159,7 +159,7 @@ impl WireObject for Performance {
                             p.copy_from_slice(&c[..8]);
                             let mut pv = [0; 8];
                             pv.copy_from_slice(&c[8..]);
-                            
+
                             // TODO add parity
                             performance.percentiles.push((
                                 bytemuck::cast::<[u8; 8], u64>(p),
@@ -183,15 +183,14 @@ impl WireObject for Performance {
     fn build_index(
         _: &reality::wire::Interner,
         frames: &[reality::wire::Frame],
-    ) -> reality::wire::FrameIndex 
-    {
+    ) -> reality::wire::FrameIndex {
         let mut frame_index = FrameIndex::default();
 
         for (idx, frame) in frames.iter().enumerate() {
             if frame.op() == 0x10 {
                 if let Some(end) = frames[idx + 1..].iter().position(|f| f.op() == 0x10) {
                     let range = idx..idx + end + 1;
-                    
+
                     assert!(range.start < range.end, "{:?}, {:?}", range, frames);
 
                     frame_index.insert(format!("{idx}-performance"), vec![range]);

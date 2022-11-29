@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use chrono::{Utc, DateTime};
-use reality::{Value, BlockProperties};
-use specs::{Entity, Component, VecStorage};
+use chrono::{DateTime, Utc};
+use reality::{BlockProperties, Value};
+use specs::{Component, Entity, VecStorage};
 
 /// Struct that contains the results of a single thunk completion,
 ///
@@ -10,7 +10,7 @@ use specs::{Entity, Component, VecStorage};
 #[storage(VecStorage)]
 pub struct Completion {
     /// Timestamp,
-    /// 
+    ///
     pub timestamp: DateTime<Utc>,
     /// Event entity that initiated this completion,
     ///

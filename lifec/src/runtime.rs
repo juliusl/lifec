@@ -16,10 +16,10 @@ pub use thunk_source::ThunkSource;
 #[storage(DefaultVecStorage)]
 pub struct Runtime {
     /// Table of functions for creating new event components
-    /// 
+    ///
     plugins: BTreeMap<String, ThunkSource>,
     /// Set of custom attributes to use, added from install()
-    /// 
+    ///
     custom_attributes: BTreeMap<String, CustomAttribute>,
     /// Custom node commands,
     ///

@@ -1,4 +1,3 @@
-
 use crate::prelude::*;
 
 /// Simple plugin that hosts a file and waits for a connection,
@@ -71,7 +70,7 @@ impl BlockObject for Publish {
 
 mod tests {
     use crate::prelude::*;
-    
+
     #[derive(Default)]
     struct Test;
 
@@ -114,7 +113,6 @@ mod tests {
                 .with_symbol("address", "127.0.0.1:49579");
             context.readln_stream().await
         });
-
 
         // This drives the event runtime a bit so things start up
         let mut count = 0;

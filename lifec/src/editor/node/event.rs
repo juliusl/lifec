@@ -138,7 +138,7 @@ impl EventNode for Node {
                         }
 
                         if let Some(tree_node) = tree_node {
-                            if let Some(state) = self.appendix.state(&s) {
+                            if let Some(state) = self.appendix.config(&s) {
                                 let mut graph = self
                                     .mutations
                                     .get(&s)
@@ -153,21 +153,21 @@ impl EventNode for Node {
                                     property.edit(
                                         move |value| {
                                             AttributeGraph::edit_value(
-                                                format!("{name} {i}"),
+                                                format!("{name}##{i}"),
                                                 value,
                                                 None,
                                                 ui,
                                             )
                                         },
                                         move |values| {
-                                            imgui::ListBox::new(format!("{name} {i}")).build(
+                                            imgui::ListBox::new(format!("{name}##{i}")).build(
                                                 ui,
                                                 || {
                                                     for (idx, value) in
                                                         values.iter_mut().enumerate()
                                                     {
                                                         AttributeGraph::edit_value(
-                                                            format!("{name} {i}-{idx}"),
+                                                            format!("{name}##{i}-{idx}"),
                                                             value,
                                                             None,
                                                             ui,
@@ -199,49 +199,49 @@ impl EventNode for Node {
     fn event_buttons(&mut self, ui: &Ui, event: EventStatus) {
         match event {
             EventStatus::Inactive(_) => {
-                if ui.small_button(format!("Start {:2}", event.entity().id())) {
+                if ui.small_button(format!("Start##{:2}", event.entity().id())) {
                     self.activate(event.entity());
                 }
 
                 if self.is_adhoc() {
                     ui.same_line();
-                    if ui.small_button(format!("Spawn {:2}", event.entity().id())) {
+                    if ui.small_button(format!("Spawn##{:2}", event.entity().id())) {
                         self.spawn(event.entity());
                     }
                 }
 
                 ui.same_line();
-                if ui.small_button(format!("Pause {:2}", event.entity().id())) {
+                if ui.small_button(format!("Pause##{:2}", event.entity().id())) {
                     self.pause(event.entity());
                 }
             }
             EventStatus::Paused(_) => {
-                if ui.small_button(format!("Resume {:2}", event.entity().id())) {
+                if ui.small_button(format!("Resume##{:2}", event.entity().id())) {
                     self.resume(event.entity());
                 }
                 ui.same_line();
-                if ui.small_button(format!("Cancel {:2}", event.entity().id())) {
+                if ui.small_button(format!("Cancel##{:2}", event.entity().id())) {
                     self.pause(event.entity());
                 }
             }
             EventStatus::InProgress(_) => {
-                if ui.small_button(format!("Pause {:2}", event.entity().id())) {
+                if ui.small_button(format!("Pause##{:2}", event.entity().id())) {
                     self.pause(event.entity());
                 }
 
                 ui.same_line();
-                if ui.small_button(format!("Cancel {:2}", event.entity().id())) {
+                if ui.small_button(format!("Cancel##{:2}", event.entity().id())) {
                     self.cancel(event.entity());
                 }
             }
             EventStatus::Cancelled(_) | EventStatus::Completed(_) => {
-                if ui.small_button(format!("Reset {:2}", event.entity().id())) {
+                if ui.small_button(format!("Reset##{:2}", event.entity().id())) {
                     self.reset(event.entity());
                 }
 
                 if self.is_spawned() && {
                     ui.same_line();
-                    ui.small_button(format!("Delete {:2}", event.entity().id()))
+                    ui.small_button(format!("Delete##{:2}", event.entity().id()))
                 } {
                     self.custom("delete_spawned", event.entity());
                 }

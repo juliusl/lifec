@@ -1,8 +1,11 @@
 use std::fmt::Display;
 
-use specs::{Entity, Component, HashMapStorage};
+use specs::{Component, Entity, HashMapStorage};
 
-use crate::{prelude::Thunk, state::{AttributeGraph, AttributeIndex}};
+use crate::{
+    prelude::Thunk,
+    state::{AttributeGraph, AttributeIndex},
+};
 
 pub mod wire;
 
@@ -33,14 +36,14 @@ pub enum NodeCommand {
     ///
     Update(AttributeGraph),
     /// Command to swap sequence postions of two nodes,
-    /// 
-    Swap { 
+    ///
+    Swap {
         /// Owner of the sequence,
         owner: Entity,
-        /// From child node, 
-        from: Entity, 
+        /// From child node,
+        from: Entity,
         /// To child node,
-        to: Entity
+        to: Entity,
     },
     /// Custom command for this node,
     ///
@@ -49,10 +52,9 @@ pub enum NodeCommand {
     Custom(String, Entity),
 }
 
-
 impl NodeCommand {
     /// Returns a custom node command,
-    /// 
+    ///
     pub fn custom(name: impl AsRef<str>, node: Entity) -> Self {
         NodeCommand::Custom(name.as_ref().to_string(), node)
     }
@@ -69,7 +71,9 @@ impl Display for NodeCommand {
             NodeCommand::Spawn(e) => write!(f, "spawn {}", e.id()),
             NodeCommand::Update(g) => write!(f, "update {}", g.entity_id()),
             NodeCommand::Custom(name, e) => write!(f, "custom.{name} {}", e.id()),
-            NodeCommand::Swap { owner, from, to } => write!(f, "swap {}: {} -> {}", owner.id(), from.id(), to.id()),
+            NodeCommand::Swap { owner, from, to } => {
+                write!(f, "swap {}: {} -> {}", owner.id(), from.id(), to.id())
+            }
         }
     }
 }
@@ -79,7 +83,7 @@ impl Display for NodeCommand {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorkspaceCommand {
     /// Command to add a plugin,
-    /// 
+    ///
     AddPlugin(Thunk),
 }
 

@@ -14,14 +14,13 @@ cfg_editor! {
         fn name() -> &'static str {
             "general_description"
         }
-    
+
         fn edit_ui(&mut self, _: &imgui::Ui) {
             // no - op
         }
-    
+
         fn display_ui(&self, ui: &imgui::Ui) {
             ui.text(format!("{}", self.name));
         }
     }
 }
-

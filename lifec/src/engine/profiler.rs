@@ -5,7 +5,7 @@ use super::Profilers;
 /// Component to create a terminal point for adhoc events to point to,
 ///
 /// This is also a "stateless" system for sampling activity from connections.
-/// 
+///
 #[derive(Component, Clone)]
 #[storage(HashMapStorage)]
 pub struct Profiler {
@@ -29,7 +29,7 @@ impl Default for Profiler {
 impl<'a> System<'a> for Profiler {
     type SystemData = Profilers<'a>;
 
-    fn run(&mut self, profilers: Self::SystemData) {       
+    fn run(&mut self, profilers: Self::SystemData) {
         profilers.profile();
     }
 }

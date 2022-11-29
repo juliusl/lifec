@@ -1,5 +1,5 @@
-use specs::{Component, DenseVecStorage, Entity};
 use super::Connection;
+use specs::{Component, DenseVecStorage, Entity};
 
 pub mod wire;
 
@@ -15,12 +15,12 @@ pub struct Performance {
     ///
     pub buckets: Vec<f32>,
     /// Percentiles measured,
-    /// 
+    ///
     /// A percentile is the percent of samples that are at or below a given threshold,
-    /// 
+    ///
     pub percentiles: Vec<(u64, u64)>,
     /// Total samples found in the histogram,
-    /// 
+    ///
     pub total_samples: u64,
     /// Performance is measured by transitions between events,
     ///
@@ -63,9 +63,7 @@ impl Performance {
                 bucket_ms,
                 buckets,
                 total_samples: histogram.len(),
-                percentiles: {
-                    percentiles.iter().map(|p| get_percentile(*p)).collect()
-                },
+                percentiles: { percentiles.iter().map(|p| get_percentile(*p)).collect() },
                 from: *from,
                 to,
             });

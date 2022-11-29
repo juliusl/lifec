@@ -1,4 +1,3 @@
-
 cfg_editor! {
     pub use crate::editor::DisplayNode;
     pub use crate::editor::EditNode;

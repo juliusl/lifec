@@ -1,4 +1,3 @@
-
 macro_rules! cfg_editor {
     ($($item:item)*) => {
         $(

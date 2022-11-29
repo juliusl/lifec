@@ -171,18 +171,19 @@ impl Sequence {
         clone.into_iter()
     }
 
-    /// Swap entity positions, 
-    /// 
+    /// Swap entity positions,
+    ///
     pub fn swap(&mut self, from: Entity, to: Entity) -> bool {
         let index = self.0.iter();
-        match (index.clone().position(|i| *i == from), index.clone().position(|i| *i == to)) {
+        match (
+            index.clone().position(|i| *i == from),
+            index.clone().position(|i| *i == to),
+        ) {
             (Some(from), Some(to)) => {
                 self.0.swap(from, to);
                 true
-            },
-            _ => {
-                false
             }
+            _ => false,
         }
     }
 }

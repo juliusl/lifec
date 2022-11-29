@@ -4,8 +4,8 @@ use crate::prelude::*;
 
 mod command;
 pub use command::CommandDispatcher;
-pub use command::WorkspaceCommand;
 pub use command::NodeCommand;
+pub use command::WorkspaceCommand;
 
 mod profiler;
 pub use profiler::Profiler;

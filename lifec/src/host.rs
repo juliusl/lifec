@@ -1,4 +1,9 @@
-use crate::{engine::{Cleanup, Profiler}, prelude::*, project::Listener, appendix::Appendix};
+use crate::{
+    appendix::Appendix,
+    engine::{Cleanup, Profiler},
+    prelude::*,
+    project::Listener,
+};
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use specs::{Dispatcher, DispatcherBuilder, Entity, World, WorldExt, Write};
@@ -54,7 +59,7 @@ pub struct Host {
 ///
 impl Host {
     /// Builds an index and inserts into world,
-    /// 
+    ///
     pub fn build_appendix(&mut self) {
         // Build runtime appendix
         self.world_mut().exec(
@@ -81,9 +86,9 @@ impl Host {
                     match (block, event, thunk, graph, engine) {
                         (Some(block), None, Some(thunk), Some(graph), None) => {
                             appendix.insert_general(entity, thunk);
-                            appendix.insert_state(
+                            appendix.insert_config(
                                 entity,
-                                crate::appendix::State {
+                                crate::appendix::Config {
                                     control_symbol: block.symbol().to_string(),
                                     graph: Some(graph.clone()),
                                 },
@@ -92,9 +97,9 @@ impl Host {
                         (block, Some(event), None, _, None) => {
                             appendix.insert_general(entity, event);
                             if let Some(block) = block {
-                                appendix.insert_state(
+                                appendix.insert_config(
                                     entity,
-                                    crate::appendix::State {
+                                    crate::appendix::Config {
                                         control_symbol: block.symbol().to_string(),
                                         graph: None,
                                     },

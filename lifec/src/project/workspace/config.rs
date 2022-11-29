@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 
-use reality::Value;
 use reality::SpecialAttribute;
+use reality::Value;
 use specs::prelude::*;
 use specs::SystemData;
 
@@ -25,7 +25,9 @@ impl<'a> Config<'a> {
     /// Scans the root block for configs,
     ///
     pub fn scan_root(&self) -> Vec<BlockIndex> {
-        let Config { entities, blocks, .. } = self;
+        let Config {
+            entities, blocks, ..
+        } = self;
         let root_block = entities.entity(0);
         let root_block = blocks.get(root_block).expect("should have root block");
         let mut configs = vec![];
@@ -40,7 +42,7 @@ impl<'a> Config<'a> {
     }
 
     /// Finds the entity that needs to be configured and applies the config,
-    /// 
+    ///
     pub fn find_apply(&self, config: &BlockIndex) {
         if let Some(event) = self.find_event(config) {
             self.apply_config(event, config.properties());
@@ -64,9 +66,14 @@ impl<'a> Config<'a> {
     }
 
     /// Apply config to state,
-    /// 
+    ///
     pub fn apply(&self) {
-        let tag = self.workspace.deref().as_ref().and_then(|w| w.tag()).cloned();
+        let tag = self
+            .workspace
+            .deref()
+            .as_ref()
+            .and_then(|w| w.tag())
+            .cloned();
         let configs = self.scan_root();
 
         if let Some(config) = configs.iter().find(|c| c.root().name() == "config") {
@@ -85,7 +92,7 @@ impl<'a> Config<'a> {
     }
 
     /// Returns true if a config can be applied to this event,
-    /// 
+    ///
     pub fn can_apply(&self, config: &BlockIndex) -> bool {
         if let Some(event) = self.find_event(config).and_then(|e| self.events.get(e)) {
             !event.is_active()
@@ -95,7 +102,7 @@ impl<'a> Config<'a> {
     }
 
     /// Finds the event referenced in a config,
-    /// 
+    ///
     pub fn find_event(&self, config: &BlockIndex) -> Option<Entity> {
         let Config { entity_map, .. } = self;
 

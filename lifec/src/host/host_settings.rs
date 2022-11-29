@@ -96,8 +96,8 @@ impl HostSettings {
             Some(Commands::Open) => {
                 if let Some(host) = self.create_host::<P>().await {
                     tokio::task::block_in_place(|| {
-                            #[cfg(feature = "editor" )]
-                            host.open_runtime_editor::<P>(self.debug);
+                        #[cfg(feature = "editor")]
+                        host.open_runtime_editor::<P>(self.debug);
                     })
                 }
             }

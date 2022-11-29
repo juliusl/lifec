@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// Plugin to simulate chaotic behavior,
-/// 
+///
 #[derive(Default)]
 pub struct Chaos;
 

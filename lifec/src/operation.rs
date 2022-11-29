@@ -47,7 +47,7 @@ pub struct Operation {
     /// Result returned from the task,
     result: Option<ThunkContext>,
     /// True if cancelled,
-    cancelled: bool, 
+    cancelled: bool,
 }
 
 impl Operation {
@@ -73,8 +73,7 @@ impl Operation {
 
     /// Starts a task with a thunk and returns it w/ self,
     ///
-    pub fn start_with(&self, Thunk(_, _, func): &Thunk, context: &mut ThunkContext) -> Self
-    {
+    pub fn start_with(&self, Thunk(_, _, func): &Thunk, context: &mut ThunkContext) -> Self {
         if self.result.is_some() {
             event!(
                 Level::WARN,
@@ -88,27 +87,31 @@ impl Operation {
     }
 
     /// Replaces any ongoing task by cancelling the previous task, and setting a new one
-    /// 
+    ///
     pub fn replace(&mut self, Thunk(symbol, _, func): &Thunk, context: &mut ThunkContext) {
-        event!(Level::DEBUG, "Replacing operation for {symbol} for entity {}", context.state().entity_id());
-        self.cancel(); 
+        event!(
+            Level::DEBUG,
+            "Replacing operation for {symbol} for entity {}",
+            context.state().entity_id()
+        );
+        self.cancel();
 
         self.task = func(context);
         self.cancelled = false;
     }
 
     /// Returns self with a new async context,
-    /// 
+    ///
     pub fn with_task(mut self, async_context: AsyncContext) -> Self {
         self.cancel();
-        
+
         self.task = Some(async_context);
         self.cancelled = false;
         self
     }
 
-    /// Sets the async context in place, 
-    /// 
+    /// Sets the async context in place,
+    ///
     pub fn set_task(&mut self, async_context: impl Into<AsyncContext>) {
         // Cancel any previous tasks that may have been running
         self.cancel();
@@ -124,7 +127,10 @@ impl Operation {
     ///
     /// **Note** If None is returned, that implies that self.context is the latest state
     ///
-    pub async fn task(&mut self, cancel_source: tokio::sync::oneshot::Receiver<()>) -> Option<ThunkContext> {
+    pub async fn task(
+        &mut self,
+        cancel_source: tokio::sync::oneshot::Receiver<()>,
+    ) -> Option<ThunkContext> {
         if let Some((task, cancel)) = self.task.take() {
             select! {
                 r = task => {
@@ -239,7 +245,7 @@ impl Operation {
     }
 
     /// Returns true if the underlying is ready
-    /// 
+    ///
     pub fn is_ready(&self) -> bool {
         if let Some(task) = self.task.as_ref() {
             task.0.is_finished()
@@ -255,23 +261,23 @@ impl Operation {
     }
 
     /// Returns true if this event has been cancelled,
-    /// 
+    ///
     /// TODO: Try to handle this differently
-    /// 
+    ///
     pub fn is_cancelled(&self) -> bool {
         self.cancelled
     }
 
-    /// Cancels any ongoing task, 
-    /// 
+    /// Cancels any ongoing task,
+    ///
     /// returns true if a change was made
-    /// 
+    ///
     pub fn cancel(&mut self) -> bool {
         if let Some((j, cancel)) = self.task.take() {
             cancel.send(()).ok();
             j.abort();
             self.cancelled = true;
-            true 
+            true
         } else {
             false
         }
@@ -291,6 +297,8 @@ impl Clone for Operation {
 
 impl Into<AsyncContext> for Operation {
     fn into(mut self) -> AsyncContext {
-        self.task.take().expect("should be an operation w/ a task to consume")
+        self.task
+            .take()
+            .expect("should be an operation w/ a task to consume")
     }
 }

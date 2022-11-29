@@ -12,13 +12,13 @@ pub enum EngineStatus {
     ///
     Active(Entity),
     /// Engine is disposed,
-    /// 
+    ///
     Disposed(Entity),
 }
 
 impl EngineStatus {
     /// Returns the entity that owns this status,
-    /// 
+    ///
     pub fn entity(&self) -> Entity {
         match self {
             EngineStatus::Inactive(e) | EngineStatus::Active(e) | EngineStatus::Disposed(e) => *e,

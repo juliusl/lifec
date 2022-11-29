@@ -3,10 +3,12 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use reality::Value;
 use logos::Logos;
-use notify::{event::ModifyKind, event::DataChange, event::MetadataKind, event::RenameMode, EventKind};
+use notify::{
+    event::DataChange, event::MetadataKind, event::ModifyKind, event::RenameMode, EventKind,
+};
 use reality::SpecialAttribute;
+use reality::Value;
 
 /// Enumeration of `modify` event kinds
 ///
@@ -64,22 +66,22 @@ impl SpecialAttribute for Modify {
             let hasher = &mut hasher;
             if let Some(token) = Modify::lexer(content.as_ref()).next() {
                 match token {
-                    Modify::Data(k) |
-                    Modify::Size(k) |
-                    Modify::Content(k) |
-                    Modify::DataOther(k) |
-                    Modify::Metadata(k) |
-                    Modify::AccessTime(k) |
-                    Modify::WriteTime(k) |
-                    Modify::Permissions(k) |
-                    Modify::Ownership(k) |
-                    Modify::Extended(k) |
-                    Modify::MetadataOther(k) |
-                    Modify::Name(k) |
-                    Modify::NameTo(k) |
-                    Modify::NameFrom(k) |
-                    Modify::NameBoth(k) |
-                    Modify::NameOther(k) => EventKind::Modify(k),
+                    Modify::Data(k)
+                    | Modify::Size(k)
+                    | Modify::Content(k)
+                    | Modify::DataOther(k)
+                    | Modify::Metadata(k)
+                    | Modify::AccessTime(k)
+                    | Modify::WriteTime(k)
+                    | Modify::Permissions(k)
+                    | Modify::Ownership(k)
+                    | Modify::Extended(k)
+                    | Modify::MetadataOther(k)
+                    | Modify::Name(k)
+                    | Modify::NameTo(k)
+                    | Modify::NameFrom(k)
+                    | Modify::NameBoth(k)
+                    | Modify::NameOther(k) => EventKind::Modify(k),
                     Modify::Error => EventKind::Modify(ModifyKind::Any),
                 }
                 .hash(hasher);

@@ -3,7 +3,8 @@ use std::time::Duration;
 use lifec::prelude::*;
 
 use poem::{
-    listener::{Acceptor, Listener, RustlsCertificate, RustlsConfig, TcpListener}, Route, Server,
+    listener::{Acceptor, Listener, RustlsCertificate, RustlsConfig, TcpListener},
+    Route, Server,
 };
 use tokio::sync::oneshot::Receiver;
 
@@ -47,8 +48,7 @@ where
                     match cancel_source.await {
                         Ok(_) => tc.status("Cancelling server").await,
                         Err(err) => {
-                            tc.status(format!("Error cancelling server, {err}"))
-                                .await;
+                            tc.status(format!("Error cancelling server, {err}")).await;
                         }
                     }
                 },
@@ -56,16 +56,15 @@ where
                     .find_int("shutdown_timeout_ms")
                     .and_then(|f| Some(Duration::from_millis(f as u64))),
             );
-    
+
             match server.await {
                 Ok(_) => {
                     tc.status("Server is exiting").await;
                 }
                 Err(err) => {
                     event!(Level::ERROR, "Server host error, {err}");
-    
-                    tc.status(format!("Server error exit {err}"))
-                        .await;
+
+                    tc.status(format!("Server error exit {err}")).await;
                     tc.error(|e| {
                         e.with_text("err", format!("app host error: {err}"));
                     });

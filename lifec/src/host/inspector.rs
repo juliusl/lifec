@@ -79,7 +79,8 @@ impl Inspector for Host {
                                         .symbol()
                                         .unwrap()
                                 );
-                                for (name, prop) in props.iter_properties().filter(|p| p.0 != thunk) {
+                                for (name, prop) in props.iter_properties().filter(|p| p.0 != thunk)
+                                {
                                     println!("      {name} {:?}", prop);
                                 }
                                 println!();

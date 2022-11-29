@@ -1,4 +1,3 @@
-
 mod listener;
 pub use listener::PluginListener;
 
@@ -8,19 +7,19 @@ pub use broker::Broker as PluginBroker;
 mod features;
 pub use features::Features as PluginFeatures;
 
-use specs::SystemData;
 use specs::prelude::*;
+use specs::SystemData;
 
 /// System data for plugins,
 ///
 #[derive(SystemData)]
-pub struct Plugins<'a> { 
+pub struct Plugins<'a> {
     features: PluginFeatures<'a>,
 }
 
 impl<'a> Plugins<'a> {
     /// Returns a reference to plugin features,
-    /// 
+    ///
     pub fn features(&self) -> &PluginFeatures<'a> {
         let Plugins { features, .. } = self;
 

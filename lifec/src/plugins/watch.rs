@@ -1,14 +1,14 @@
+use logos::Logos;
+use notify::{
+    recommended_watcher, Config, ErrorKind, Event, EventHandler, PollWatcher, RecommendedWatcher,
+    Watcher,
+};
 use std::{
     collections::{hash_map::DefaultHasher, HashSet},
     hash::{Hash, Hasher},
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
-};
-use logos::Logos;
-use notify::{
-    recommended_watcher, Config, ErrorKind, Event, EventHandler, PollWatcher, RecommendedWatcher,
-    Watcher,
 };
 
 use crate::prelude::*;
@@ -107,7 +107,7 @@ impl Plugin for Watch {
                                         .iter()
                                         .filter_map(|p| p.to_str())
                                         .collect::<Vec<_>>()
-                                        .join(",")
+                                        .join(","),
                                 );
 
                                 tc.with_symbol("found_event_kind", format!("{:?}", kind));

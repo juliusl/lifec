@@ -4,21 +4,17 @@ use std::path::PathBuf;
 use crate::prelude::*;
 
 /// Handles unpacking resources for a `RustEmbed` source
-/// 
+///
 pub struct Resources(
     /// folder prefix
-    pub &'static str
+    pub &'static str,
 );
 
 impl Resources {
     /// Reads a string from file
     ///
     /// If the file doesn't exist, unpacks the resource from an embedded resource if it exists.
-    pub async fn read_string<C>(
-        &self,
-        tc: &ThunkContext,
-        src: &String,
-    ) -> Option<String>
+    pub async fn read_string<C>(&self, tc: &ThunkContext, src: &String) -> Option<String>
     where
         C: RustEmbed,
     {
@@ -34,13 +30,9 @@ impl Resources {
     }
 
     /// Reads binary content from a file
-    /// 
+    ///
     /// If the file doesn't exist, unpacks the resource from an embedded resource if it exists.
-    pub async fn read_binary<C>(
-        &self,
-        tc: &ThunkContext,
-        src: &String,
-    ) -> Option<Vec<u8>>
+    pub async fn read_binary<C>(&self, tc: &ThunkContext, src: &String) -> Option<Vec<u8>>
     where
         C: RustEmbed,
     {
@@ -66,7 +58,7 @@ impl Resources {
     {
         if let Some(src) = tc.state().find_symbol(attribute_name) {
             self.read_string::<C>(tc, &src).await
-        }  else {
+        } else {
             None
         }
     }
@@ -82,7 +74,7 @@ impl Resources {
     {
         if let Some(src) = tc.state().find_symbol(attribute_name) {
             self.read_binary::<C>(tc, &src).await
-        }  else {
+        } else {
             None
         }
     }
@@ -111,10 +103,8 @@ impl Resources {
             if let Some(resource) = C::get(src.trim_start_matches(&format!("{prefix}/"))) {
                 match tokio::fs::write(&src, resource.data).await {
                     Ok(_) => {
-                        tc.status(format!(
-                            "Loaded embedded resource {prefix} for {src}"
-                        ))
-                        .await;
+                        tc.status(format!("Loaded embedded resource {prefix} for {src}"))
+                            .await;
                     }
                     Err(err) => {
                         event!(Level::ERROR, "error loading resource {prefix} {err}");

@@ -33,8 +33,8 @@ async fn main() {
             // Examples
             // lifec --workspace <workspace-uri> start
             // lifec --runmd_path <path to runmd file> start
-            // lifec --url <url to runmd content> start 
-            // lifec start 
+            // lifec --url <url to runmd content> start
+            // lifec start
             Commands::Start(start) => {
                 let mut host_settings = cli.host_settings();
                 host_settings.set_command(lifec::host::Commands::Start(start.clone()));
@@ -46,7 +46,7 @@ async fn main() {
                 host_settings.handle::<Lifec>().await;
             }
             // Examples
-            // lifec host -- .. 
+            // lifec host -- ..
             Commands::Host(settings) => {
                 settings.handle::<Lifec>().await;
             }
@@ -99,9 +99,9 @@ struct Lifec {
     ///
     /// A workspace directory is a directory of .runmd files that are compiled together. A valid workspace directory requires a root
     /// .runmd file, followed by named runmd files (ex. test.runmd).
-    /// 
-    /// Named files will be parsed w/ the file name used as the implicit block symbol. All named files will be parsed first and the root .runmd file will be parsed last. 
-    /// 
+    ///
+    /// Named files will be parsed w/ the file name used as the implicit block symbol. All named files will be parsed first and the root .runmd file will be parsed last.
+    ///
     /// When this mode is used, the workspace feature
     /// will be enabled with thunk contexts, so all plugins will execute in the context of the same work_dir.
     ///
