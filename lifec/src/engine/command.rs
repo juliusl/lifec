@@ -85,12 +85,18 @@ pub enum WorkspaceCommand {
     /// Command to add a plugin,
     ///
     AddPlugin(Thunk),
+    /// Command to apply a custom attribute to a plugin,
+    ///
+    /// The u64 is the ident-id from an interner for the custom attribute being applied,
+    ///
+    ApplyCustomAttribute(Thunk, u64),
 }
 
 impl Display for WorkspaceCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             WorkspaceCommand::AddPlugin(Thunk(name, _, _)) => write!(f, "add_plugin::{name}"),
+            WorkspaceCommand::ApplyCustomAttribute(_, _) => todo!(),
         }
     }
 }

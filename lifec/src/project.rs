@@ -22,7 +22,10 @@ pub use workspace::WorkspaceConfig;
 mod listener;
 pub use listener::Listener;
 
-/// Trait to facilitate
+/// Collection of stateless functions that are used to construct a host,
+///
+/// Also provides fn to compile a workspace and runmd files. This becomes the only dependency for
+/// compiling runmd files into a runtime.
 ///
 pub trait Project
 where

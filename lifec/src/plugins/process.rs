@@ -45,9 +45,8 @@ impl Plugin for Process {
                     }
                 })
                 .add_doc(docs, ENV_DOC)
-                .custom_attr()
+                .name_required()
                 .list()
-                .input()
                 .symbol("This should be the value of the environment variable");
 
             // Enable .arg to declare arguments
@@ -60,8 +59,6 @@ impl Plugin for Process {
                     p.define_child(last, "arg", Value::Symbol(value.to_string()));
                 })
                 .add_doc(docs, ARG_DOC)
-                .custom_attr()
-                .input()
                 .list()
                 .symbol("This should be a single argument w/ no spaces");
 
@@ -78,45 +75,34 @@ impl Plugin for Process {
                     }
                 })
                 .add_doc(docs, FLAG_DOC)
-                .custom_attr()
-                .input()
                 .list()
                 .symbol(
-                    "This should be the flag followed by a space and then value, `ex. flag value`",
+                    "This should be the flag name followed by a space and then value, `ex. .flag --{flag} {value}`",
                 );
 
             // Enable .inherit, will inherit arg/env from previous state
             docs.as_mut()
-                .add_custom_with("inherit", |p, value| {
+                .add_custom_with("inherit", |p, _| {
                     let last = p
                         .last_child_entity()
                         .expect("should have added an entity for the process");
 
-                    if value.is_empty() {
-                        p.define_child(last, "inherit", true);
-                    }
-
-                    // todo, could parse and only take the value as a complex
+                    p.define_child(last, "inherit", true);
                 })
                 .add_doc(
                     docs,
                     "Inherit any arg/env properties from the previous state",
-                )
-                .custom_attr()
-                .input();
+                );
 
             // Enable .copy_previous, will copy previous state
-            docs.as_mut().add_custom_with("copy_previous", |p, value| {
-                let last = p
-                    .last_child_entity()
-                    .expect("should have added an entity for the process");
-
-                if value.is_empty() {
+            docs.as_mut()
+                .add_custom_with("copy_previous", |p, _| {
+                    let last = p
+                        .last_child_entity()
+                        .expect("should have added an entity for the process");
                     p.define_child(last, "copy_previous", true);
-                }
-            }).add_doc(docs, "Copies previous state into current state so that the previous state will be propagated")
-                .custom_attr()
-                .input();
+                 })
+                .add_doc(docs, "Copies previous state into current state so that the previous state will be propagated");
 
             // Enables .cd, setting the current_directory for the process
             docs.as_mut()
@@ -152,8 +138,6 @@ impl Plugin for Process {
                     }
                 })
                 .add_doc(docs, "Sets the current directory of the process")
-                .custom_attr()
-                .input()
                 .symbol("should be a well formed path to an existing directory");
 
             // Enables redirecting stdout to a file,
@@ -164,8 +148,6 @@ impl Plugin for Process {
                     p.define_child(entity, "redirect", Value::Symbol(content));
                 })
                 .add_doc(docs, "Redirects output of this process to a file")
-                .custom_attr()
-                .input()
                 .symbol("Should be a path to a file");
 
             // Cache output from process
@@ -178,9 +160,7 @@ impl Plugin for Process {
                 .add_doc(
                     docs,
                     "Caches the output of the process to the thunk context",
-                )
-                .custom_attr()
-                .input();
+                );
 
             // Silent stdout/stderr from stream
             docs.as_mut()
@@ -192,9 +172,7 @@ impl Plugin for Process {
                 .add_doc(
                     docs,
                     "Does not output the stdout of the child process to the parent process std out",
-                )
-                .custom_attr()
-                .input();
+                );
         }
     }
 

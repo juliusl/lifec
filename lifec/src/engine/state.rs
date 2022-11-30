@@ -652,7 +652,7 @@ impl<'a> State<'a> {
     pub fn delete(&mut self, entity: Entity) -> bool {
         match self.entities.delete(entity) {
             Ok(_) => {
-                event!(Level::DEBUG, "Deleted spawned entity, {}", entity.id());
+                event!(Level::DEBUG, "Deleted entity, {}", entity.id());
                 true
             }
             Err(err) => {

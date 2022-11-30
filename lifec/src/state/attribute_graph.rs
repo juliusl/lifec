@@ -348,7 +348,7 @@ cfg_editor! {
         ) {
             match value {
                 Value::Empty => {
-                    ui.label_text(name, "empty");
+                    ui.label_text(name, "applied");
                 }
                 Value::Bool(b) => {
                     ui.checkbox(name, b);

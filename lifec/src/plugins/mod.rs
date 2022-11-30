@@ -262,26 +262,36 @@ pub fn find_doc(
 
 /// Returns all documentation for this plugin,
 ///
-pub fn docs(plugin: impl AsRef<str>, world: &World) -> BTreeMap<String, Documentation> {
-    let mut interner = Interner::default();
-    let base_id = interner.add_ident(plugin);
-    let resource_id = ResourceId::new_with_dynamic_id::<Interner>(base_id);
-
+pub fn docs(plugin: impl AsRef<str>, world: &World) -> BTreeMap<(String, u64), Documentation> {
     let mut docs = BTreeMap::default();
 
-    if let Some(_interner) = world.try_fetch_by_id::<Interner>(resource_id) {
-        interner = interner.merge(&_interner);
-
+    if let Some(mut interner) = find_doc_interner(plugin.as_ref(), world) {
+        let base_id = interner.add_ident(plugin.as_ref());
         for (id, attr) in interner.strings().iter().filter(|(i, _)| **i != base_id) {
-            let resource_id = ResourceId::new_with_dynamic_id::<Documentation>(id | base_id);
+            let resource_id = ResourceId::new_with_dynamic_id::<Documentation>(id ^ base_id);
 
             if let Some(doc) = world.try_fetch_by_id::<Documentation>(resource_id) {
-                docs.insert(attr.clone(), doc.deref().clone());
+                docs.insert((attr.clone(), id ^ base_id), doc.deref().clone());
             }
         }
     }
 
     docs
+}
+
+/// Finds the doc interner for a plugin,
+///
+pub fn find_doc_interner(plugin: impl AsRef<str>, world: &World) -> Option<Interner> {
+    let mut interner = Interner::default();
+    let base_id = interner.add_ident(plugin);
+    let resource_id = ResourceId::new_with_dynamic_id::<Interner>(base_id);
+
+    if let Some(_interner) = world.try_fetch_by_id::<Interner>(resource_id) {
+        interner = interner.merge(&_interner);
+        Some(interner)
+    } else {
+        None
+    }
 }
 
 /// Implement trait to add documentation,
@@ -302,7 +312,9 @@ impl<'a, 'b> AddDoc<'a, 'b> for CustomAttribute {
         token: &'a mut DocumentationToken<'b>,
         summary: impl AsRef<str>,
     ) -> &mut Documentation {
-        token.add_doc(self.ident(), summary.as_ref())
+        let mut doc: Documentation = summary.as_ref().into();
+        doc.custom_attr().input();
+        token.add_doc(self.ident(), doc)
     }
 }
 
@@ -335,7 +347,7 @@ impl<'a> DocumentationToken<'a> {
     ) -> &mut Documentation {
         let custom_attr_id = self.interner.add_ident(attr_name.as_ref());
         let resource_id =
-            ResourceId::new_with_dynamic_id::<Documentation>(self.base_ident_id | custom_attr_id);
+            ResourceId::new_with_dynamic_id::<Documentation>(self.base_ident_id ^ custom_attr_id);
 
         self.docs.insert(resource_id.clone(), doc.into());
         self.docs

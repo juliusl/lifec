@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeMap,
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut}, path::PathBuf,
 };
 
 use atlier::system::{App, Extension};
@@ -21,7 +21,7 @@ use crate::{
     state::AttributeGraph,
 };
 
-use super::NodeStatus;
+use super::{NodeStatus, Canvas};
 
 /// Extension to display workspace editing tools,
 ///
@@ -38,6 +38,8 @@ pub struct WorkspaceEditor {
     workspace_config: BTreeMap<String, BlockIndex>,
     /// Background clear color
     background: [f32; 4],
+    /// Canvas
+    canvas: Canvas,
 }
 
 impl WorkspaceEditor {
@@ -173,21 +175,21 @@ impl WorkspaceEditor {
                 ui.text(thunk.1);
 
                 if let Some(node) = plugin_node {
-                    for (name, doc) in docs(name, world) {
+                    for ((name, id), doc) in docs(name, world) {
                         ui.table_next_row();
                         ui.table_next_column();
                         TreeNode::new(format!(".{name}"))
                             .leaf(true)
                             .bullet(true)
                             .push(ui);
-                        // if let Some(tooltip) = imgui::drag_drop::DragDropSource::new("ADD_PLUGIN")
-                        //     .begin_payload(ui, WorkspaceCommand::AddPlugin(thunk))
-                        // {
-                        //     ui.text(format!(
-                        //         "Thunk - {name} - Drop on host editor or canvas to add this plugin"
-                        //     ));
-                        //     tooltip.end();
-                        // }
+                        if let Some(tooltip) = imgui::drag_drop::DragDropSource::new("APPLY_CUSTOM_ATTRIBUTE")
+                            .begin_payload(ui, WorkspaceCommand::ApplyCustomAttribute(thunk, id))
+                        {
+                            ui.text(format!(
+                                "Custom attribute - {name} - Drop on host editor or canvas to apply this to a plugin"
+                            ));
+                            tooltip.end();
+                        }
 
                         ui.table_next_column();
                         ui.text(doc.summary);
@@ -488,6 +490,8 @@ impl Extension for WorkspaceEditor {
         self.handle_clipboard(ui);
         self.workspace_window(world, ui);
 
+        // self.canvas.on_ui(world, ui);
+
         {
             for guest in world.system_data::<Runner>().guests() {
                 let mut guest_editor = guest.guest_editor();
@@ -609,6 +613,7 @@ impl From<Appendix> for WorkspaceEditor {
             appendix,
             clipboard: None,
             workspace_config: Default::default(),
+            canvas: Default::default(),
             background: [0.02122, 0.02519, 0.03434, 1.0],
         }
     }
