@@ -1,15 +1,16 @@
 use std::{
     collections::BTreeMap,
-    ops::{Deref, DerefMut}, path::PathBuf,
+    ops::{Deref, DerefMut},
 };
 
 use atlier::system::{App, Extension};
 use copypasta::{ClipboardContext, ClipboardProvider};
 use imgui::{
-    ColorEdit, TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags, Ui, Window, StyleVar,
+    ColorEdit, StyleVar, TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags,
+    Ui, Window,
 };
 use reality::{BlockIndex, Value};
-use specs::{Join, RunNow, World, WorldExt};
+use specs::{Join, LazyUpdate, RunNow, World, WorldExt};
 pub use tokio::sync::broadcast::{channel, Receiver, Sender};
 use tracing::{event, Level};
 
@@ -21,7 +22,7 @@ use crate::{
     state::AttributeGraph,
 };
 
-use super::{NodeStatus, Canvas};
+use super::{Canvas, NodeStatus};
 
 /// Extension to display workspace editing tools,
 ///
@@ -38,8 +39,6 @@ pub struct WorkspaceEditor {
     workspace_config: BTreeMap<String, BlockIndex>,
     /// Background clear color
     background: [f32; 4],
-    /// Canvas
-    canvas: Canvas,
 }
 
 impl WorkspaceEditor {
@@ -139,7 +138,7 @@ impl WorkspaceEditor {
     ///
     pub fn plugins(&mut self, world: &World, ui: &Ui) {
         let indent_spacing = ui.push_style_var(StyleVar::IndentSpacing(8.0));
-        
+
         let runtime = world.read_resource::<Runtime>();
 
         let table_flags = TableFlags::BORDERS_INNER_V
@@ -182,8 +181,12 @@ impl WorkspaceEditor {
                             .leaf(true)
                             .bullet(true)
                             .push(ui);
-                        if let Some(tooltip) = imgui::drag_drop::DragDropSource::new("APPLY_CUSTOM_ATTRIBUTE")
-                            .begin_payload(ui, WorkspaceCommand::ApplyCustomAttribute(thunk, id))
+                        if let Some(tooltip) =
+                            imgui::drag_drop::DragDropSource::new("APPLY_CUSTOM_ATTRIBUTE")
+                                .begin_payload(
+                                    ui,
+                                    WorkspaceCommand::ApplyCustomAttribute(thunk, id),
+                                )
                         {
                             ui.text(format!(
                                 "Custom attribute - {name} - Drop on host editor or canvas to apply this to a plugin"
@@ -264,6 +267,14 @@ impl WorkspaceEditor {
                     .flags(TreeNodeFlags::NO_TREE_PUSH_ON_OPEN | TreeNodeFlags::DEFAULT_OPEN )
                     .build(ui)
                 {
+                    if ui.button("New Operation") {
+                        let canvas = Canvas::new(world);
+
+                        if let Some(entity) = canvas.entity() {
+                            world.read_resource::<LazyUpdate>().insert(entity, canvas);
+                        }
+                    }
+
                     if let Some(token) = ui.begin_table("hosts", 2) {
                         ui.table_setup_column("Name");
                         ui.table_setup_column("Controls");
@@ -359,6 +370,13 @@ impl WorkspaceEditor {
                                         Err(err) => {
                                             event!(Level::ERROR, "error sending command {err}");
                                         }
+                                    }
+                                }
+
+                                ui.same_line();
+                                if ui.button(format!("Edit##{}", entity.id())) {
+                                    if let Some(canvas) = Canvas::edit(world, entity) {
+                                        world.read_resource::<LazyUpdate>().insert(entity, canvas);
                                     }
                                 }
 
@@ -480,6 +498,8 @@ impl Extension for WorkspaceEditor {
             b: 0.03434,
             a: 1.0,
         });
+
+        _world.register::<Canvas>();
     }
 
     fn configure_imgui_context(context: &mut imgui::Context) {
@@ -490,7 +510,9 @@ impl Extension for WorkspaceEditor {
         self.handle_clipboard(ui);
         self.workspace_window(world, ui);
 
-        // self.canvas.on_ui(world, ui);
+        for (_, canvas) in (&world.entities(), &mut world.write_component::<Canvas>()).join() {
+            canvas.on_ui(world, ui);
+        }
 
         {
             for guest in world.system_data::<Runner>().guests() {
@@ -613,7 +635,6 @@ impl From<Appendix> for WorkspaceEditor {
             appendix,
             clipboard: None,
             workspace_config: Default::default(),
-            canvas: Default::default(),
             background: [0.02122, 0.02519, 0.03434, 1.0],
         }
     }

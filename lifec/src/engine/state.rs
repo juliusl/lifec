@@ -38,7 +38,7 @@ pub struct State<'a> {
     tick_control: Write<'a, TickControl>,
     /// Appendix stores metadata on entities,
     ///
-    appendix: Write<'a, Arc<Appendix>>,
+    appendix: Read<'a, Arc<Appendix>>,
     /// Channel to send error contexts,
     ///
     send_errors: Read<'a, tokio::sync::mpsc::Sender<ErrorContext>, EventRuntime>,
@@ -1259,7 +1259,9 @@ impl<'a> State<'a> {
                                 },
                             );
 
-                            *self.appendix = Arc::new(appendix);
+                            self.lazy_updates().exec_mut(move |world| {
+                                world.insert(Arc::new(appendix));
+                            });
 
                             self.lazy_update.insert(plugin_entity, block.clone());
 

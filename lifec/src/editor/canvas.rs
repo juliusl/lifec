@@ -1,40 +1,47 @@
 use std::{
     collections::{BTreeMap, HashMap},
+    fmt::Display,
     ops::Deref,
+    sync::Arc,
 };
 
 use atlier::system::Extension;
-use imgui::{
-    drag_drop::DragDropPayload, ChildWindow, DragDropFlags, DragDropTarget, StyleVar, TableFlags,
-    Ui, Window, MouseButton,
-};
+use imgui::{ChildWindow, DragDropFlags, DragDropTarget, StyleVar, TableFlags, Ui, Window, StyleColor};
 use reality::{
     wire::{Interner, ResourceId},
-    BlockProperties, Documentation, Value, BlockProperty,
+    BlockProperties, Documentation, Value,
 };
-use specs::World;
+use specs::{Component, Entity, HashMapStorage, World, WorldExt};
 use std::fmt::Write;
 use tracing::{event, Level};
 
 use crate::{
+    appendix::Appendix,
     engine::WorkspaceCommand,
-    prelude::{find_doc_interner, Thunk},
+    prelude::{find_doc_interner, Event, Thunk},
     state::AttributeGraph,
 };
 
-/// Struct for building an operation,
+/// Struct for building and configuring an Event component,
 ///
-#[derive(Default, Clone)]
+/// Normally you would declare and operation or event w/ .runmd. This extension allows you to
+/// build it within this tooling.
+///
+#[derive(Component, Default, Clone)]
+#[storage(HashMapStorage)]
 pub struct Canvas {
     /// Pending workspace commands,
     ///
     commands: Vec<WorkspaceCommand>,
     /// True if the plugin tree should be opened,
     ///
-    opened: bool,
+    plugin_tree_opened: bool,
     /// Optionally, existing entity being edited
     ///  
-    existing: Option<u32>,
+    context: CanvasContext,
+    /// Appendix for looking up existing names, symbols, etc
+    ///
+    appendix: Arc<Appendix>,
     /// Custom attributes that are being applied in a block properties collection,
     ///
     custom_attributes: HashMap<usize, BlockProperties>,
@@ -46,15 +53,129 @@ pub struct Canvas {
     interner: Interner,
 }
 
+/// Enumeration of possible contexts this canvas can be opened w/,
+///
+#[derive(Default, Clone)]
+pub enum CanvasContext {
+    /// Canvas was opened empty,
+    ///
+    #[default]
+    Empty,
+    /// Canvas was opened to create a new runtime,
+    ///
+    New(Entity, String, Option<String>),
+    /// Canvas was opened to edit a runtime,
+    ///
+    Edit(Entity),
+}
+
+impl Display for CanvasContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CanvasContext::Empty => write!(f, "Canvas"),
+            CanvasContext::New(e, _, _) => write!(f, "Canvas - New##{:?}", e),
+            CanvasContext::Edit(e) => write!(f, "Canvas - Editing##{:?}", e),
+        }
+    }
+}
+
+impl Canvas {
+    /// Creates a canvas for building a new plugin sequence,
+    ///
+    pub fn new(world: &World) -> Canvas {
+        let appendix = world
+            .try_fetch::<Arc<Appendix>>()
+            .and_then(|a| Some(a.deref().clone()))
+            .unwrap_or_default();
+        let new_entity = world.entities().create();
+        Self {
+            context: CanvasContext::New(new_entity, String::default(), None),
+            appendix,
+            ..Default::default()
+        }
+    }
+
+    /// Creates a new canvas for editing an existing plugin sequence,
+    ///
+    /// Returns None if the existing entity does not have an Event component that can be edited,
+    ///
+    pub fn edit(world: &World, existing: Entity) -> Option<Canvas> {
+        if let Some(event) = world.read_component::<Event>().get(existing) {
+            let mut canvas = Self::new(world);
+            canvas.context = CanvasContext::Edit(existing);
+            // If sequence is None, that means the event has been activated. If the event is activated then it cannot be edited,
+            if let Event(_, thunks, Some(sequence)) = event {
+                for (thunk, entity) in thunks.iter().zip(sequence.iter_entities()) {
+                    let properties = world
+                        .read_component::<BlockProperties>()
+                        .get(entity)
+                        .cloned();
+
+                    canvas.add_plugin(canvas.commands.len(), world, *thunk, properties);
+                }
+            }
+
+            Some(canvas)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the entity that owns this Canvas component,
+    ///
+    pub fn entity(&self) -> Option<Entity> {
+        match self.context {
+            CanvasContext::Empty => None,
+            CanvasContext::New(e, _, _) | CanvasContext::Edit(e) => Some(e),
+        }
+    }
+}
+
 /// Main entry point for the Canvas extension,
 ///
 impl Extension for Canvas {
     fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui<'_>) {
         let window_padding = ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
         let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
-        Window::new("Canvas")
+        Window::new(format!("{}", self.context))
             .size([1064.0, 700.0], imgui::Condition::Appearing)
             .build(ui, || {
+                match &mut self.context {
+                    CanvasContext::Empty => {}
+                    CanvasContext::New(e, name, tag) => {
+                        ui.input_text(format!("name##{:?}", e), name).build();
+                        if let Some(tag) = tag.as_mut() {
+                            ui.input_text(format!("tag##{:?}", e), tag).build();
+                        } else {
+                            if ui.input_text(format!("tag##{:?}", e), &mut String::default()).build() {
+                                *tag = Some(String::default());
+                            }
+                        }
+
+                        ui.label_text("entity", format!("{:?}", e));
+                        ui.new_line();
+                        ui.text_wrapped("Use this widget to build a new plugin sequence that can be used in either an engine event, or adhoc operation");
+                    }
+                    CanvasContext::Edit(existing) => {
+                        ui.label_text(
+                            format!("name##{}", existing.id()),
+                            self.appendix.name(&existing).unwrap_or(&String::default()),
+                        );
+                        ui.label_text("entity", format!("{:?}", existing));
+                        ui.text("Use this widget to edit an existing event or adhoc operation");
+
+                        ui.new_line();
+                        let token = ui.push_style_color(StyleColor::Text, 
+                            imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s());
+                        ui.text_wrapped(
+                            "Note: Since the existing event/operation has already been compiled, any previous custom attributes used will not show up in the transpile preview"
+                        );
+                        token.end();
+                    }
+                }
+
+                ui.spacing();
+                ui.separator();
                 if let Some(token) = ui.begin_table_with_flags("layout", 2, TableFlags::RESIZABLE) {
                     ui.table_next_row();
                     ui.table_next_column();
@@ -80,7 +201,7 @@ impl Canvas {
     fn plugins_tree(&mut self, world: &World, ui: &Ui) {
         ChildWindow::new("Plugins").build(ui, || {
             imgui::TreeNode::new("Plugins")
-                .opened(self.opened, imgui::Condition::Always)
+                .opened(self.plugin_tree_opened, imgui::Condition::Always)
                 .build(ui, || {
                     let snapshot = self.commands.clone();
                     for (idx, w) in snapshot.iter().enumerate() {
@@ -99,7 +220,7 @@ impl Canvas {
                         }
 
                         if let Some(node) = node {
-                            self.edit_plugin_properties(w, idx, ui);
+                            self.edit_plugin_properties(world, w, idx, ui);
                             node.pop();
                         }
                     }
@@ -113,18 +234,8 @@ impl Canvas {
                     Ok(command) => {
                         let idx = self.commands.len();
                         if let WorkspaceCommand::AddPlugin(thunk) = command.data {
-                            if let Some(interner) = find_doc_interner(thunk.0, world) {
-                                self.interner = self.interner.merge(&interner);
-                            }
-
-                            let mut properties = BlockProperties::new(thunk.0);
-                            properties.add(thunk.0, Value::Symbol(String::default()));
-                            self.custom_attributes.insert(idx, properties);
-
-                            self.documentation.insert(idx, Default::default());
+                            self.add_plugin(idx, world, thunk, None);
                         }
-                        self.commands.push(command.data);
-                        self.opened = true;
                     }
                     Err(err) => {
                         event!(Level::ERROR, "Error accepting workspace command, {err}");
@@ -135,11 +246,41 @@ impl Canvas {
         }
     }
 
+    /// Adds a plugin to the canvas at idx,
+    ///
+    fn add_plugin(
+        &mut self,
+        idx: usize,
+        world: &World,
+        thunk: Thunk,
+        properties: Option<BlockProperties>,
+    ) {
+        if let Some(interner) = find_doc_interner(thunk.0, world) {
+            self.interner = self.interner.merge(&interner);
+        }
+
+        if let Some(properties) = properties {
+            self.custom_attributes.insert(idx, properties);
+        } else {
+            let mut properties = BlockProperties::new(thunk.0);
+            properties.add(thunk.0, Value::Symbol(String::default()));
+            self.custom_attributes.insert(idx, properties);
+        }
+
+        self.documentation.insert(idx, Default::default());
+        self.plugin_tree_opened = true;
+        self.commands.push(WorkspaceCommand::AddPlugin(thunk));
+    }
+
     /// Transpile preview,
     ///
     fn preview_transpiled(&self, ui: &Ui) {
         ChildWindow::new("Transpiled").build(ui, || {
-            ui.input_text_multiline("transpiled", &mut self.transpile_runmd(), [0.0, 0.0])
+            let mut transpiled = self.transpile_runmd();
+            if ui.button(format!("Copy to clipboard##{}", self.context)) {
+                ui.set_clipboard_text(&transpiled);
+            }
+            ui.input_text_multiline("transpiled", &mut transpiled, [0.0, 0.0])
                 .read_only(true)
                 .build();
         });
@@ -149,6 +290,18 @@ impl Canvas {
     ///
     fn transpile_runmd(&self) -> String {
         let mut transpiled = String::new();
+
+        match &self.context {
+            CanvasContext::New(_, name, Some(tag)) if !name.is_empty() => {
+                writeln!(transpiled, "+ {tag} .operation {name}").ok();
+            },
+            CanvasContext::New(_, name, None) if !name.is_empty() => {
+                writeln!(transpiled, "+ .operation {name}").ok();
+            },
+            _ => {
+
+            }
+        }
 
         for (idx, c) in self.commands.iter().enumerate() {
             match c {
@@ -309,7 +462,7 @@ impl Canvas {
 
     /// Displays ui to edit custom attribute fields for a plugin,
     ///
-    fn edit_plugin_properties(&mut self, w: &WorkspaceCommand, idx: usize, ui: &Ui) {
+    fn edit_plugin_properties(&mut self, world: &World, w: &WorkspaceCommand, idx: usize, ui: &Ui) {
         if let WorkspaceCommand::AddPlugin(Thunk(name, ..)) = w {
             if let Some(properties) = self.custom_attributes.get_mut(&idx) {
                 if let Some(prop_mut) = properties.property_mut(name) {
@@ -323,8 +476,10 @@ impl Canvas {
                 }
 
                 let mut to_remove = vec![];
+                // let mut to_add = vec![];
 
-                for (name, property) in properties.iter_properties_mut().filter(|(n, _)| n != name) {
+                for (name, property) in properties.iter_properties_mut().filter(|(n, _)| n != name)
+                {
                     if let Some(doc) = self.documentation.get(&idx) {
                         property.edit(
                             move |value| {
@@ -380,12 +535,30 @@ impl Canvas {
                         if ui.small_button("Del") {
                             to_remove.push(name.clone());
                         }
+                        // ui.same_line();
+                        // if let Some(doc) = doc.get(name) {
+                        //     if doc.is_list {
+                        //         ui.same_line();
+                        //         if ui.small_button(format!("Inc##{idx}")) {
+                        //             match w {
+                        //                 WorkspaceCommand::AddPlugin(thunk) => {
+                        //                     to_add.push(thunk);
+                        //                 },
+                        //                 _ => {}
+                        //             }
+                        //         }
+                        //     }
+                        // }
                     }
                 }
 
-                for name in to_remove.iter() {
+                for name in to_remove.drain(..) {
                     properties.remove(name);
                 }
+
+                // for t in to_add.drain(..) {
+                //     self.add_plugin(self.commands.len(), world, *t, None);
+                // }
             }
         }
     }
