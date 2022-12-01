@@ -1,4 +1,3 @@
-use std::time::Instant;
 
 use crate::plugins::*;
 use logos::{Lexer, Logos};
@@ -37,7 +36,7 @@ impl Plugin for Timer {
                 // let duration = Duration::from_secs_f32(duration);
                 // tokio::time::sleep(duration).await;
 
-                let start = Instant::now();
+                let start = tokio::time::Instant::now();
                 loop {
                     let elapsed = start.elapsed();
                     let progress = elapsed.as_secs_f32() / duration;

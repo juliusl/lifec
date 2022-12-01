@@ -9,17 +9,17 @@ use atlier::system::Extension;
 use imgui::{ChildWindow, DragDropFlags, DragDropTarget, StyleVar, TableFlags, Ui, Window, StyleColor};
 use reality::{
     wire::{Interner, ResourceId},
-    BlockProperties, Documentation, Value,
+    BlockProperties, Documentation, Value
 };
-use specs::{Component, Entity, HashMapStorage, World, WorldExt};
+use specs::{Component, Entity, HashMapStorage, World, WorldExt, RunNow};
 use std::fmt::Write;
 use tracing::{event, Level};
 
 use crate::{
     appendix::Appendix,
     engine::WorkspaceCommand,
-    prelude::{find_doc_interner, Event, Thunk},
-    state::AttributeGraph,
+    prelude::{find_doc_interner, Event, Thunk, Host, Listener},
+    state::AttributeGraph, project::WorkspaceSource, host::{StateExt, EventHandler}, debugger::Debugger,
 };
 
 use super::WorkspaceEditor;
@@ -29,7 +29,7 @@ use super::WorkspaceEditor;
 /// Normally you would declare and operation or event w/ .runmd. This extension allows you to
 /// build it within this tooling.
 ///
-#[derive(Component, Default, Clone)]
+#[derive(Component, Default)]
 #[storage(HashMapStorage)]
 pub struct Canvas {
     /// Pending workspace commands,
@@ -53,6 +53,14 @@ pub struct Canvas {
     /// Interner to lookup strings,
     ///
     interner: Interner,
+    /// This is a sandbox host in the sense that it is sandboxed from the current world,
+    /// 
+    /// It is not sandboxed on the machine,
+    /// 
+    compiled_sandbox_host: Option<Host>,
+    /// If this is being tested in the sandbox host, this will be the spawned entity,
+    /// 
+    spawned: Option<Entity>,
 }
 
 /// Enumeration of possible contexts this canvas can be opened w/,
@@ -157,6 +165,52 @@ impl Extension for Canvas {
                         ui.label_text("entity", format!("{:?}", e));
                         ui.new_line();
                         ui.text_wrapped("Use this widget to build a new plugin sequence that can be used in either an engine event, or adhoc operation");
+
+                        ui.disabled(name.is_empty(), || {
+                            if ui.button(format!("Compile##{}", self.context)) {
+                                if let Some(mut replacing) = self.compiled_sandbox_host.take() {
+                                    replacing.exit();
+                                    self.spawned.take();
+                                }
+
+                                let transpiled = self.transpile_runmd();
+                                let workspace_source = world.system_data::<WorkspaceSource>();
+                                let mut host = workspace_source.compile(transpiled);
+                                host.build_appendix();
+                                let debugger = Debugger::create(host.world());
+                                host.world_mut().insert(Some(debugger));
+
+                                self.compiled_sandbox_host = Some(host);
+                            }
+                        });
+
+                        if let Some(host) = self.compiled_sandbox_host.as_mut() {
+                            ui.disabled(self.spawned.is_some(), ||{
+                                if ui.button(format!("Spawn##{}", self.context)) {
+                                    let entity = host.world().entities().entity(1);
+                                    {
+                                        self.spawned = Some(host.state().spawn(entity));
+                                    }
+                                    host.world_mut().maintain();
+                                }
+                            });
+
+                            if let Some(spawned) = self.spawned {
+                                if host.state().is_ready(spawned) {
+                                    let spawned = self.spawned.take().expect("should exist");
+                                    host.state().wait_on(spawned);
+                                    
+                                    for _ in 0..self.commands.len() {
+                                        EventHandler::<Debugger>::default().run_now(host.world());
+                                    }
+                                } else {
+                                    ui.same_line();
+                                    ui.text("processing");
+                                    host.state().tick();
+                                    EventHandler::<Debugger>::default().run_now(host.world());
+                                }
+                            }
+                        }
                     }
                     CanvasContext::Edit(existing) => {
                         ui.label_text(
@@ -288,6 +342,13 @@ impl Canvas {
             ui.input_text_multiline("transpiled", &mut transpiled, [0.0, 0.0])
                 .read_only(true)
                 .build();
+            
+            if let Some(host) = self.compiled_sandbox_host.as_ref() {
+                if let Some(dbg) = host.debugger().as_ref() {
+                    dbg.completion_tree(ui);
+                    dbg.updates_log(ui)
+                }
+            }
         });
     }
 

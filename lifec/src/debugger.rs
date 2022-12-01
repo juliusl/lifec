@@ -372,7 +372,7 @@ cfg_editor! {
 
     /// Dispalys logs in a tree format,
     ///
-    pub fn updates_log(&mut self, ui: &Ui) {
+    pub fn updates_log(&self, ui: &Ui) {
         let mut logs = BTreeMap::<String, BTreeMap<Entity, &VecDeque<StatusUpdate>>>::default();
 
         for (e, status_updates) in self.status_updates.iter() {

@@ -21,6 +21,9 @@ pub use commands::Commands;
 mod sequencer;
 pub use sequencer::Sequencer;
 
+mod state_ext;
+pub use state_ext::StateExt;
+
 cfg_editor! {
     mod editor;
     pub use editor::Editor;

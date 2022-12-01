@@ -1021,7 +1021,7 @@ impl<'a> State<'a> {
 
 cfg_editor! {
     impl<'a> State<'a> {
-        /// Returns connections from adhoc profilers as a vector of nodes,
+    /// Returns connections from adhoc profilers as a vector of nodes,
     ///
     pub fn adhoc_nodes(&self) -> Vec<Node> {
         let State {

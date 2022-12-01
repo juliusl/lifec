@@ -32,6 +32,7 @@ pub use crate::operation::Operation;
 pub use crate::plugins::*;
 pub use crate::project::default_parser;
 pub use crate::project::default_runtime;
+pub use crate::project::compile_world;
 pub use crate::project::Listener;
 pub use crate::project::Operations;
 pub use crate::project::Project;

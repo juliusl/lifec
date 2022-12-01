@@ -177,48 +177,54 @@ where
     fn compile(runmd: impl AsRef<str>, parser: Option<Parser>) -> World {
         let parser = parser.unwrap_or(Self::parser()).parse(runmd.as_ref());
 
-        let mut world = parser.commit();
+        let world = parser.commit();
 
-        let engine = &mut Engine::default();
-        engine.initialize(&mut world);
-
-        // Setup graphs for all plugin entities
-        for (entity, block_index) in
-            (&world.entities(), &world.read_component::<BlockIndex>()).join()
-        {
-            let mut graph = AttributeGraph::new(block_index.clone());
-            if entity.id() != block_index.root().id() {
-                graph = graph.scope(entity.id()).expect("invalid block index state");
-            }
-            world
-                .write_component()
-                .insert(entity, graph)
-                .expect("Should be able to insert graph for entity");
-        }
-
-        let blocks = {
-            world
-                .read_component::<Block>()
-                .join()
-                .cloned()
-                .collect::<Vec<_>>()
-        };
-
-        for block in blocks.iter() {
-            engine.interpret(&world, block);
-
-            Self::interpret(&world, block);
-            event!(
-                Level::TRACE,
-                "Interpreted block {} {}",
-                block.name(),
-                block.symbol()
-            );
-        }
-
-        world.maintain();
-        world
+        compile_world(world, Self::interpret)
     }
+}
+
+/// Compiles and returns a World,
+/// 
+pub fn compile_world(mut world: World, interpret: impl Fn(&World, &Block)) -> World {
+    let engine = &mut Engine::default();
+    engine.initialize(&mut world);
+
+    // Setup graphs for all plugin entities
+    for (entity, block_index) in
+        (&world.entities(), &world.read_component::<BlockIndex>()).join()
+    {
+        let mut graph = AttributeGraph::new(block_index.clone());
+        if entity.id() != block_index.root().id() {
+            graph = graph.scope(entity.id()).expect("invalid block index state");
+        }
+        world
+            .write_component()
+            .insert(entity, graph)
+            .expect("Should be able to insert graph for entity");
+    }
+
+    let blocks = {
+        world
+            .read_component::<Block>()
+            .join()
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+
+    for block in blocks.iter() {
+        engine.interpret(&world, block);
+
+        interpret(&world, block);
+        event!(
+            Level::TRACE,
+            "Interpreted block {} {}",
+            block.name(),
+            block.symbol()
+        );
+    }
+
+    world.maintain();
+    world
 }
 
 /// Returns a basic runtime with standard plugins,

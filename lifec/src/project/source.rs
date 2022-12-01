@@ -6,9 +6,10 @@ pub use runmd::RunmdFile;
 use specs::prelude::*;
 use specs::{Read, ReadStorage, SystemData};
 
-use crate::prelude::{Host, Runtime, Sequencer};
+use crate::engine::Sequences;
+use crate::prelude::{Host, Runtime, Sequencer, State};
 
-use super::{default_world, Listener, Project, Workspace};
+use super::{compile_world, default_world, Listener, Project, Workspace};
 
 /// System data for workspace source and resources used to parse the world,
 ///
@@ -71,6 +72,34 @@ impl<'a> WorkspaceSource<'a> {
         host.link_sequences();
         host.build_appendix();
         host.enable_listener::<L>();
+        host
+    }
+
+    /// Compiles runmd to a host using only the current runtime components availabie in the world,
+    /// 
+    pub fn compile(&self, runmd: impl AsRef<str>) -> Host {
+        let parser = self.new_parser();
+
+        let mut parser = parser.parse(
+            format!(
+                r#"
+```
+{}
+```
+"#,
+            runmd.as_ref()).trim(),
+        );
+        parser.evaluate_stack();
+
+        let world = parser.commit();
+        let mut world = compile_world(world, |_, _| {});
+        world.setup::<Sequences>();
+        world.setup::<State>();
+
+        let mut host = Host::from(world);
+        host.link_sequences();
+        host.build_appendix();
+        host.world_mut().maintain();
         host
     }
 }

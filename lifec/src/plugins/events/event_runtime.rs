@@ -132,7 +132,7 @@ impl SetupHandler<sync::mpsc::Sender<StatusUpdate>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Receiver<StatusUpdate>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Receiver<StatusUpdate>>() {
-            let (tx, rx) = mpsc::channel::<StatusUpdate>(30);
+            let (tx, rx) = mpsc::channel::<StatusUpdate>(1000);
             world.insert(tx);
             world.insert(rx);
         }
