@@ -136,17 +136,26 @@ impl WorkspaceEditor {
 
     /// Plugins table,
     ///
-    pub fn plugins(&mut self, world: &World, ui: &Ui) {
+    pub fn plugins(world: &World, ui: &Ui, compact: bool) {
         let indent_spacing = ui.push_style_var(StyleVar::IndentSpacing(8.0));
 
         let runtime = world.read_resource::<Runtime>();
 
-        let table_flags = TableFlags::BORDERS_INNER_V
-            | TableFlags::BORDERS_INNER_H
+        let mut table_flags = TableFlags::BORDERS_INNER_V;
+           
+        if !compact {
+            table_flags |= TableFlags::BORDERS_INNER_H
             | TableFlags::RESIZABLE
             | TableFlags::HIDEABLE;
+        }
 
-        if let Some(token) = ui.begin_table_with_flags(format!("Plugins"), 2, table_flags) {
+        if let Some(token) = ui.begin_table_with_flags(format!("Plugins"), {
+            if !compact {
+                2
+            } else {
+                1
+            }
+        }, table_flags) {
             fn name_column(ui: &Ui) {
                 let mut table_column_setup = TableColumnSetup::new("Plugin");
                 table_column_setup.flags =
@@ -154,7 +163,10 @@ impl WorkspaceEditor {
                 ui.table_setup_column_with(table_column_setup);
             }
             name_column(ui);
-            ui.table_setup_column("Description");
+
+            if !compact {
+                ui.table_setup_column("Description");
+            }
             ui.table_headers_row();
 
             for thunk in runtime.deref().iter_thunks() {
@@ -170,8 +182,14 @@ impl WorkspaceEditor {
                     ));
                     tooltip.end();
                 }
-                ui.table_next_column();
-                ui.text(thunk.1);
+                if compact {
+                    if ui.is_item_hovered() {
+                        ui.tooltip_text(thunk.1);
+                    }
+                } else {
+                    ui.table_next_column();
+                    ui.text(thunk.1);
+                }
 
                 if let Some(node) = plugin_node {
                     for ((name, id), doc) in docs(name, world) {
@@ -194,8 +212,26 @@ impl WorkspaceEditor {
                             tooltip.end();
                         }
 
-                        ui.table_next_column();
-                        ui.text(doc.summary);
+                        if compact {
+                            if ui.is_item_hovered() {
+                                ui.tooltip(|| {
+                                    if doc.is_list {
+                                        ui.text_colored(imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s(), "[List]");
+                                    }
+                                    ui.text(format!("Summary:\n{}", doc.summary));
+                                    ui.new_line();
+                                    for attr in doc.attribute_types {
+                                        ui.text(format!("{attr}"));
+                                        if let Some(comment) = doc.comments.get(&attr) {
+                                            ui.text(comment);
+                                        }
+                                    }
+                                });
+                            }
+                        } else {
+                            ui.table_next_column();
+                            ui.text(doc.summary);
+                        }
                     }
                     node.pop();
                 }
@@ -466,7 +502,7 @@ impl WorkspaceEditor {
                 }
 
                 if imgui::CollapsingHeader::new("Plugins").build(ui) {
-                    self.plugins(world, ui);
+                    Self::plugins(world, ui, false);
                 }
 
                 if imgui::CollapsingHeader::new("Node command handlers").build(ui) {

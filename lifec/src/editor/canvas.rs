@@ -22,6 +22,8 @@ use crate::{
     state::AttributeGraph,
 };
 
+use super::WorkspaceEditor;
+
 /// Struct for building and configuring an Event component,
 ///
 /// Normally you would declare and operation or event w/ .runmd. This extension allows you to
@@ -138,7 +140,7 @@ impl Extension for Canvas {
         let window_padding = ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
         let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
         Window::new(format!("{}", self.context))
-            .size([1064.0, 700.0], imgui::Condition::Appearing)
+            .size([1624.0, 765.0], imgui::Condition::Appearing)
             .build(ui, || {
                 match &mut self.context {
                     CanvasContext::Empty => {}
@@ -176,8 +178,11 @@ impl Extension for Canvas {
 
                 ui.spacing();
                 ui.separator();
-                if let Some(token) = ui.begin_table_with_flags("layout", 2, TableFlags::RESIZABLE) {
+                if let Some(token) = ui.begin_table_with_flags("layout", 3, TableFlags::RESIZABLE | TableFlags::NO_PAD_INNER_X | TableFlags::SIZING_STRETCH_PROP) {
                     ui.table_next_row();
+                    ui.table_next_column();
+                    WorkspaceEditor::plugins(world, ui, true);
+
                     ui.table_next_column();
                     // Shows a tree of plugins that will be added,
                     self.plugins_tree(world, ui);
@@ -220,7 +225,7 @@ impl Canvas {
                         }
 
                         if let Some(node) = node {
-                            self.edit_plugin_properties(world, w, idx, ui);
+                            self.edit_plugin_properties(w, idx, ui);
                             node.pop();
                         }
                     }
@@ -378,24 +383,33 @@ impl Canvas {
                 let doc_id = ResourceId::new_with_dynamic_id::<Documentation>(custom_attr_id);
                 if let Some(doc) = world.try_fetch_by_id::<Documentation>(doc_id) {
                     if doc.modifies.is_empty() && doc.reads.is_empty() && doc.is_custom_attr {
-                        if let Some(properties) = self.custom_attributes.get_mut(&idx) {
-                            let id = self.interner.clone().add_ident(dest.0) ^ custom_attr_id;
-                            let name = self.interner.strings().get(&id).unwrap();
-                            properties.add(name, Value::Symbol(String::default()));
-
-                            if doc.name_required {
-                                properties
-                                    .add(format!("{name}::name"), Value::Symbol(String::default()));
-                            }
-
-                            if let Some(documentation) = self.documentation.get_mut(&idx) {
-                                documentation.insert(name.to_string(), doc.deref().clone());
-                            }
-                        }
+                        let name = self.resolve_custom_attr_name(dest.0, custom_attr_id);
+                        self.add_custom_attr(idx, name, &doc);
                     }
                 }
             }
             _ => {}
+        }
+    }
+
+    fn resolve_custom_attr_name(&self, plugin: impl AsRef<str>, custom_attr_dynamic_id: u64) -> String {
+        let id = self.interner.clone().add_ident(plugin.as_ref()) ^ custom_attr_dynamic_id;
+        self.interner.strings().get(&id).unwrap().to_string()
+    }
+
+    fn add_custom_attr(&mut self, idx: usize, name: impl AsRef<str>, doc: &Documentation) { 
+        let name = name.as_ref();
+        if let Some(properties) = self.custom_attributes.get_mut(&idx) {
+            properties.add(name, Value::Symbol(String::default()));
+
+            if doc.name_required {
+                properties
+                    .add(format!("{name}::name"), Value::Symbol(String::default()));
+            }
+
+            if let Some(documentation) = self.documentation.get_mut(&idx) {
+                documentation.insert(name.to_string(), doc.deref().clone());
+            }
         }
     }
 
@@ -462,7 +476,7 @@ impl Canvas {
 
     /// Displays ui to edit custom attribute fields for a plugin,
     ///
-    fn edit_plugin_properties(&mut self, world: &World, w: &WorkspaceCommand, idx: usize, ui: &Ui) {
+    fn edit_plugin_properties(&mut self, w: &WorkspaceCommand, idx: usize, ui: &Ui) {
         if let WorkspaceCommand::AddPlugin(Thunk(name, ..)) = w {
             if let Some(properties) = self.custom_attributes.get_mut(&idx) {
                 if let Some(prop_mut) = properties.property_mut(name) {
@@ -476,10 +490,9 @@ impl Canvas {
                 }
 
                 let mut to_remove = vec![];
-                // let mut to_add = vec![];
+                let mut to_add = vec![];
 
-                for (name, property) in properties.iter_properties_mut().filter(|(n, _)| n != name)
-                {
+                for (name, property) in properties.iter_properties_mut().filter(|(n, _)| n != name) {
                     if let Some(doc) = self.documentation.get(&idx) {
                         property.edit(
                             move |value| {
@@ -492,8 +505,12 @@ impl Canvas {
                                 if let Some(doc) = doc.get(name) {
                                     if !doc.attribute_types.is_empty() && ui.is_item_hovered() {
                                         ui.tooltip(|| {
+                                            if doc.is_list {
+                                                ui.text_colored(imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s(), "[List]");
+                                            }
+
                                             for a in doc.attribute_types.iter() {
-                                                ui.text(format!("{a}:"));
+                                                ui.text(format!("{a}"));
                                                 if let Some(comment) = doc.comments.get(a) {
                                                     ui.text(format!("{comment}"));
                                                 }
@@ -517,8 +534,12 @@ impl Canvas {
                                 if let Some(doc) = doc.get(name) {
                                     if !doc.attribute_types.is_empty() && ui.is_item_hovered() {
                                         ui.tooltip(|| {
+                                            if doc.is_list {
+                                                ui.text_colored(imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s(), "[List]");
+                                            }
+
                                             for a in doc.attribute_types.iter() {
-                                                ui.text(format!("{a}:"));
+                                                ui.text(format!("{a}"));
                                                 if let Some(comment) = doc.comments.get(a) {
                                                     ui.text(format!("{comment}"));
                                                 }
@@ -532,23 +553,17 @@ impl Canvas {
                         );
 
                         ui.same_line();
-                        if ui.small_button("Del") {
+                        if ui.small_button(format!("Del##{idx}{name}")) {
                             to_remove.push(name.clone());
                         }
-                        // ui.same_line();
-                        // if let Some(doc) = doc.get(name) {
-                        //     if doc.is_list {
-                        //         ui.same_line();
-                        //         if ui.small_button(format!("Inc##{idx}")) {
-                        //             match w {
-                        //                 WorkspaceCommand::AddPlugin(thunk) => {
-                        //                     to_add.push(thunk);
-                        //                 },
-                        //                 _ => {}
-                        //             }
-                        //         }
-                        //     }
-                        // }
+                        if let Some(doc) = doc.get(name) {
+                            if doc.is_list {
+                                ui.same_line();
+                                if ui.small_button(format!("Inc##{idx}{name}")) {
+                                    to_add.push((idx, name.to_string(), doc.clone()));
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -556,9 +571,9 @@ impl Canvas {
                     properties.remove(name);
                 }
 
-                // for t in to_add.drain(..) {
-                //     self.add_plugin(self.commands.len(), world, *t, None);
-                // }
+                for (idx, name, doc) in to_add.drain(..) {                                    
+                    self.add_custom_attr(idx, name, &doc);
+                }
             }
         }
     }
