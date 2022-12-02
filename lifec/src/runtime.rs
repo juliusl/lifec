@@ -49,6 +49,8 @@ impl SpecialAttribute for Runtime {
                     // Otherwise, check to see if the world has a runtime resource
                     .unwrap_or(world.read_resource::<Runtime>().deref().clone());
                 for (_, c) in runtime.custom_attributes {
+                    c.parse(&mut parser.clone(), "");
+
                     parser.add_custom(c);
                 }
             }

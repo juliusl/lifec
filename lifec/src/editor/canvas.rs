@@ -166,6 +166,8 @@ impl Extension for Canvas {
                         ui.new_line();
                         ui.text_wrapped("Use this widget to build a new plugin sequence that can be used in either an engine event, or adhoc operation");
 
+                       //ui.input_text(format!("workspace##{:?}", e), &mut self.workspace_uri).build();
+
                         ui.disabled(name.is_empty(), || {
                             if ui.button(format!("Compile##{}", self.context)) {
                                 if let Some(mut replacing) = self.compiled_sandbox_host.take() {
@@ -175,7 +177,10 @@ impl Extension for Canvas {
 
                                 let transpiled = self.transpile_runmd();
                                 let workspace_source = world.system_data::<WorkspaceSource>();
+                                
                                 let mut host = workspace_source.compile(transpiled);
+                                // let workspace = Workspace::new(&self.workspace_uri, None);
+                                // host.world_mut().insert(Some(workspace));
                                 host.build_appendix();
                                 let debugger = Debugger::create(host.world());
                                 host.world_mut().insert(Some(debugger));
@@ -187,9 +192,10 @@ impl Extension for Canvas {
                         if let Some(host) = self.compiled_sandbox_host.as_mut() {
                             ui.disabled(self.spawned.is_some(), ||{
                                 if ui.button(format!("Spawn##{}", self.context)) {
-                                    let entity = host.world().entities().entity(1);
+                                    let operations = host.state().list_adhoc_operations();
+                                    if let Some(entity) = operations.first().and_then(|(e, _, _)| Some(e))
                                     {
-                                        self.spawned = Some(host.state().spawn(entity));
+                                        self.spawned = Some(host.state().spawn(*entity));
                                     }
                                     host.world_mut().maintain();
                                 }

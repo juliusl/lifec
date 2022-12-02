@@ -78,10 +78,8 @@ impl Plugin for Watch {
                 }
 
                 let mut event_set = HashSet::<u64>::default();
-                for event_def in tc.find_binary_values("event_kind") {
-                    let mut be_bytes = [0; 8];
-                    be_bytes.copy_from_slice(event_def.as_slice());
-                    let code = u64::from_be_bytes(be_bytes);
+                for (a, b) in tc.find_int_pair_values("event_kind") {
+                    let code = bytemuck::cast::<[i32; 2], u64>([a, b]);
                     event_set.insert(code);
                     event!(Level::TRACE, "Looking for event_kind with hash {code}");
                 }
@@ -141,7 +139,8 @@ impl Plugin for Watch {
                     .state()
                     .find_symbol("watch")
                     .expect("should have a file path value");
-                let file = tc.work_dir().expect("should have a work dir").join(file);
+
+                let file = PathBuf::from(file).canonicalize().expect("should be a valid path");
 
                 // Creating a reference so the watcher doesn't get dropped while we wait
                 // for the event that we're looking for
@@ -201,33 +200,63 @@ impl Plugin for Watch {
             },
         }
 
-        parser.add_custom_with("poll_interval", |p, content| {
-            let child_entity = p.last_child_entity().expect("should have child entity");
+        if let Some(mut docs) = Self::start_docs(parser) {
+            let docs = &mut docs;
 
-            match TimerSettings::lexer(&content).next() {
-                Some(TimerSettings::Duration(duration)) => {
-                    p.define_child(child_entity, "poll_interval", Value::Float(duration))
-                }
-                _ => {
-                    event!(
-                        Level::ERROR,
-                        "Could not parse poll_interval setting, {content}"
-                    );
-                }
-            }
-        });
+            docs.as_mut()
+                .add_custom_with("poll_interval", |p, content| {
+                    let child_entity = p.last_child_entity().expect("should have child entity");
 
-        parser.add_custom_with("compare_contents", |p, _| {
-            let child_entity = p.last_child_entity().expect("should have a child entity");
-            p.define_child(child_entity, "compare_contents", true);
-        });
+                    match TimerSettings::lexer(&content).next() {
+                        Some(TimerSettings::Duration(duration)) => {
+                            p.define_child(child_entity, "poll_interval", Value::Float(duration))
+                        }
+                        _ => {
+                            event!(
+                                Level::ERROR,
+                                "Could not parse poll_interval setting, {content}"
+                            );
+                        }
+                    }
+                })
+                .add_doc(
+                    docs,
+                    "If the fallback polling method is used, this is the polling interval",
+                )
+                .symbol("Uses timer syntax, i.e. `1 s` or `1000 ms`");
 
-        // Add custom attributes to define events to look for
-        parser
-            .with_custom::<Create>()
-            .with_custom::<Modify>()
-            .with_custom::<Access>()
-            .with_custom::<Remove>();
+            docs.as_mut().add_custom_with("compare_contents", |p, _| {
+                let child_entity = p.last_child_entity().expect("should have a child entity");
+                p.define_child(child_entity, "compare_contents", true);
+            }).add_doc(docs, "If watching for file changes, using this attribute could optimize the notification");
+
+            CustomAttribute::new::<Create>()
+                .add_doc(docs, "Enables watching for a `create` notification")
+                .list()
+                .symbol("Configures the kind of event to watch for. Accepted values are `file`, `folder`, and `other`.");
+
+            CustomAttribute::new::<Modify>()
+                .add_doc(docs, "Enables watching for a `modify` notification")
+                .list()
+                .symbol("Configures the kind of event to watch for. Accepted values are `size`, `content`, `data other`, `metadata`, `access_time`, `write_time`, `permissions`, `ownership`, `extended`, `metadata other`, `name`, `name to`, `name from`, `name both`, `name other`");
+
+            CustomAttribute::new::<Access>()
+                .add_doc(docs, "Enables watching for a `access` notification")
+                .list()
+                .symbol("Configures the kind of event to watch for. Accepted values are `read`, `open`, `open exec`, `open read`, `open write`, `open other`, `close`, `close exec`, `close read`, `close write`, `close other`, `other`.");
+
+            CustomAttribute::new::<Remove>()
+                .add_doc(docs, "Enables watching for a `remove` notification")
+                .list()
+                .symbol("Configures the kind of event to watch for. Accepted values are `file`, `folder`, `other`.");
+
+            // Add custom attributes to define events to look for
+            docs.as_mut()
+                .with_custom::<Create>()
+                .with_custom::<Modify>()
+                .with_custom::<Access>()
+                .with_custom::<Remove>();
+        }
     }
 }
 

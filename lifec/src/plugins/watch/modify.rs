@@ -86,10 +86,12 @@ impl SpecialAttribute for Modify {
                 }
                 .hash(hasher);
 
+                let hash = hasher.finish();
+                let [a, b] = bytemuck::cast::<u64, [i32; 2]>(hash);
                 parser.define_child(
                     entity,
                     "event_kind",
-                    Value::BinaryVector(hasher.finish().to_be_bytes().to_vec()),
+                    Value::IntPair(a, b),
                 )
             }
         }

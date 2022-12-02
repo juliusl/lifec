@@ -162,6 +162,15 @@ pub trait AttributeIndex {
         }
     }
 
+    /// Find an int pair value from an attribute
+    ///
+    fn find_int_pair_values(&self, with_name: impl AsRef<str>) -> Vec<(i32, i32)> {
+        self.find_values(with_name)
+            .iter()
+            .filter_map(Value::int_pair)
+            .collect()
+    }
+
     /// Finds an int range value from an attribute
     ///
     fn find_int_range(&self, with_name: impl AsRef<str>) -> Option<(i32, i32, i32)> {
