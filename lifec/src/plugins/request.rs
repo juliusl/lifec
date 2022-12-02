@@ -6,6 +6,8 @@ use hyper::{Body, Request as HttpRequest};
 use reality::{BlockObject, BlockProperties};
 use tracing::{event, Level};
 
+use super::AddDoc;
+
 /// Type for installing a lifec plugin implementation. This plugin makes
 /// https requests, with a hyper secure client.
 ///
@@ -22,72 +24,93 @@ impl Plugin for Request {
     }
 
     fn compile(parser: &mut crate::prelude::AttributeParser) {
-        /*
-        Example Usage:
-            : Accept .header text/json
-            or
-            : Accept .symbol {media_type}
-            : .fmt media_type
-         */
-        parser.add_custom_with("header", |p, c| {
-            let var_name = p.symbol().expect("Requires a var name").to_string();
+        if let Some(mut docs) = Self::start_docs(parser) {
+            let docs = &mut docs;
+            /*
+            Example Usage:
+                : Accept .header text/json
+                or
+                : Accept .symbol {media_type}
+                : .fmt media_type
+             */
+            docs.as_mut()
+                .add_custom_with("header", |p, c| {
+                    let var_name = p.symbol().expect("Requires a var name").to_string();
 
-            let last = p
-                .last_child_entity()
-                .expect("should have added an entity for the process");
+                    let last = p
+                        .last_child_entity()
+                        .expect("should have added an entity for the process");
 
-            p.define_child(last, "header", Value::Symbol(var_name.to_string()));
-            p.define_child(last, var_name, Value::Symbol(c));
-        });
+                    p.define_child(last, "header", Value::Symbol(var_name.to_string()));
+                    p.define_child(last, var_name, Value::Symbol(c));
+                })
+                .add_doc(docs, "Sets an http header on the request.")
+                .name_required()
+                .list()
+                .symbol("Should be a valid header value");
 
-        parser.add_custom_with("accept", |p, c| {
-            let last = p
-                .last_child_entity()
-                .expect("should have added an entity for the process");
+            docs.as_mut()
+                .add_custom_with("accept", |p, c| {
+                    let last = p
+                        .last_child_entity()
+                        .expect("should have added an entity for the process");
 
-            p.define_child(last, "header", "accept");
-            p.define_child(last, "accept", Value::Symbol(c));
-        });
+                    p.define_child(last, "header", "accept");
+                    p.define_child(last, "accept", Value::Symbol(c));
+                })
+                .add_doc(docs, "Shortcut for `: Accept .header {value}`")
+                .symbol("Should be the value of the Accept header, which is usually a media type");
 
-        parser.add_custom_with("get", |p, _| {
-            let last = p
-                .last_child_entity()
-                .expect("should have added an entity for the process");
+            docs.as_mut()
+                .add_custom_with("get", |p, _| {
+                    let last = p
+                        .last_child_entity()
+                        .expect("should have added an entity for the process");
 
-            p.define_child(last, "method", "GET");
-        });
+                    p.define_child(last, "method", "GET");
+                })
+                .add_doc(docs, "Sets the method for the request to GET (defaults)");
 
-        parser.add_custom_with("post", |p, _| {
-            let last = p
-                .last_child_entity()
-                .expect("should have added an entity for the process");
+            docs.as_mut()
+                .add_custom_with("post", |p, _| {
+                    let last = p
+                        .last_child_entity()
+                        .expect("should have added an entity for the process");
 
-            p.define_child(last, "method", "POST");
-        });
+                    p.define_child(last, "method", "POST");
+                })
+                .add_doc(docs, "Sets the method for the request to POST");
 
-        parser.add_custom_with("put", |p, _| {
-            let last = p
-                .last_child_entity()
-                .expect("should have added an entity for the process");
+            docs.as_mut()
+                .add_custom_with("put", |p, _| {
+                    let last = p
+                        .last_child_entity()
+                        .expect("should have added an entity for the process");
 
-            p.define_child(last, "method", "PUT");
-        });
+                    p.define_child(last, "method", "PUT");
+                })
+                .add_doc(docs, "Sets the method for the request to PUT");
 
-        parser.add_custom_with("head", |p, _| {
-            let last = p
-                .last_child_entity()
-                .expect("should have added an entity for the process");
+            docs.as_mut()
+                .add_custom_with("head", |p, _| {
+                    let last = p
+                        .last_child_entity()
+                        .expect("should have added an entity for the process");
 
-            p.define_child(last, "method", "HEAD");
-        });
+                    p.define_child(last, "method", "HEAD");
+                })
+                .add_doc(docs, "Sets the method for the request to HEAD");
 
-        parser.add_custom_with("delete", |p, _| {
-            let last = p
-                .last_child_entity()
-                .expect("should have added an entity for the process");
+            docs.as_mut()
+                .add_custom_with("delete", |p, _| {
+                    let last = p
+                        .last_child_entity()
+                        .expect("should have added an entity for the process");
 
-            p.define_child(last, "method", "DELETE");
-        });
+                    p.define_child(last, "method", "DELETE");
+                })
+                .add_doc(docs, "Sets the method for the request to DELETE");
+        }
     }
 
     fn call(context: &mut ThunkContext) -> Option<AsyncContext> {

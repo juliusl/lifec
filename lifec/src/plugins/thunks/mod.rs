@@ -10,7 +10,7 @@ pub use thunk_context::ThunkContext;
 
 use crate::appendix::General;
 
-use super::{Call, Plugin};
+use super::{Call, Plugin, Compile};
 use std::fmt::Debug;
 use std::hash::Hash;
 
@@ -24,6 +24,8 @@ pub struct Thunk(
     pub &'static str,
     /// Call fn,
     pub Call,
+    /// Compile fn,
+    pub Compile,
 );
 
 impl Thunk {
@@ -37,7 +39,7 @@ impl Thunk {
     where
         P: Plugin + ?Sized,
     {
-        Self(P::symbol(), P::description(), P::call)
+        Self(P::symbol(), P::description(), P::call, P::compile)
     }
 }
 

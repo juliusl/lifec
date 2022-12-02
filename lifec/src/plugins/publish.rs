@@ -54,6 +54,20 @@ impl Plugin for Publish {
             }
         })
     }
+
+    fn compile(parser: &mut AttributeParser) {
+        if let Some(mut docs) = Self::start_docs(parser) {
+            let docs = &mut docs;
+            docs.as_mut().add_custom_with("address", |p, c| {
+                let entity = p.last_child_entity().expect("should have last entity");
+
+                p.define_child(entity, "tcp", Value::Symbol(c));
+            })
+            .add_doc(docs, "Sets the tcp address to listen to. Accepts and writes to the first connection.")
+            .required()
+            .symbol("Should be a valid IpV4 address, i.e. 127.0.0.1:8345. You can leave the port empty for a new port to be assigned");
+        }
+    }
 }
 
 impl BlockObject for Publish {

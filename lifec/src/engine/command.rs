@@ -95,7 +95,7 @@ pub enum WorkspaceCommand {
 impl Display for WorkspaceCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            WorkspaceCommand::AddPlugin(Thunk(name, _, _)) => write!(f, "add_plugin::{name}"),
+            WorkspaceCommand::AddPlugin(Thunk(name, _, _, _)) => write!(f, "add_plugin::{name}"),
             WorkspaceCommand::ApplyCustomAttribute(_, _) => todo!(),
         }
     }

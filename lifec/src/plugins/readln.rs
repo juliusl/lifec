@@ -43,34 +43,40 @@ impl Plugin for Readln {
     }
 
     fn compile(parser: &mut reality::AttributeParser) {
-        parser.add_custom_with("prompt", |p, content| {
-            let child_entity = p.last_child_entity().expect("should have a child entity");
-            if let Some(prop_name) = p.symbol().cloned() {
-                /*
-                # Example
-                : name .prompt name >
-                : age  .prompt age  >
-                */
-                p.define_child(
-                    child_entity,
-                    "prompt",
-                    Value::Symbol(String::from(&prop_name)),
-                );
-                p.define_child(child_entity, &prop_name, Value::Symbol(content));
-            } else {
-                /*
-                # Example
-                : .readln name
-                : .prompt name>
-                */
-                p.define_child(
-                    child_entity,
-                    "prompt",
-                    Value::Symbol(String::from("readln-prompt")),
-                );
-                p.define_child(child_entity, "readln-prompt", Value::Symbol(content));
-            }
-        });
+        if let Some(mut docs) = Self::start_docs(parser) {
+            docs.as_mut().add_custom_with("prompt", |p, content| {
+                let child_entity = p.last_child_entity().expect("should have a child entity");
+                if let Some(prop_name) = p.symbol().cloned() {
+                    /*
+                    # Example
+                    : name .prompt name >
+                    : age  .prompt age  >
+                    */
+                    p.define_child(
+                        child_entity,
+                        "prompt",
+                        Value::Symbol(String::from(&prop_name)),
+                    );
+                    p.define_child(child_entity, &prop_name, Value::Symbol(content));
+                } else {
+                    /*
+                    # Example
+                    : .readln name
+                    : .prompt name>
+                    */
+                    p.define_child(
+                        child_entity,
+                        "prompt",
+                        Value::Symbol(String::from("readln-prompt")),
+                    );
+                    p.define_child(child_entity, "readln-prompt", Value::Symbol(content));
+                }
+            })
+            .add_doc(&mut docs, "Prints a prompt on stderr. If an identifier was passed to the .readln, then the value read here will be used to replace the property with that identifier.")
+            .list()
+            .name_optional()
+            .symbol("The prompt to print, ex: name>");
+        }
     }
 }
 

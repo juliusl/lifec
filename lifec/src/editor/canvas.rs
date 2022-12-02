@@ -345,7 +345,7 @@ impl Canvas {
             if ui.button(format!("Copy to clipboard##{}", self.context)) {
                 ui.set_clipboard_text(&transpiled);
             }
-            ui.input_text_multiline("transpiled", &mut transpiled, [0.0, 0.0])
+            ui.input_text_multiline(format!("transpiled runmd##{}", self.context), &mut transpiled, [0.0, 0.0])
                 .read_only(true)
                 .build();
             
@@ -394,35 +394,38 @@ impl Canvas {
                             .iter_properties()
                             .filter(|(n, _)| !n.ends_with("::name") && n != name)
                         {
-                            if let Some(property) = properties.property(format!("{name}::name")) {
-                                if let Some(symbol) = property.symbol() {
-                                    writeln!(
-                                        transpiled,
-                                        ": {:<10} .{} {}",
-                                        symbol,
-                                        name,
-                                        value.symbol().unwrap_or(&String::default())
-                                    )
-                                    .ok();
-                                } else if let Some(symbols) = property.symbol_vec() {
-                                    let values = value.symbol_vec().unwrap_or_default();
-                                    for (idx, s) in symbols.iter().enumerate() {
+                            match properties.property(format!("{name}::name")) {
+                                Some(ref property) if !property.symbol().map(String::is_empty).unwrap_or_default() => {
+                                    if let Some(symbol) = property.symbol() {
                                         writeln!(
                                             transpiled,
                                             ": {:<10} .{} {}",
-                                            s,
+                                            symbol,
                                             name,
-                                            values.get(idx).unwrap_or(&String::default())
+                                            value.symbol().unwrap_or(&String::default())
                                         )
                                         .ok();
+                                    } else if let Some(symbols) = property.symbol_vec() {
+                                        let values = value.symbol_vec().unwrap_or_default();
+                                        for (idx, s) in symbols.iter().enumerate() {
+                                            writeln!(
+                                                transpiled,
+                                                ": {:<10} .{} {}",
+                                                s,
+                                                name,
+                                                values.get(idx).unwrap_or(&String::default())
+                                            )
+                                            .ok();
+                                        }
                                     }
                                 }
-                            } else {
-                                if let Some(symbol) = value.symbol() {
-                                    writeln!(transpiled, ": .{name} {}", symbol).ok();
-                                } else if let Some(symbols) = value.symbol_vec() {
-                                    for s in symbols.iter() {
-                                        writeln!(transpiled, ": .{name} {}", s).ok();
+                                _ => {
+                                    if let Some(symbol) = value.symbol() {
+                                        writeln!(transpiled, ": .{name} {}", symbol).ok();
+                                    } else if let Some(symbols) = value.symbol_vec() {
+                                        for s in symbols.iter() {
+                                            writeln!(transpiled, ": .{name} {}", s).ok();
+                                        }
                                     }
                                 }
                             }
@@ -469,7 +472,7 @@ impl Canvas {
         if let Some(properties) = self.custom_attributes.get_mut(&idx) {
             properties.add(name, Value::Symbol(String::default()));
 
-            if doc.name_required {
+            if doc.name_required | doc.name_optional {
                 properties
                     .add(format!("{name}::name"), Value::Symbol(String::default()));
             }
@@ -576,6 +579,16 @@ impl Canvas {
                                                 ui.text_colored(imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s(), "[List]");
                                             }
 
+                                            if doc.name_required {
+                                                ui.same_line();
+                                                ui.text_colored(imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s(), "[Name Required]");
+                                            }
+
+                                            if doc.name_optional {
+                                                ui.same_line();
+                                                ui.text_colored(imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s(), "[Name Optional]");
+                                            }
+
                                             for a in doc.attribute_types.iter() {
                                                 ui.text(format!("{a}"));
                                                 if let Some(comment) = doc.comments.get(a) {
@@ -603,6 +616,16 @@ impl Canvas {
                                         ui.tooltip(|| {
                                             if doc.is_list {
                                                 ui.text_colored(imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s(), "[List]");
+                                            }
+
+                                            if doc.name_required {
+                                                ui.same_line();
+                                                ui.text_colored(imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s(), "[Name Required]");
+                                            }
+
+                                            if doc.name_optional {
+                                                ui.same_line();
+                                                ui.text_colored(imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s(), "[Name Optional]");
                                             }
 
                                             for a in doc.attribute_types.iter() {

@@ -173,7 +173,14 @@ impl WorkspaceEditor {
                 ui.table_next_row();
                 ui.table_next_column();
                 let name = thunk.0;
-                let plugin_node = TreeNode::new(name).push(ui);
+                let docs = docs(name, world);
+
+                let mut plugin_node = TreeNode::new(name);
+                if docs.is_empty() {
+                    plugin_node = plugin_node.leaf(true);
+                }
+                let plugin_node = plugin_node.push(ui);
+
                 if let Some(tooltip) = imgui::drag_drop::DragDropSource::new("ADD_PLUGIN")
                     .begin_payload(ui, WorkspaceCommand::AddPlugin(thunk))
                 {
@@ -191,13 +198,13 @@ impl WorkspaceEditor {
                     ui.text(thunk.1);
                 }
 
+
                 if let Some(node) = plugin_node {
-                    for ((name, id), doc) in docs(name, world) {
+                    for ((name, id), doc) in docs {
                         ui.table_next_row();
                         ui.table_next_column();
                         TreeNode::new(format!(".{name}"))
                             .leaf(true)
-                            .bullet(true)
                             .push(ui);
                         if let Some(tooltip) =
                             imgui::drag_drop::DragDropSource::new("APPLY_CUSTOM_ATTRIBUTE")
@@ -217,6 +224,10 @@ impl WorkspaceEditor {
                                 ui.tooltip(|| {
                                     if doc.is_list {
                                         ui.text_colored(imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s(), "[List]");
+                                    }
+                                    if doc.name_required {
+                                        ui.same_line();
+                                        ui.text_colored(imgui::color::ImColor32::from_rgba(66, 150, 250, 171).to_rgba_f32s(), "[Name Required]");
                                     }
                                     ui.text(format!("Summary:\n{}", doc.summary));
                                     ui.new_line();

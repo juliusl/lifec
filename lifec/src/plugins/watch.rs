@@ -238,12 +238,17 @@ impl Plugin for Watch {
             CustomAttribute::new::<Modify>()
                 .add_doc(docs, "Enables watching for a `modify` notification")
                 .list()
-                .symbol("Configures the kind of event to watch for. Accepted values are `size`, `content`, `data other`, `metadata`, `access_time`, `write_time`, `permissions`, `ownership`, `extended`, `metadata other`, `name`, `name to`, `name from`, `name both`, `name other`");
+                .symbol(r#"
+Configures the kind of event to watch for. Accepted values are `size`, `content`, `data other`, `metadata`, 
+    `access_time`, `write_time`, `permissions`, `ownership`, `extended`, 
+    `metadata other`, `name`, `name to`, `name from`, `name both`, `name other`"#);
 
             CustomAttribute::new::<Access>()
                 .add_doc(docs, "Enables watching for a `access` notification")
                 .list()
-                .symbol("Configures the kind of event to watch for. Accepted values are `read`, `open`, `open exec`, `open read`, `open write`, `open other`, `close`, `close exec`, `close read`, `close write`, `close other`, `other`.");
+                .symbol("
+Configures the kind of event to watch for. Accepted values are `read`, `open`, `open exec`, `open read`, `open write`, 
+    `open other`, `close`, `close exec`, `close read`, `close write`, `close other`, `other`.");
 
             CustomAttribute::new::<Remove>()
                 .add_doc(docs, "Enables watching for a `remove` notification")

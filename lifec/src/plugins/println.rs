@@ -31,7 +31,13 @@ impl Plugin for Println {
     }
 
     fn compile(parser: &mut reality::AttributeParser) {
-        parser.with_custom::<Fmt>();
+        if let Some(mut docs) = Self::start_docs(parser) {
+            CustomAttribute::new::<Fmt>()
+                .add_doc(&mut docs, "Formats the string being printed w/ properties from the current state")
+                .symbol("Comma seperated list of identifiers to interpolate.");
+
+            docs.as_mut().with_custom::<Fmt>();
+        }
     }
 }
 
