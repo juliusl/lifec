@@ -103,7 +103,7 @@ where
             .with_special_attr::<Operations>();
 
         for RunmdFile { symbol, source } in files {
-            parser.set_implicit_symbol(&symbol);
+            parser.set_implicit_symbol(symbol);
 
             if let Some(runmd) = source {
                 parser = parser.parse(runmd);
