@@ -13,7 +13,7 @@ use super::{
     connection::ConnectionState, Adhoc, EngineStatus, Limit, NodeCommand, Plugins, Profiler,
     TickControl, Transition, Yielding,
 };
-use crate::{appendix::Appendix, engine::Completion, prelude::*};
+use crate::{appendix::Appendix, engine::Completion, prelude::*, guest::{Guest, RemoteProtocol}};
 
 cfg_editor! {
     use crate::editor::{Node, NodeStatus};
@@ -93,6 +93,9 @@ pub struct State<'a> {
     /// Engine storage,
     ///
     engines: ReadStorage<'a, Engine>,
+    /// Guests storage,
+    /// 
+    guests: ReadStorage<'a, Guest>,
     /// Execution limits,
     ///
     limits: WriteStorage<'a, Limit>,
@@ -1331,6 +1334,7 @@ impl<'a> State<'a> {
             thunks,
             blocks,
             graphs,
+            guests,
             ..
         } = self;
 
@@ -1343,6 +1347,7 @@ impl<'a> State<'a> {
         let mut thunk_map = HashMap::<Entity, Thunk>::default();
         let mut graph_map = HashMap::<Entity, AttributeGraph>::default();
         let mut block_map = HashMap::<Entity, Block>::default();
+        let mut remote_protocols = HashMap::<Entity, RemoteProtocol>::default();
         for call in sequence.iter_entities() {
             let thunk = thunks.get(call).expect("should have a thunk").clone();
             let graph = graphs.get(call).expect("should have a graph").clone();
@@ -1350,6 +1355,13 @@ impl<'a> State<'a> {
             thunk_map.insert(call, thunk);
             graph_map.insert(call, graph);
             block_map.insert(call, block);
+
+            // Will only exist if the plugin enabled a guest at compile time
+            if let Some(guest) = guests.get(call) {
+                let rp = guest.subscribe();
+
+                remote_protocols.insert(call, rp);
+            }
         }
 
         let (tx, rx) = tokio::sync::oneshot::channel::<()>();
@@ -1371,6 +1383,10 @@ impl<'a> State<'a> {
 
                     context.set_state(graph.clone());
                     context.set_block(block);
+
+                    if let Some(rp) = remote_protocols.get(&e) {
+                        context.enable_remote(rp.clone());
+                    }
 
                     let mut operation =
                         Operation::empty(handle.clone()).start_with(thunk, &mut context);
