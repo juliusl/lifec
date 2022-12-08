@@ -20,7 +20,17 @@ pub use remote_protocol::RemoteProtocol;
 pub type Run = fn(&Guest);
 
 /// Guest host as a component,
-///
+/// 
+/// This is useful in situations where a plugin wishes to maintain their own world/host, and mostly convienient for running
+/// "stateless" functions from plugins via the remote_protocol feature.
+/// 
+/// Internally a "Protocol" is used to create a boundary between callers and internal world storage. This also enables the guest component to 
+/// directly encode/decode wire objects from/to the World.
+/// 
+/// If the "editor" feature is enabled, the guest component also includes a feature to add custom "nodes" to storage. In the editor these nodes will be updated and allowed to create 
+/// ui. Plugins are freely to modify guests they create/consume. The runtime does not enforce any other isolation beyond ensuring that the guest cannot mutate the main host. Guests will have
+/// the same permissions as the current host on the environment.
+/// 
 #[derive(Component)]
 #[storage(HashMapStorage)]
 pub struct Guest {
@@ -34,8 +44,7 @@ pub struct Guest {
     protocol: tokio::sync::watch::Sender<Protocol>,
     /// Remote protocol,
     remote: Option<RemoteProtocol>,
-
-    /// Guest nodes,
+    /// Guest nodes, requires the "editor" feature
     #[cfg(feature = "editor")]
     nodes: Vec<Node>,
 }
@@ -59,7 +68,6 @@ impl Guest {
             protocol,
             stateless,
             remote: None,
-
             #[cfg(feature = "editor")]
             nodes: vec![],
         };
@@ -192,7 +200,7 @@ impl Guest {
 
     /// Encode wire objects to protocol and update the watch channel,
     ///
-    /// Returns objects that were encoded
+    /// Returns true if objects were encoded
     ///
     pub fn encode<T>(&self, take_objects: impl FnOnce(&Protocol) -> Vec<(Entity, T)>) -> bool
     where

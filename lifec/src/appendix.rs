@@ -1,5 +1,5 @@
 use specs::Entity;
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::hash::Hash;
 
 mod general;
@@ -7,6 +7,8 @@ pub use general::General;
 
 mod state;
 pub use state::Config;
+
+use crate::engine::Adhoc;
 
 /// Struct for storing descriptions of entities and various parts,
 ///
@@ -18,6 +20,9 @@ pub struct Appendix {
     /// Index of config state of an entity,
     ///
     pub config: HashMap<u32, Config>,
+    /// Map of workspace operations,
+    /// 
+    pub workspace_operations: BTreeMap<Adhoc, Entity>,
     /// Prefix notes,
     ///
     pub prefix_notes: HashMap<String, String>,
@@ -34,6 +39,21 @@ impl Appendix {
     ///
     pub fn insert_config(&mut self, entity: Entity, state: impl Into<Config>) {
         self.config.insert(entity.id(), state.into());
+    }
+
+    /// Inserts an entry to lookup a workspace operation,
+    /// 
+    pub fn insert_operation(&mut self, adhoc: Adhoc, entity: Entity) {
+        self.workspace_operations.insert(adhoc, entity);
+    }
+
+    /// Finds a workspace operation, returns the entity if exists,
+    /// 
+    pub fn find_operation(&self, tag: impl Into<String>, name: impl Into<String>) -> Option<Entity> {
+        self.workspace_operations.get(&Adhoc {
+            name: name.into(),
+            tag: tag.into(),
+        }).cloned()
     }
 
     /// Returns a config state description for the entity,

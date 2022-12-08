@@ -1,7 +1,7 @@
 use specs::{prelude::*, SystemData};
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
-use crate::{guest::RemoteProtocol, prelude::*};
+use crate::{guest::RemoteProtocol, prelude::*, appendix::Appendix};
 
 cfg_not_editor! {
 /// System data with plugin feature resources,
@@ -25,6 +25,7 @@ pub struct Features<'a> {
     tokio_runtime: Read<'a, tokio::runtime::Runtime, EventRuntime>,
     secure_client: Read<'a, SecureClient, EventRuntime>,
     remote_protocol: Read<'a, Option<RemoteProtocol>>,
+    appendix: Read<'a, Arc<Appendix>>,
     broker: PluginBroker<'a>,
     host_editor: Read<'a, tokio::sync::watch::Receiver<HostEditor>, EventRuntime>,
 }
@@ -39,6 +40,7 @@ impl<'a> Features<'a> {
             tokio_runtime,
             secure_client,
             broker,
+            appendix,
             ..
         } = self;
 
@@ -55,6 +57,8 @@ impl<'a> Features<'a> {
         if let Some(remote_protocol) = self.remote_protocol.as_ref() {
             context.enable_remote(remote_protocol.clone());
         }
+
+        context.enable_appendix(appendix.deref().clone());
 
         #[cfg(feature = "editor")]
         let context = self.enable_editor_features(&context);

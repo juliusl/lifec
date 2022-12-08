@@ -2,7 +2,7 @@ use specs::{Component, VecStorage};
 
 /// Component to distinguish adhoc workspace operations,
 ///
-#[derive(Debug, Component, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Component, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[storage(VecStorage)]
 pub struct Adhoc {
     /// Name of the adhoc component

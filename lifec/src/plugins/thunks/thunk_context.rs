@@ -1,3 +1,4 @@
+use crate::appendix::Appendix;
 use crate::engine::{Completion, NodeCommand, Yielding};
 use crate::guest::{Guest, RemoteProtocol};
 use crate::prelude::{attributes::Fmt, *};
@@ -58,6 +59,8 @@ pub struct ThunkContext {
     client: Option<SecureClient>,
     /// Workspace for this context, if enabled the work_dir from the workspace can be used
     workspace: Option<Workspace>,
+    /// Reference to an appendix,
+    appendix: Option<Arc<Appendix>>,
     /// Local tcp socket address,
     local_tcp_addr: Option<SocketAddr>,
     /// Local udp socket address,
@@ -112,6 +115,7 @@ impl Clone for ThunkContext {
             handle: self.handle.clone(),
             client: self.client.clone(),
             workspace: self.workspace.clone(),
+            appendix: self.appendix.clone(),
             local_tcp_addr: self.local_tcp_addr.clone(),
             local_udp_addr: self.local_udp_addr.clone(),
             status_updates: self.status_updates.clone(),
@@ -253,6 +257,32 @@ impl ThunkContext {
     ///
     pub fn tag(&self) -> Option<String> {
         self.workspace.as_ref().and_then(|w| w.tag().cloned())
+    }
+
+    /// Finds and spawns an operation by name and tag from the current workspace,
+    ///
+    /// Blocks until a result is received, and returns the thunk context if successful
+    /// 
+    pub async fn run(&self, operation_name: impl AsRef<String>) -> Option<ThunkContext> {
+        let tag = self.tag().unwrap_or(String::from("operation"));
+
+        if let Some(operation) = self
+            .appendix
+            .as_ref()
+            .and_then(|a| a.find_operation(&tag, operation_name.as_ref()))
+            .and_then(|op| self.dispatch_node_command(NodeCommand::Spawn(op)))
+        {
+            match operation.await {
+                Ok(tc) => Some(tc),
+                Err(err) => {
+                    event!(Level::ERROR, "Encountered error while yielding for spawned operation, {err}");
+                    None
+                },
+            }
+        } else {
+            event!(Level::WARN, "Did not find operation, {} {}", operation_name.as_ref(), tag);
+            None
+        }
     }
 
     /// Copies previous state to the current state,
@@ -398,6 +428,12 @@ impl ThunkContext {
         } else {
             false
         }
+    }
+
+    /// Eanbles the appendix for this context,
+    ///
+    pub fn enable_appendix(&mut self, appendix: Arc<Appendix>) {
+        self.appendix = Some(appendix);
     }
 
     /// Enables the remote protocol on this thunk,

@@ -6,8 +6,14 @@ use crate::{
 };
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
-use specs::{Dispatcher, DispatcherBuilder, Entity, World, WorldExt, Write};
-use std::{error::Error, ops::Deref, path::PathBuf, str::from_utf8};
+use specs::{AsyncDispatcher, Dispatcher, DispatcherBuilder, Entity, World, WorldExt, Write};
+use std::{
+    borrow::{Borrow, BorrowMut},
+    error::Error,
+    ops::Deref,
+    path::PathBuf,
+    str::from_utf8,
+};
 
 mod inspector;
 pub use inspector::Inspector;
@@ -127,6 +133,16 @@ impl Host {
                 }
             },
         );
+
+        // Add adhoc operations to appendix for easy-access 
+        self.world_mut()
+            .exec(|(operations, mut appendix): (Operations, Write<Appendix>)| {
+                let operations = operations.scan_root();
+
+                for (entity, adhoc, _) in operations {
+                    appendix.insert_operation(adhoc, entity);
+                }
+            });
     }
 
     /// Returns a new dispatcher builder with core
@@ -423,7 +439,7 @@ impl Host {
 
     /// Creates a new dispatcher builder,
     ///
-    pub fn new_dispatcher_builder<'a, 'b, P>(&mut self) -> DispatcherBuilder<'a, 'b>
+    pub fn new_dispatcher_builder<'a, 'b, P>(&self) -> DispatcherBuilder<'a, 'b>
     where
         P: Project,
     {
@@ -451,7 +467,28 @@ impl Host {
         P: Project,
     {
         let mut dispatcher = self.new_dispatcher_builder::<P>().build();
+
         dispatcher.setup(self.world_mut());
+        dispatcher
+    }
+
+    /// Consumes self and returns an AsyncDispatcher,
+    ///
+    /// The returned dispatcher will take ownership of the host, and the host can be accessed
+    /// via world() and world_mut(). The dispatcher is self-contained, meaning all systems can be
+    /// run without needing to maintain a seperate reference to a Dispatcher and event-loop.
+    ///
+    /// This is an alternative to using Host::start(..) that gives the caller direct control over the lifetime of the host. However,
+    /// this means that the caller is responsible for calling .exit() in order to shutdown tokio before this dispatcher is dropped.
+    ///
+    pub fn create_async<'a, P>(self) -> AsyncDispatcher<'a, Host>
+    where
+        P: Project,
+    {
+        let dispatcher = self.new_dispatcher_builder::<P>();
+
+        let mut dispatcher = dispatcher.build_async(self);
+        dispatcher.setup();
         dispatcher
     }
 
@@ -523,6 +560,18 @@ impl Host {
             .remove::<tokio::runtime::Runtime>()
             .expect("should be able to remove")
             .shutdown_background();
+    }
+}
+
+impl Borrow<World> for Host {
+    fn borrow(&self) -> &World {
+        self.world()
+    }
+}
+
+impl BorrowMut<World> for Host {
+    fn borrow_mut(&mut self) -> &mut World {
+        self.world_mut()
     }
 }
 
