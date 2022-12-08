@@ -434,7 +434,13 @@ impl Host {
             let ListenerSetup(enable) = setup;
 
             enable(self.world(), &mut dispatcher);
+        } else {
+            // Use a default no-op listener to drain channels
+            let ListenerSetup(enable) = ListenerSetup::new::<()>();
+
+            enable(self.world(), &mut dispatcher);
         }
+
         dispatcher
     }
 
