@@ -12,6 +12,7 @@ pub struct Features<'a> {
     tokio_runtime: Read<'a, tokio::runtime::Runtime, EventRuntime>,
     secure_client: Read<'a, SecureClient, EventRuntime>,
     remote_protocol: Read<'a, Option<RemoteProtocol>>,
+    appendix: Read<'a, Arc<Appendix>>,
     broker: PluginBroker<'a>,
 }
 }

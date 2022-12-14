@@ -3,7 +3,7 @@ use std::time::Duration;
 use lifec::prelude::*;
 
 use poem::{
-    listener::{Acceptor, Listener, RustlsCertificate, RustlsConfig, TcpListener},
+    listener::{Acceptor, Listener, NativeTlsConfig, TcpListener},
     Route, Server,
 };
 use tokio::sync::oneshot::Receiver;
@@ -98,21 +98,26 @@ where
 
                     let mut app_host = AppHost(Some(A::create(&mut tc)));
 
-                    let mut tcp_conn = Some(TcpListener::bind(address));
+                    let mut tcp_conn = Some(TcpListener::bind(address.clone()));
                     let mut tls_tcp_conn = None;
 
                     // Enable TLS
-                    if let (Some(key), Some(cert)) = (
-                        tc.state().find_binary("tls_key"),
+                    if let (Some(password_src), Some(cert)) = (
+                        tc.state().find_symbol("tls_password_src"),
                         tc.state().find_binary("tls_crt"),
                     ) {
                         if let Some(conn) = tcp_conn.take() {
-                            tls_tcp_conn = Some(
-                                conn.rustls(
-                                    RustlsConfig::new()
-                                        .fallback(RustlsCertificate::new().key(key).cert(cert)),
-                                ),
-                            );
+                            match tokio::fs::read_to_string(&password_src).await {
+                                Ok(password) => {
+                                    tls_tcp_conn = Some(conn.native_tls(
+                                        NativeTlsConfig::new().pkcs12(cert).password(password),
+                                    ))
+                                }
+                                Err(err) => {
+                                    event!(Level::ERROR, "Could not read password src, {password_src}");
+                                    tc.error(|g| g.add_symbol("error", format!("{err}")));
+                                },
+                            }
                         }
                     }
 
@@ -122,6 +127,8 @@ where
                     } else if let Some(tcp_conn) = tcp_conn {
                         let server = Server::new(tcp_conn);
                         app_host.start_server(&mut tc, cancel_source, server).await;
+                    } else {
+                        event!(Level::ERROR, "Error creating a tcp listener on {address}");
                     }
                 }
 
@@ -139,7 +146,7 @@ where
         BlockProperties::default()
             .require("app_host")
             .optional("shutdown_timeout_ms")
-            .optional("tls_key")
+            .optional("tls_password_src")
             .optional("tls_crt")
     }
 
