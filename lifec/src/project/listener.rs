@@ -12,11 +12,7 @@ where
     ///
     fn create(world: &World) -> Self;
 
-    /// Called when a status update is received,
-    ///
-    fn on_status_update(&mut self, status_update: &StatusUpdate);
-
-    /// Called when a completed operation is received,
+    /// Called when an operation is being dispatched to the listener to handle,
     ///
     fn on_operation(&mut self, operation: Operation);
 
@@ -24,13 +20,23 @@ where
     ///
     fn on_completion(&mut self, completion: Completion);
 
-    /// Called when an error context is received,
-    ///
-    fn on_error_context(&mut self, error: &ErrorContext);
-
     /// Called when a plugin completes,
     ///
     fn on_completed_event(&mut self, entity: &Entity);
+
+    /// Called when a status update is received,
+    ///
+    fn on_status_update(&mut self, (entity, progress, msg): &StatusUpdate) {
+        event!(Level::TRACE, "entity: {:?}, progress: {}, message: {}", entity, progress, msg);
+    }
+
+    /// Called when an error context is received,
+    ///
+    fn on_error_context(&mut self, error: &ErrorContext) {
+        for err in error.errors() {
+            event!(Level::ERROR, "Plugin error encountered, {err}");
+        }
+    }
 }
 
 /// Enabling listener enables dispatching node commands,
@@ -41,9 +47,7 @@ impl Listener for () {
     fn create(_: &World) -> Self {
         ()
     }
-    fn on_status_update(&mut self, _: &StatusUpdate) {}
     fn on_operation(&mut self, _: Operation) {}
     fn on_completion(&mut self, _: Completion) {}
-    fn on_error_context(&mut self, _: &ErrorContext) {}
     fn on_completed_event(&mut self, _: &Entity) {}
 }

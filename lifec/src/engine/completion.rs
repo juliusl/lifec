@@ -55,12 +55,10 @@ mod tests {
         fn create(_: &specs::World) -> Self {
             Test { completion: None }
         }
-        fn on_status_update(&mut self, _: &crate::prelude::StatusUpdate) {}
         fn on_operation(&mut self, _: crate::prelude::Operation) {}
         fn on_completion(&mut self, completion: super::Completion) {
             self.completion = Some(completion);
         }
-        fn on_error_context(&mut self, _: &crate::prelude::ErrorContext) {}
         fn on_completed_event(&mut self, _: &specs::Entity) {}
     }
 

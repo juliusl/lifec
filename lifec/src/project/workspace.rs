@@ -1,10 +1,11 @@
 use crate::prelude::*;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::BTreeMap, path::PathBuf, io::ErrorKind};
 
 mod config;
 pub use config::Config as WorkspaceConfig;
 
 mod operation;
+use logos::Logos;
 pub use operation::Operations;
 
 /// Struct for managing a complex runmd project,
@@ -76,8 +77,8 @@ impl Workspace {
 
     /// Sets the root runmd content for this workspace,
     ///
-    pub fn set_root_runmd(&mut self, runmd: impl AsRef<str>) {
-        self.root_runmd = Some(runmd.as_ref().to_string());
+    pub fn set_root_runmd(&mut self, runmd: impl Into<String>) {
+        self.root_runmd = Some(runmd.into());
     }
 
     /// Caches a file,
@@ -158,31 +159,33 @@ impl Workspace {
 
     /// Get a tenant from the workspace,
     ///
-    pub fn tenant(&self, tenant: impl AsRef<str>) -> Self {
+    pub fn tenant(&self, tenant: impl Into<String>) -> Self {
+        let tenant = tenant.into();
         let work_dir = self
             .root
             .clone()
             .unwrap_or(PathBuf::from(""))
             .join(".world")
             .join(self.host.as_str())
-            .join(tenant.as_ref());
+            .join(&tenant);
 
         Self {
             work_dir,
             root: self.root.clone(),
-            root_runmd: None,
-            tag: None,
+            root_runmd: self.root_runmd.clone(),
             host: self.host.to_string(),
-            tenant: Some(tenant.as_ref().to_string()),
+            tenant: Some(tenant),
+            cached_files: self.cached_files.clone(),
+            tag: self.tag.clone(),
             path: None,
-            cached_files: BTreeMap::default(),
         }
     }
 
     /// Get a path from the workspace,
     ///
-    pub fn path(&self, path: impl AsRef<str>) -> Option<Self> {
+    pub fn path(&self, path: impl Into<String>) -> Option<Self> {
         if let Some(tenant) = self.tenant.as_ref() {
+            let path = path.into();
             let work_dir = self
                 .root
                 .clone()
@@ -190,17 +193,17 @@ impl Workspace {
                 .join(".world")
                 .join(self.host.as_str())
                 .join(tenant.as_str())
-                .join(path.as_ref());
+                .join(&path);
 
             Some(Self {
                 work_dir,
                 root: self.root.clone(),
-                root_runmd: None,
-                tag: None,
+                root_runmd: self.root_runmd.clone(),
                 host: self.host.to_string(),
-                tenant: Some(tenant.to_string()),
-                path: Some(path.as_ref().to_string()),
-                cached_files: BTreeMap::default(),
+                tenant: Some(tenant.into()),
+                cached_files: self.cached_files.clone(),
+                tag: self.tag.clone(),
+                path: Some(path),
             })
         } else {
             event!(Level::ERROR, "Trying to create a path without a tenant");
@@ -236,6 +239,78 @@ impl Workspace {
     ///
     pub fn get_tenant(&self) -> Option<&String> {
         self.tenant.as_ref()
+    }
+
+    /// Creates work directories, 
+    /// 
+    /// Returns an error if any of the folders were unable to be created
+    /// 
+    pub fn create_dirs(&self) -> Result<(), std::io::Error> {
+        std::fs::create_dir_all(self.work_dir())
+    }
+
+    /// Creates a child world using the same source but child working directory,
+    /// 
+    /// The work directory depends on the specifity of the current Workspace. If the workspace is a host-level directory, 
+    /// then a tenant folder will be used. If the current directory is a tenant-level directory then a path folder will be used.
+    /// 
+    /// Otherwise, if the current workspace is a path-level directory, then an error will be returned as it is already at the leaf level.
+    /// 
+    pub fn create_child<P>(&self, ident: impl Into<String>, create_dirs_all: bool) -> Result<World, std::io::Error> 
+    where
+        P: Project
+    {
+        let ident = ident.into();
+        let mut element_lexer = reality::Elements::lexer(&ident);
+
+        match element_lexer.next() {
+            // This will be a more strict then the underlying regex, which allows symbols
+            // [./A-Za-z]+[A-Za-z-._:=/#0-9]*
+            Some(reality::Elements::Identifier(ident)) if 
+                !ident.contains(".") && 
+                !ident.contains("/") && 
+                !ident.contains(":") && 
+                !ident.contains("=") && 
+                !ident.contains("#") => {
+                // OK 
+            },
+            _ => return Err(std::io::Error::new(ErrorKind::InvalidInput, "ident was not a valid identifier"))
+        }
+
+        match self {
+            _ if self.path.is_some() => {
+                Err(std::io::Error::new(ErrorKind::Unsupported, "current workspace type is a path, which is already a leaf"))
+            } 
+            _ if self.tenant.is_some() => {
+                if let Some(workspace) = self.path(ident) {
+
+                    if create_dirs_all {
+                        workspace.create_dirs()?;
+                    }
+
+                    if let Some(world) = workspace.compile::<P>() {
+                        Ok(world)
+                    } else {
+                        Err(std::io::Error::new(ErrorKind::Other, "a root .runmd is not set"))
+                    }
+                } else {
+                    unreachable!("this would only return None if tenant is empty")
+                }
+            }
+            _ => {
+                let workspace = self.tenant(ident);
+
+                if create_dirs_all {
+                    workspace.create_dirs()?;
+                }
+
+                if let Some(world) = workspace.compile::<P>() {
+                    Ok(world)
+                } else {
+                    Err(std::io::Error::new(ErrorKind::Other, "a root .runmd is not set"))
+                }
+            }
+        }
     }
 }
 
@@ -323,6 +398,7 @@ mod tests {
     #[test]
     #[tracing_test::traced_test]
     fn test_compile_workspace() {
+        use std::path::PathBuf;
         use reality::Block;
         use reality::BlockProperty;
         use reality::{Attribute, Value};
@@ -599,5 +675,13 @@ mod tests {
         dispatcher.dispatch(host.world());
         dispatcher.dispatch(host.world());
         dispatcher.dispatch(host.world());
+
+        // Testing create_child
+
+        let world = workspace.create_child::<Test>("child", false).expect("should be able to create child world");
+
+        let child_workspace = world.fetch::<Option<Workspace>>(); 
+
+        assert_eq!(&PathBuf::from(".world/test.io/child"), child_workspace.as_ref().expect("should have a workspace").work_dir())
     }
 }

@@ -14,7 +14,7 @@ use tracing::{event, Level};
 use crate::{
     appendix::Appendix,
     engine::Completion,
-    prelude::{ErrorContext, Listener, StatusUpdate},
+    prelude::{Listener, StatusUpdate},
 };
 
 /// Struct for engine debugger,
@@ -30,9 +30,6 @@ pub struct Debugger {
     /// Status updates,
     ///
     status_updates: BTreeMap<Entity, VecDeque<StatusUpdate>>,
-    /// Errors,
-    ///
-    errors: Vec<ErrorContext>,
     /// Number of status updates to keep,
     ///
     status_update_limits: Option<usize>,
@@ -512,10 +509,6 @@ impl Listener for Debugger {
 
         self.completions
             .push_back(((completion.event, completion.thunk), completion));
-    }
-
-    fn on_error_context(&mut self, error: &crate::prelude::ErrorContext) {
-        self.errors.push(error.clone());
     }
 
     fn on_operation(&mut self, _: crate::prelude::Operation) {}

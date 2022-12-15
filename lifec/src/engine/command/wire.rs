@@ -122,6 +122,110 @@ impl WireObject for NodeCommand {
         }
     }
 
+    fn decode_v2<'a, BlobImpl>(
+        world: &specs::World,
+        mut decoder: reality::wire::Decoder<'a, BlobImpl>,
+    ) -> Self
+    where
+        Self: Sized,
+        BlobImpl: std::io::Read + std::io::Write + std::io::Seek + Clone + Default,
+    {
+        let command = decoder.decode_namespace("node_command");
+        if let Some((name, decoder)) = command.iter().next() {
+            if let Some(entity) = decoder.peek().map(|f| f.get_entity(world, false)) {
+                let interner = decoder.interner();
+                let frames = decoder.frames().collect::<Vec<_>>();
+                return match name.as_str() {
+                    "activate" => NodeCommand::Activate(entity),
+                    "reset" => NodeCommand::Reset(entity),
+                    "pause" => NodeCommand::Pause(entity),
+                    "resume" => NodeCommand::Resume(entity),
+                    "cancel" => NodeCommand::Cancel(entity),
+                    "spawn" => NodeCommand::Spawn(entity),
+                    "swap" => {
+                        let from = frames.get(1).expect("should have a from frame");
+                        debug_assert_eq!(
+                            from.name(interner).expect("should have a name").as_str(),
+                            "node_command"
+                        );
+                        debug_assert_eq!(
+                            from.symbol(interner).expect("should have a name").as_str(),
+                            "swap.from"
+                        );
+                        let from =
+                            from.get_entity(world, false);
+
+                        let to = frames.get(2).expect("should have a to frame");
+                        debug_assert_eq!(
+                            to.name(interner).expect("should have a name").as_str(),
+                            "node_command"
+                        );
+                        debug_assert_eq!(
+                            to.symbol(interner).expect("should have a name").as_str(),
+                            "swap.to"
+                        );
+                        let to =
+                            to.get_entity(world, false);
+
+                        NodeCommand::Swap {
+                            owner: entity,
+                            from,
+                            to,
+                        }
+                    }
+                    "update" => {
+                        let mut attributes = vec![];
+                        for attr in frames.iter().skip(1) {
+                            match (
+                                attr.name(interner),
+                                attr.symbol(interner),
+                                attr.read_value(interner, decoder.blob_device()),
+                            ) {
+                                (Some(name), None, Some(value)) => {
+                                    attributes.push(Attribute::new(entity.id(), &name, value));
+                                }
+                                (Some(name), Some(symbol), Some(value)) => {
+                                    let mut attr = Attribute::new(
+                                        entity.id(),
+                                        format!("{symbol}::{name}"),
+                                        Value::Empty,
+                                    );
+
+                                    attr.edit_as(value);
+                                    attributes.push(attr);
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        if let Some(index) = BlockIndex::index(attributes.clone()).first() {
+                            NodeCommand::Update(AttributeGraph::new(index.clone()))
+                        } else {
+                            event!(Level::ERROR, "{:#?}", attributes);
+                            panic!("Could not get graph")
+                        }
+                    }
+                    "custom" => {
+                        let command = frames.get(1).expect("should have a command frame");
+                        assert_eq!(command.name(interner), Some("custom".to_string()));
+
+                        NodeCommand::Custom(
+                            command.symbol(interner).expect("should have a symbol"),
+                            entity,
+                        )
+                    }
+                    _ => {
+                        panic!("Unrecognized start frame")
+                    }
+                };
+            } else {
+                panic!("Unrecognized decoder state")
+            }
+        } else {
+            panic!("Decoder is empty")
+        }
+    }
+
     fn decode<BlobImpl>(
         protocol: &reality::wire::Protocol<BlobImpl>,
         interner: &reality::wire::Interner,
@@ -133,7 +237,7 @@ impl WireObject for NodeCommand {
     {
         match frames.get(0) {
             Some(frame) => {
-                assert_eq!(frame.keyword(), Keywords::Extension);
+                debug_assert_eq!(frame.keyword(), Keywords::Extension);
                 let entity =
                     frame.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
                 match frame
@@ -149,11 +253,11 @@ impl WireObject for NodeCommand {
                     "spawn" => NodeCommand::Spawn(entity),
                     "swap" => {
                         let from = frames.get(1).expect("should have a from frame");
-                        assert_eq!(
+                        debug_assert_eq!(
                             from.name(interner).expect("should have a name").as_str(),
                             "node_command"
                         );
-                        assert_eq!(
+                        debug_assert_eq!(
                             from.symbol(interner).expect("should have a name").as_str(),
                             "swap.from"
                         );
@@ -161,11 +265,11 @@ impl WireObject for NodeCommand {
                             from.get_entity(protocol.as_ref(), protocol.assert_entity_generation());
 
                         let to = frames.get(2).expect("should have a to frame");
-                        assert_eq!(
+                        debug_assert_eq!(
                             to.name(interner).expect("should have a name").as_str(),
                             "node_command"
                         );
-                        assert_eq!(
+                        debug_assert_eq!(
                             to.symbol(interner).expect("should have a name").as_str(),
                             "swap.to"
                         );

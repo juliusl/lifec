@@ -34,24 +34,10 @@ impl ErrorContext {
 
     /// Looks for an error block symbol, and returns all text attributes
     ///
-    pub fn errors(&self) -> Vec<(String, String)> {
-        // self.0.get_block("error").unwrap_or_default().iter_attributes().filter_map(|a| {
-        //     if a.name().starts_with("block_") {
-        //         return None;
-        //     }
-
-        //     let name = a.name();
-        //     match a.value() {
-        //         atlier::system::Value::TextBuffer(error) => {
-        //             Some((name.to_string(), error.to_string()))
-        //         },
-        //         _ => {
-        //             None
-        //         }
-        //     }
-        // }).collect()
-
-        todo!()
+    pub fn errors(&self) -> Vec<String> {
+        let Self(graph, ..) = self;
+        
+        graph.find_symbol_values("error")
     }
 
     /// Sets the entity that is able to fix errors in the error context
