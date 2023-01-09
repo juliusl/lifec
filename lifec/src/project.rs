@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::ops::Deref;
 
 use crate::debugger::Debugger;
 use crate::engine::Adhoc;
@@ -154,6 +156,15 @@ where
             }
         };
 
+        // Set operations map to workspace, 
+        // When the parser parses runmd, it will generate an index of entities that correspond to the symbols of attributes and blocks that were declared
+        {
+            let operation_map = &world.read_resource::<HashMap<String, Entity>>();
+
+            workspace.set_operations_map(operation_map.deref().clone());
+        }
+
+        // Insert Workspace as a World resource
         world.insert(Some(workspace.clone()));
 
         // Apply config defined in root block
