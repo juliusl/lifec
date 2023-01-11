@@ -106,7 +106,7 @@ impl Canvas {
     }
 
     /// Creates a new canvas for editing an existing plugin sequence,
-    ///
+    /// 
     /// Returns None if the existing entity does not have an Event component that can be edited,
     ///
     pub fn edit(world: &World, existing: Entity) -> Option<Canvas> {
@@ -661,7 +661,7 @@ impl Canvas {
                     properties.remove(name);
                 }
 
-                for (idx, name, doc) in to_add.drain(..) {                                    
+                for (idx, name, doc) in to_add.drain(..) {
                     self.add_custom_attr(idx, name, &doc);
                 }
             }

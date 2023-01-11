@@ -66,6 +66,10 @@ pub use run::Run;
 
 mod request;
 pub use request::Request;
+
+mod define;
+pub use define::Define;
+
 // mod enable_networking;
 // use enable_networking::EnableNetworking;
 
