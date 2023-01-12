@@ -1,8 +1,9 @@
+use atlier::system::Extension;
 use reality::{AttributeParser, SpecialAttribute, Attribute};
 use serde::{Serialize, Deserialize};
 use specs::{storage::HashMapStorage, Component, WorldExt};
 
-use crate::engine::Adhoc;
+use crate::{engine::Adhoc, state::AttributeGraph};
 
 /// Pointer struct for implementing a Form Component
 ///
@@ -121,6 +122,39 @@ impl SpecialAttribute for Form {
         if let Ok(adhoc) = Adhoc::from_parser(content, "form", parser) {
             world.write_component()
                 .insert(form_entity, Form { adhoc, elements: vec![] }).expect("should be able to insert");
+        }
+    }
+}
+
+impl Extension for Form {
+    fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {
+        self.render_elements(ui);
+    }
+}
+
+impl Form {
+    /// Renders input widgets for elements of the form,
+    /// 
+    fn render_elements(&mut self, ui: &imgui::Ui) {
+        for (idx, element) in self.iter_elements_mut().enumerate() {
+            match element {
+                FormElement::Description(description) => {
+                    ui.text(description);
+                },
+                FormElement::Required(attr) => {
+                    let name = &attr.name;
+
+                    AttributeGraph::edit_value(
+                        format!("{name}##{idx}"),
+                        attr.value_mut(),
+                        None,
+                        ui,
+                    );
+                },
+                FormElement::Optional(_) => {
+                    
+                },
+            }
         }
     }
 }
