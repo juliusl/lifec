@@ -257,12 +257,27 @@ pub fn default_runtime() -> Runtime {
     runtime
 }
 
-/// Returns a basic reality parser,
-///
-pub fn default_parser(world: World) -> Parser {
-    Parser::new_with(world)
-        .with_special_attr::<Runtime>()
-        .with_special_attr::<Engine>()
+cfg_not_editor! {
+    /// Returns a basic reality parser,
+    ///
+    pub fn default_parser(world: World) -> Parser {
+        Parser::new_with(world)
+            .with_special_attr::<Runtime>()
+            .with_special_attr::<Engine>()
+    }
+}
+
+cfg_editor! {
+    /// Returns a basic reality parser,
+    ///
+    pub fn default_parser(world: World) -> Parser {
+        use crate::editor::Form;
+        
+        Parser::new_with(world)
+            .with_special_attr::<Runtime>()
+            .with_special_attr::<Engine>()
+            .with_special_attr::<Form>()
+    }
 }
 
 /// Retursn the default lifec world,

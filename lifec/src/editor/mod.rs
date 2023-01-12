@@ -7,6 +7,9 @@ pub use host_editor::HostEditor;
 mod canvas;
 pub use canvas::Canvas;
 
+mod form;
+pub use form::Form;
+
 mod node;
 pub use node::Node;
 pub use node::NodeStatus;

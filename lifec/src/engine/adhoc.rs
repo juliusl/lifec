@@ -1,8 +1,12 @@
+use std::io::ErrorKind;
+
+use reality::AttributeParser;
+use serde::{Deserialize, Serialize};
 use specs::{Component, VecStorage};
 
 /// Component to distinguish adhoc workspace operations,
 ///
-#[derive(Debug, Component, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Component, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[storage(VecStorage)]
 pub struct Adhoc {
     /// Name of the adhoc component
@@ -14,6 +18,27 @@ pub struct Adhoc {
 }
 
 impl Adhoc {
+    /// Returns an Adhoc struct deriving from an attribute parser state,
+    /// 
+    pub fn from_parser(name: impl AsRef<str>, symbol: impl AsRef<str>, parser: &mut AttributeParser) -> Result<Self, std::io::Error> {
+        let name = name.as_ref().to_string();
+        let symbol = symbol.as_ref();
+
+        let tag = if let Some(tag) = parser.name() {
+            if tag != &symbol {
+                let tag = format!("{tag}.operation");
+                parser.set_name(&tag);
+                tag.to_string()
+            } else {
+                String::from("operation")
+            }
+        } else {
+            return Err(std::io::Error::new(ErrorKind::InvalidInput, "parser missing name"));
+        };
+
+        Ok(Adhoc { name, tag })
+    }
+
     /// Returns the tag name,
     ///
     pub fn tag(&self) -> impl AsRef<str> + '_ {
