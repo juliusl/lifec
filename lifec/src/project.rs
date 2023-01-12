@@ -270,9 +270,11 @@ cfg_not_editor! {
 cfg_editor! {
     /// Returns a basic reality parser,
     ///
-    pub fn default_parser(world: World) -> Parser {
+    pub fn default_parser(mut world: World) -> Parser {
         use crate::editor::Form;
         
+        world.register::<Form>();
+
         Parser::new_with(world)
             .with_special_attr::<Runtime>()
             .with_special_attr::<Engine>()

@@ -22,7 +22,7 @@ use crate::{
     state::AttributeGraph,
 };
 
-use super::{Canvas, NodeStatus};
+use super::{Canvas, NodeStatus, Form};
 
 /// Extension to display workspace editing tools,
 ///
@@ -251,6 +251,15 @@ impl WorkspaceEditor {
             token.end();
         }
         indent_spacing.end();
+    }
+
+    /// Forms table,
+    /// 
+    pub fn forms(world: &World, ui: &Ui) {
+        let mut forms = world.write_component::<Form>();
+        for form in (&mut forms).join() {
+            form.on_ui(world, ui);
+        }
     }
 
     /// Custom node handlers,
@@ -520,6 +529,7 @@ impl WorkspaceEditor {
                     self.custom_node_handlers(world, ui);
                 }
 
+                // Self::forms(world, ui);
                 // if imgui::CollapsingHeader::new("Debugger").build(ui) {
                 //     if let Some(debugger) = world.read_resource::<Option<Debugger>>().deref() {
                 //         debugger.display_ui(ui);

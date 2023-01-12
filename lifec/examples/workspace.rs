@@ -47,6 +47,12 @@ fn main() {
     + test .operation print-2
     : .println Hello Print Operation c 4
     : .chaos
+
+    + .form print
+    : .description Test form for print
+    : .require name .symbol
+    : .require test-num .int
+
     ```
     "#,
     );
