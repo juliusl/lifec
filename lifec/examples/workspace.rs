@@ -48,10 +48,13 @@ fn main() {
     : .println Hello Print Operation c 4
     : .chaos
 
-    + .form print
+    + .operation print-form
+    : .println Hello {name}
+    : .fmt name
+
+    + .form print-form
     : .description Test form for print
     : .require name .symbol
-    : .require test-num .int
 
     ```
     "#,

@@ -333,6 +333,10 @@ impl AttributeIndex for AttributeGraph {
     fn control_values(&self) -> &BTreeMap<String, Value> {
         self.index.control_values()
     }
+
+    fn control_values_mut(&mut self) -> &mut BTreeMap<String, Value> {
+        self.index.control_values_mut()
+    }
 }
 
 cfg_editor! {

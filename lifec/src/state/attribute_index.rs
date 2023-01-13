@@ -52,6 +52,10 @@ pub trait AttributeIndex {
     ///
     fn control_values(&self) -> &BTreeMap<String, Value>;
 
+    /// Returns a mutable reference to map of control values,
+    /// 
+    fn control_values_mut(&mut self) -> &mut BTreeMap<String, Value>;
+
     /// Finds all text values with name,
     ///
     fn find_text_values(&self, with_name: impl AsRef<str>) -> Vec<String> {

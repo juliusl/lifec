@@ -52,6 +52,7 @@ impl<'a> WorkspaceSource<'a> {
         let mut host = Host::from(world);
         host.link_sequences();
         host.build_appendix();
+        host.enable_listener::<()>();
         host
     }
 
@@ -99,6 +100,7 @@ impl<'a> WorkspaceSource<'a> {
         let mut host = Host::from(world);
         host.link_sequences();
         host.build_appendix();
+        host.enable_listener::<()>();
         host.world_mut().maintain();
         host
     }

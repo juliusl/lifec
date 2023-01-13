@@ -56,7 +56,7 @@ impl<'a> Operations<'a> {
     /// Executes an operation from the root block,
     ///
     pub fn execute_operation(
-        &mut self,
+        &self,
         operation: impl AsRef<str>,
         tag: Option<String>,
         context: Option<&ThunkContext>,
@@ -83,7 +83,7 @@ impl<'a> Operations<'a> {
     /// Dispatches an operation,
     ///
     pub fn dispatch_operation(
-        &mut self,
+        &self,
         operation: impl AsRef<str>,
         tag: Option<String>,
         context: Option<&ThunkContext>,

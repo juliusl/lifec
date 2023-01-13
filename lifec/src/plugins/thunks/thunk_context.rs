@@ -263,7 +263,7 @@ impl ThunkContext {
     ///
     /// Blocks until a result is received, and returns the thunk context if successful
     /// 
-    pub async fn run(&self, operation_name: impl AsRef<String>) -> Option<ThunkContext> {
+    pub async fn run(&self, operation_name: impl AsRef<str>) -> Option<ThunkContext> {
         let tag = self.tag().unwrap_or(String::from("operation"));
 
         if let Some(operation) = self

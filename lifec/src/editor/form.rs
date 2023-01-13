@@ -1,9 +1,10 @@
 use atlier::system::Extension;
+use imgui::Window;
 use reality::{Attribute, AttributeParser, SpecialAttribute};
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, WorldExt};
 
-use crate::{engine::Adhoc, state::AttributeGraph};
+use crate::{engine::Adhoc, state::{AttributeGraph, AttributeIndex}, prelude::{Operations, ThunkContext, Operation}};
 
 /// Pointer struct for implementing a Form Component
 ///
@@ -42,6 +43,8 @@ use crate::{engine::Adhoc, state::AttributeGraph};
 pub struct Form {
     adhoc: Adhoc,
     elements: Vec<FormElement>,
+    #[serde(skip)]
+    operation: Option<Operation>,
 }
 
 /// Enumeration of elements in the form,
@@ -127,6 +130,7 @@ impl SpecialAttribute for Form {
                     Form {
                         adhoc,
                         elements: vec![],
+                        operation: None,
                     },
                 )
                 .expect("should be able to insert");
@@ -135,12 +139,51 @@ impl SpecialAttribute for Form {
 }
 
 impl Extension for Form {
-    fn on_ui(&'_ mut self, _: &specs::World, ui: &'_ imgui::Ui<'_>) {
-        self.render_elements(ui);
+    fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui<'_>) {
+        self.render_window(world, ui);
     }
 }
 
 impl Form {
+    fn render_window(&mut self, world: &specs::World, ui: &imgui::Ui) {
+        Window::new(format!("Form - {}", self.adhoc().name().as_ref())).build(ui, ||{
+            self.render_elements(ui);
+
+            ui.spacing();
+            ui.separator();
+
+            ui.disabled(self.operation.is_some(), ||{
+                if ui.button("Run") {
+                    let operations = world.system_data::<Operations>();
+                    let mut context = ThunkContext::default();
+    
+                    for attr in self.iter_elements() {
+                        match attr {
+                            FormElement::Description(_) => continue,
+                            FormElement::Required(attr) | FormElement::Optional(attr) => context.state_mut().add_attribute(attr.clone()),
+                        }
+                    }
+
+                    println!("{:?}", context.values());
+    
+                    let operation = operations.execute_operation(
+                        self.adhoc().name(), 
+                        Some(self.adhoc().tag().as_ref().to_string()), 
+                        Some(&context.commit())
+                    );
+    
+                    self.operation = operation;
+                }
+            });
+  
+            if let Some(operation) = self.operation.as_mut() {
+                if let Some(_) = operation.wait_if_ready() {
+                    self.operation.take();
+                }
+            }
+        });
+    }
+
     /// Renders input widgets for elements of the form,
     ///
     fn render_elements(&mut self, ui: &imgui::Ui) {

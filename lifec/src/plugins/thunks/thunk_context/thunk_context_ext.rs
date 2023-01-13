@@ -58,4 +58,8 @@ impl AttributeIndex for ThunkContext {
     fn control_values(&self) -> &std::collections::BTreeMap<String, Value> {
         self.state().control_values()
     }
+
+    fn control_values_mut(&mut self) -> &mut std::collections::BTreeMap<String, Value> {
+        self.state_mut().control_values_mut()
+    }
 }
