@@ -6,7 +6,7 @@ use std::{
 };
 
 use atlier::system::Extension;
-use imgui::{ChildWindow, DragDropFlags, DragDropTarget, StyleVar, TableFlags, Ui, Window, StyleColor};
+use imgui::{DragDropFlags, DragDropTarget, StyleVar, TableFlags, Ui, StyleColor};
 use reality::{
     wire::{Interner, ResourceId},
     BlockProperties, Documentation, Value
@@ -144,12 +144,12 @@ impl Canvas {
 /// Main entry point for the Canvas extension,
 ///
 impl Extension for Canvas {
-    fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui<'_>) {
+    fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui) {
         let window_padding = ui.push_style_var(StyleVar::WindowPadding([16.0, 16.0]));
         let frame_padding = ui.push_style_var(StyleVar::FramePadding([8.0, 5.0]));
-        Window::new(format!("{}", self.context))
+        ui.window(format!("{}", self.context))
             .size([1624.0, 765.0], imgui::Condition::Appearing)
-            .build(ui, || {
+            .build(|| {
                 match &mut self.context {
                     CanvasContext::Empty => {}
                     CanvasContext::New(e, name, tag) => {
@@ -264,23 +264,23 @@ impl Canvas {
     /// Plugins tree
     ///
     fn plugins_tree(&mut self, world: &World, ui: &Ui) {
-        ChildWindow::new("Plugins").build(ui, || {
-            imgui::TreeNode::new("Plugins")
+        ui.child_window("Plugins").build(|| {
+            ui.tree_node_config("Plugins")
                 .opened(self.plugin_tree_opened, imgui::Condition::Always)
-                .build(ui, || {
+                .build(|| {
                     let snapshot = self.commands.clone();
                     for (idx, w) in snapshot.iter().enumerate() {
-                        let node = imgui::TreeNode::new(format!("{}##{idx}", w))
+                        let node = ui.tree_node_config(format!("{}##{idx}", w))
                             .label::<String, _>(format!("{}", w))
-                            .push(ui);
-                        if let Some(tooltip) = imgui::drag_drop::DragDropSource::new("REORDER")
+                            .push();
+                        if let Some(tooltip) = ui.drag_drop_source_config("REORDER")
                             .flags(DragDropFlags::SOURCE_NO_PREVIEW_TOOLTIP)
-                            .begin_payload(ui, idx)
+                            .begin_payload(idx)
                         {
                             tooltip.end();
                         }
 
-                        if let Some(target) = imgui::drag_drop::DragDropTarget::new(ui) {
+                        if let Some(target) = ui.drag_drop_target() {
                             self.accept_payload(world, idx, target);
                         }
 
@@ -292,7 +292,7 @@ impl Canvas {
                 });
         });
 
-        if let Some(target) = imgui::drag_drop::DragDropTarget::new(ui) {
+        if let Some(target) = ui.drag_drop_target() {
             match target.accept_payload::<WorkspaceCommand, _>("ADD_PLUGIN", DragDropFlags::empty())
             {
                 Some(result) => match result {
@@ -340,7 +340,7 @@ impl Canvas {
     /// Transpile preview,
     ///
     fn preview_transpiled(&self, ui: &Ui) {
-        ChildWindow::new("Transpiled").build(ui, || {
+        ui.child_window("Transpiled").build(|| {
             let mut transpiled = self.transpile_runmd();
             if ui.button(format!("Copy to clipboard##{}", self.context)) {
                 ui.set_clipboard_text(&transpiled);
