@@ -21,7 +21,7 @@ wgpu = { version = "0.14.2", optional = true }
 
 # These are for runtime/plugins
 reality = { git = "https://github.com/juliusl/reality.git", branch="pr/workspace-refactor" }
-specs = { version = "0.18.0", features = ["default", "derive", "shred-derive"] }
+specs = { git = "https://github.com/amethyst/specs", features = ["default", "derive", "shred-derive"] }
 rand = "0.8.5"
 serde = "1.0.137"
 chrono = "0.4.19"
