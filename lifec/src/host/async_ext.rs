@@ -25,11 +25,14 @@ impl Host {
             tokio::time::interval(tick_rate)
         };
 
-        while !self.should_exit() {
+       loop {
+            interval.tick().await;
             dispatcher.dispatch(self.world());
             self.world_mut().maintain();
 
-            interval.tick().await;
+            if self.should_exit() {
+                break;
+            }
         }
     }
 }
