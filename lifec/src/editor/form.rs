@@ -1,5 +1,4 @@
 use atlier::system::Extension;
-use imgui::Window;
 use reality::{Attribute, AttributeParser, SpecialAttribute};
 use serde::{Deserialize, Serialize};
 use specs::{storage::HashMapStorage, Component, WorldExt};
@@ -139,14 +138,14 @@ impl SpecialAttribute for Form {
 }
 
 impl Extension for Form {
-    fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui<'_>) {
+    fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui) {
         self.render_window(world, ui);
     }
 }
 
 impl Form {
     fn render_window(&mut self, world: &specs::World, ui: &imgui::Ui) {
-        Window::new(format!("Form - {}", self.adhoc().name().as_ref())).build(ui, ||{
+        ui.window(format!("Form - {}", self.adhoc().name().as_ref())).build(||{
             self.render_elements(ui);
 
             ui.spacing();

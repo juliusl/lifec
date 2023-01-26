@@ -6,8 +6,8 @@ use std::{
 use atlier::system::{App, Extension};
 use copypasta::{ClipboardContext, ClipboardProvider};
 use imgui::{
-    ColorEdit, StyleVar, TableColumnFlags, TableColumnSetup, TableFlags, TreeNode, TreeNodeFlags,
-    Ui, Window,
+    StyleVar, TableColumnFlags, TableColumnSetup, TableFlags, TreeNodeFlags,
+    Ui,
 };
 use reality::{BlockIndex, Value};
 use specs::{Join, LazyUpdate, RunNow, World, WorldExt};
@@ -98,9 +98,9 @@ impl WorkspaceEditor {
                         ui.table_next_column();
 
                         let tag = c.root().name();
-                        let tree = TreeNode::new(format!("{editing}{idx}"))
+                        let tree = ui.tree_node_config(format!("{editing}{idx}"))
                             .label::<String, _>(format!("{editing}"))
-                            .push(ui);
+                            .push();
 
                         ui.table_next_column();
                         ui.text(tag.trim_end_matches(".config").trim_end_matches("config"));
@@ -175,14 +175,14 @@ impl WorkspaceEditor {
                 let name = thunk.0;
                 let docs = docs(name, world);
 
-                let mut plugin_node = TreeNode::new(name);
+                let mut plugin_node = ui.tree_node_config(name);
                 if docs.is_empty() {
                     plugin_node = plugin_node.leaf(true);
                 }
-                let plugin_node = plugin_node.push(ui);
+                let plugin_node = plugin_node.push();
 
-                if let Some(tooltip) = imgui::drag_drop::DragDropSource::new("ADD_PLUGIN")
-                    .begin_payload(ui, WorkspaceCommand::AddPlugin(thunk))
+                if let Some(tooltip) = ui.drag_drop_source_config("ADD_PLUGIN")
+                    .begin_payload(WorkspaceCommand::AddPlugin(thunk))
                 {
                     ui.text(format!(
                         "Thunk - {name} - Drop on host editor or canvas to add this plugin"
@@ -203,13 +203,12 @@ impl WorkspaceEditor {
                     for ((name, id), doc) in docs {
                         ui.table_next_row();
                         ui.table_next_column();
-                        TreeNode::new(format!(".{name}"))
+                        ui.tree_node_config(format!(".{name}"))
                             .leaf(true)
-                            .push(ui);
+                            .push();
                         if let Some(tooltip) =
-                            imgui::drag_drop::DragDropSource::new("APPLY_CUSTOM_ATTRIBUTE")
+                            ui.drag_drop_source_config("APPLY_CUSTOM_ATTRIBUTE")
                                 .begin_payload(
-                                    ui,
                                     WorkspaceCommand::ApplyCustomAttribute(thunk, id),
                                 )
                         {
@@ -298,16 +297,16 @@ impl WorkspaceEditor {
     /// Opens a workspace window,
     ///
     pub fn workspace_window(&mut self, world: &World, ui: &Ui) {
-        Window::new("Workspace editor")
+        ui.window("Workspace editor")
             .size([700.0, 600.0], imgui::Condition::Appearing)
             .menu_bar(true)
-            .build(ui, || {
+            .build(|| {
                 ui.menu_bar(|| {
                     ui.menu("Windows", || {
                         let enable_demo_window = self.enable_demo;
-                        if imgui::MenuItem::new("Imgui demo window")
+                        if ui.menu_item_config("Imgui demo window")
                             .selected(enable_demo_window)
-                            .build(ui)
+                            .build()
                         {
                             self.enable_demo = !enable_demo_window;
                         }
@@ -338,10 +337,10 @@ impl WorkspaceEditor {
 
                         ui.table_next_row();
                         ui.table_next_column();
-                        let tree_node = TreeNode::new("main_host")
+                        let tree_node = ui.tree_node_config("main_host")
                             .flags(TreeNodeFlags::DEFAULT_OPEN | TreeNodeFlags::FRAME_PADDING)
                             .label::<String, _>("main".to_string())
-                            .push(ui);
+                            .push();
 
 
                         if let Some(node) = tree_node {
@@ -358,14 +357,14 @@ impl WorkspaceEditor {
                             for engine in engines {
                                 ui.table_next_row();
                                 ui.table_next_column();
-                                let tree_node = TreeNode::new(format!(
+                                let tree_node = ui.tree_node_config(format!(
                                     "{}",
                                     self.appendix
                                         .name(&engine.status.entity())
                                         .unwrap_or_default()
                                 ))
                                 .flags(TreeNodeFlags::FRAME_PADDING | TreeNodeFlags::NO_TREE_PUSH_ON_OPEN)
-                                .push(ui);
+                                .push();
 
                                 ui.table_next_column();
                                 if let NodeStatus::Engine(EngineStatus::Inactive(_)) = engine.status {
@@ -461,7 +460,7 @@ impl WorkspaceEditor {
                             );
                             ui.table_next_row();
                             ui.table_next_column();
-                            let tree_node = TreeNode::new(title).push(ui);
+                            let tree_node = ui.tree_node_config(title).push();
 
                             ui.table_next_column();
                             if let Some(node) = tree_node {
@@ -563,7 +562,7 @@ impl Extension for WorkspaceEditor {
         context.style_mut().cell_padding = [12.0, 6.0];
     }
 
-    fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui<'_>) {
+    fn on_ui(&'_ mut self, world: &specs::World, ui: &'_ imgui::Ui) {
         self.handle_clipboard(ui);
         self.workspace_window(world, ui);
 
@@ -581,15 +580,15 @@ impl Extension for WorkspaceEditor {
                         .unwrap_or(format!("{}", guest.owner.id()).as_str())
                 );
 
-                Window::new("Workspace editor")
+                ui.window("Workspace editor")
                     .menu_bar(true)
-                    .build(ui, || {
+                    .build(|| {
                         ui.menu_bar(|| {
                             ui.menu("Windows", || {
                                 ui.menu("Guests", || {
-                                    if imgui::MenuItem::new(format!("{}", title))
+                                    if ui.menu_item_config(format!("{}", title))
                                         .selected(guest_editor.events_window_opened())
-                                        .build(ui)
+                                        .build()
                                     {
                                         if guest_editor.events_window_opened() {
                                             guest_editor.close_event_window();
@@ -633,9 +632,9 @@ impl Extension for WorkspaceEditor {
                         if let Some(edit) = n.edit.take() {
                             n.suspended_edit = Some(edit);
                         } else {
-                            Window::new("Workspace editor")
+                            ui.window("Workspace editor")
                                 .menu_bar(true)
-                                .build(ui, || {
+                                .build(|| {
                                     ui.menu_bar(|| {
                                         ui.menu("Windows", || {
                                             ui.menu("Suspended", || {
@@ -647,9 +646,9 @@ impl Extension for WorkspaceEditor {
                                                             .as_str(),
                                                     )
                                                     .to_string();
-                                                if imgui::MenuItem::new(format!("Guest {}", name))
+                                                if ui.menu_item_config(format!("Guest {}", name))
                                                     .selected(n.suspended_edit.is_some())
-                                                    .build(ui)
+                                                    .build()
                                                 {
                                                     if let Some(suspended) = n.suspended_edit.take()
                                                     {
@@ -669,7 +668,7 @@ impl Extension for WorkspaceEditor {
 
         ui.main_menu_bar(|| {
             ui.menu("Theme", || {
-                if ColorEdit::new("Background clear", &mut self.background).build(ui) {
+                if ui.color_edit4("Background clear", &mut self.background) {
                     let [r, g, b, a] = self.background;
                     let mut clear_color = world.write_resource::<wgpu::Color>();
                     let clear_color = clear_color.deref_mut();

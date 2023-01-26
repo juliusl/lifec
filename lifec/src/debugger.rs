@@ -45,7 +45,7 @@ cfg_editor! {
     use reality::wire::ControlDevice;
     use reality::Keywords;
     use crate::state::AttributeGraph;
-    use imgui::{TableFlags, TreeNode, Ui};
+    use imgui::{TableFlags, Ui};
     use atlier::system::App;
 
     impl App for Debugger {
@@ -54,24 +54,24 @@ cfg_editor! {
         }
 
         fn edit_ui(&mut self, ui: &imgui::Ui) {
-            imgui::ChildWindow::new("Completion Tree")
+            ui.child_window("Completion Tree")
                 .size([600.0, 0.0])
-                .build(ui, || {
+                .build(|| {
                     self.completion_tree(ui);
                 });
 
             ui.same_line();
-            imgui::ChildWindow::new("Status Updates")
+            ui.child_window("Status Updates")
                 .border(true)
                 .size([0.0, 0.0])
-                .build(ui, || {
+                .build(|| {
                     self.updates_log(ui);
                 });
         }
 
         fn display_ui(&self, ui: &imgui::Ui) {
             if let Some(encoder) = self.encoded.as_ref() {
-                TreeNode::new("Control Device").build(ui, || {
+                ui.tree_node_config("Control Device").build(|| {
                     if let Some(table) = ui.begin_table("Idents", 2) {
                         let control_device = ControlDevice::new(encoder.interner());
                         ui.table_next_row();
@@ -112,7 +112,7 @@ cfg_editor! {
                     }
                 });
 
-                TreeNode::new("Frames").build(ui, || {
+                ui.tree_node_config("Frames").build(|| {
                     if let Some(table) = ui.begin_table_with_flags(
                         "frames",
                         7,
@@ -240,7 +240,7 @@ cfg_editor! {
         }
 
         for (group, completions) in groups {
-            imgui::TreeNode::new(group).build(ui, || {
+            ui.tree_node_config(group).build(|| {
                 for Completion {
                     timestamp,
                     event,
@@ -250,7 +250,7 @@ cfg_editor! {
                     returns,
                 } in completions.iter()
                 {
-                    imgui::TreeNode::new(format!("{:?}{:?}", event, thunk))
+                    ui.tree_node_config(format!("{:?}{:?}", event, thunk))
                         .label::<String, _>(format!(
                             "{} Completion {} {}.{}",
                             timestamp,
@@ -258,7 +258,7 @@ cfg_editor! {
                             self.appendix.name(&event).unwrap_or_default(),
                             self.appendix.name(thunk).unwrap_or_default()
                         ))
-                        .build(ui, || {
+                        .build(|| {
                             ui.new_line();
                             if !control_values.is_empty() {
                                 ui.text("Control Values");
@@ -385,15 +385,15 @@ cfg_editor! {
         }
 
         for (log, status_updates) in logs {
-            TreeNode::new(format!("Logs {}", log)).build(ui, || {
+            ui.tree_node_config(format!("Logs {}", log)).build(|| {
                 for (idx, (entity, updates)) in status_updates.iter().enumerate() {
-                    TreeNode::new(format!("{} {}", idx, entity.id()))
+                    ui.tree_node_config(format!("{} {}", idx, entity.id()))
                         .label::<String, _>(format!(
                             "{}: {}",
                             entity.id(),
                             self.appendix().name(entity).unwrap_or_default()
                         ))
-                        .build(ui, || {
+                        .build(|| {
                             let p = updates
                                 .iter()
                                 .map(|(_, p, _)| *p)

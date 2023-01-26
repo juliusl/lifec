@@ -10,8 +10,8 @@ use specs::{prelude::*, Entities, SystemData};
 use tokio::sync::oneshot;
 
 use super::{
-    connection::ConnectionState, Adhoc, EngineStatus, Limit, NodeCommand, Plugins, Profiler,
-    TickControl, Transition, Yielding,
+    connection::ConnectionState, Adhoc, Limit, NodeCommand, Plugins, Profiler,
+    TickControl, Transition, Yielding, EngineStatus,
 };
 use crate::{appendix::Appendix, engine::Completion, prelude::*, guest::{Guest, RemoteProtocol}};
 

@@ -1,4 +1,4 @@
-use imgui::{DragDropFlags, TreeNode, TreeNodeFlags, Ui};
+use imgui::{DragDropFlags, TreeNodeFlags, Ui};
 use specs::Entity;
 use tracing::Level;
 
@@ -28,13 +28,13 @@ impl EventNode for Node {
         let tree_node = match self.connection_state {
             Some(connection_state) if connection_state.is_spawned() => {
                 let source = connection_state.source();
-                let tree_node = TreeNode::new(format!("{:?}", event.entity()))
+                let tree_node = ui.tree_node_config(format!("{:?}", event.entity()))
                     .label::<String, _>(format!(
                         "{}", 
                         self.appendix.name(&source).unwrap_or("--")
                     ))
                     .flags(tree_node_flags)
-                    .push(ui);
+                    .push();
                 // ui.table_next_column();
                 // if let Some(general) = self.appendix.general(&source) {
                 //     general.display_ui(ui);
@@ -42,13 +42,13 @@ impl EventNode for Node {
                 tree_node
             }
             _ => {
-                let tree_node = TreeNode::new(format!("{:?}", event.entity()))
+                let tree_node = ui.tree_node_config(format!("{:?}", event.entity()))
                     .label::<String, _>(format!(
                         "{}",
                         self.appendix.name(&event.entity()).unwrap_or("--")
                     ))
                     .flags(tree_node_flags)
-                    .push(ui);
+                    .push();
                 // ui.table_next_column();
                 // if let Some(general) = self.appendix.general(&event.entity()) {
                 //     general.display_ui(ui);
@@ -57,7 +57,7 @@ impl EventNode for Node {
             }
         };
 
-        if let Some(target) = imgui::drag_drop::DragDropTarget::new(ui) {
+        if let Some(target) = ui.drag_drop_target() {
             match target.accept_payload::<WorkspaceCommand, _>("ADD_PLUGIN", DragDropFlags::empty())
             {
                 Some(result) => match result {
@@ -104,19 +104,19 @@ impl EventNode for Node {
                     ui.table_next_row();
                     ui.table_next_column();
                     if let Some(name) = self.appendix.name(&s) {
-                        let tree_node = TreeNode::new(format!("{:?}", s))
+                        let tree_node = ui.tree_node_config(format!("{:?}", s))
                             .label::<String, _>(format!("{name}"))
                             .flags(TreeNodeFlags::SPAN_FULL_WIDTH)
-                            .push(ui);
+                            .push();
                         if let Some(tooltip) =
-                            imgui::drag_drop::DragDropSource::new("REORDER_PLUGIN")
+                            ui.drag_drop_source_config("REORDER_PLUGIN")
                                 .flags(DragDropFlags::SOURCE_NO_PREVIEW_TOOLTIP)
-                                .begin_payload(ui, (self.status.entity(), s))
+                                .begin_payload((self.status.entity(), s))
                         {
                             tooltip.end();
                         }
 
-                        if let Some(target) = imgui::drag_drop::DragDropTarget::new(ui) {
+                        if let Some(target) = ui.drag_drop_target() {
                             match target.accept_payload::<(Entity, Entity), _>(
                                 "REORDER_PLUGIN",
                                 DragDropFlags::empty(),

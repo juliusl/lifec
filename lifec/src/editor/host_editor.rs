@@ -1,7 +1,6 @@
 use atlier::system::App;
 use imgui::{
-    ChildWindow, StyleVar, TableColumnFlags, TableColumnSetup, TableFlags, TreeNodeFlags, Ui,
-    Window,
+    StyleVar, TableColumnFlags, TableColumnSetup, TableFlags, TreeNodeFlags, Ui,
 };
 use specs::{Entity, Read, System, Write};
 use std::collections::hash_map::DefaultHasher;
@@ -176,10 +175,10 @@ impl HostEditor {
         let mut opened = self.is_event_window_opened;
 
         if opened {
-            Window::new(format!("Events {suffix}"))
+            ui.window(format!("Events {suffix}"))
                 .size([1500.0, 700.0], imgui::Condition::Appearing)
                 .opened(&mut opened)
-                .build(ui, || {
+                .build(|| {
                     if let Some(_) = self.remote.as_ref() {
                         ui.text("Remote protocol is enabled");
                     }
@@ -190,27 +189,27 @@ impl HostEditor {
                     ui.spacing();
                     ui.separator();
                     ui.group(|| {
-                        ChildWindow::new(&format!("Events List {suffix}"))
+                        ui.child_window(&format!("Events List {suffix}"))
                             .size([750.0, 400.0])
                             .border(true)
-                            .build(ui, || {
+                            .build(|| {
                                 self.event_list(ui);
                             });
 
                         ui.same_line();
-                        ChildWindow::new(&format!("Performance {suffix}"))
+                        ui.child_window(&format!("Performance {suffix}"))
                             .size([-1.0, 400.0])
                             .border(true)
-                            .build(ui, || {
+                            .build(|| {
                                 self.performance_section(ui);
                             });
                     });
 
                     if let Some(debugger) = self.debugger.as_mut() {
-                        ChildWindow::new(&format!("Debugger {suffix}"))
+                        ui.child_window(&format!("Debugger {suffix}"))
                             .size([0.0, -1.0])
                             .border(true)
-                            .build(ui, || {
+                            .build(|| {
                                 debugger.edit_ui(ui);
                             });
                     }
@@ -248,16 +247,16 @@ impl App for HostEditor {
         window_padding.end();
         frame_padding.end();
 
-        Window::new("Workspace editor")
+        ui.window("Workspace editor")
             .menu_bar(true)
-            .build(ui, || {
+            .build(|| {
                 ui.menu_bar(|| {
                     ui.menu("Windows", || {
                         ui.menu("Host editor", || {
                             let event_window_opened = self.is_event_window_opened;
-                            if imgui::MenuItem::new("Events window")
+                            if ui.menu_item_config("Events window")
                                 .selected(self.is_event_window_opened)
-                                .build(ui)
+                                .build()
                             {
                                 self.is_event_window_opened = !event_window_opened;
                             }
@@ -479,9 +478,9 @@ impl HostEditor {
                 | TreeNodeFlags::FRAME_PADDING
                 | TreeNodeFlags::NO_TREE_PUSH_ON_OPEN;
 
-            imgui::TreeNode::new(format!("Engine: {title}"))
+            ui.tree_node_config(format!("Engine: {title}"))
                 .flags(tree_flags)
-                .build(ui, || {
+                .build(|| {
                     /// Name column definition
                     ///
                     fn name_column(ui: &Ui) {
