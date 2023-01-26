@@ -53,9 +53,9 @@ where
                     let _ = host.prepare::<P>();
 
                     let result = {
-                        let mut workspace_oeprations = host.world().system_data::<Operations>();
+                        let workspace_operations = host.world().system_data::<Operations>();
 
-                        if let Some(mut operation) = workspace_oeprations.execute_operation(
+                        if let Some(mut operation) = workspace_operations.execute_operation(
                             operation,
                             root.tag().cloned(),
                             Some(&tc),

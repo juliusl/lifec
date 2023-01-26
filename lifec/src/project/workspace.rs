@@ -713,7 +713,7 @@ mod tests {
         dispatcher.dispatch(host.world());
 
         {
-            let mut operation_data = host.world().system_data::<Operations>();
+            let operation_data = host.world().system_data::<Operations>();
             let operation = operation_data.execute_operation("print", None, None);
             operation.expect("should have an operation").wait();
 

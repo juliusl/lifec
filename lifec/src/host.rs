@@ -324,6 +324,19 @@ impl Host {
         host
     }
 
+    /// Returns a host with a world compiled from the default host workspace,
+    /// 
+    pub fn load_default_workspace<P>(
+        root: Option<PathBuf>,
+        host: impl AsRef<str>,
+        tag: Option<impl AsRef<str>>,
+    ) -> Self 
+    where
+        P: Project,
+    {
+        Self::load_workspace::<P>(root, host, "", None::<String>, tag)
+    }
+
     /// Returns a host with a world compiled from a workspace,
     ///
     pub fn load_workspace<P>(
@@ -336,8 +349,11 @@ impl Host {
     where
         P: Project,
     {
-        let workspace = Workspace::new(host.as_ref(), root);
-        let mut workspace = workspace.tenant(tenant.as_ref());
+        let mut workspace = Workspace::new(host.as_ref(), root);
+
+        if !tenant.as_ref().is_empty() {
+            workspace = workspace.tenant(tenant.as_ref());
+        }
 
         if let Some(path) = path {
             if let Some(w) = workspace.path(path.as_ref()) {
