@@ -14,7 +14,7 @@ cfg_editor! {
 
 /// CLI arguments that can be configured into a host,
 ///
-#[derive(Debug, Default, Args)]
+#[derive(Debug, Default, Args, Clone)]
 #[clap(arg_required_else_help = true)]
 pub struct HostSettings {
     #[clap(long, action, default_value_t = false)]
