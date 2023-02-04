@@ -1,5 +1,6 @@
 use crate::appendix::Appendix;
 use crate::engine::{Completion, NodeCommand, Yielding};
+use crate::error::Error;
 use crate::guest::{Guest, RemoteProtocol};
 use crate::prelude::{attributes::Fmt, *};
 use hyper::{Body, Response};
@@ -18,8 +19,7 @@ use tokio::{
     },
     task::JoinHandle,
 };
-use tracing::event;
-use tracing::Level;
+use tracing::{error, debug, warn, info};
 
 pub mod thunk_context_ext;
 
@@ -50,6 +50,8 @@ pub struct ThunkContext {
     previous_graph: Option<AttributeGraph>,
     /// Current state of this context,
     graph: AttributeGraph,
+    /// Error struct,
+    error: Option<Error>,
 
     /// Entity that owns this context
     entity: Option<Entity>,
@@ -111,6 +113,7 @@ impl Clone for ThunkContext {
             error_graph: self.error_graph.clone(),
             previous_graph: self.previous_graph.clone(),
             graph: self.graph.clone(),
+            error: self.error.clone(),
             entity: self.entity.clone(),
             handle: self.handle.clone(),
             client: self.client.clone(),
@@ -140,6 +143,7 @@ impl Debug for ThunkContext {
             .field("error_graph", &self.error_graph)
             .field("previous_graph", &self.previous_graph)
             .field("graph", &self.graph)
+            .field("error", &self.error)
             .field("entity", &self.entity)
             .field("handle", &self.handle)
             .field("client", &self.client)
@@ -262,7 +266,7 @@ impl ThunkContext {
     /// Finds and spawns an operation by name and tag from the current workspace,
     ///
     /// Blocks until a result is received, and returns the thunk context if successful
-    /// 
+    ///
     pub async fn run(&self, operation_name: impl AsRef<str>) -> Option<ThunkContext> {
         let tag = self.tag().unwrap_or(String::from("operation"));
 
@@ -275,12 +279,18 @@ impl ThunkContext {
             match operation.await {
                 Ok(tc) => Some(tc),
                 Err(err) => {
-                    event!(Level::ERROR, "Encountered error while yielding for spawned operation, {err}");
+                    error!(
+                        "Encountered error while yielding for spawned operation, {err}"
+                    );
                     None
-                },
+                }
             }
         } else {
-            event!(Level::WARN, "Did not find operation, {} {}", operation_name.as_ref(), tag);
+            warn!(
+                "Did not find operation, {} {}",
+                operation_name.as_ref(),
+                tag
+            );
             None
         }
     }
@@ -332,15 +342,13 @@ impl ThunkContext {
     ///
     pub fn commit(&self) -> Self {
         if self.response_cache.is_some() {
-            event!(
-                Level::WARN,
+            warn!(
                 "Committing context without consuming response_cache"
             );
         }
 
         if self.body_cache.is_some() {
-            event!(
-                Level::WARN,
+            warn!(
                 "Committing context without consuming body_cache"
             );
         }
@@ -421,7 +429,7 @@ impl ThunkContext {
             match guest_dispatcher.try_send(guest) {
                 Ok(_) => true,
                 Err(err) => {
-                    event!(Level::ERROR, "Error sending a guest {err}");
+                    error!("Error sending a guest {err}");
                     false
                 }
             }
@@ -541,7 +549,7 @@ impl ThunkContext {
             match watcher.changed().await {
                 Ok(_) => Some(watcher.borrow().clone()),
                 Err(err) => {
-                    event!(Level::ERROR, "Error watching host editor for changes {err}");
+                    error!("Error watching host editor for changes {err}");
                     None
                 }
             }
@@ -574,8 +582,7 @@ impl ThunkContext {
                 .expect("needs to be able to bind to an address");
 
             let local_addr = listener.local_addr().expect("was just created").to_string();
-            event!(
-                Level::INFO,
+            info!(
                 "Entity {} Listening on {local_addr}",
                 self.entity.expect("should have an entity").id()
             );
@@ -590,12 +597,12 @@ impl ThunkContext {
                     Some((stream, address))
                 },
                 _ = cancel_source => {
-                    event!(Level::WARN, "{local_addr} is being cancelled");
+                    warn!("{local_addr} is being cancelled");
                     None
                 }
             }
         } else {
-            event!(Level::ERROR, "No local address assigned to context");
+            error!("No local address assigned to context");
             None
         }
     }
@@ -609,7 +616,7 @@ impl ThunkContext {
                     if let Some(address) =
                         socket.local_addr().ok().and_then(|a| Some(a.to_string()))
                     {
-                        event!(Level::DEBUG, "created socket at {address}");
+                        debug!("created socket at {address}");
 
                         // Add the socket address as a transient value
                         // self.define("socket", "address")
@@ -620,12 +627,12 @@ impl ThunkContext {
                     self.udp_socket.clone()
                 }
                 Err(err) => {
-                    event!(Level::ERROR, "could not enable socket {err}");
+                    error!("could not enable socket {err}");
                     None
                 }
             }
         } else {
-            event!(Level::ERROR, "No local address assigned to context");
+            error!("No local address assigned to context");
             None
         }
     }
@@ -640,15 +647,13 @@ impl ThunkContext {
                         self.local_udp_addr = Some(addr);
                     }
                     Err(err) => {
-                        event!(
-                            Level::ERROR,
+                        error!(
                             "Could not get local socket address for udp socket, {udp} {err}"
                         );
                     }
                 },
                 Err(err) => {
-                    event!(
-                        Level::ERROR,
+                    error!(
                         "Could not assign address for udp socket, {udp} {err}"
                     );
                 }
@@ -662,15 +667,13 @@ impl ThunkContext {
                         self.local_tcp_addr = Some(addr);
                     }
                     Err(err) => {
-                        event!(
-                            Level::ERROR,
+                        error!(
                             "Could not get local address for tcp listener, {tcp} {err}"
                         );
                     }
                 },
                 Err(err) => {
-                    event!(
-                        Level::ERROR,
+                    error!(
                         "Could not assign address for tcp listener, {tcp} {err}"
                     );
                 }
@@ -711,7 +714,7 @@ impl ThunkContext {
             match disp.try_send(completion) {
                 Ok(_) => {}
                 Err(err) => {
-                    event!(Level::ERROR, "Could not dispatch {err}");
+                    error!("Could not dispatch {err}");
                 }
             }
         }
@@ -730,7 +733,7 @@ impl ThunkContext {
                     match node_dispatcher.try_send((command, Some(yielding))) {
                         Ok(_) => Some(receiver),
                         Err(err) => {
-                            event!(Level::ERROR, "Could not send command, {err}");
+                            error!("Could not send command, {err}");
                             None
                         }
                     }
@@ -738,7 +741,7 @@ impl ThunkContext {
                 _ => match node_dispatcher.try_send((command, None)) {
                     Ok(_) => None,
                     Err(err) => {
-                        event!(Level::ERROR, "Could not send command, {err}");
+                        error!("Could not send command, {err}");
                         None
                     }
                 },
@@ -769,7 +772,7 @@ impl ThunkContext {
                 // Return a receiver which is a thunk context,
                 Ok(_) => Some(receiver),
                 Err(err) => {
-                    event!(Level::ERROR, "Could not send command, {err}");
+                    error!("Could not send command, {err}");
                     None
                 }
             }
@@ -804,6 +807,43 @@ impl ThunkContext {
                     match task.await {
                         Some(next) => next,
                         None => default_return,
+                    }
+                }),
+                tx,
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Returns a task if a task should be awaited,
+    ///
+    /// The task function can return a Result to allow for better error handling,
+    ///
+    pub fn task_with_result<F>(
+        &self,
+        task: impl FnOnce(CancelSource) -> F,
+    ) -> Option<(JoinHandle<ThunkContext>, CancelToken)>
+    where
+        F: Future<Output = Result<ThunkContext, Error>> + Send + 'static,
+    {
+        if let Self {
+            handle: Some(handle),
+            ..
+        } = self
+        {
+            let mut default_return = self.clone();
+            let (tx, cancel) = channel::<()>();
+
+            let task = (task)(cancel);
+            Some((
+                handle.spawn(async {
+                    match task.await {
+                        Ok(next) => next,
+                        Err(err) => {
+                            default_return.error = Some(err);
+                            default_return
+                        }
                     }
                 }),
                 tx,
@@ -855,6 +895,12 @@ impl ThunkContext {
                 Some(ErrorContext::new(e.clone(), None))
             }
         })
+    }
+
+    /// Returns the current error state,
+    /// 
+    pub fn err(&self) -> Option<&Error> {
+        self.error.as_ref()
     }
 }
 
@@ -908,11 +954,11 @@ impl ThunkContext {
         let stream = tokio::net::TcpStream::connect(address)
             .await
             .expect("Should be able to connect");
-        event!(Level::DEBUG, "Connecting to stream");
+        debug!("Connecting to stream");
 
         stream.readable().await.ok();
 
-        event!(Level::DEBUG, "Reading from stream");
+        debug!("Reading from stream");
         let mut lines = BufReader::new(stream).lines();
 
         let mut received = String::new();
@@ -934,80 +980,6 @@ impl ThunkContext {
     pub fn local_udp_addr(&self) -> Option<SocketAddr> {
         self.local_udp_addr
     }
-}
-
-/// Cryptography related functions, Private Key side
-///
-impl ThunkContext {
-    /// Create a signature using the assigned signature key,
-    ///
-    pub fn sign(&self) {
-        /*
-            1) Get assigned identity of the current block,
-            - The prefix should be {block.name()}.{block.symbol()}.
-            - or, {block.symbol()}.control.
-            2) Lookup the private-key with the assigned identity
-
-            After a listener starts and is bound to an address,
-            I need to be able to assign the address to a name.
-
-            receive.runner.{host}/{path}
-
-            receive.runner.obddemo.azurecr.io/demo/library/redis/6.2.1
-
-            1) look up host
-            2) look up path
-            3) look up block name/symbol
-
-            4) What private key to use?
-            {host}
-                -> {block}
-                    -> {key}
-
-        Name File:
-        {
-            "data": {
-                // Settings from Project struct
-                "host": "",
-                "container": "",
-                "path": "",
-
-                // Full entity name
-                "name": "",
-                "symbol": "",
-                "local_addr": "",
-
-                "signatures": {
-                    "host": "", // Find this in .world/{host}/
-                    "container": "" // Find this in .world/{host}/{container}/
-                    "path": "", // Find this in .world/{host}/{container}/{path}/
-
-                    "name": "",
-                    "symbol": "",
-                    "local_addr": "",
-                },
-            },
-            "signature": ""
-        }
-
-        */
-    }
-
-    /// Decrypt some bytes using the assigned decryption key,
-    ///
-    pub fn decrypt(&self) {}
-}
-
-/// Cryptography related functions, Public Key side
-///
-impl ThunkContext {
-    /// Verify the signature of some bytes using the assigned verifying key,
-    ///
-    pub fn verify(&self) {}
-
-    /// Encrypt some bytes using the assigned encryption key
-    ///
-    pub fn encrypt(&self) {}
 }
 
 /// Some utility methods

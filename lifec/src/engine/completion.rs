@@ -38,16 +38,54 @@ pub struct Completion {
     pub returns: Option<BlockProperties>,
 }
 
+#[allow(dead_code)]
+#[allow(unused_imports)]
 mod tests {
+    use reality::{BlockObject, BlockProperties};
+    use tracing::trace;
+
     use super::Completion;
-    use crate::prelude::{Listener, Project};
+    use crate::{prelude::{Listener, Project}, project::default_runtime, plugins::Plugin, error::Error};
 
     #[derive(Default, Debug)]
     struct Test {
         completion: Option<Completion>,
     }
 
+    #[derive(Default)]
+    struct Skip;
+
+    impl Plugin for Skip {
+        fn symbol() -> &'static str {
+            "skip"
+        }
+
+        fn call(context: &mut crate::plugins::ThunkContext) -> Option<crate::plugins::AsyncContext> {
+            context.task_with_result(|_| {
+                async {
+                    Err(Error::skip("testing skip"))
+                }
+            })
+        }
+    }
+
+    impl BlockObject for Skip {
+        fn query(&self) -> reality::BlockProperties {
+            BlockProperties::default()
+        }
+
+        fn parser(&self) -> Option<reality::CustomAttribute> {
+            Some(Self::as_custom_attr())
+        }
+    }
+
     impl Project for Test {
+        fn runtime() -> crate::runtime::Runtime {
+            let mut runtime = default_runtime();
+            runtime.install_with_custom::<Skip>("");
+            runtime
+        }
+
         fn interpret(_: &specs::World, _: &reality::Block) {}
     }
 
@@ -57,12 +95,15 @@ mod tests {
         }
         fn on_operation(&mut self, _: crate::prelude::Operation) {}
         fn on_completion(&mut self, completion: super::Completion) {
-            self.completion = Some(completion);
+            if self.completion.is_none() {
+                self.completion = Some(completion);
+            }
         }
         fn on_completed_event(&mut self, _: &specs::Entity) {}
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn test() {
         use crate::host::Host;
         use std::ops::Deref;
@@ -72,12 +113,20 @@ mod tests {
         ``` test
         + .engine
         : .start a
+        : .start b
         : .exit
         ```
 
         ``` a test
         + .runtime
         : .println hello world
+        ```
+
+        ``` b test
+        + .runtime
+        : .skip
+        : .println testing skipped
+        : .println testing skipped 2
         ```
         "#,
         );
@@ -93,5 +142,13 @@ mod tests {
             let println = returns.property("println").unwrap();
             assert_eq!(println.symbol(), Some(&String::from("hello world")));
         }
+
+        logs_assert(|lines| {
+            let count = lines.iter().filter(|l| l.contains("testing skip")).count();
+            assert!(count > 0, "didn't find any skip lines");
+
+            eprintln!("{count}");
+            Ok(())
+        });
     }
 }

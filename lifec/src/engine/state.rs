@@ -19,7 +19,7 @@ cfg_editor! {
     use crate::editor::{Node, NodeStatus};
 }
 
-use tracing::{event, Level};
+use tracing::{event, Level, warn, error, debug};
 
 pub type NodeCommandHandler = fn(&mut State, Entity) -> bool;
 
@@ -1395,6 +1395,19 @@ impl<'a> State<'a> {
                         select! {
                             result = operation.task(rx) => {
                                 match result {
+                                    Some(err) if err.err().is_some() => {
+                                        let err = err.err().expect("should have an error if match");
+                                        match err {
+                                            _ if err.is_skip() => {
+                                                warn!("skipping @ {:?} error: {err}", e);
+                                            }
+                                            _ => {
+                                                error!("sequence encountered a plugin error, cancelling sequence @ {:?} error: {err}", e);
+                                                _tx.send(()).ok();
+                                                break;
+                                            }
+                                        }
+                                    }
                                     Some(mut result) => {
                                         let mut completion = Completion {
                                             timestamp: Utc::now(),
@@ -1412,18 +1425,21 @@ impl<'a> State<'a> {
                                         context.dispatch_completion(completion);
                                     }
                                     None => {
+                                        warn!("sequence operationg did not return a result, cancelling current sequence @ {:?}", e);
+                                        _tx.send(()).ok();
+                                        break;
                                     }
                                 }
                             },
                             _ = _rx => {
+                                warn!("cancel signal received, cancelling sequence @ {:?}", e);
                                 _tx.send(()).ok();
                                 break;
                             }
                         }
                     }
 
-                    event!(
-                        Level::DEBUG,
+                    debug!(
                         "\n\n\t{:?}\n\tcompleted\n\tplugin {}\n",
                         thunk,
                         e.id(),

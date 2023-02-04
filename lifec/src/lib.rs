@@ -20,3 +20,5 @@ pub mod plugins;
 pub mod resources;
 
 pub mod prelude;
+
+pub mod error;
