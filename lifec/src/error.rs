@@ -15,14 +15,14 @@ pub struct Error {
 impl Error {
     /// Returns an error that indicates this error is recoverable,
     /// 
-    pub fn recoverable() -> Self {
-        Error { category: Category::Recoverable(None) }
+    pub fn recoverable(message: &'static str) -> Self {
+        Error { category: Category::Recoverable(message, None) }
     }
 
     /// Returns an error that indicates this error can 
     /// 
-    pub fn recoverable_with(context: ThunkContext, recoverer: Entity) -> Self {
-        Error { category: Category::Recoverable(Some((Arc::new(context), recoverer))) }
+    pub fn recoverable_with(message: &'static str, context: ThunkContext, recoverer: Entity) -> Self {
+        Error { category: Category::Recoverable(message, Some((Arc::new(context), recoverer))) }
     }
 
     /// Returns an error that indicates this error is an invalid operation,
@@ -74,7 +74,7 @@ impl Error {
     /// 
     pub fn try_get_recovery_state(&self) -> Option<(Arc<ThunkContext>, Entity)> {
         match &self.category {
-            Category::Recoverable(r) => r.clone(),
+            Category::Recoverable(_, r) => r.clone(),
             _ => None
         }
     }
@@ -89,7 +89,7 @@ enum Category {
     /// Optionally, may include state that can be used for recovery. If no state is provided then the 
     /// assumption is that this intermittent and a retry will eventually succeed.
     /// 
-    Recoverable(Option<(Arc<ThunkContext>, Entity)>),
+    Recoverable(&'static str, Option<(Arc<ThunkContext>, Entity)>),
     /// Caregory of errors that inidicate that the previous operation is invalid in the current context,
     /// 
     InvalidOperation(&'static str),
