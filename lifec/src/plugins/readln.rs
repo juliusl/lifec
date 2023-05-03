@@ -46,7 +46,7 @@ impl Plugin for Readln {
         if let Some(mut docs) = Self::start_docs(parser) {
             docs.as_mut().add_custom_with("prompt", |p, content| {
                 let child_entity = p.last_child_entity().expect("should have a child entity");
-                if let Some(prop_name) = p.symbol().cloned() {
+                if let Some(prop_name) = p.property().cloned() {
                     /*
                     # Example
                     : name .prompt name >

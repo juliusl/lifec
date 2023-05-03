@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 lifec = { path = "../lifec" }
-poem = { version = "1.3.32", features = ["server", "static-files", "native-tls"] }
+poem = { version = "1.3.55", features = ["server", "static-files", "native-tls"] }
 tokio = "1.19.2"

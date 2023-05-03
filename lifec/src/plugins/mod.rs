@@ -234,7 +234,7 @@ pub trait Plugin {
                     .insert(child, Thunk::from_plugin::<Self>())
                     .expect("should be able to insert thunk component");
 
-                if let Some(label) = parser.symbol() {
+                if let Some(label) = parser.property() {
                     parser.define_child(child, "label", Value::Symbol(label.to_string()));
                 }
 

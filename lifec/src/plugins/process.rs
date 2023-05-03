@@ -34,7 +34,7 @@ impl Plugin for Process {
                         .last_child_entity()
                         .expect("should have added an entity for the process");
 
-                    if let Some(var_name) = p.symbol() {
+                    if let Some(var_name) = p.property() {
                         let var_name = var_name.to_string();
                         p.define_child(last, "env", Value::Symbol(var_name.to_string()));
                         if !value.is_empty() {

@@ -35,7 +35,7 @@ impl Plugin for Request {
              */
             docs.as_mut()
                 .add_custom_with("header", |p, c| {
-                    let var_name = p.symbol().expect("Requires a var name").to_string();
+                    let var_name = p.property().expect("Requires a var name").to_string();
 
                     let last = p
                         .last_child_entity()
