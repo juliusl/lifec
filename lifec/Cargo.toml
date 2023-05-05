@@ -44,6 +44,7 @@ sha2 = "0.10.6"
 signature = "1.6.4"
 rpassword = "7.0.0"
 hdrhistogram = "7.5.2"
+async-trait = "0.1.68"
 
 [[example]]
 name = "workspace"

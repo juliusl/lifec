@@ -81,12 +81,17 @@ impl BlockObject for Timer {
 ///
 #[derive(Logos, Debug, PartialEq)]
 pub enum TimerSettings {
-    /// Duration to wait, The value is always in seconds
+    /// Duration to wait converted to seconds,
+    /// 
     #[regex("[0-9]*", on_duration)]
     Duration(f32),
+    /// Increment of time is seconds
+    /// 
     #[token("s")]
     #[token("secs")]
     Seconds,
+    /// Increment of time is miliseconds
+    /// 
     #[token("ms")]
     Miliseconds,
     #[error]

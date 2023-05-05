@@ -10,16 +10,17 @@ use specs::{prelude::*, Entities, SystemData};
 use tokio::sync::oneshot;
 
 use super::{
-    connection::ConnectionState, Adhoc, Limit, NodeCommand, Plugins, Profiler,
-    TickControl, Transition, Yielding, EngineStatus,
+    connection::ConnectionState, Adhoc, EngineStatus, Limit, NodeCommand, Plugins, Profiler,
+    TickControl, Transition, Yielding,
 };
-use crate::{appendix::Appendix, engine::Completion, prelude::*, guest::{Guest, RemoteProtocol}};
+use crate::{
+    appendix::Appendix,
+    engine::Completion,
+    guest::{Guest, RemoteProtocol},
+    prelude::*,
+};
 
-cfg_editor! {
-    use crate::editor::{Node, NodeStatus};
-}
-
-use tracing::{event, Level, warn, error, debug};
+use tracing::{debug, error, event, warn, Level};
 
 pub type NodeCommandHandler = fn(&mut State, Entity) -> bool;
 
@@ -94,7 +95,7 @@ pub struct State<'a> {
     ///
     engines: ReadStorage<'a, Engine>,
     /// Guests storage,
-    /// 
+    ///
     guests: ReadStorage<'a, Guest>,
     /// Execution limits,
     ///
@@ -1022,162 +1023,6 @@ impl<'a> State<'a> {
     }
 }
 
-cfg_editor! {
-    impl<'a> State<'a> {
-    /// Returns connections from adhoc profilers as a vector of nodes,
-    ///
-    pub fn adhoc_nodes(&self) -> Vec<Node> {
-        let State {
-            entities,
-            appendix,
-            profilers,
-            connections,
-            ..
-        } = self;
-
-        (entities, profilers, connections)
-            .join()
-            .map(|(e, _, c)| Node {
-                status: NodeStatus::Profiler(e),
-                connection: Some(c.clone()),
-                appendix: appendix.deref().clone(),
-                ..Default::default()
-            })
-            .collect::<Vec<_>>()
-    }
-
-    /// Returns current event nodes,
-    ///
-    pub fn event_nodes(&'a self) -> Vec<Node> {
-        self.scan()
-            .filter_map(|e| self.event_node(e.entity()))
-            .collect::<Vec<_>>()
-    }
-
-    /// Returns a node,
-    ///
-    pub fn event_node(&self, event: Entity) -> Option<Node> {
-        let State {
-            appendix,
-            entities,
-            cursors,
-            events,
-            connections,
-            transitions,
-            sequences,
-            connection_states,
-            adhocs,
-            ..
-        } = self;
-
-        if let Some((_, connection, cursor, transition, sequence, connection_state, adhoc)) = (
-            events,
-            connections.maybe(),
-            cursors.maybe(),
-            transitions.maybe(),
-            sequences.maybe(),
-            connection_states.maybe(),
-            adhocs.maybe(),
-        )
-            .join()
-            .get(event, entities)
-        {
-            Some(Node {
-                status: NodeStatus::Event(self.status(event)),
-                transition: transition.cloned(),
-                connection: connection.cloned(),
-                cursor: cursor.cloned(),
-                sequence: sequence.cloned(),
-                connection_state: connection_state.cloned(),
-                appendix: appendix.deref().clone(),
-                adhoc: adhoc.cloned(),
-                ..Default::default()
-            })
-        } else {
-            None
-        }
-    }
-
-    /// Scans engines for status,
-    ///
-    pub fn scan_engines(&'a self) -> impl Iterator<Item = EngineStatus> + '_ {
-        let Self {
-            entities,
-            sequences,
-            engines,
-            ..
-        } = self;
-
-        (entities, sequences, engines)
-            .join()
-            .map(|(e, _, _)| self.engine_status(e))
-    }
-
-    /// Returns the status for an engine,
-    ///
-    pub fn engine_status(&self, engine: Entity) -> EngineStatus {
-        let Self {
-            entities,
-            sequences,
-            engines,
-            ..
-        } = self;
-
-        match (sequences, engines).join().get(engine, entities) {
-            Some((sequence, _)) => {
-                let mut _events = sequence.iter_entities().map(|e| self.status(e));
-
-                if _events.all(|e| match e {
-                    super::EventStatus::Inactive(_) => true,
-                    _ => false,
-                }) {
-                    EngineStatus::Inactive(engine)
-                } else {
-                    EngineStatus::Active(engine)
-                }
-            }
-            None => EngineStatus::Disposed(engine),
-        }
-    }
-
-    /// Returns a vector of engine nodes,
-    ///
-    pub fn engine_nodes(&self) -> Vec<Node> {
-        self.scan_engines()
-            .filter_map(|e| self.engine_node(e.entity()))
-            .collect::<Vec<_>>()
-    }
-
-    /// Returns the current engine node for an entity,
-    ///
-    pub fn engine_node(&self, engine: Entity) -> Option<Node> {
-        let State {
-            appendix,
-            entities,
-            cursors,
-            engines,
-            sequences,
-            ..
-        } = self;
-
-        if let Some((_, cursor, sequence)) = (engines, cursors.maybe(), sequences.maybe())
-            .join()
-            .get(engine, entities)
-        {
-            Some(Node {
-                status: NodeStatus::Engine(self.engine_status(engine)),
-                cursor: cursor.cloned(),
-                sequence: sequence.cloned(),
-                appendix: appendix.deref().clone(),
-                ..Default::default()
-            })
-        } else {
-            None
-        }
-    }
-}
-}
-
 impl<'a> State<'a> {
     /// Returns the entity for a block by name,
     ///
@@ -1455,5 +1300,163 @@ impl<'a> State<'a> {
         });
 
         Operation::empty(handle.clone()).with_task((task, tx))
+    }
+}
+
+cfg_editor! {
+    use crate::editor::{Node, NodeStatus};
+
+    impl<'a> State<'a> {
+        /// Returns connections from adhoc profilers as a vector of nodes,
+        ///
+        pub fn adhoc_nodes(&self) -> Vec<Node> {
+            let State {
+                entities,
+                appendix,
+                profilers,
+                connections,
+                ..
+            } = self;
+
+            (entities, profilers, connections)
+                .join()
+                .map(|(e, _, c)| Node {
+                    status: NodeStatus::Profiler(e),
+                    connection: Some(c.clone()),
+                    appendix: appendix.deref().clone(),
+                    ..Default::default()
+                })
+                .collect::<Vec<_>>()
+        }
+
+        /// Returns current event nodes,
+        ///
+        pub fn event_nodes(&'a self) -> Vec<Node> {
+            self.scan()
+                .filter_map(|e| self.event_node(e.entity()))
+                .collect::<Vec<_>>()
+        }
+
+        /// Returns a node,
+        ///
+        pub fn event_node(&self, event: Entity) -> Option<Node> {
+            let State {
+                appendix,
+                entities,
+                cursors,
+                events,
+                connections,
+                transitions,
+                sequences,
+                connection_states,
+                adhocs,
+                ..
+            } = self;
+
+            if let Some((_, connection, cursor, transition, sequence, connection_state, adhoc)) = (
+                events,
+                connections.maybe(),
+                cursors.maybe(),
+                transitions.maybe(),
+                sequences.maybe(),
+                connection_states.maybe(),
+                adhocs.maybe(),
+            )
+            .join()
+            .get(event, entities)
+            {
+                Some(Node {
+                    status: NodeStatus::Event(self.status(event)),
+                    transition: transition.cloned(),
+                    connection: connection.cloned(),
+                    cursor: cursor.cloned(),
+                    sequence: sequence.cloned(),
+                    connection_state: connection_state.cloned(),
+                    appendix: appendix.deref().clone(),
+                    adhoc: adhoc.cloned(),
+                    ..Default::default()
+                })
+            } else {
+                None
+            }
+        }
+
+        /// Scans engines for status,
+        ///
+        pub fn scan_engines(&'a self) -> impl Iterator<Item = EngineStatus> + '_ {
+            let Self {
+                entities,
+                sequences,
+                engines,
+                ..
+            } = self;
+
+            (entities, sequences, engines)
+                .join()
+                .map(|(e, _, _)| self.engine_status(e))
+        }
+
+        /// Returns the status for an engine,
+        ///
+        pub fn engine_status(&self, engine: Entity) -> EngineStatus {
+            let Self {
+                entities,
+                sequences,
+                engines,
+                ..
+            } = self;
+
+            match (sequences, engines).join().get(engine, entities) {
+                Some((sequence, _)) => {
+                    let mut _events = sequence.iter_entities().map(|e| self.status(e));
+
+                    if _events.all(|e| match e {
+                        super::EventStatus::Inactive(_) => true,
+                        _ => false,
+                    }) {
+                        EngineStatus::Inactive(engine)
+                    } else {
+                        EngineStatus::Active(engine)
+                    }
+                }
+                None => EngineStatus::Disposed(engine),
+            }
+        }
+
+        /// Returns a vector of engine nodes,
+        ///
+        pub fn engine_nodes(&self) -> Vec<Node> {
+            self.scan_engines()
+                .filter_map(|e| self.engine_node(e.entity()))
+                .collect::<Vec<_>>()
+        }
+
+        /// Returns the current engine node for an entity,
+        ///
+        pub fn engine_node(&self, engine: Entity) -> Option<Node> {
+            let State {
+                appendix,
+                entities,
+                cursors,
+                engines,
+                sequences,
+                ..
+            } = self;
+
+            if let Some((_, cursor, sequence)) = (engines, cursors.maybe(), sequences.maybe())
+                .join()
+                .get(engine, entities)
+            {
+                Some(Node {
+                    status: NodeStatus::Engine(self.engine_status(engine)),
+                    cursor: cursor.cloned(),
+                    sequence: sequence.cloned(),
+                    appendix: appendix.deref().clone(),
+                    ..Default::default()
+                })
+            } else {
+                None
+            }
+        }
     }
 }
