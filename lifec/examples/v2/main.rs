@@ -1,5 +1,7 @@
-use lifec::v2::Engine;
 use reality::v2::prelude::*;
+
+mod example;
+use example::*;
 
 /// Example using v2 compiler with lifec extensions,
 /// 
@@ -14,55 +16,37 @@ use reality::v2::prelude::*;
 /// 
 /// ```runmd test
 /// +           .host                   # Example usage of example engine
-/// <engine>    .example    
+/// <engine>    .example    initial
 /// :           .setup      folder
 /// :           .greet      world
 /// :           .greet      world 2
 /// :           .greet      world 3
+/// <engine>    .example    cache
+/// :           .setup      cache
+/// :           .greet      world 4
 /// ```
 /// 
 #[reality::parse_docs]
 #[tokio::main]
 async fn main() -> Result<()> {
-    enable_logging();
+    // enable_logging();
     
     let mut compiler = Compiler::new().with_docs();
 
-    let _ = lifec::v2::compile_runmd_engine(&mut compiler)?;
+    let _ = lifec::v2::compile(&mut compiler)?;
     let _ = compile_runmd_main(&mut compiler)?;
 
     export_toml(&mut compiler, ".test/lifec-example.toml").await?;
 
     compiler.link(Example::new())?;
 
+    compiler.as_mut().exec(|examples: ExampleProvider|{
+        for (e, _) in examples.state_vec::<ExampleInstance>().iter() {
+            println!("{:?}", e);
+        }
+    });
+
     Ok(())
-}
-
-/// Example of a component that uses the engine extensions,
-/// 
-#[derive(Runmd, Debug, Component, Clone)]
-#[storage(VecStorage)]
-pub struct Example {
-    /// List of identifiers to entities that are "setup" event types
-    /// 
-    #[config(ext=engine.once)]
-    setup: Vec<String>,
-    /// List of identifiers to entities that are "greet" event types
-    /// 
-    #[config(ext=engine.start)]
-    greet: Vec<String>,
-    /// Extensions for managing engine behavior
-    /// 
-    #[ext]
-    engine: Engine,
-}
-
-impl Example {
-    /// Returns a new example component,
-    /// 
-    fn new() -> Self {
-        Self { setup: vec![], greet: vec![], engine: Engine::new() }
-    }
 }
 
 /// Enables logging

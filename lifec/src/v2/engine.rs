@@ -18,6 +18,19 @@ pub struct Engine {
     properties: Properties,
 }
 
+#[derive(Runmd, Debug, Component, Clone)]
+#[storage(VecStorage)]
+pub struct Event {
+    after: String,
+    name: String,
+}
+
+impl Event {
+    fn new() -> Self {
+        Self { after: String::new(), name: String::new() }
+    }
+}
+
 impl Engine {
     /// Returns a new empty engine,
     ///
@@ -40,7 +53,10 @@ impl Engine {
                 .property(key)
                 .and_then(|p| p.as_properties())
             {
-                println!("{:?}", properties);
+                let mut event = Event::new();
+                event.visit_properties(&properties);
+
+                println!("{:?}", event);
             }
         }
 
@@ -61,7 +77,11 @@ impl Engine {
                 .property(key)
                 .and_then(|p| p.as_properties())
             {
-                println!("{:?}", properties);
+                let mut event = Event::new();
+                event.visit_properties(&properties);
+                println!("{:?}", event);
+            } else {
+                
             }
         }
 
