@@ -18,6 +18,8 @@ pub struct Engine {
     properties: Properties,
 }
 
+/// 
+/// 
 #[derive(Runmd, Debug, Component, Clone)]
 #[storage(VecStorage)]
 pub struct Event {
@@ -46,6 +48,8 @@ impl Engine {
         let output = Properties::empty();
 
         for e in events.iter() {
+            let mut event = Event::new();
+            event.name = e.to_string();
             println!("event -- {name}.{e}");
             let key = format!("engine.once.{name}");
             if let Some(properties) = self
@@ -53,7 +57,6 @@ impl Engine {
                 .property(key)
                 .and_then(|p| p.as_properties())
             {
-                let mut event = Event::new();
                 event.visit_properties(&properties);
 
                 println!("{:?}", event);
@@ -69,6 +72,8 @@ impl Engine {
         let output = Properties::empty();
 
         for e in events.iter() {
+            let mut event = Event::new();
+            event.name = e.to_string();
             println!("event -- {name}.{e}");
             let key = format!("engine.start.{name}");
 
@@ -77,11 +82,9 @@ impl Engine {
                 .property(key)
                 .and_then(|p| p.as_properties())
             {
-                let mut event = Event::new();
                 event.visit_properties(&properties);
+                event.name = e.to_string();
                 println!("{:?}", event);
-            } else {
-                
             }
         }
 
