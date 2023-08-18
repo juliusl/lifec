@@ -19,7 +19,7 @@ use tokio::{
     },
     task::JoinHandle,
 };
-use tracing::{error, debug, warn, info};
+use tracing::{debug, error, info, warn};
 
 pub mod thunk_context_ext;
 
@@ -267,30 +267,35 @@ impl ThunkContext {
     ///
     /// Blocks until a result is received, and returns the thunk context if successful
     ///
-    pub async fn run(&self, operation_name: impl AsRef<str>) -> Option<ThunkContext> {
-        let tag = self.tag().unwrap_or(String::from("operation"));
-
+    pub async fn run(
+        &self,
+        operation_name: impl AsRef<str>,
+        tag: Option<&str>,
+    ) -> Option<ThunkContext> {
         if let Some(operation) = self
-            .appendix
-            .as_ref()
-            .and_then(|a| a.find_operation(&tag, operation_name.as_ref()))
+            .workspace()
+            .and_then(|w| {
+                if let Some(tag) = tag {
+                    w.use_tag(tag)
+                        .find_operation(operation_name.as_ref())
+                        .map(|e| *e)
+                } else {
+                    w.find_operation(operation_name.as_ref()).copied()
+                }
+            })
             .and_then(|op| self.dispatch_node_command(NodeCommand::Spawn(op)))
         {
             match operation.await {
                 Ok(tc) => Some(tc),
                 Err(err) => {
                     error!(
-                        "Encountered error while yielding for spawned operation, {err}"
+                        op = operation_name.as_ref(),
+                        "Error running operation, {err}"
                     );
                     None
                 }
             }
         } else {
-            warn!(
-                "Did not find operation, {} {}",
-                operation_name.as_ref(),
-                tag
-            );
             None
         }
     }
@@ -342,15 +347,11 @@ impl ThunkContext {
     ///
     pub fn commit(&self) -> Self {
         if self.response_cache.is_some() {
-            warn!(
-                "Committing context without consuming response_cache"
-            );
+            warn!("Committing context without consuming response_cache");
         }
 
         if self.body_cache.is_some() {
-            warn!(
-                "Committing context without consuming body_cache"
-            );
+            warn!("Committing context without consuming body_cache");
         }
 
         let mut clone = self.clone();
@@ -647,15 +648,11 @@ impl ThunkContext {
                         self.local_udp_addr = Some(addr);
                     }
                     Err(err) => {
-                        error!(
-                            "Could not get local socket address for udp socket, {udp} {err}"
-                        );
+                        error!("Could not get local socket address for udp socket, {udp} {err}");
                     }
                 },
                 Err(err) => {
-                    error!(
-                        "Could not assign address for udp socket, {udp} {err}"
-                    );
+                    error!("Could not assign address for udp socket, {udp} {err}");
                 }
             }
         }
@@ -667,15 +664,11 @@ impl ThunkContext {
                         self.local_tcp_addr = Some(addr);
                     }
                     Err(err) => {
-                        error!(
-                            "Could not get local address for tcp listener, {tcp} {err}"
-                        );
+                        error!("Could not get local address for tcp listener, {tcp} {err}");
                     }
                 },
                 Err(err) => {
-                    error!(
-                        "Could not assign address for tcp listener, {tcp} {err}"
-                    );
+                    error!("Could not assign address for tcp listener, {tcp} {err}");
                 }
             }
         }
@@ -898,7 +891,7 @@ impl ThunkContext {
     }
 
     /// Returns the current error state,
-    /// 
+    ///
     pub fn err(&self) -> Option<&Error> {
         self.error.as_ref()
     }
