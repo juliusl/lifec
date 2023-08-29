@@ -320,7 +320,7 @@ impl ThunkContext {
                     w.find_operation(operation_name.as_ref()).copied()
                 }
             })
-            .and_then(|op| self.dispatch_node_command(NodeCommand::Spawn(op)))
+            .and_then(|op| self.into_dispatch_node_command(NodeCommand::Spawn(op)))
         {
             match operation.await {
                 Ok(tc) => Some(tc),
