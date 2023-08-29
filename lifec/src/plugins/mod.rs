@@ -5,7 +5,6 @@ use std::ops::Deref;
 pub use crate::prelude::*;
 use reality::wire::Interner;
 use reality::wire::ResourceId;
-use tokio::select;
 use tokio::sync::oneshot;
 
 // mod network;

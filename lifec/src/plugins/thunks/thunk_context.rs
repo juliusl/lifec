@@ -300,6 +300,44 @@ impl ThunkContext {
         }
     }
 
+    /// Consumes the current context, finds, and spawns an operation by name and tag from the current workspace,
+    ///
+    /// Blocks until a result is received, and returns the thunk context if successful
+    ///
+    pub async fn into_run(
+        self,
+        operation_name: impl AsRef<str>,
+        tag: Option<&str>,
+    ) -> Option<ThunkContext> {
+        if let Some(operation) = self
+            .workspace()
+            .and_then(|w| {
+                if let Some(tag) = tag {
+                    w.use_tag(tag)
+                        .find_operation(operation_name.as_ref())
+                        .map(|e| *e)
+                } else {
+                    w.find_operation(operation_name.as_ref()).copied()
+                }
+            })
+            .and_then(|op| self.dispatch_node_command(NodeCommand::Spawn(op)))
+        {
+            match operation.await {
+                Ok(tc) => Some(tc),
+                Err(err) => {
+                    error!(
+                        op = operation_name.as_ref(),
+                        "Error running operation, {err}"
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    }
+
+
     /// Copies previous state to the current state,
     ///
     /// This is so that previous values can move forward to the next plugin, when .commit() gets called.
@@ -710,6 +748,37 @@ impl ThunkContext {
                     error!("Could not dispatch {err}");
                 }
             }
+        }
+    }
+
+    /// Consumes the current context, Sends a node command, if the command was a spawn command assumes yielding and returns a receiver to get the result on completion,
+    ///
+    pub fn into_dispatch_node_command(
+        mut self,
+        command: NodeCommand,
+    ) -> Option<tokio::sync::oneshot::Receiver<ThunkContext>> {
+        if let Some(node_dispatcher) = self.node_dispatcher.take() {
+            match command {
+                NodeCommand::Spawn(_) => {
+                    let (yielding, receiver) = Yielding::new(self);
+                    match node_dispatcher.try_send((command, Some(yielding))) {
+                        Ok(_) => Some(receiver),
+                        Err(err) => {
+                            error!("Could not send command, {err}");
+                            None
+                        }
+                    }
+                }
+                _ => match node_dispatcher.try_send((command, None)) {
+                    Ok(_) => None,
+                    Err(err) => {
+                        error!("Could not send command, {err}");
+                        None
+                    }
+                },
+            }
+        } else {
+            None
         }
     }
 
