@@ -62,6 +62,9 @@ pub struct Host {
     /// Will setup a listener for the host
     ///
     listener_setup: Option<ListenerSetup>,
+    /// Enable pacing mode,
+    /// 
+    enable_pacing: bool,
 }
 
 /// ECS configuration,
@@ -170,6 +173,12 @@ impl Host {
         self.listener_setup = Some(ListenerSetup::new::<L>());
     }
 
+    /// Enables pacing in the start wait for exit loop,
+    /// 
+    pub fn enable_pacing(&mut self) {
+        self.enable_pacing = true;
+    }
+
     /// Returns a immutable reference to the world,
     ///
     pub fn world(&self) -> &World {
@@ -249,6 +258,7 @@ impl Host {
                 None,
             )),
             listener_setup: None,
+            enable_pacing: false,
         };
 
         host.link_sequences();
@@ -318,6 +328,7 @@ impl Host {
             start: None,
             world: Some(P::compile(content, None)),
             listener_setup: None,
+            enable_pacing: false,
         };
 
         host.link_sequences();
@@ -401,6 +412,7 @@ impl Host {
             start: None,
             world: Some(P::compile_workspace(&workspace, files.iter(), None)),
             listener_setup: None,
+            enable_pacing: false,
         };
 
         host.link_sequences();
@@ -558,6 +570,9 @@ impl Host {
         while !self.should_exit() {
             dispatcher.dispatch(self.world());
             self.world_mut().maintain();
+            if self.enable_pacing {
+                std::thread::sleep(std::time::Duration::from_millis(16));
+            }
         }
     }
 
@@ -610,6 +625,7 @@ impl From<World> for Host {
             start: None,
             world: Some(world),
             listener_setup: None,
+            enable_pacing: false,
         }
     }
 }
