@@ -62,9 +62,9 @@ pub struct Host {
     /// Will setup a listener for the host
     ///
     listener_setup: Option<ListenerSetup>,
-    /// Enable pacing mode,
+    /// Tick delay in milliseconds,
     /// 
-    enable_pacing: bool,
+    tick_delay_ms: Option<u64>,
 }
 
 /// ECS configuration,
@@ -176,7 +176,13 @@ impl Host {
     /// Enables pacing in the start wait for exit loop,
     /// 
     pub fn enable_pacing(&mut self) {
-        self.enable_pacing = true;
+        self.set_tick_delay(16);
+    }
+
+    /// Sets the tick rate for the dispatcher loop,
+    /// 
+    pub fn set_tick_delay(&mut self, milli: u64) {
+        self.tick_delay_ms = Some(milli);
     }
 
     /// Returns a immutable reference to the world,
@@ -258,7 +264,7 @@ impl Host {
                 None,
             )),
             listener_setup: None,
-            enable_pacing: false,
+            tick_delay_ms: None,
         };
 
         host.link_sequences();
@@ -328,7 +334,7 @@ impl Host {
             start: None,
             world: Some(P::compile(content, None)),
             listener_setup: None,
-            enable_pacing: false,
+            tick_delay_ms: None,
         };
 
         host.link_sequences();
@@ -412,7 +418,7 @@ impl Host {
             start: None,
             world: Some(P::compile_workspace(&workspace, files.iter(), None)),
             listener_setup: None,
-            enable_pacing: false,
+            tick_delay_ms: None,
         };
 
         host.link_sequences();
@@ -570,8 +576,8 @@ impl Host {
         while !self.should_exit() {
             dispatcher.dispatch(self.world());
             self.world_mut().maintain();
-            if self.enable_pacing {
-                std::thread::sleep(std::time::Duration::from_millis(16));
+            if let Some(ms) = self.tick_delay_ms {
+                std::thread::sleep(std::time::Duration::from_millis(ms));
             }
         }
     }
@@ -625,7 +631,7 @@ impl From<World> for Host {
             start: None,
             world: Some(world),
             listener_setup: None,
-            enable_pacing: false,
+            tick_delay_ms: None,
         }
     }
 }
