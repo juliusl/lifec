@@ -6,7 +6,7 @@ use crate::{
 };
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
-use specs::{AsyncDispatcher, Dispatcher, DispatcherBuilder, Entity, World, WorldExt, Write};
+use specs::{AsyncDispatcher, Dispatcher, DispatcherBuilder, Entity, World, WorldExt, Write, LendJoin};
 use std::{
     borrow::{Borrow, BorrowMut},
     error::Error,

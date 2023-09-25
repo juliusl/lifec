@@ -59,7 +59,7 @@ impl<'a> Sequences<'a> {
     ///
     pub fn build_engine(&mut self, engine: Entity) {
         if let Some((block, engine)) = (&self.blocks, &self.engines)
-            .join()
+            .lend_join()
             .get(engine, &self.entities)
         {
             let transitions = engine.iter_transitions();
@@ -124,7 +124,7 @@ impl<'a> Sequences<'a> {
 
     pub fn configure_lifecycles(&mut self, engine: Entity) {
         if let Some((engine, sequence)) = (&self.engines, &self.sequences)
-            .join()
+            .lend_join()
             .get(engine, &self.entities)
         {
             if let Some(last) = sequence.last() {

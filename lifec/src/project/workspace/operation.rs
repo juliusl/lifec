@@ -43,7 +43,7 @@ impl<'a> Operations<'a> {
                 let operation_entity = entities.entity(operation_entity);
 
                 if let Some((adhoc, operation)) =
-                    (adhocs, sequences).join().get(operation_entity, entities)
+                    (adhocs, sequences).lend_join().get(operation_entity, entities)
                 {
                     operations.push((operation_entity, adhoc.clone(), operation.clone()));
                 }

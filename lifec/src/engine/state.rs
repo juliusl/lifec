@@ -160,7 +160,7 @@ impl<'a> State<'a> {
                 let operation_entity = entities.entity(operation_entity);
 
                 if let Some((adhoc, operation)) =
-                    (adhocs, sequences).join().get(operation_entity, entities)
+                    (adhocs, sequences).lend_join().get(operation_entity, entities)
                 {
                     operations.push((operation_entity, adhoc.clone(), operation.clone()));
                 }
@@ -219,7 +219,7 @@ impl<'a> State<'a> {
             ..
         } = self;
 
-        if let Some((event, operation)) = (events, operations.maybe()).join().get(entity, entities)
+        if let Some((event, operation)) = (events, operations.maybe()).lend_join().get(entity, entities)
         {
             if tick_control.is_paused(entity) {
                 return EventStatus::Paused(entity);
@@ -1079,7 +1079,7 @@ cfg_editor! {
             connection_states.maybe(),
             adhocs.maybe(),
         )
-            .join()
+            .lend_join()
             .get(event, entities)
         {
             Some(Node {
@@ -1123,7 +1123,7 @@ cfg_editor! {
             ..
         } = self;
 
-        match (sequences, engines).join().get(engine, entities) {
+        match (sequences, engines).lend_join().get(engine, entities) {
             Some((sequence, _)) => {
                 let mut _events = sequence.iter_entities().map(|e| self.status(e));
 
@@ -1161,7 +1161,7 @@ cfg_editor! {
         } = self;
 
         if let Some((_, cursor, sequence)) = (engines, cursors.maybe(), sequences.maybe())
-            .join()
+            .lend_join()
             .get(engine, entities)
         {
             Some(Node {

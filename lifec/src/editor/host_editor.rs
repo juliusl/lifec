@@ -520,7 +520,7 @@ impl HostEditor {
                         controls_column(ui);
                         ui.table_headers_row();
 
-                        for mut node in nodes {
+                        for node in nodes {
                             if let Some(statuses) = self.node_status.as_ref() {
                                 if let Some(status) = statuses.get(&node.status.entity()) {
                                     node.status = status.clone();

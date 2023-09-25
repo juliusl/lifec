@@ -134,7 +134,7 @@ mod tests {
         host.start_with::<Test>("test");
 
         let test = host.world().fetch::<Option<Test>>();
-        if let Some(test) = test.deref().clone() {
+        if let Some(test) = test.clone().deref() {
             assert!(test.completion.is_some());
             let completion = test.completion.clone().unwrap();
 

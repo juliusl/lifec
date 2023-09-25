@@ -478,7 +478,7 @@ impl Canvas {
             }
 
             if let Some(documentation) = self.documentation.get_mut(&idx) {
-                documentation.insert(name.to_string(), doc.deref().clone());
+                documentation.insert(name.to_string(), doc.clone());
             }
         }
     }

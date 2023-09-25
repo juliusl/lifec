@@ -637,7 +637,7 @@ impl WireObject for Debugger {
                 .int_pair()
                 .expect("should be a float pair");
             let timestamp = bytemuck::cast::<[i32; 2], i64>([a, b]);
-            let timestamp = chrono::DateTime::<Utc>::from_utc(
+            let timestamp = chrono::DateTime::<Utc>::from_naive_utc_and_offset (
                 NaiveDateTime::from_timestamp_opt(timestamp, 0).expect("should be a timestamp"),
                 Utc,
             );
