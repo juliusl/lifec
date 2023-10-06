@@ -1,0 +1,12 @@
+[package]
+name = "lifec_engine"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.75"
+reality = { path = "../../reality/reality" }
+tokio = "1.32.0"
+tokio-util = "0.7.9"
