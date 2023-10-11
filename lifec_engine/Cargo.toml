@@ -5,8 +5,15 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = [ "call_async" ]
+call_async = [ "async-trait" ]
+
 [dependencies]
 anyhow = "1.0.75"
-reality = { path = "../../reality/reality" }
+reality = { git = "https://github.com/juliusl/reality.git", branch="pr/v2-v2" }
 tokio = "1.32.0"
 tokio-util = "0.7.9"
+tracing = "0.1.37"
+
+async-trait = { version = "0.1.73", optional = true }
