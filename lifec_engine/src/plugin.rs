@@ -76,11 +76,9 @@ impl From<SpawnResult> for PluginOutput {
 ///
 #[derive(Clone)]
 pub struct ThunkContext {
-    /// Storage mapping to this context,
+    /// Source storage mapping to this context,
     ///
-    /// **Note**: Storage will be initialized by runmd.
-    ///
-    pub target: AsyncStorageTarget<Shared>,
+    pub(crate) target: AsyncStorageTarget<Shared>,
     /// Attribute for this context,
     ///
     attribute: Option<ResourceKey<Attribute>>,
@@ -131,8 +129,10 @@ impl ThunkContext {
     }
 
     /// Get mutable access to storage,
+    /// 
+    /// **Note**: Marked unsafe because will mutate the source storage. Source storage is re-used on each execution.
     ///
-    pub async fn storage_mut(&self) -> tokio::sync::RwLockWriteGuard<Shared> {
+    pub async unsafe fn storage_mut(&self) -> tokio::sync::RwLockWriteGuard<Shared> {
         self.target.storage.write().await
     }
 
@@ -142,10 +142,18 @@ impl ThunkContext {
         self.target.storage.try_read().ok()
     }
 
-    /// Tries to get mutable access to storage,
+    /// (unsafe) Tries to get mutable access to storage,
+    /// 
+    /// **Note**: Marked unsafe because will mutate the source storage. Source storage is re-used on each execution.
     ///
-    pub fn try_storage_mut(&mut self) -> Option<tokio::sync::RwLockWriteGuard<Shared>> {
+    pub unsafe fn try_storage_mut(&mut self) -> Option<tokio::sync::RwLockWriteGuard<Shared>> {
         self.target.storage.try_write().ok()
+    }
+
+    /// Returns access to output storage,
+    /// 
+    pub fn output(&self) -> AsyncStorageTarget<Shared> {
+        self.output.clone()
     }
 
     /// Spawn a task w/ this context,
