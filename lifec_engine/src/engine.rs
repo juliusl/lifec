@@ -1,19 +1,19 @@
-use std::sync::Arc;
-use std::path::Path;
 use std::collections::BTreeMap;
+use std::path::Path;
+use std::sync::Arc;
 
-use reality::StorageTarget;
-use reality::Shared;
-use reality::Project;
 use reality::AsyncStorageTarget;
+use reality::Project;
+use reality::Shared;
+use reality::StorageTarget;
 use tokio_util::sync::CancellationToken;
 
 use anyhow::anyhow;
 
-use crate::plugin::ThunkContext;
-use crate::plugin::Thunk;
-use crate::plugin::Plugin;
 use crate::operation::Operation;
+use crate::plugin::Plugin;
+use crate::plugin::Thunk;
+use crate::plugin::ThunkContext;
 
 /// Table of plugins by engine uuid,
 ///
@@ -138,7 +138,7 @@ pub struct Engine<const UUID: u128> {
     ///
     cancellation: CancellationToken,
     /// Operations mapped w/ this engine,
-    /// 
+    ///
     operations: BTreeMap<String, Operation>,
 }
 
@@ -199,7 +199,7 @@ impl<const UUID: u128> Engine<UUID> {
     }
 
     /// Compiles operations from the parsed project,
-    /// 
+    ///
     pub async fn compile(mut self) -> Self {
         use std::ops::Deref;
 
@@ -220,7 +220,7 @@ impl<const UUID: u128> Engine<UUID> {
     }
 
     /// Runs an operation by address,
-    /// 
+    ///
     pub async fn run(&self, address: impl AsRef<str>) -> anyhow::Result<ThunkContext> {
         if let Some(operation) = self.operations.get(address.as_ref()) {
             operation.execute().await
@@ -230,7 +230,7 @@ impl<const UUID: u128> Engine<UUID> {
     }
 
     /// Returns an iterator over operations,
-    /// 
+    ///
     pub fn iter_operations(&self) -> impl Iterator<Item = (&String, &Operation)> {
         self.operations.iter()
     }
