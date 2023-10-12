@@ -11,8 +11,14 @@ use crate::plugin::ThunkContext;
 ///
 #[derive(Clone)]
 pub struct Operation {
+    /// Name of this operation,
+    /// 
     name: String,
+    /// Tag allowing operation variants
+    /// 
     tag: Option<String>,
+    /// Thunk context of the operation,
+    /// 
     context: Option<ThunkContext>,
 }
 
