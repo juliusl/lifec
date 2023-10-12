@@ -1,16 +1,20 @@
-use std::{
-    future::Future,
-    marker::PhantomData,
-    ops::DerefMut,
-};
+use std::ops::DerefMut;
+use std::marker::PhantomData;
+use std::future::Future;
 
-use anyhow::anyhow;
+use reality::Attribute;
+use reality::StorageTarget;
+use reality::Shared;
+use reality::ResourceKey;
+use reality::BlockObject;
+use reality::AttributeType;
+use reality::AsyncStorageTarget;
+
 use futures_util::FutureExt;
-use reality::{
-    AsyncStorageTarget, Attribute, AttributeType, BlockObject, ResourceKey, Shared, StorageTarget,
-};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
+
+use anyhow::anyhow;
 
 /// Type alias for the result of spawning a task,
 ///
@@ -76,12 +80,12 @@ pub struct ThunkContext {
     ///
     /// **Note**: Storage will be initialized by runmd.
     ///
-    target: AsyncStorageTarget<Shared>,
+    pub target: AsyncStorageTarget<Shared>,
     /// Attribute for this context,
     ///
     attribute: Option<ResourceKey<Attribute>>,
     /// Output storage target,
-    /// 
+    ///
     pub output: AsyncStorageTarget<Shared>,
     /// Cancellation token that can be used by the engine to signal shutdown,
     ///
@@ -287,6 +291,7 @@ where
 #[allow(unused_imports)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::ops::Deref;
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -294,9 +299,11 @@ mod tests {
     use futures_util::{pin_mut, StreamExt, TryStreamExt};
     use reality::derive::*;
     use reality::*;
+    use tokio::join;
     use uuid::Bytes;
 
     use crate::engine::EngineBuilder;
+    use crate::operation::Operation;
     use crate::plugin::{PluginOutput, Thunk, ThunkContext, ThunkFn};
     use crate::{engine::Engine, plugin::call_plugin};
 
@@ -340,13 +347,13 @@ mod tests {
     async fn test_plugin_model() {
         // TODO: Test Isoloation -- 7bda126d-466c-4408-b5b7-9683eea90b65
         let mut builder = Engine::builder();
-        
+
         builder.register::<TestPlugin>();
 
         let mut engine = builder.build_primary();
         let runmd = r#"
         ```runmd
-        + .operation
+        + .operation test/operation
         <test_plugin> cargo
         : .name hello-world-2
         : RUST_LOG .env lifec=debug
@@ -355,6 +362,20 @@ mod tests {
         : .args test
         <test_plugin> cargo
         : .name hello-world-3
+        : RUST_LOG .env lifec=trace
+        : HOME .env /home/test2
+        : .args --name
+        : .args test3
+
+        + test_tag .operation test/operation
+        <test_plugin> cargo
+        : .name hello-world-2-tagged
+        : RUST_LOG .env lifec=debug
+        : HOME .env /home/test
+        : .args --name
+        : .args test
+        <test_plugin> cargo
+        : .name hello-world-3-tagged
         : RUST_LOG .env lifec=trace
         : HOME .env /home/test2
         : .args --name
@@ -370,37 +391,16 @@ mod tests {
 
         engine.load_file(".test/test_plugin.md").await;
 
-        // TODO: Need to move this to the body of an "operation"
-        if let Some(project) = engine.project.take() {
-            let nodes = project.nodes.into_inner().unwrap();
+        let engine = engine.compile().await;
+        let _ = join!(
+            engine.run("test/operation"),
+            engine.run("test/operation#test_tag")
+        );
 
-            for (_, target) in nodes.iter() {
-                let node = reality::Node(target.clone());
-
-                let _ = node
-                    .stream_attributes()
-                    .map(|a| Ok(a))
-                    .try_fold(
-                        engine.new_context(target.clone()),
-                        move |mut tc, a| async move {
-                            tc.set_attribute(a);
-                            let previous = tc.clone();
-                            match tc.call().await {
-                                Ok(tc) => {
-                                    if let Some(tc) = tc {
-                                        Ok(tc)
-                                    } else {
-                                        Ok(previous)
-                                    }
-                                }
-                                Err(err) => Err(err),
-                            }
-                        },
-                    )
-                    .await;
-            }
+        for (address, _) in engine.iter_operations() {
+            println!("{address}");
         }
-
+        
         ()
     }
 }

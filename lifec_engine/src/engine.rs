@@ -1,34 +1,50 @@
-use std::{sync::Arc, path::Path, collections::BTreeMap};
-use reality::{AsyncStorageTarget, Project, Shared};
+use std::sync::Arc;
+use std::path::Path;
+use std::collections::BTreeMap;
+
+use reality::StorageTarget;
+use reality::Shared;
+use reality::Project;
+use reality::AsyncStorageTarget;
 use tokio_util::sync::CancellationToken;
-use crate::plugin::{ThunkContext, Plugin, Thunk};
+
+use anyhow::anyhow;
+
+use crate::plugin::ThunkContext;
+use crate::plugin::Thunk;
+use crate::plugin::Plugin;
+use crate::operation::Operation;
 
 /// Table of plugins by engine uuid,
-/// 
-static PLUGINS_TABLE: std::sync::RwLock<BTreeMap<uuid::Uuid, Vec<reality::BlockPlugin<Shared>>>> = std::sync::RwLock::new(BTreeMap::new());
+///
+static PLUGINS_TABLE: std::sync::RwLock<BTreeMap<uuid::Uuid, Vec<reality::BlockPlugin<Shared>>>> =
+    std::sync::RwLock::new(BTreeMap::new());
 
 /// Uuid for the primary engine uuid,
-/// 
+///
 const PRIMARY: u128 = 0;
 
 pub struct EngineBuilder {
     /// Plugins to register w/ the Engine
-    /// 
+    ///
     plugins: Vec<reality::BlockPlugin<Shared>>,
     /// Runtime builder,
-    /// 
+    ///
     runtime_builder: tokio::runtime::Builder,
 }
 
 impl EngineBuilder {
     /// Creates a new engine builder,
-    /// 
+    ///
     pub fn new(runtime_builder: tokio::runtime::Builder) -> Self {
-        Self { plugins: vec![], runtime_builder }
+        Self {
+            plugins: vec![],
+            runtime_builder,
+        }
     }
 
     /// Registers a plugin w/ this engine builder,
-    /// 
+    ///
     pub fn register<P: Plugin + Send + Sync + 'static>(&mut self) {
         self.plugins.push(|parser| {
             parser.with_object_type::<Thunk<P>>();
@@ -36,13 +52,13 @@ impl EngineBuilder {
     }
 
     /// Builds the current engine under the primary uuid (0),
-    /// 
+    ///
     pub fn build_primary(self) -> Engine<PRIMARY> {
         self.build()
     }
 
     /// Consumes the builder and returns a new engine,
-    /// 
+    ///
     pub fn build<const UUID: u128>(mut self) -> Engine<UUID> {
         let runtime = self.runtime_builder.build().unwrap();
 
@@ -55,8 +71,20 @@ impl EngineBuilder {
 
         if let Some(project) = engine.project.as_mut() {
             project.add_block_plugin(None, None, |_| {});
-            project.add_node_plugin("operation", move |_, _, target| {
-                if let Some(plugins) = PLUGINS_TABLE.read().ok().and_then(|plugins| plugins.get(&uuid::Uuid::from_u128(UUID)).cloned()) {
+            project.add_node_plugin("operation", move |name, tag, target| {
+                let name = name
+                    .map(|n| n.to_string())
+                    .unwrap_or(format!("{}", uuid::Uuid::new_v4()));
+
+                if let Some(mut storage) = target.storage_mut() {
+                    storage.put_resource(Operation::new(name, tag.map(|t| t.to_string())), None)
+                }
+
+                if let Some(plugins) = PLUGINS_TABLE
+                    .read()
+                    .ok()
+                    .and_then(|plugins| plugins.get(&uuid::Uuid::from_u128(UUID)).cloned())
+                {
                     for p in plugins.iter() {
                         p(target);
                     }
@@ -100,7 +128,7 @@ impl EngineBuilder {
 /// ```
 ///
 pub struct Engine<const UUID: u128> {
-    /// Project,
+    /// Inner project,
     ///
     pub project: Option<Project<Shared>>,
     /// Wrapped w/ a runtime so that it can be dropped properly
@@ -109,11 +137,14 @@ pub struct Engine<const UUID: u128> {
     /// Cancelled when the engine is dropped,
     ///
     cancellation: CancellationToken,
+    /// Operations mapped w/ this engine,
+    /// 
+    operations: BTreeMap<String, Operation>,
 }
 
 impl Engine<0> {
     /// Creates a new engine builder,
-    /// 
+    ///
     pub fn builder() -> EngineBuilder {
         EngineBuilder::new(tokio::runtime::Builder::new_multi_thread())
     }
@@ -121,7 +152,7 @@ impl Engine<0> {
 
 impl<const UUID: u128> Engine<UUID> {
     /// Loads a file,
-    /// 
+    ///
     pub async fn load_file(&mut self, path: impl AsRef<Path>) {
         if let Some(project) = self.project.take() {
             self.project = project.load_file(path).await.ok();
@@ -147,13 +178,14 @@ impl<const UUID: u128> Engine<UUID> {
             project: Some(Project::new(Shared::default())),
             runtime: Some(runtime),
             cancellation: CancellationToken::new(),
+            operations: BTreeMap::new(),
         }
     }
 
     /// Creates a new context on this engine,
-    /// 
+    ///
     /// **Note** Each time a thunk context is created a new output storage target is generated, however the original storage target is used.
-    /// 
+    ///
     pub fn new_context(&self, storage: Arc<tokio::sync::RwLock<Shared>>) -> ThunkContext {
         let mut context = ThunkContext::from(AsyncStorageTarget::from_parts(
             storage,
@@ -165,6 +197,43 @@ impl<const UUID: u128> Engine<UUID> {
         context.cancellation = self.cancellation.child_token();
         context
     }
+
+    /// Compiles operations from the parsed project,
+    /// 
+    pub async fn compile(mut self) -> Self {
+        use std::ops::Deref;
+
+        if let Some(project) = self.project.take() {
+            let nodes = project.nodes.into_inner().unwrap();
+
+            for (_, target) in nodes.iter() {
+                if let Some(operation) = target.read().await.resource::<Operation>(None) {
+                    let mut operation = operation.deref().clone();
+                    operation.bind(self.new_context(target.clone()));
+
+                    self.operations.insert(operation.address(), operation);
+                }
+            }
+        }
+
+        self
+    }
+
+    /// Runs an operation by address,
+    /// 
+    pub async fn run(&self, address: impl AsRef<str>) -> anyhow::Result<ThunkContext> {
+        if let Some(operation) = self.operations.get(address.as_ref()) {
+            operation.execute().await
+        } else {
+            Err(anyhow!("Operation does not exist"))
+        }
+    }
+
+    /// Returns an iterator over operations,
+    /// 
+    pub fn iter_operations(&self) -> impl Iterator<Item = (&String, &Operation)> {
+        self.operations.iter()
+    }
 }
 
 impl<const UUID: u128> Default for Engine<UUID> {
@@ -173,7 +242,7 @@ impl<const UUID: u128> Default for Engine<UUID> {
     }
 }
 
-impl<const UUID: u128>  Drop for Engine<UUID> {
+impl<const UUID: u128> Drop for Engine<UUID> {
     fn drop(&mut self) {
         self.cancellation.cancel();
 
