@@ -151,11 +151,19 @@ impl Engine<0> {
 }
 
 impl<const UUID: u128> Engine<UUID> {
-    /// Loads a file,
+    /// Loads src from a file,
     ///
     pub async fn load_file(&mut self, path: impl AsRef<Path>) {
         if let Some(project) = self.project.take() {
             self.project = project.load_file(path).await.ok();
+        }
+    }
+
+    /// Loads source,
+    /// 
+    pub async fn load_source(&mut self, src: impl AsRef<str>) {
+        if let Some(project) = self.project.take() {
+            self.project = project.load_content(src.as_ref()).await.ok();
         }
     }
 

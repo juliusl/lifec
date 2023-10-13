@@ -4,6 +4,7 @@ use futures_util::TryStreamExt;
 use futures_util::StreamExt;
 
 use anyhow::anyhow;
+use reality::StorageTarget;
 
 use crate::plugin::ThunkContext;
 
@@ -49,11 +50,23 @@ impl Operation {
         self.context = Some(context);
     }
 
+    /// Returns a reference to the inner context,
+    /// 
+    pub fn context(&self) -> Option<&ThunkContext> {
+        self.context.as_ref()
+    }
+
+    /// Returns a mutable reference to the inner context,
+    /// 
+    pub fn context_mut(&mut self) -> Option<&mut ThunkContext> {
+        self.context.as_mut()
+    }
+
     /// Executes the operation,
     /// 
     pub async fn execute(&self) -> anyhow::Result<ThunkContext> {
         if let Some(context) = self.context.clone() {
-            let node = reality::Node(context.target.storage.clone());
+            let node = reality::Node(context.source.storage.clone());
 
             node
                 .stream_attributes()
@@ -61,6 +74,11 @@ impl Operation {
                 .try_fold(
                     context,
                     move |mut tc, a| async move {
+                        {
+                            let mut storage = tc.transient.storage.write().await;
+                            storage.drain_dispatch_queues();
+                        }
+
                         tc.set_attribute(a);
                         let previous = tc.clone();
                         match tc.call().await {

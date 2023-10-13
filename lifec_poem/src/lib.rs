@@ -7,3 +7,6 @@ pub use static_files::StaticFiles;
 
 mod route_plugin;
 pub use route_plugin::RoutePlugin;
+
+mod engine_server;
+pub use engine_server::host_engine;

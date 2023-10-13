@@ -1,14 +1,14 @@
-use std::ops::DerefMut;
-use std::marker::PhantomData;
 use std::future::Future;
+use std::marker::PhantomData;
+use std::ops::DerefMut;
 
-use reality::Attribute;
-use reality::StorageTarget;
-use reality::Shared;
-use reality::ResourceKey;
-use reality::BlockObject;
-use reality::AttributeType;
 use reality::AsyncStorageTarget;
+use reality::Attribute;
+use reality::AttributeType;
+use reality::BlockObject;
+use reality::ResourceKey;
+use reality::Shared;
+use reality::StorageTarget;
 
 use futures_util::FutureExt;
 use tokio::task::JoinHandle;
@@ -74,17 +74,16 @@ impl From<SpawnResult> for PluginOutput {
 
 /// Struct containing shared context between plugins,
 ///
-#[derive(Clone)]
 pub struct ThunkContext {
     /// Source storage mapping to this context,
     ///
-    pub(crate) target: AsyncStorageTarget<Shared>,
+    pub(crate) source: AsyncStorageTarget<Shared>,
     /// Attribute for this context,
     ///
     attribute: Option<ResourceKey<Attribute>>,
-    /// Output storage target,
+    /// Transient storage target,
     ///
-    pub output: AsyncStorageTarget<Shared>,
+    pub transient: AsyncStorageTarget<Shared>,
     /// Cancellation token that can be used by the engine to signal shutdown,
     ///
     pub cancellation: tokio_util::sync::CancellationToken,
@@ -94,19 +93,37 @@ impl From<AsyncStorageTarget<Shared>> for ThunkContext {
     fn from(value: AsyncStorageTarget<Shared>) -> Self {
         let handle = value.runtime.clone().expect("should have a runtime");
         Self {
-            target: value,
+            source: value,
             attribute: None,
-            output: Shared::default().into_thread_safe_with(handle),
+            transient: Shared::default().into_thread_safe_with(handle),
             cancellation: CancellationToken::new(),
         }
     }
 }
 
+impl Clone for ThunkContext {
+    fn clone(&self) -> Self {
+        Self {
+            source: self.source.clone(),
+            attribute: self.attribute.clone(),
+            transient: self.transient.clone(),
+            cancellation: self.cancellation.clone(),
+        }
+    }
+}
+
 impl ThunkContext {
+    /// Reset the transient storage,
+    /// 
+    pub fn reset(&mut self) {
+        let handle = self.source.runtime.clone().expect("should have a runtime");
+        self.transient = Shared::default().into_thread_safe_with(handle);
+    }
+
     /// Calls the thunk fn related to this context,
     ///
     pub async fn call(&self) -> anyhow::Result<Option<ThunkContext>> {
-        let storage = self.target.storage.read().await;
+        let storage = self.source.storage.read().await;
         let thunk = storage.resource::<ThunkFn>(self.attribute.map(|a| a.transmute()));
 
         if let Some(thunk) = thunk {
@@ -122,38 +139,40 @@ impl ThunkContext {
         self.attribute = Some(attribute);
     }
 
-    /// Get read access to storage,
+    /// Get read access to source storage,
     ///
-    pub async fn storage(&self) -> tokio::sync::RwLockReadGuard<Shared> {
-        self.target.storage.read().await
+    pub async fn source(&self) -> tokio::sync::RwLockReadGuard<Shared> {
+        self.source.storage.read().await
     }
 
-    /// Get mutable access to storage,
-    /// 
+    /// Get mutable access to source storage,
+    ///
     /// **Note**: Marked unsafe because will mutate the source storage. Source storage is re-used on each execution.
     ///
-    pub async unsafe fn storage_mut(&self) -> tokio::sync::RwLockWriteGuard<Shared> {
-        self.target.storage.write().await
+    pub async unsafe fn source_mut(&self) -> tokio::sync::RwLockWriteGuard<Shared> {
+        self.source.storage.write().await
     }
 
-    /// Tries to get access to storage,
+    /// Tries to get access to source storage,
     ///
-    pub fn try_storage(&self) -> Option<tokio::sync::RwLockReadGuard<Shared>> {
-        self.target.storage.try_read().ok()
+    pub fn try_source(&self) -> Option<tokio::sync::RwLockReadGuard<Shared>> {
+        self.source.storage.try_read().ok()
     }
 
-    /// (unsafe) Tries to get mutable access to storage,
-    /// 
+    /// (unsafe) Tries to get mutable access to source storage,
+    ///
     /// **Note**: Marked unsafe because will mutate the source storage. Source storage is re-used on each execution.
     ///
-    pub unsafe fn try_storage_mut(&mut self) -> Option<tokio::sync::RwLockWriteGuard<Shared>> {
-        self.target.storage.try_write().ok()
+    pub unsafe fn try_source_mut(&mut self) -> Option<tokio::sync::RwLockWriteGuard<Shared>> {
+        self.source.storage.try_write().ok()
     }
 
-    /// Returns access to output storage,
-    /// 
-    pub fn output(&self) -> AsyncStorageTarget<Shared> {
-        self.output.clone()
+    /// Returns the transient storage target,
+    ///
+    /// **Note**: During an operation run dispatch queues are drained before each thunk execution.
+    ///
+    pub fn transient(&self) -> AsyncStorageTarget<Shared> {
+        self.transient.clone()
     }
 
     /// Spawn a task w/ this context,
@@ -164,7 +183,7 @@ impl ThunkContext {
     where
         F: Future<Output = anyhow::Result<ThunkContext>> + Send + 'static,
     {
-        self.target
+        self.source
             .runtime
             .clone()
             .as_ref()
@@ -188,7 +207,7 @@ impl ThunkContext {
     /// **Note**: This is the state that was evaluated at the start of the application, when the runmd was parsed.
     ///
     pub async fn initialized<P: Plugin + Default + Clone + Sync + Send + 'static>(&self) -> P {
-        self.target
+        self.source
             .storage
             .read()
             .await
@@ -408,7 +427,7 @@ mod tests {
         for (address, _) in engine.iter_operations() {
             println!("{address}");
         }
-        
+
         ()
     }
 }
