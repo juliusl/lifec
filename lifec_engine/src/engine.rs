@@ -131,12 +131,12 @@ pub struct Engine<const UUID: u128> {
     /// Inner project,
     ///
     pub project: Option<Project<Shared>>,
+    /// Cancelled when the engine is dropped,
+    ///
+    pub cancellation: CancellationToken,
     /// Wrapped w/ a runtime so that it can be dropped properly
     ///
     runtime: Option<tokio::runtime::Runtime>,
-    /// Cancelled when the engine is dropped,
-    ///
-    cancellation: CancellationToken,
     /// Operations mapped w/ this engine,
     ///
     operations: BTreeMap<String, Operation>,
@@ -174,8 +174,8 @@ impl<const UUID: u128> Engine<UUID> {
     pub fn new() -> Self {
         let mut runtime = tokio::runtime::Builder::new_multi_thread();
         runtime.enable_all();
-        let runtime = runtime.build().expect("should have an engine");
 
+        let runtime = runtime.build().expect("should have an engine");
         Engine::new_with(runtime)
     }
 

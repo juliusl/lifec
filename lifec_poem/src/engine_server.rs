@@ -8,7 +8,7 @@ use reality::StorageTarget;
 use tracing::info;
 
 /// Maps http request into transient storage before executing an engine operation,
-/// 
+///
 #[poem::handler]
 async fn run_operation(
     request: &poem::Request,
@@ -61,15 +61,26 @@ pub async fn host_engine<const UUID: u128>(engine: lifec_engine::engine::Engine<
             )
         });
 
+    let cancel_engine = engine.cancellation.clone();
+    tokio::spawn(async move {
+        let _ = tokio::signal::ctrl_c().await;
+
+        info!("Received cancel signal, closing server");
+        cancel_engine.cancel();
+    });
+
     let server = Server::new(TcpListener::bind("localhost:7575"));
-    server.run(operations).await.unwrap();
+    server
+        .run_with_graceful_shutdown(operations, engine.cancellation.cancelled(), None)
+        .await
+        .unwrap();
 }
 
 /// Provides helper functions for accessing poem request resources,
 ///
 pub trait PoemExt {
     /// Take the request body from storage,
-    /// 
+    ///
     fn take_body(&mut self) -> Option<poem::Body>;
 }
 
@@ -136,6 +147,7 @@ mod tests {
         }
     }
 
+    #[ignore = "This test is to test an engine server locally, requires Ctrl+C to shutdown"]
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_engine_server() {
@@ -143,15 +155,22 @@ mod tests {
         builder.register::<Test>();
 
         let mut engine = builder.build_primary();
-        engine.load_source(r#"
+        engine
+            .load_source(
+                r#"
 ```runmd
 + .operation test/operation
 <app/test> cargo
 : .name hello-world-2
 ```
-"#).await;
+"#,
+            )
+            .await;
 
         host_engine(engine).await;
+        
+        // Tests graceful shutdown
+        assert!(logs_contain("Received cancel signal, closing server"));
         ()
     }
 }
