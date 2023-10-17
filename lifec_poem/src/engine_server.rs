@@ -1,8 +1,8 @@
 use lifec_engine::operation::Operation;
 
 use poem::{
-    get, http::StatusCode, listener::TcpListener, web::Data, Body, EndpointExt, Response,
-    ResponseParts, Server,
+    get, http::StatusCode, web::Data, Body, EndpointExt, Response,
+    ResponseParts, Server
 };
 use reality::StorageTarget;
 use tracing::info;
@@ -46,12 +46,15 @@ async fn run_operation(
     Response::builder().status(StatusCode::BAD_REQUEST).finish()
 }
 
-/// Host an engine w/ a http server,
-///
-pub async fn host_engine<const UUID: u128>(engine: lifec_engine::engine::Engine<UUID>) {
+/// Host an engine as an http server,
+/// 
+pub async fn host_engine<L: poem::listener::Listener + 'static, const UUID: u128>(
+    listener: L,
+    engine: lifec_engine::engine::Engine<UUID>,
+) {
     let engine = engine.compile().await;
 
-    let operations = engine
+    let routes = engine
         .iter_operations()
         .fold(poem::Route::new(), |routes, (address, op)| {
             info!("Setting route {address}");
@@ -61,6 +64,16 @@ pub async fn host_engine<const UUID: u128>(engine: lifec_engine::engine::Engine<
             )
         });
 
+    // -- TODO: Engine server protocol -- can have a "list_operations"
+    // -- Can also parse comments as documentation
+    // Then, can have something like this:
+    // + .operation 
+    // <application/lifec.engine.server> localhost:7575
+    // <..connect>
+    // : .run ''
+    // : .run ''
+    // let routes = Route::new().nest("/operation", operations);
+    
     let cancel_engine = engine.cancellation.clone();
     tokio::spawn(async move {
         let _ = tokio::signal::ctrl_c().await;
@@ -69,9 +82,9 @@ pub async fn host_engine<const UUID: u128>(engine: lifec_engine::engine::Engine<
         cancel_engine.cancel();
     });
 
-    let server = Server::new(TcpListener::bind("localhost:7575"));
+    let server = Server::new(listener);
     server
-        .run_with_graceful_shutdown(operations, engine.cancellation.cancelled(), None)
+        .run_with_graceful_shutdown(routes, engine.cancellation.cancelled(), None)
         .await
         .unwrap();
 }
@@ -167,8 +180,8 @@ mod tests {
             )
             .await;
 
-        host_engine(engine).await;
-        
+        host_engine(poem::listener::TcpListener::bind("localhost:7575"), engine).await;
+
         // Tests graceful shutdown
         assert!(logs_contain("Received cancel signal, closing server"));
         ()
