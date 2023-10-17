@@ -1,11 +1,13 @@
 use lifec_engine::operation::Operation;
 
 use poem::{
-    get, http::StatusCode, web::Data, Body, EndpointExt, Response,
-    ResponseParts, Server
+    get,
+    http::{Extensions, HeaderMap, HeaderName, HeaderValue, StatusCode, Version},
+    web::Data,
+    Body, EndpointExt, Response, ResponseParts, Server,
 };
-use reality::StorageTarget;
-use tracing::info;
+use reality::{borrow_mut, ResourceKey, StorageTarget};
+use tracing::{info, error};
 
 /// Maps http request into transient storage before executing an engine operation,
 ///
@@ -26,6 +28,16 @@ async fn run_operation(
         let uri = request.uri().clone();
         storage.put_resource(uri, None);
         storage.put_resource(body, None);
+        storage.put_resource(
+            ResponseParts {
+                status: StatusCode::OK,
+                version: Version::HTTP_11,
+                headers: HeaderMap::new(),
+                extensions: Extensions::new(),
+            },
+            None,
+        );
+        storage.put_resource(Body::empty(), Some(ResourceKey::with_hash("response")));
         storage.put_resource(request.method().clone(), None);
     }
 
@@ -37,7 +49,7 @@ async fn run_operation(
             return *response;
         } else if let (Some(parts), Some(body)) = (
             storage.take_resource::<ResponseParts>(None),
-            storage.take_resource::<Body>(None),
+            storage.take_resource::<Body>(Some(ResourceKey::with_hash("response"))),
         ) {
             return Response::from_parts(*parts, *body);
         }
@@ -47,7 +59,7 @@ async fn run_operation(
 }
 
 /// Host an engine as an http server,
-/// 
+///
 pub async fn host_engine<L: poem::listener::Listener + 'static, const UUID: u128>(
     listener: L,
     engine: lifec_engine::engine::Engine<UUID>,
@@ -67,13 +79,13 @@ pub async fn host_engine<L: poem::listener::Listener + 'static, const UUID: u128
     // -- TODO: Engine server protocol -- can have a "list_operations"
     // -- Can also parse comments as documentation
     // Then, can have something like this:
-    // + .operation 
+    // + .operation
     // <application/lifec.engine.server> localhost:7575
     // <..connect>
     // : .run ''
     // : .run ''
     // let routes = Route::new().nest("/operation", operations);
-    
+
     let cancel_engine = engine.cancellation.clone();
     tokio::spawn(async move {
         let _ = tokio::signal::ctrl_c().await;
@@ -95,6 +107,25 @@ pub trait PoemExt {
     /// Take the request body from storage,
     ///
     fn take_body(&mut self) -> Option<poem::Body>;
+
+    /// Set the status code on the response,
+    ///
+    fn set_status_code(&mut self, code: StatusCode);
+
+    /// Sets a header on the response,
+    ///
+    fn set_header(
+        &mut self,
+        header: impl Into<HeaderName> + Send + Sync + 'static,
+        value: impl Into<HeaderValue> + Send + Sync + 'static,
+    );
+
+    /// Sets the body on the response,
+    /// 
+    fn set_response_body(
+        &mut self,
+        body: Body,
+    );
 }
 
 impl PoemExt for lifec_engine::plugin::ThunkContext {
@@ -106,6 +137,54 @@ impl PoemExt for lifec_engine::plugin::ThunkContext {
             .ok()
             .and_then(|mut s| s.take_resource::<Body>(None).map(|b| *b))
     }
+
+    fn set_status_code(&mut self, code: StatusCode) {
+        let transient = self.transient().storage;
+        let transient = transient.try_write();
+
+        if let Ok(mut transient) = transient {
+            use std::ops::DerefMut;
+
+            borrow_mut!(transient, ResponseParts, |parts| => {
+                parts.status = code;
+            });
+        } else {
+            error!("Could not write to transient storage. Existing read-lock.");
+        }
+    }
+
+    fn set_header(
+        &mut self,
+        header: impl Into<HeaderName> + Send + Sync + 'static,
+        value: impl Into<HeaderValue> + Send + Sync + 'static,
+    ) {
+        let transient = self.transient().storage;
+        let transient = transient.try_write();
+
+        if let Ok(mut transient) = transient {
+            use std::ops::DerefMut;
+
+            borrow_mut!(transient, ResponseParts, |parts| => {
+                parts.headers.insert(header.into(), value.into());
+            });
+        } else {
+            error!("Could not write to transient storage. Existing read-lock.");
+        }
+    }
+
+    fn set_response_body(
+        &mut self,
+        body: Body,
+    ) {
+        let transient = self.transient().storage;
+        let transient = transient.try_write();
+
+        if let Ok(mut transient) = transient {
+            transient.put_resource(body, Some(ResourceKey::with_hash("response")))
+        } else {
+            error!("Could not write to transient storage. Existing read-lock.");
+        }
+    }
 }
 
 #[allow(unused_imports)]
@@ -116,7 +195,7 @@ mod tests {
 
     use lifec_engine::plugin::{CallAsync, ThunkContext};
     use lifec_engine::{engine, prelude::*};
-    use poem::http::HeaderMap;
+    use poem::http::{HeaderMap, HeaderName, StatusCode};
     use poem::{async_trait, Body};
 
     use crate::host_engine;
@@ -154,6 +233,20 @@ mod tests {
             if let Some(map) = transient.resource::<HeaderMap>(None) {
                 println!("{:?}", map);
             }
+            
+            // Test logging an error
+            context.set_header(
+                poem::http::HeaderName::from_static("x-ms-test-header"),
+                poem::http::HeaderValue::from_static("test"),
+            );
+            drop(transient);
+            
+            context.set_header(
+                poem::http::HeaderName::from_static("x-ms-test-header"),
+                poem::http::HeaderValue::from_static("test"),
+            );
+            context.set_status_code(StatusCode::ACCEPTED);
+            context.set_response_body(Body::from_string("hello-world".to_string()));
 
             println!("{:?}", init);
             Ok(())
