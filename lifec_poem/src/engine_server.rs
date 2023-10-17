@@ -1,13 +1,14 @@
-use lifec_engine::operation::Operation;
+use hyper::{client::HttpConnector};
+use lifec_engine::{operation::Operation, plugin::{CallAsync, ThunkContext}};
 
 use poem::{
     get,
-    http::{Extensions, HeaderMap, HeaderName, HeaderValue, StatusCode, Version},
+    http::{Extensions, HeaderMap, HeaderName, HeaderValue, StatusCode, Uri, Version},
     web::Data,
-    Body, EndpointExt, Response, ResponseParts, Server,
+    Body, EndpointExt, Response, ResponseParts, Server, async_trait, RequestBuilder,
 };
-use reality::{borrow_mut, ResourceKey, StorageTarget};
-use tracing::{info, error};
+use reality::{borrow_mut, derive::BlockObjectType, ResourceKey, StorageTarget};
+use tracing::{error, info};
 
 /// Maps http request into transient storage before executing an engine operation,
 ///
@@ -121,11 +122,8 @@ pub trait PoemExt {
     );
 
     /// Sets the body on the response,
-    /// 
-    fn set_response_body(
-        &mut self,
-        body: Body,
-    );
+    ///
+    fn set_response_body(&mut self, body: Body);
 }
 
 impl PoemExt for lifec_engine::plugin::ThunkContext {
@@ -172,10 +170,7 @@ impl PoemExt for lifec_engine::plugin::ThunkContext {
         }
     }
 
-    fn set_response_body(
-        &mut self,
-        body: Body,
-    ) {
+    fn set_response_body(&mut self, body: Body) {
         let transient = self.transient().storage;
         let transient = transient.try_write();
 
@@ -184,6 +179,68 @@ impl PoemExt for lifec_engine::plugin::ThunkContext {
         } else {
             error!("Could not write to transient storage. Existing read-lock.");
         }
+    }
+}
+
+use lifec_engine::prelude::*;
+
+pub type SecureClient = hyper::Client<hyper_tls::HttpsConnector<HttpConnector>>;
+
+/// Extensions for working w/ a hyper client,
+/// 
+#[async_trait]
+pub trait HyperExt {
+    /// Makes an https request and returns the response,
+    /// 
+    async fn request(&mut self, request: hyper::Request<hyper::Body>) -> anyhow::Result<hyper::Response<hyper::Body>>;
+}
+
+#[async_trait]
+impl HyperExt for ThunkContext {
+    async fn request(&mut self, request: hyper::Request<hyper::Body>) -> anyhow::Result<hyper::Response<hyper::Body>> {
+        let source = self.source().await;
+
+        let client = source.resource::<SecureClient>(None);
+        if let Some(client) = client {
+            let response  = client.request(request).await?;
+            Ok(response)
+        } else {
+            Err(anyhow::anyhow!("Secure http client is not enabled"))
+        }
+    }
+}
+
+#[derive(Default, Clone, BlockObjectType)]
+pub struct RemotePlugin {
+    address: String,
+    host: poem::http::Uri,
+}
+
+impl std::str::FromStr for RemotePlugin {
+    type Err = anyhow::Error;
+
+    fn from_str(_: &str) -> Result<Self, Self::Err> {
+        Ok(RemotePlugin {
+            address: String::new(),
+            host: Uri::from_static("localhost:7575"),
+        })
+    }
+}
+
+#[async_trait]
+impl CallAsync for RemotePlugin {
+    async fn call(context: &mut ThunkContext) -> anyhow::Result<()> {
+        let init = context.initialized::<RemotePlugin>().await;
+
+        let request = hyper::Request::get(init.host).body(hyper::Body::empty())?;
+        let response = context.request(request).await?;
+
+        let (parts, body) = response.into_parts();
+
+        context.set_status_code(parts.status);
+        context.set_response_body(body.into());
+
+        Ok(())
     }
 }
 
@@ -233,14 +290,14 @@ mod tests {
             if let Some(map) = transient.resource::<HeaderMap>(None) {
                 println!("{:?}", map);
             }
-            
+
             // Test logging an error
             context.set_header(
                 poem::http::HeaderName::from_static("x-ms-test-header"),
                 poem::http::HeaderValue::from_static("test"),
             );
             drop(transient);
-            
+
             context.set_header(
                 poem::http::HeaderName::from_static("x-ms-test-header"),
                 poem::http::HeaderValue::from_static("test"),

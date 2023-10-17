@@ -70,10 +70,10 @@ impl Operation {
 
             node
                 .stream_attributes()
-                .map(|a| Ok(a))
+                .map(Ok)
                 .try_fold(
                     context,
-                    move |mut tc, a| async move {
+                    |mut tc, a| async move {
                         {
                             let mut storage = tc.transient.storage.write().await;
                             storage.drain_dispatch_queues();
@@ -82,13 +82,8 @@ impl Operation {
                         tc.set_attribute(a);
                         let previous = tc.clone();
                         match tc.call().await {
-                            Ok(tc) => {
-                                if let Some(tc) = tc {
-                                    Ok(tc)
-                                } else {
-                                    Ok(previous)
-                                }
-                            }
+                            Ok(Some(tc)) =>  Ok(tc),
+                            Ok(None) => Ok(previous),
                             Err(err) => Err(err),
                         }
                     },
