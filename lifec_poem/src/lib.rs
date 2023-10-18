@@ -8,5 +8,13 @@ pub use static_files::StaticFiles;
 mod route_plugin;
 pub use route_plugin::RoutePlugin;
 
+#[cfg(feature = "v2")]
 mod engine_server;
-pub use engine_server::host_engine;
+
+#[cfg(feature = "v2")]
+pub mod v2 {
+    pub use super::engine_server::host_engine;
+    pub use super::engine_server::PoemExt;
+    pub use super::engine_server::remote_plugin::HyperExt;
+    pub use super::engine_server::remote_plugin::RemoteOperation;
+}

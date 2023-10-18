@@ -6,6 +6,7 @@ use reality::AsyncStorageTarget;
 use reality::Attribute;
 use reality::AttributeType;
 use reality::BlockObject;
+use reality::Extension;
 use reality::ResourceKey;
 use reality::Shared;
 use reality::StorageTarget;
@@ -114,7 +115,7 @@ impl Clone for ThunkContext {
 
 impl ThunkContext {
     /// Reset the transient storage,
-    /// 
+    ///
     pub fn reset(&mut self) {
         let handle = self.source.runtime.clone().expect("should have a runtime");
         self.transient = Shared::default().into_thread_safe_with(handle);
@@ -215,6 +216,19 @@ impl ThunkContext {
             .map(|r| r.clone())
             .unwrap_or_default()
     }
+
+    /// Returns any extensions that may exist for this,
+    ///
+    pub async fn extension<P: Plugin + Default + Clone + Sync + Send + 'static>(
+        &self,
+    ) -> Option<reality::Extension<P>> {
+        self.source
+            .storage
+            .read()
+            .await
+            .resource::<reality::Extension<P>>(self.attribute.clone().map(|a| a.transmute()))
+            .map(|r| r.clone())
+    }
 }
 
 /// Allows users to export logic as a simple fn,
@@ -287,6 +301,10 @@ where
         let key = parser.attributes.last().clone();
         if let Some(storage) = parser.storage() {
             storage.lazy_put_resource::<ThunkFn>(<P as Plugin>::call, key.map(|k| k.transmute()));
+            storage.lazy_put_resource::<Extension<P>>(
+                Extension::new(key.map(|k| k.transmute())),
+                key.map(|k| k.transmute()),
+            );
         }
     }
 }
@@ -326,7 +344,9 @@ mod tests {
     use futures_util::{pin_mut, StreamExt, TryStreamExt};
     use reality::derive::*;
     use reality::*;
+    use tokio::io::AsyncReadExt;
     use tokio::join;
+    use tracing::trace;
     use uuid::Bytes;
 
     use crate::engine::EngineBuilder;
@@ -365,7 +385,51 @@ mod tests {
     impl CallAsync for TestPlugin {
         async fn call(tc: &mut super::ThunkContext) -> anyhow::Result<()> {
             let _initialized = tc.initialized::<TestPlugin>().await;
-            println!("Initialized as -- {:?}", _initialized);
+            trace!("Initialized as -- {:?}", _initialized);
+
+            if let Some(extension) = tc.extension::<TestPlugin>().await {
+                fn test_before(
+                    _: AsyncStorageTarget<Shared>,
+                    s: anyhow::Result<TestPlugin>,
+                ) -> anyhow::Result<TestPlugin> {
+                    if let Ok(mut s) = s {
+                        println!("running extension before");
+                        let mut name = String::new();
+                        std::io::stdin().read_line(&mut name)?;
+                        s.name = name.trim().to_string();
+
+                        Ok(s)
+                    } else {
+                        Err(anyhow::anyhow!("could not test before"))
+                    }
+                }
+
+                fn test_after(
+                    _: AsyncStorageTarget<Shared>,
+                    s: anyhow::Result<TestPlugin>,
+                ) -> anyhow::Result<TestPlugin> {
+                    if let Ok(s) = s {
+                        println!("running extension after");
+                        Ok(s)
+                    } else {
+                        Err(anyhow::anyhow!("could not test after"))
+                    }
+                }
+                // trace!("has extension");
+
+                let ext = extension
+                    .before(test_before)
+                    .after(test_after)
+                    .run(tc.transient(), _initialized, |_, s| {
+                        println!("user middleware");
+                        s
+                    })
+                    
+                    .await;           
+                
+                println!("ext -- {:?}", ext);
+            }
+
             Ok(())
         }
     }

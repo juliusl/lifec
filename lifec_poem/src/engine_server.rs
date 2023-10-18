@@ -1,14 +1,22 @@
-use hyper::{client::HttpConnector};
-use lifec_engine::{operation::Operation, plugin::{CallAsync, ThunkContext}};
-
-use poem::{
-    get,
-    http::{Extensions, HeaderMap, HeaderName, HeaderValue, StatusCode, Uri, Version},
-    web::Data,
-    Body, EndpointExt, Response, ResponseParts, Server, async_trait, RequestBuilder,
-};
-use reality::{borrow_mut, derive::BlockObjectType, ResourceKey, StorageTarget};
-use tracing::{error, info};
+use lifec_engine::operation::Operation;
+use poem::get;
+use poem::http::Extensions;
+use poem::http::HeaderMap;
+use poem::http::HeaderName;
+use poem::http::HeaderValue;
+use poem::http::StatusCode;
+use poem::http::Version;
+use poem::web::Data;
+use poem::Body;
+use poem::EndpointExt;
+use poem::Response;
+use poem::ResponseParts;
+use poem::Server;
+use reality::borrow_mut;
+use reality::ResourceKey;
+use reality::StorageTarget;
+use tracing::error;
+use tracing::info;
 
 /// Maps http request into transient storage before executing an engine operation,
 ///
@@ -59,6 +67,11 @@ async fn run_operation(
     Response::builder().status(StatusCode::BAD_REQUEST).finish()
 }
 
+#[poem::handler]
+async fn index(operations: Data<&Vec<String>>) -> Response {
+    todo!()
+}
+
 /// Host an engine as an http server,
 ///
 pub async fn host_engine<L: poem::listener::Listener + 'static, const UUID: u128>(
@@ -67,10 +80,14 @@ pub async fn host_engine<L: poem::listener::Listener + 'static, const UUID: u128
 ) {
     let engine = engine.compile().await;
 
+    let mut route_list = vec![];
+
     let routes = engine
         .iter_operations()
         .fold(poem::Route::new(), |routes, (address, op)| {
             info!("Setting route {address}");
+            let address = address.replace("#", "/_tag/");
+            route_list.push(address.to_string());
             routes.at(
                 address,
                 get(run_operation.data(op.clone())).post(run_operation.data(op.clone())),
@@ -86,6 +103,8 @@ pub async fn host_engine<L: poem::listener::Listener + 'static, const UUID: u128
     // : .run ''
     // : .run ''
     // let routes = Route::new().nest("/operation", operations);
+
+    let routes = routes.at("/", get(index.data(route_list)));
 
     let cancel_engine = engine.cancellation.clone();
     tokio::spawn(async move {
@@ -124,6 +143,10 @@ pub trait PoemExt {
     /// Sets the body on the response,
     ///
     fn set_response_body(&mut self, body: Body);
+
+    /// Replaces the header map,
+    ///
+    fn replace_header_map(&mut self, header_map: HeaderMap);
 }
 
 impl PoemExt for lifec_engine::plugin::ThunkContext {
@@ -180,67 +203,152 @@ impl PoemExt for lifec_engine::plugin::ThunkContext {
             error!("Could not write to transient storage. Existing read-lock.");
         }
     }
-}
 
-use lifec_engine::prelude::*;
+    fn replace_header_map(&mut self, header_map: HeaderMap) {
+        let transient = self.transient().storage;
+        let transient = transient.try_write();
 
-pub type SecureClient = hyper::Client<hyper_tls::HttpsConnector<HttpConnector>>;
-
-/// Extensions for working w/ a hyper client,
-/// 
-#[async_trait]
-pub trait HyperExt {
-    /// Makes an https request and returns the response,
-    /// 
-    async fn request(&mut self, request: hyper::Request<hyper::Body>) -> anyhow::Result<hyper::Response<hyper::Body>>;
-}
-
-#[async_trait]
-impl HyperExt for ThunkContext {
-    async fn request(&mut self, request: hyper::Request<hyper::Body>) -> anyhow::Result<hyper::Response<hyper::Body>> {
-        let source = self.source().await;
-
-        let client = source.resource::<SecureClient>(None);
-        if let Some(client) = client {
-            let response  = client.request(request).await?;
-            Ok(response)
+        if let Ok(mut transient) = transient {
+            transient.put_resource(header_map, None)
         } else {
-            Err(anyhow::anyhow!("Secure http client is not enabled"))
+            error!("Could not write to transient storage. Existing read-lock.");
         }
     }
 }
 
-#[derive(Default, Clone, BlockObjectType)]
-pub struct RemotePlugin {
-    address: String,
-    host: poem::http::Uri,
-}
+pub mod remote_plugin {
+    use async_trait::async_trait;
+    use hyper::client::HttpConnector;
+    use hyper::Uri;
+    use lifec_engine::plugin::CallAsync;
+    use lifec_engine::plugin::ThunkContext;
+    use lifec_engine::prelude::*;
 
-impl std::str::FromStr for RemotePlugin {
-    type Err = anyhow::Error;
+    use super::*;
 
-    fn from_str(_: &str) -> Result<Self, Self::Err> {
-        Ok(RemotePlugin {
-            address: String::new(),
-            host: Uri::from_static("localhost:7575"),
-        })
+    /// Type-alias for a secure client,
+    ///
+    type SecureClient = hyper::Client<hyper_tls::HttpsConnector<HttpConnector>>;
+
+    /// Type-alias for a local client,
+    ///
+    type LocalClient = hyper::Client<HttpConnector>;
+
+    /// Extensions for working w/ a hyper client,
+    ///
+    #[async_trait]
+    pub trait HyperExt {
+        /// Makes an https request and returns the response,
+        ///
+        async fn request(
+            &mut self,
+            request: hyper::Request<hyper::Body>,
+            use_https: bool,
+        ) -> anyhow::Result<hyper::Response<hyper::Body>>;
     }
-}
 
-#[async_trait]
-impl CallAsync for RemotePlugin {
-    async fn call(context: &mut ThunkContext) -> anyhow::Result<()> {
-        let init = context.initialized::<RemotePlugin>().await;
+    /// DRY - make request
+    ///
+    macro_rules! do_request {
+        ($source:ident, $request:ident, $client:ty) => {
+            if let Some(client) = $source.resource::<$client>(None) {
+                let response = client.request($request).await?;
+                Ok(response)
+            } else {
+                Err(anyhow::anyhow!("Secure http client is not enabled"))
+            }
+        };
+    }
 
-        let request = hyper::Request::get(init.host).body(hyper::Body::empty())?;
-        let response = context.request(request).await?;
+    #[async_trait]
+    impl HyperExt for ThunkContext {
+        async fn request(
+            &mut self,
+            request: hyper::Request<hyper::Body>,
+            use_https: bool,
+        ) -> anyhow::Result<hyper::Response<hyper::Body>> {
+            let source = self.source().await;
 
-        let (parts, body) = response.into_parts();
+            if use_https {
+                do_request!(source, request, SecureClient)
+            } else {
+                do_request!(source, request, LocalClient)
+            }
+        }
+    }
 
-        context.set_status_code(parts.status);
-        context.set_response_body(body.into());
+    /// Struct containing fields for executing a remote operation via engine-server
+    ///
+    #[derive(Default, Clone, BlockObjectType)]
+    #[reality(rename = "application/lifec.remote.operation")]
+    pub struct RemoteOperation {
+        /// Path of the operation to call,
+        ///
+        path: Tagged<String>,
+        /// Engine server host,
+        ///
+        #[reality(ignore)]
+        host: String,
+        /// True if https is required,
+        ///
+        #[reality(ignore)]
+        use_https: bool,
+    }
 
-        Ok(())
+    impl std::str::FromStr for RemoteOperation {
+        type Err = anyhow::Error;
+
+        fn from_str(host: &str) -> Result<Self, Self::Err> {
+            if host.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "`application/lifec.remote.operation` requires a host"
+                ));
+            }
+
+            let use_https = host.starts_with("localhost");
+            Ok(RemoteOperation {
+                path: Tagged::default(),
+                host: String::new(),
+                use_https,
+            })
+        }
+    }
+
+    #[async_trait]
+    impl CallAsync for RemoteOperation {
+        async fn call(context: &mut ThunkContext) -> anyhow::Result<()> {
+            let init = context.initialized::<RemoteOperation>().await;
+
+            let uri = if let Some(path) = init.path.value() {
+                let mut path = path.to_string();
+
+                if let Some(tag) = init.path.tag() {
+                    path = format!("{path}/_tag/{tag}");
+                }
+
+                Uri::builder()
+                    .authority(init.host)
+                    .scheme(if init.use_https { "https " } else { "http" })
+                    .path_and_query(format!("/{}", path))
+                    .build()?
+            } else {
+                return Err(anyhow::anyhow!(
+                    "`application/lifec.remote.operation` requires a : .path property"
+                ));
+            };
+
+            let request = hyper::Request::get(uri);
+            let request = request.body(hyper::Body::empty())?;
+            let response = context.request(request, init.use_https).await?;
+
+            let (parts, body) = response.into_parts();
+
+            context.set_status_code(parts.status);
+            context.set_response_body(body.into());
+            context.replace_header_map(parts.headers);
+
+            Ok(())
+        }
     }
 }
 
@@ -255,7 +363,7 @@ mod tests {
     use poem::http::{HeaderMap, HeaderName, StatusCode};
     use poem::{async_trait, Body};
 
-    use crate::host_engine;
+    use crate::v2::host_engine;
 
     #[derive(Debug, Clone, Default, BlockObjectType)]
     #[reality(rename = "app/test")]
