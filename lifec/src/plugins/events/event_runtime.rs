@@ -55,7 +55,7 @@ impl SetupHandler<sync::watch::Sender<HostEditor>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Sender<Guest>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Sender<Guest>>() {
-            let (tx, rx) = mpsc::channel::<Guest>(30);
+            let (tx, rx) = mpsc::channel::<Guest>(100);
             world.insert(tx);
             world.insert(rx);
         }
@@ -66,7 +66,7 @@ impl SetupHandler<sync::mpsc::Sender<Guest>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Receiver<Guest>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Receiver<Guest>>() {
-            let (tx, rx) = mpsc::channel::<Guest>(30);
+            let (tx, rx) = mpsc::channel::<Guest>(100);
             world.insert(tx);
             world.insert(rx);
         }
@@ -77,7 +77,7 @@ impl SetupHandler<sync::mpsc::Receiver<Guest>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Sender<Completion>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Sender<Completion>>() {
-            let (tx, rx) = mpsc::channel::<Completion>(30);
+            let (tx, rx) = mpsc::channel::<Completion>(100);
             world.insert(tx);
             world.insert(rx);
         }
@@ -88,7 +88,7 @@ impl SetupHandler<sync::mpsc::Sender<Completion>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Receiver<Completion>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Receiver<Completion>>() {
-            let (tx, rx) = mpsc::channel::<Completion>(30);
+            let (tx, rx) = mpsc::channel::<Completion>(100);
             world.insert(tx);
             world.insert(rx);
         }
@@ -99,7 +99,7 @@ impl SetupHandler<sync::mpsc::Receiver<Completion>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Sender<(NodeCommand, Option<Yielding>)>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Sender<(NodeCommand, Option<Yielding>)>>() {
-            let (tx, rx) = mpsc::channel::<(NodeCommand, Option<Yielding>)>(30);
+            let (tx, rx) = mpsc::channel::<(NodeCommand, Option<Yielding>)>(100);
             world.insert(tx);
             world.insert(rx);
         }
@@ -110,7 +110,7 @@ impl SetupHandler<sync::mpsc::Sender<(NodeCommand, Option<Yielding>)>> for Event
 impl SetupHandler<sync::mpsc::Receiver<(NodeCommand, Option<Yielding>)>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Receiver<(NodeCommand, Option<Yielding>)>>() {
-            let (tx, rx) = mpsc::channel::<(NodeCommand, Option<Yielding>)>(30);
+            let (tx, rx) = mpsc::channel::<(NodeCommand, Option<Yielding>)>(100);
             world.insert(tx);
             world.insert(rx);
         }
@@ -121,7 +121,7 @@ impl SetupHandler<sync::mpsc::Receiver<(NodeCommand, Option<Yielding>)>> for Eve
 impl SetupHandler<sync::mpsc::Sender<StatusUpdate>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Sender<StatusUpdate>>() {
-            let (tx, rx) = mpsc::channel::<StatusUpdate>(30);
+            let (tx, rx) = mpsc::channel::<StatusUpdate>(100);
             world.insert(tx);
             world.insert(rx);
         }
@@ -165,7 +165,7 @@ impl SetupHandler<sync::broadcast::Sender<Entity>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Sender<ErrorContext>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Sender<ErrorContext>>() {
-            let (tx, rx) = mpsc::channel::<ErrorContext>(10);
+            let (tx, rx) = mpsc::channel::<ErrorContext>(100);
             world.insert(tx);
             world.insert(rx);
         }
@@ -176,7 +176,7 @@ impl SetupHandler<sync::mpsc::Sender<ErrorContext>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Receiver<ErrorContext>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Receiver<ErrorContext>>() {
-            let (tx, rx) = mpsc::channel::<ErrorContext>(10);
+            let (tx, rx) = mpsc::channel::<ErrorContext>(100);
             world.insert(tx);
             world.insert(rx);
         }
@@ -187,7 +187,7 @@ impl SetupHandler<sync::mpsc::Receiver<ErrorContext>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Receiver<Operation>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Receiver<Operation>>() {
-            let (tx, rx) = mpsc::channel::<Operation>(10);
+            let (tx, rx) = mpsc::channel::<Operation>(100);
             world.insert(tx);
             world.insert(rx);
         }
@@ -198,7 +198,7 @@ impl SetupHandler<sync::mpsc::Receiver<Operation>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Sender<Operation>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Sender<Operation>>() {
-            let (tx, rx) = mpsc::channel::<Operation>(10);
+            let (tx, rx) = mpsc::channel::<Operation>(100);
             world.insert(tx);
             world.insert(rx);
         }
