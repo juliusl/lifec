@@ -2,10 +2,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use reality::AsyncStorageTarget;
-use reality::Project;
-use reality::Shared;
-use reality::StorageTarget;
+use reality::prelude::*;
 use tokio_util::sync::CancellationToken;
 
 use anyhow::anyhow;
@@ -46,13 +43,34 @@ impl EngineBuilder {
     /// Registers a plugin w/ this engine builder,
     ///
     pub fn register<P: Plugin + Send + Sync + 'static>(&mut self) {
-        self.plugins.push(|parser| {
+        self.register_with(|parser| {
             parser.with_object_type::<Thunk<P>>();
         });
     }
 
+    /// Registers a plugin w/ this engine builder,
+    ///
+    pub fn register_extension<
+        C: ExtensionController<P> + Send + Sync + 'static,
+        P: Plugin + Send + Sync + 'static,
+    >(
+        &mut self,
+    ) {
+        self.register_with(|parser| {
+            parser.with_object_type::<Thunk<ExtensionPlugin<C, P>>>();
+        });
+    }
+
+    /// Registers a plugin w/ this engine builder,
+    ///
+    #[inline]
+    pub fn register_with(&mut self, plugin: fn(&mut AttributeParser<Shared>)) {
+        self.plugins.push(plugin);
+    }
+
     /// Builds the current engine under the primary uuid (0),
     ///
+    #[inline]
     pub fn build_primary(self) -> Engine<PRIMARY> {
         self.build()
     }
@@ -160,7 +178,7 @@ impl<const UUID: u128> Engine<UUID> {
     }
 
     /// Loads source,
-    /// 
+    ///
     pub async fn load_source(&mut self, src: impl AsRef<str>) {
         if let Some(project) = self.project.take() {
             self.project = project.load_content(src.as_ref()).await.ok();

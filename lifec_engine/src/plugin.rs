@@ -6,7 +6,7 @@ use reality::AsyncStorageTarget;
 use reality::Attribute;
 use reality::AttributeType;
 use reality::BlockObject;
-use reality::Extension;
+use reality::ExtensionController;
 use reality::ResourceKey;
 use reality::Shared;
 use reality::StorageTarget;
@@ -219,14 +219,17 @@ impl ThunkContext {
 
     /// Returns any extensions that may exist for this,
     ///
-    pub async fn extension<P: Plugin + Default + Clone + Sync + Send + 'static>(
+    pub async fn extension<
+        C: Send + Sync + 'static,
+        P: Plugin + Default + Clone + Sync + Send + 'static,
+    >(
         &self,
-    ) -> Option<reality::Extension<P>> {
+    ) -> Option<reality::Extension<C, P>> {
         self.source
             .storage
             .read()
             .await
-            .resource::<reality::Extension<P>>(self.attribute.clone().map(|a| a.transmute()))
+            .resource::<reality::Extension<C, P>>(self.attribute.clone().map(|a| a.transmute()))
             .map(|r| r.clone())
     }
 }
@@ -279,6 +282,16 @@ impl<T: CallAsync + BlockObject<Shared> + Send + Sync> Plugin for T {
     }
 }
 
+impl<C, P> Plugin for reality::prelude::ExtensionPlugin<C, P> 
+where
+    C: ExtensionController<P> + Send + Sync + 'static,
+    P: Plugin + Send + Sync + 'static,
+{
+    fn call(context: ThunkContext) -> crate::plugin::PluginOutput {
+        P::call(context)
+    }
+}
+
 /// Pointer-struct for normalizing plugin types,
 ///
 pub struct Thunk<P>(pub PhantomData<P>)
@@ -301,10 +314,6 @@ where
         let key = parser.attributes.last().clone();
         if let Some(storage) = parser.storage() {
             storage.lazy_put_resource::<ThunkFn>(<P as Plugin>::call, key.map(|k| k.transmute()));
-            storage.lazy_put_resource::<Extension<P>>(
-                Extension::new(key.map(|k| k.transmute())),
-                key.map(|k| k.transmute()),
-            );
         }
     }
 }
@@ -336,6 +345,7 @@ where
 #[allow(unused_imports)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::marker::PhantomData;
     use std::ops::Deref;
     use std::sync::Arc;
     use std::time::Duration;
@@ -343,7 +353,7 @@ mod tests {
     use async_stream::try_stream;
     use futures_util::{pin_mut, StreamExt, TryStreamExt};
     use reality::derive::*;
-    use reality::*;
+    use reality::prelude::*;
     use tokio::io::AsyncReadExt;
     use tokio::join;
     use tracing::trace;
@@ -381,53 +391,52 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct TestExtension {}
+
+    impl ExtensionController<TestPlugin> for TestExtension {
+        fn ident() -> &'static str {
+            "test/extension"
+        }
+
+        fn setup(
+            resource_key: Option<&reality::ResourceKey<reality::Attribute>>,
+        ) -> Extension<Self, TestPlugin> {
+            Self::default_setup(resource_key).before(|_, _, t| {
+                if let Ok(mut t) = t {
+                    use std::io::Write;
+                    println!("Enter Name (current_value = {}):", t.name);
+                    print!("> ");
+                    std::io::stdout().flush()?;
+                    let mut name = String::new();
+                    std::io::stdin().read_line(&mut name)?;
+                    let name = name.trim();
+                    if !name.is_empty() {
+                        t.name = name.to_string();
+                    }
+                    Ok(t)
+                } else {
+                    t
+                }
+            })
+        }
+    }
+
     #[async_trait::async_trait]
     impl CallAsync for TestPlugin {
         async fn call(tc: &mut super::ThunkContext) -> anyhow::Result<()> {
             let _initialized = tc.initialized::<TestPlugin>().await;
-            trace!("Initialized as -- {:?}", _initialized);
+            println!("Initialized as -- {:?}", _initialized);
 
-            if let Some(extension) = tc.extension::<TestPlugin>().await {
-                fn test_before(
-                    _: AsyncStorageTarget<Shared>,
-                    s: anyhow::Result<TestPlugin>,
-                ) -> anyhow::Result<TestPlugin> {
-                    if let Ok(mut s) = s {
-                        println!("running extension before");
-                        let mut name = String::new();
-                        std::io::stdin().read_line(&mut name)?;
-                        s.name = name.trim().to_string();
-
-                        Ok(s)
-                    } else {
-                        Err(anyhow::anyhow!("could not test before"))
-                    }
+            #[cfg(feature = "test_local")]
+            {
+                if let Some(extension) = tc.extension::<TestExtension, TestPlugin>().await {
+                    let ext = extension
+                        .run(tc.transient(), _initialized)
+                        .await;
+    
+                    println!("ext -- {:?}", ext);
                 }
-
-                fn test_after(
-                    _: AsyncStorageTarget<Shared>,
-                    s: anyhow::Result<TestPlugin>,
-                ) -> anyhow::Result<TestPlugin> {
-                    if let Ok(s) = s {
-                        println!("running extension after");
-                        Ok(s)
-                    } else {
-                        Err(anyhow::anyhow!("could not test after"))
-                    }
-                }
-                // trace!("has extension");
-
-                let ext = extension
-                    .before(test_before)
-                    .after(test_after)
-                    .run(tc.transient(), _initialized, |_, s| {
-                        println!("user middleware");
-                        s
-                    })
-                    
-                    .await;           
-                
-                println!("ext -- {:?}", ext);
             }
 
             Ok(())
@@ -435,17 +444,19 @@ mod tests {
     }
 
     #[tokio::test]
+    // #[tracing_test::traced_test]
     async fn test_plugin_model() {
         // TODO: Test Isoloation -- 7bda126d-466c-4408-b5b7-9683eea90b65
         let mut builder = Engine::builder();
 
         builder.register::<TestPlugin>();
+        builder.register_extension::<TestExtension, TestPlugin>();
 
         let mut engine = builder.build_primary();
         let runmd = r#"
         ```runmd
         + .operation test/operation
-        <test_plugin> cargo
+        <test/extension(test_plugin)> cargo
         : .name hello-world-2
         : RUST_LOG .env lifec=debug
         : HOME .env /home/test

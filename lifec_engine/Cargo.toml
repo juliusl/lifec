@@ -8,6 +8,7 @@ edition = "2021"
 [features]
 default = [ "call_async" ]
 call_async = [ "async-trait" ]
+test_local = [ ]
 
 [dependencies]
 anyhow = "1.0.75"
