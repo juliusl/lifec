@@ -76,7 +76,7 @@ where
 
 impl<A> Plugin for AppHost<A>
 where
-    A: WebApp + Send + Sync,
+    A: WebApp + Send + Sync + 'static,
 {
     fn symbol() -> &'static str {
         "app_host"
@@ -140,7 +140,7 @@ where
 
 impl<A> BlockObject for AppHost<A>
 where
-    A: WebApp + Send + Sync,
+    A: WebApp + Send + Sync + 'static,
 {
     fn query(&self) -> BlockProperties {
         BlockProperties::default()
@@ -157,7 +157,7 @@ where
 
 impl<A> Default for AppHost<A>
 where
-    A: WebApp + Send + Sync,
+    A: WebApp + Send + Sync + 'static,
 {
     fn default() -> Self {
         Self(None)

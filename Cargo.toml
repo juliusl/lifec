@@ -4,3 +4,6 @@ members = [
     "lifec",
     "lifec_poem",
 ]
+
+[patch.crates-io]
+specs = { git = 'https://github.com/juliusl/specs.git', branch = "fix/ahash"}
