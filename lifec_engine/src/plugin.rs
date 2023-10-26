@@ -366,7 +366,7 @@ mod tests {
 
     use super::{CallAsync, Plugin};
 
-    #[derive(BlockObjectType, Default, Debug, Clone)]
+    #[derive(Reality, Default, Debug, Clone)]
     #[reality(rename = "test_plugin")]
     struct TestPlugin {
         #[reality(ignore)]
