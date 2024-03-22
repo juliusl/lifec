@@ -99,7 +99,7 @@ impl SetupHandler<sync::mpsc::Receiver<Completion>> for EventRuntime {
 impl SetupHandler<sync::mpsc::Sender<(NodeCommand, Option<Yielding>)>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Sender<(NodeCommand, Option<Yielding>)>>() {
-            let (tx, rx) = mpsc::channel::<(NodeCommand, Option<Yielding>)>(10000);
+            let (tx, rx) = mpsc::channel::<(NodeCommand, Option<Yielding>)>(20000);
             world.insert(tx);
             world.insert(rx);
         }
@@ -110,7 +110,7 @@ impl SetupHandler<sync::mpsc::Sender<(NodeCommand, Option<Yielding>)>> for Event
 impl SetupHandler<sync::mpsc::Receiver<(NodeCommand, Option<Yielding>)>> for EventRuntime {
     fn setup(world: &mut specs::World) {
         if !world.has_value::<sync::mpsc::Receiver<(NodeCommand, Option<Yielding>)>>() {
-            let (tx, rx) = mpsc::channel::<(NodeCommand, Option<Yielding>)>(10000);
+            let (tx, rx) = mpsc::channel::<(NodeCommand, Option<Yielding>)>(20000);
             world.insert(tx);
             world.insert(rx);
         }
