@@ -175,7 +175,7 @@ impl Connection {
             Some(ConnectionState::duplicate(incoming, *source))
         } else {
             event!(
-                Level::WARN,
+                Level::DEBUG,
                 "Trying to schedule an unknown event, {}",
                 incoming.id()
             );
