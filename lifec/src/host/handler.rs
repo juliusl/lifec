@@ -18,7 +18,7 @@ impl ListenerSetup {
             builder.add(
                 EventHandler::new(L::create(world)),
                 "listener",
-                &["event_runtime", "cleanup"],
+                &[],
             );
         })
     }
